@@ -47,6 +47,13 @@ resource "aws_ecs_task_definition" "frontend" {
           value = "${local.protocol}://${aws_lb.app.dns_name}"
         }
       ]
+      healthCheck = {
+        command     = ["CMD-SHELL", "wget --spider -q http://localhost:${var.frontend_container_port}${var.frontend_health_check_path} || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 30
+      }
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -103,6 +110,13 @@ resource "aws_ecs_task_definition" "backend" {
           valueFrom = "${aws_secretsmanager_secret.app.arn}:JWT_SECRET::"
         }
       ]
+      healthCheck = {
+        command     = ["CMD-SHELL", "wget --spider -q http://localhost:${var.backend_container_port}${var.backend_health_check_path} || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 30
+      }
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -244,4 +258,3 @@ resource "aws_appautoscaling_policy" "backend_memory" {
     target_value = var.memory_target_utilization
   }
 }
-
