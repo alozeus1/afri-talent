@@ -8,6 +8,10 @@ backend_image  = "123456789012.dkr.ecr.us-east-1.amazonaws.com/afritalent-prod-b
 db_name     = "afritalent"
 db_username = "afritalent"
 
+# CloudFront (ACM cert must be in us-east-1)
+# cloudfront_acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/abc123"
+# cloudfront_aliases = ["app.afritalent.com"]
+
 # GitHub Actions OIDC
 github_repo = "alozeus1/afri-talent"
 github_ref  = "refs/heads/main"

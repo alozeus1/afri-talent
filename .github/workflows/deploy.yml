@@ -1,0 +1,107 @@
+name: Deploy ECS
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "Base URL for frontend API (CloudFront URL)"
+        required: true
+      frontend_image_tag:
+        description: "Frontend image tag"
+        default: "latest"
+      backend_image_tag:
+        description: "Backend image tag"
+        default: "latest"
+      ecs_cluster:
+        description: "ECS cluster name"
+        default: "afritalent-prod-cluster"
+      frontend_service:
+        description: "Frontend ECS service name"
+        default: "afritalent-prod-frontend"
+      backend_service:
+        description: "Backend ECS service name"
+        default: "afritalent-prod-backend"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+      ECR_FRONTEND_REPO: ${{ secrets.ECR_FRONTEND_REPO }}
+      ECR_BACKEND_REPO: ${{ secrets.ECR_BACKEND_REPO }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        run: |
+          IMAGE_TAG="${{ inputs.backend_image_tag }}"
+          IMAGE_URI="${ECR_BACKEND_REPO}:${IMAGE_TAG}"
+          docker build -t "${IMAGE_URI}" ./backend
+          docker push "${IMAGE_URI}"
+
+      - name: Build and push frontend image
+        run: |
+          IMAGE_TAG="${{ inputs.frontend_image_tag }}"
+          IMAGE_URI="${ECR_FRONTEND_REPO}:${IMAGE_TAG}"
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL="${{ inputs.api_url }}" \
+            -t "${IMAGE_URI}" ./frontend
+          docker push "${IMAGE_URI}"
+
+      - name: Update ECS services
+        run: |
+          set -euo pipefail
+          CLUSTER="${{ inputs.ecs_cluster }}"
+
+          update_service() {
+            SERVICE_NAME="$1"
+            CONTAINER_NAME="$2"
+            IMAGE_URI="$3"
+
+            TASK_DEF_ARN=$(aws ecs describe-services \
+              --cluster "${CLUSTER}" \
+              --services "${SERVICE_NAME}" \
+              --query "services[0].taskDefinition" \
+              --output text)
+
+            aws ecs describe-task-definition \
+              --task-definition "${TASK_DEF_ARN}" \
+              --query taskDefinition \
+              --output json > taskdef.json
+
+            jq --arg IMAGE "${IMAGE_URI}" --arg NAME "${CONTAINER_NAME}" \
+              '.containerDefinitions |= map(if .name == $NAME then .image = $IMAGE else . end)
+              | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+              taskdef.json > new-taskdef.json
+
+            NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+              --cli-input-json file://new-taskdef.json \
+              --query "taskDefinition.taskDefinitionArn" \
+              --output text)
+
+            aws ecs update-service \
+              --cluster "${CLUSTER}" \
+              --service "${SERVICE_NAME}" \
+              --task-definition "${NEW_TASK_DEF_ARN}"
+          }
+
+          update_service "${{ inputs.frontend_service }}" "frontend" "${ECR_FRONTEND_REPO}:${{ inputs.frontend_image_tag }}"
+          update_service "${{ inputs.backend_service }}" "backend" "${ECR_BACKEND_REPO}:${{ inputs.backend_image_tag }}"
+
+          aws ecs wait services-stable --cluster "${CLUSTER}" --services "${{ inputs.frontend_service }}" "${{ inputs.backend_service }}"
+

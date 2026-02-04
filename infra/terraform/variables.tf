@@ -224,6 +224,24 @@ variable "log_retention_in_days" {
   default     = 30
 }
 
+variable "cloudfront_price_class" {
+  type        = string
+  description = "CloudFront price class"
+  default     = "PriceClass_100"
+}
+
+variable "cloudfront_aliases" {
+  type        = list(string)
+  description = "CloudFront alternate domain names"
+  default     = []
+}
+
+variable "cloudfront_acm_certificate_arn" {
+  type        = string
+  description = "ACM certificate ARN for CloudFront (must be in us-east-1)"
+  default     = ""
+}
+
 variable "github_repo" {
   type        = string
   description = "GitHub repository in OWNER/REPO format for OIDC trust"
@@ -242,8 +260,8 @@ variable "github_actions_role_name" {
   default     = ""
 }
 
-variable "github_actions_role_policy_arn" {
+variable "github_actions_additional_policy_arn" {
   type        = string
-  description = "IAM policy ARN attached to the GitHub Actions role"
-  default     = "arn:aws:iam::aws:policy/AdministratorAccess"
+  description = "Optional additional IAM policy ARN attached to the GitHub Actions role"
+  default     = ""
 }

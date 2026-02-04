@@ -11,6 +11,7 @@ This Terraform stack provisions an enterprise-ready AWS deployment for the AfriT
 - Secrets Manager for `DATABASE_URL` + `JWT_SECRET`
 - CloudWatch logs + autoscaling policies
 - GitHub Actions OIDC provider + IAM role for CI/CD
+- CloudFront distribution in front of ALB
 
 ### Prerequisites
 
@@ -52,6 +53,17 @@ github_ref  = "refs/heads/main"
 
 After `terraform apply`, copy `github_actions_role_arn` output into the GitHub secret `AWS_ROLE_ARN`.
 
+### Manual Deployment Workflow
+
+The repo includes `.github/workflows/deploy.yml` (manual trigger) to build/push images and update ECS.
+
+Required GitHub secrets:
+
+- `AWS_ROLE_ARN` (from Terraform output)
+- `AWS_REGION` (optional, defaults to `us-east-1`)
+- `ECR_FRONTEND_REPO`
+- `ECR_BACKEND_REPO`
+
 ### GitHub Secrets for Terraform Plan
 
 - `AWS_ROLE_ARN` (from Terraform output)
@@ -73,7 +85,7 @@ docker push <backend_repo_url>:latest
 
 # Frontend (NEXT_PUBLIC_API_URL is baked at build time)
 docker build \
-  --build-arg NEXT_PUBLIC_API_URL=https://<alb_dns_name> \
+  --build-arg NEXT_PUBLIC_API_URL=https://<cloudfront_domain_name> \
   -t <frontend_repo_url>:latest ./frontend
 docker push <frontend_repo_url>:latest
 ```
@@ -83,5 +95,6 @@ Then update `frontend_image` / `backend_image` in `terraform.tfvars` and re-appl
 ### Notes
 
 - The frontend uses `NEXT_PUBLIC_API_URL` during build; ensure it matches the ALB URL.
+- The frontend uses `NEXT_PUBLIC_API_URL` during build; use the CloudFront URL.
 - The backend expects `/health` for ALB health checks.
 - HTTPS is supported by passing `acm_certificate_arn`.

@@ -36,8 +36,75 @@ resource "aws_iam_role" "github_actions" {
   assume_role_policy = data.aws_iam_policy_document.github_actions_assume_role.json
 }
 
-resource "aws_iam_role_policy_attachment" "github_actions" {
-  role       = aws_iam_role.github_actions.name
-  policy_arn = var.github_actions_role_policy_arn
+data "aws_iam_policy_document" "github_actions_deploy" {
+  statement {
+    actions = [
+      "ecr:GetAuthorizationToken"
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
+      "ecr:CompleteLayerUpload",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:InitiateLayerUpload",
+      "ecr:PutImage",
+      "ecr:UploadLayerPart"
+    ]
+    resources = [
+      aws_ecr_repository.frontend.arn,
+      aws_ecr_repository.backend.arn
+    ]
+  }
+
+  statement {
+    actions = [
+      "ecs:DescribeServices",
+      "ecs:DescribeTaskDefinition",
+      "ecs:RegisterTaskDefinition",
+      "ecs:UpdateService",
+      "ecs:ListTasks",
+      "ecs:DescribeTasks"
+    ]
+    resources = [
+      aws_ecs_service.frontend.arn,
+      aws_ecs_service.backend.arn,
+      aws_ecs_cluster.main.arn,
+      "*"
+    ]
+  }
+
+  statement {
+    actions = [
+      "iam:PassRole"
+    ]
+    resources = [
+      aws_iam_role.ecs_task_execution.arn,
+      aws_iam_role.ecs_task.arn
+    ]
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PassedToService"
+      values   = ["ecs-tasks.amazonaws.com"]
+    }
+  }
 }
 
+resource "aws_iam_policy" "github_actions_deploy" {
+  name   = "${local.name_prefix}-github-deploy"
+  policy = data.aws_iam_policy_document.github_actions_deploy.json
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_deploy" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = aws_iam_policy.github_actions_deploy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_additional" {
+  count      = var.github_actions_additional_policy_arn == "" ? 0 : 1
+  role       = aws_iam_role.github_actions.name
+  policy_arn = var.github_actions_additional_policy_arn
+}

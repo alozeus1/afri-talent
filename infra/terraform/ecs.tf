@@ -44,7 +44,7 @@ resource "aws_ecs_task_definition" "frontend" {
         },
         {
           name  = "NEXT_PUBLIC_API_URL"
-          value = "${local.protocol}://${aws_lb.app.dns_name}"
+          value = local.frontend_url
         }
       ]
       healthCheck = {
@@ -97,7 +97,7 @@ resource "aws_ecs_task_definition" "backend" {
         },
         {
           name  = "FRONTEND_URL"
-          value = "${local.protocol}://${aws_lb.app.dns_name}"
+          value = local.frontend_url
         }
       ]
       secrets = [
