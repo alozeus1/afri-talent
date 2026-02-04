@@ -12,6 +12,7 @@ This Terraform stack provisions an enterprise-ready AWS deployment for the AfriT
 - CloudWatch logs + autoscaling policies
 - GitHub Actions OIDC provider + IAM role for CI/CD
 - CloudFront distribution in front of ALB
+- Optional Route53 module for `app`, `admin`, and `api` DNS records
 
 ### Prerequisites
 
@@ -62,6 +63,9 @@ terraform apply
    terraform output -raw frontend_ecr_repository
    terraform output -raw backend_ecr_repository
    terraform output -raw github_actions_role_arn
+   terraform output -raw frontend_dns_record
+   terraform output -raw admin_dns_record
+   terraform output -raw api_dns_record
    ```
 
 2. **Configure GitHub secrets**
@@ -118,6 +122,21 @@ terraform apply
    curl -I https://<cloudfront_domain_name>
    curl https://<cloudfront_domain_name>/api/health
    ```
+
+### Route53 DNS Records (Optional)
+
+If you want dedicated DNS records for `frontend`, `admin`, and `api`, enable the Route53 module:
+
+```hcl
+enable_route53 = true
+route53_zone_id = "Z1234567890"
+frontend_domain_name = "app.afritalent.com"
+admin_domain_name = "admin.afritalent.com"
+api_domain_name = "api.afritalent.com"
+```
+
+- `frontend` and `admin` aliases point to CloudFront.
+- `api` alias points directly to the ALB for `/health` and API traffic.
 
 ### Rollback (Manual)
 

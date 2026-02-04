@@ -242,6 +242,36 @@ variable "cloudfront_acm_certificate_arn" {
   default     = ""
 }
 
+variable "enable_route53" {
+  type        = bool
+  description = "Create Route53 records"
+  default     = false
+}
+
+variable "route53_zone_id" {
+  type        = string
+  description = "Route53 hosted zone ID"
+  default     = ""
+}
+
+variable "frontend_domain_name" {
+  type        = string
+  description = "Frontend DNS name (e.g., app.example.com)"
+  default     = ""
+}
+
+variable "admin_domain_name" {
+  type        = string
+  description = "Admin DNS name (e.g., admin.example.com)"
+  default     = ""
+}
+
+variable "api_domain_name" {
+  type        = string
+  description = "API DNS name (e.g., api.example.com)"
+  default     = ""
+}
+
 variable "github_repo" {
   type        = string
   description = "GitHub repository in OWNER/REPO format for OIDC trust"

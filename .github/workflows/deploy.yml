@@ -105,3 +105,30 @@ jobs:
 
           aws ecs wait services-stable --cluster "${CLUSTER}" --services "${{ inputs.frontend_service }}" "${{ inputs.backend_service }}"
 
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          API_URL="${{ inputs.api_url }}"
+
+          echo "Checking frontend..."
+          for i in {1..12}; do
+            if curl -fsS "${API_URL}" > /dev/null; then
+              echo "Frontend OK"
+              break
+            fi
+            echo "Frontend not ready, retrying..."
+            sleep 10
+          done
+
+          echo "Checking API health..."
+          for i in {1..12}; do
+            if curl -fsS "${API_URL}/api/health" > /dev/null; then
+              echo "API OK"
+              exit 0
+            fi
+            echo "API not ready, retrying..."
+            sleep 10
+          done
+
+          echo "Smoke test failed"
+          exit 1

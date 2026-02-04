@@ -12,6 +12,13 @@ db_username = "afritalent"
 # cloudfront_acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/abc123"
 # cloudfront_aliases = ["app.afritalent.com"]
 
+# Route53 (optional)
+# enable_route53 = true
+# route53_zone_id = "Z1234567890"
+# frontend_domain_name = "app.afritalent.com"
+# admin_domain_name = "admin.afritalent.com"
+# api_domain_name = "api.afritalent.com"
+
 # GitHub Actions OIDC
 github_repo = "alozeus1/afri-talent"
 github_ref  = "refs/heads/main"

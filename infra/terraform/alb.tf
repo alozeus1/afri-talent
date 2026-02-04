@@ -85,6 +85,23 @@ resource "aws_lb_listener_rule" "backend_http" {
   }
 }
 
+resource "aws_lb_listener_rule" "backend_api_host_http" {
+  count        = var.api_domain_name == "" ? 0 : 1
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 5
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
+  }
+
+  condition {
+    host_header {
+      values = [var.api_domain_name]
+    }
+  }
+}
+
 resource "aws_lb_listener_rule" "backend_https" {
   count        = var.acm_certificate_arn == "" ? 0 : 1
   listener_arn = aws_lb_listener.https[0].arn
@@ -102,3 +119,19 @@ resource "aws_lb_listener_rule" "backend_https" {
   }
 }
 
+resource "aws_lb_listener_rule" "backend_api_host_https" {
+  count        = var.acm_certificate_arn == "" || var.api_domain_name == "" ? 0 : 1
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 5
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend.arn
+  }
+
+  condition {
+    host_header {
+      values = [var.api_domain_name]
+    }
+  }
+}

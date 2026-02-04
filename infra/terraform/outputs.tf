@@ -52,3 +52,18 @@ output "github_oidc_provider_arn" {
   description = "GitHub OIDC provider ARN"
   value       = aws_iam_openid_connect_provider.github.arn
 }
+
+output "frontend_dns_record" {
+  description = "Frontend Route53 record (if enabled)"
+  value       = var.enable_route53 ? module.route53[0].frontend_fqdn : ""
+}
+
+output "admin_dns_record" {
+  description = "Admin Route53 record (if enabled)"
+  value       = var.enable_route53 ? module.route53[0].admin_fqdn : ""
+}
+
+output "api_dns_record" {
+  description = "API Route53 record (if enabled)"
+  value       = var.enable_route53 ? module.route53[0].api_fqdn : ""
+}
