@@ -33,3 +33,12 @@ output "app_secrets_arn" {
   value       = aws_secretsmanager_secret.app.arn
 }
 
+output "github_actions_role_arn" {
+  description = "IAM role ARN for GitHub Actions OIDC"
+  value       = aws_iam_role.github_actions.arn
+}
+
+output "github_oidc_provider_arn" {
+  description = "GitHub OIDC provider ARN"
+  value       = aws_iam_openid_connect_provider.github.arn
+}

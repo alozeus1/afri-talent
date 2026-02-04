@@ -224,3 +224,26 @@ variable "log_retention_in_days" {
   default     = 30
 }
 
+variable "github_repo" {
+  type        = string
+  description = "GitHub repository in OWNER/REPO format for OIDC trust"
+  default     = "alozeus1/afri-talent"
+}
+
+variable "github_ref" {
+  type        = string
+  description = "Git reference allowed to assume the role"
+  default     = "refs/heads/main"
+}
+
+variable "github_actions_role_name" {
+  type        = string
+  description = "IAM role name for GitHub Actions"
+  default     = ""
+}
+
+variable "github_actions_role_policy_arn" {
+  type        = string
+  description = "IAM policy ARN attached to the GitHub Actions role"
+  default     = "arn:aws:iam::aws:policy/AdministratorAccess"
+}

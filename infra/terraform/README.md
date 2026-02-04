@@ -10,6 +10,7 @@ This Terraform stack provisions an enterprise-ready AWS deployment for the AfriT
 - ECR repositories for container images
 - Secrets Manager for `DATABASE_URL` + `JWT_SECRET`
 - CloudWatch logs + autoscaling policies
+- GitHub Actions OIDC provider + IAM role for CI/CD
 
 ### Prerequisites
 
@@ -38,6 +39,29 @@ terraform init
 terraform apply
 ```
 
+### GitHub Actions OIDC
+
+Terraform provisions an OIDC provider and IAM role so GitHub Actions can deploy without long-lived keys.
+
+Set these variables in `terraform.tfvars`:
+
+```hcl
+github_repo = "alozeus1/afri-talent"
+github_ref  = "refs/heads/main"
+```
+
+After `terraform apply`, copy `github_actions_role_arn` output into the GitHub secret `AWS_ROLE_ARN`.
+
+### GitHub Secrets for Terraform Plan
+
+- `AWS_ROLE_ARN` (from Terraform output)
+- `TF_STATE_BUCKET`
+- `TF_STATE_KEY` (optional)
+- `TF_STATE_REGION` (optional)
+- `TF_LOCK_TABLE` (optional)
+- `TF_FRONTEND_IMAGE` / `TF_BACKEND_IMAGE` (optional)
+- `ACM_CERTIFICATE_ARN` (optional)
+
 ### Build & Push Images
 
 Terraform creates ECR repos. Build images using the repo URLs from outputs:
@@ -61,4 +85,3 @@ Then update `frontend_image` / `backend_image` in `terraform.tfvars` and re-appl
 - The frontend uses `NEXT_PUBLIC_API_URL` during build; ensure it matches the ALB URL.
 - The backend expects `/health` for ALB health checks.
 - HTTPS is supported by passing `acm_certificate_arn`.
-
