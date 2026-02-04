@@ -1,0 +1,226 @@
+variable "aws_region" {
+  type        = string
+  description = "AWS region to deploy into"
+  default     = "us-east-1"
+}
+
+variable "project_name" {
+  type        = string
+  description = "Project name for resource naming"
+  default     = "afritalent"
+}
+
+variable "environment" {
+  type        = string
+  description = "Environment name (e.g., dev, staging, prod)"
+  default     = "prod"
+}
+
+variable "az_count" {
+  type        = number
+  description = "Number of availability zones to use"
+  default     = 2
+}
+
+variable "vpc_cidr" {
+  type        = string
+  description = "VPC CIDR block"
+  default     = "10.20.0.0/16"
+}
+
+variable "public_subnet_cidrs" {
+  type        = list(string)
+  description = "Public subnet CIDR blocks"
+  default     = ["10.20.0.0/24", "10.20.1.0/24"]
+}
+
+variable "private_subnet_cidrs" {
+  type        = list(string)
+  description = "Private subnet CIDR blocks"
+  default     = ["10.20.10.0/24", "10.20.11.0/24"]
+}
+
+variable "enable_nat_gateway" {
+  type        = bool
+  description = "Enable NAT gateway for private subnets"
+  default     = true
+}
+
+variable "acm_certificate_arn" {
+  type        = string
+  description = "ACM certificate ARN for HTTPS (optional)"
+  default     = ""
+}
+
+variable "frontend_image" {
+  type        = string
+  description = "Container image URI for the frontend service"
+}
+
+variable "backend_image" {
+  type        = string
+  description = "Container image URI for the backend service"
+}
+
+variable "frontend_container_port" {
+  type        = number
+  description = "Frontend container port"
+  default     = 3000
+}
+
+variable "backend_container_port" {
+  type        = number
+  description = "Backend container port"
+  default     = 4000
+}
+
+variable "frontend_container_cpu" {
+  type        = number
+  description = "CPU units for frontend task"
+  default     = 512
+}
+
+variable "frontend_container_memory" {
+  type        = number
+  description = "Memory (MB) for frontend task"
+  default     = 1024
+}
+
+variable "backend_container_cpu" {
+  type        = number
+  description = "CPU units for backend task"
+  default     = 512
+}
+
+variable "backend_container_memory" {
+  type        = number
+  description = "Memory (MB) for backend task"
+  default     = 1024
+}
+
+variable "frontend_desired_count" {
+  type        = number
+  description = "Desired count for frontend service"
+  default     = 2
+}
+
+variable "backend_desired_count" {
+  type        = number
+  description = "Desired count for backend service"
+  default     = 2
+}
+
+variable "frontend_min_capacity" {
+  type        = number
+  description = "Minimum frontend service capacity"
+  default     = 2
+}
+
+variable "frontend_max_capacity" {
+  type        = number
+  description = "Maximum frontend service capacity"
+  default     = 6
+}
+
+variable "backend_min_capacity" {
+  type        = number
+  description = "Minimum backend service capacity"
+  default     = 2
+}
+
+variable "backend_max_capacity" {
+  type        = number
+  description = "Maximum backend service capacity"
+  default     = 6
+}
+
+variable "cpu_target_utilization" {
+  type        = number
+  description = "Target CPU utilization for autoscaling"
+  default     = 60
+}
+
+variable "memory_target_utilization" {
+  type        = number
+  description = "Target memory utilization for autoscaling"
+  default     = 70
+}
+
+variable "frontend_health_check_path" {
+  type        = string
+  description = "Health check path for frontend target group"
+  default     = "/"
+}
+
+variable "backend_health_check_path" {
+  type        = string
+  description = "Health check path for backend target group"
+  default     = "/health"
+}
+
+variable "db_name" {
+  type        = string
+  description = "Database name"
+  default     = "afritalent"
+}
+
+variable "db_username" {
+  type        = string
+  description = "Database master username"
+  default     = "afritalent"
+}
+
+variable "db_engine_version" {
+  type        = string
+  description = "Postgres engine version"
+  default     = "16.3"
+}
+
+variable "db_instance_class" {
+  type        = string
+  description = "RDS instance class"
+  default     = "db.t4g.medium"
+}
+
+variable "db_allocated_storage" {
+  type        = number
+  description = "Allocated storage in GB"
+  default     = 50
+}
+
+variable "db_multi_az" {
+  type        = bool
+  description = "Enable Multi-AZ for RDS"
+  default     = true
+}
+
+variable "db_backup_retention_days" {
+  type        = number
+  description = "Backup retention period"
+  default     = 7
+}
+
+variable "db_deletion_protection" {
+  type        = bool
+  description = "Enable deletion protection on RDS"
+  default     = true
+}
+
+variable "db_skip_final_snapshot" {
+  type        = bool
+  description = "Skip final snapshot on delete"
+  default     = false
+}
+
+variable "enable_container_insights" {
+  type        = bool
+  description = "Enable ECS container insights"
+  default     = true
+}
+
+variable "log_retention_in_days" {
+  type        = number
+  description = "CloudWatch log retention in days"
+  default     = 30
+}
+

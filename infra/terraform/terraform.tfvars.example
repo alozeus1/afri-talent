@@ -1,0 +1,13 @@
+project_name        = "afritalent"
+environment         = "prod"
+aws_region          = "us-east-1"
+
+frontend_image = "123456789012.dkr.ecr.us-east-1.amazonaws.com/afritalent-prod-frontend:latest"
+backend_image  = "123456789012.dkr.ecr.us-east-1.amazonaws.com/afritalent-prod-backend:latest"
+
+db_name     = "afritalent"
+db_username = "afritalent"
+
+# Optional HTTPS
+# acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/abc123"
+
