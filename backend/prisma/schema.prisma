@@ -1,0 +1,180 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CANDIDATE
+  EMPLOYER
+}
+
+enum JobStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWING
+  SHORTLISTED
+  REJECTED
+  ACCEPTED
+}
+
+enum ReviewStatus {
+  PENDING
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+enum ReviewTargetType {
+  JOB
+  APPLICATION
+  RESOURCE
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employer      Employer?
+  applications  Application[]
+  adminReviews  AdminReview[] @relation("AdminReviewer")
+
+  @@index([role])
+  @@index([createdAt])
+}
+
+model Employer {
+  id          String   @id @default(uuid())
+  companyName String
+  website     String?
+  location    String
+  bio         String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  jobs Job[]
+}
+
+model Job {
+  id          String    @id @default(uuid())
+  title       String
+  slug        String    @unique
+  description String
+  location    String
+  type        String
+  seniority   String
+  salaryMin   Int?
+  salaryMax   Int?
+  currency    String?
+  tags        String[]
+  status      JobStatus
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  employerId String
+  employer   Employer @relation(fields: [employerId], references: [id])
+
+  applications Application[]
+  adminReviews AdminReview[] @relation("JobReviews")
+
+  @@index([status])
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([employerId])
+  @@index([location])
+  @@index([type])
+  @@index([seniority])
+}
+
+model Application {
+  id          String            @id @default(uuid())
+  status      ApplicationStatus
+  cvUrl       String?
+  coverLetter String?
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  jobId       String
+  job         Job               @relation(fields: [jobId], references: [id])
+
+  candidateId String
+  candidate   User              @relation(fields: [candidateId], references: [id])
+
+  adminReviews AdminReview[] @relation("ApplicationReviews")
+
+  @@unique([jobId, candidateId])
+  @@index([jobId])
+  @@index([candidateId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+}
+
+model Resource {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  excerpt     String
+  content     String
+  category    String
+  coverImage  String?
+  published   Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  adminReviews AdminReview[] @relation("ResourceReviews")
+
+  @@index([published])
+  @@index([published, publishedAt(sort: Desc)])
+  @@index([category])
+}
+
+model AdminReview {
+  id        String            @id @default(uuid())
+  status    ReviewStatus
+  notes     String?
+  createdAt DateTime          @default(now())
+
+  reviewerId String
+  reviewer   User @relation("AdminReviewer", fields: [reviewerId], references: [id])
+
+  targetType ReviewTargetType
+
+  targetJobId         String?
+  targetJob           Job?        @relation("JobReviews", fields: [targetJobId], references: [id])
+
+  targetApplicationId String?
+  targetApplication   Application? @relation("ApplicationReviews", fields: [targetApplicationId], references: [id])
+
+  targetResourceId    String?
+  targetResource      Resource?    @relation("ResourceReviews", fields: [targetResourceId], references: [id])
+
+  @@index([reviewerId])
+  @@index([targetType])
+  @@index([createdAt(sort: Desc)])
+}
+
