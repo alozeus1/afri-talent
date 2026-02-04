@@ -33,6 +33,19 @@ Frontend:
 - No dedicated test suite yet; rely on linting and typechecks.
 - CI runs `eslint`, `tsc`, and Terraform validation.
 
+## Architecture Overview
+
+- High-level layout is documented in `DEPLOYMENT.md` (ASCII diagram) and `infra/terraform/README.md` (AWS stack details).
+- Data flow: CloudFront → ALB → ECS (frontend + backend) → RDS PostgreSQL.
+- If you add diagrams, place them in `docs/architecture/` and link them from `DEPLOYMENT.md`.
+
+## Release Process
+
+- Provision or update infra with Terraform (`infra/terraform`), then capture outputs.
+- Build/push images to ECR (or use the manual `Deploy ECS` workflow).
+- Run `npx prisma migrate deploy` against the production DB on first release.
+- Validate `/api/health` and UI routes; use the rollback steps in `infra/terraform/README.md` if needed.
+
 ## Commit & Pull Request Guidelines
 
 - Use concise, imperative commit messages (e.g., “Add Terraform plan job”).
