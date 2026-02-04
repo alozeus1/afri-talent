@@ -1,0 +1,41 @@
+name: Terraform
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "infra/terraform/**"
+  push:
+    branches: [main, develop]
+    paths:
+      - "infra/terraform/**"
+
+env:
+  TF_VERSION: "1.5.7"
+
+jobs:
+  validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init (no backend)
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        run: terraform validate
+
