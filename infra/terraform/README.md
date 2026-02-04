@@ -119,6 +119,12 @@ terraform apply
    curl https://<cloudfront_domain_name>/api/health
    ```
 
+### Rollback (Manual)
+
+1. Identify the previous working image tags in ECR.
+2. Re-run the `Deploy ECS` workflow with the older tags.
+3. Confirm ECS services are stable and health checks pass.
+
 ### GitHub Actions OIDC
 
 Terraform provisions an OIDC provider and IAM role so GitHub Actions can deploy without long-lived keys.
