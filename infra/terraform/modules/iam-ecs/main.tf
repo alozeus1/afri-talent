@@ -10,7 +10,7 @@ data "aws_iam_policy_document" "ecs_task_assume_role" {
 }
 
 resource "aws_iam_role" "ecs_task_execution" {
-  name               = "${local.name_prefix}-ecs-exec"
+  name               = "${var.name_prefix}-ecs-exec"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
 }
 
@@ -26,18 +26,17 @@ data "aws_iam_policy_document" "ecs_task_execution_secrets" {
       "kms:Decrypt"
     ]
 
-    resources = [aws_secretsmanager_secret.app.arn]
+    resources = [var.secret_arn]
   }
 }
 
 resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
-  name   = "${local.name_prefix}-ecs-secrets"
+  name   = "${var.name_prefix}-ecs-secrets"
   role   = aws_iam_role.ecs_task_execution.id
   policy = data.aws_iam_policy_document.ecs_task_execution_secrets.json
 }
 
 resource "aws_iam_role" "ecs_task" {
-  name               = "${local.name_prefix}-ecs-task"
+  name               = "${var.name_prefix}-ecs-task"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
 }
-

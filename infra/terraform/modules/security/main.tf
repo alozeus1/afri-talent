@@ -1,7 +1,7 @@
 resource "aws_security_group" "alb" {
-  name        = "${local.name_prefix}-alb-sg"
+  name        = "${var.name_prefix}-alb-sg"
   description = "ALB security group"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = var.vpc_id
 
   ingress {
     from_port   = 80
@@ -25,25 +25,25 @@ resource "aws_security_group" "alb" {
   }
 
   tags = {
-    Name = "${local.name_prefix}-alb-sg"
+    Name = "${var.name_prefix}-alb-sg"
   }
 }
 
 resource "aws_security_group" "ecs" {
-  name        = "${local.name_prefix}-ecs-sg"
+  name        = "${var.name_prefix}-ecs-sg"
   description = "ECS service security group"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = var.vpc_id
 
   ingress {
-    from_port       = var.frontend_container_port
-    to_port         = var.frontend_container_port
+    from_port       = var.frontend_port
+    to_port         = var.frontend_port
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
 
   ingress {
-    from_port       = var.backend_container_port
-    to_port         = var.backend_container_port
+    from_port       = var.backend_port
+    to_port         = var.backend_port
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
   }
@@ -56,14 +56,14 @@ resource "aws_security_group" "ecs" {
   }
 
   tags = {
-    Name = "${local.name_prefix}-ecs-sg"
+    Name = "${var.name_prefix}-ecs-sg"
   }
 }
 
 resource "aws_security_group" "rds" {
-  name        = "${local.name_prefix}-rds-sg"
+  name        = "${var.name_prefix}-rds-sg"
   description = "RDS security group"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = var.vpc_id
 
   ingress {
     from_port       = 5432
@@ -80,7 +80,6 @@ resource "aws_security_group" "rds" {
   }
 
   tags = {
-    Name = "${local.name_prefix}-rds-sg"
+    Name = "${var.name_prefix}-rds-sg"
   }
 }
-

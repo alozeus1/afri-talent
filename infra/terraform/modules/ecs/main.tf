@@ -1,5 +1,5 @@
 resource "aws_ecs_cluster" "main" {
-  name = "${local.name_prefix}-cluster"
+  name = "${var.name_prefix}-cluster"
 
   setting {
     name  = "containerInsights"
@@ -8,23 +8,23 @@ resource "aws_ecs_cluster" "main" {
 }
 
 resource "aws_cloudwatch_log_group" "frontend" {
-  name              = "/ecs/${local.name_prefix}/frontend"
+  name              = "/ecs/${var.name_prefix}/frontend"
   retention_in_days = var.log_retention_in_days
 }
 
 resource "aws_cloudwatch_log_group" "backend" {
-  name              = "/ecs/${local.name_prefix}/backend"
+  name              = "/ecs/${var.name_prefix}/backend"
   retention_in_days = var.log_retention_in_days
 }
 
 resource "aws_ecs_task_definition" "frontend" {
-  family                   = "${local.name_prefix}-frontend"
+  family                   = "${var.name_prefix}-frontend"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = var.frontend_container_cpu
   memory                   = var.frontend_container_memory
-  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
-  task_role_arn            = aws_iam_role.ecs_task.arn
+  execution_role_arn       = var.ecs_task_execution_role_arn
+  task_role_arn            = var.ecs_task_role_arn
 
   container_definitions = jsonencode([
     {
@@ -44,7 +44,7 @@ resource "aws_ecs_task_definition" "frontend" {
         },
         {
           name  = "NEXT_PUBLIC_API_URL"
-          value = local.frontend_url
+          value = var.frontend_url
         }
       ]
       healthCheck = {
@@ -67,13 +67,13 @@ resource "aws_ecs_task_definition" "frontend" {
 }
 
 resource "aws_ecs_task_definition" "backend" {
-  family                   = "${local.name_prefix}-backend"
+  family                   = "${var.name_prefix}-backend"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = var.backend_container_cpu
   memory                   = var.backend_container_memory
-  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
-  task_role_arn            = aws_iam_role.ecs_task.arn
+  execution_role_arn       = var.ecs_task_execution_role_arn
+  task_role_arn            = var.ecs_task_role_arn
 
   container_definitions = jsonencode([
     {
@@ -97,17 +97,17 @@ resource "aws_ecs_task_definition" "backend" {
         },
         {
           name  = "FRONTEND_URL"
-          value = local.frontend_url
+          value = var.frontend_url
         }
       ]
       secrets = [
         {
           name      = "DATABASE_URL"
-          valueFrom = "${aws_secretsmanager_secret.app.arn}:DATABASE_URL::"
+          valueFrom = "${var.secret_arn}:DATABASE_URL::"
         },
         {
           name      = "JWT_SECRET"
-          valueFrom = "${aws_secretsmanager_secret.app.arn}:JWT_SECRET::"
+          valueFrom = "${var.secret_arn}:JWT_SECRET::"
         }
       ]
       healthCheck = {
@@ -130,57 +130,51 @@ resource "aws_ecs_task_definition" "backend" {
 }
 
 resource "aws_ecs_service" "frontend" {
-  name            = "${local.name_prefix}-frontend"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.frontend.arn
-  desired_count   = var.frontend_desired_count
-  launch_type     = "FARGATE"
-  enable_execute_command = true
+  name                               = "${var.name_prefix}-frontend"
+  cluster                            = aws_ecs_cluster.main.id
+  task_definition                    = aws_ecs_task_definition.frontend.arn
+  desired_count                      = var.frontend_desired_count
+  launch_type                        = "FARGATE"
+  enable_execute_command             = true
+  deployment_minimum_healthy_percent = 50
+  deployment_maximum_percent         = 200
+  health_check_grace_period_seconds  = 60
 
   network_configuration {
-    subnets         = aws_subnet.private[*].id
-    security_groups = [aws_security_group.ecs.id]
+    subnets          = var.private_subnet_ids
+    security_groups  = [var.ecs_sg_id]
     assign_public_ip = false
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.frontend.arn
+    target_group_arn = var.frontend_target_group_arn
     container_name   = "frontend"
     container_port   = var.frontend_container_port
   }
+}
 
+resource "aws_ecs_service" "backend" {
+  name                               = "${var.name_prefix}-backend"
+  cluster                            = aws_ecs_cluster.main.id
+  task_definition                    = aws_ecs_task_definition.backend.arn
+  desired_count                      = var.backend_desired_count
+  launch_type                        = "FARGATE"
+  enable_execute_command             = true
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
   health_check_grace_period_seconds  = 60
 
-  depends_on = [aws_lb_listener.http]
-}
-
-resource "aws_ecs_service" "backend" {
-  name            = "${local.name_prefix}-backend"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.backend.arn
-  desired_count   = var.backend_desired_count
-  launch_type     = "FARGATE"
-  enable_execute_command = true
-
   network_configuration {
-    subnets         = aws_subnet.private[*].id
-    security_groups = [aws_security_group.ecs.id]
+    subnets          = var.private_subnet_ids
+    security_groups  = [var.ecs_sg_id]
     assign_public_ip = false
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.backend.arn
+    target_group_arn = var.backend_target_group_arn
     container_name   = "backend"
     container_port   = var.backend_container_port
   }
-
-  deployment_minimum_healthy_percent = 50
-  deployment_maximum_percent         = 200
-  health_check_grace_period_seconds  = 60
-
-  depends_on = [aws_lb_listener.http]
 }
 
 resource "aws_appautoscaling_target" "frontend" {
@@ -200,7 +194,7 @@ resource "aws_appautoscaling_target" "backend" {
 }
 
 resource "aws_appautoscaling_policy" "frontend_cpu" {
-  name               = "${local.name_prefix}-frontend-cpu"
+  name               = "${var.name_prefix}-frontend-cpu"
   policy_type        = "TargetTrackingScaling"
   resource_id        = aws_appautoscaling_target.frontend.resource_id
   scalable_dimension = aws_appautoscaling_target.frontend.scalable_dimension
@@ -215,7 +209,7 @@ resource "aws_appautoscaling_policy" "frontend_cpu" {
 }
 
 resource "aws_appautoscaling_policy" "frontend_memory" {
-  name               = "${local.name_prefix}-frontend-mem"
+  name               = "${var.name_prefix}-frontend-mem"
   policy_type        = "TargetTrackingScaling"
   resource_id        = aws_appautoscaling_target.frontend.resource_id
   scalable_dimension = aws_appautoscaling_target.frontend.scalable_dimension
@@ -230,7 +224,7 @@ resource "aws_appautoscaling_policy" "frontend_memory" {
 }
 
 resource "aws_appautoscaling_policy" "backend_cpu" {
-  name               = "${local.name_prefix}-backend-cpu"
+  name               = "${var.name_prefix}-backend-cpu"
   policy_type        = "TargetTrackingScaling"
   resource_id        = aws_appautoscaling_target.backend.resource_id
   scalable_dimension = aws_appautoscaling_target.backend.scalable_dimension
@@ -245,7 +239,7 @@ resource "aws_appautoscaling_policy" "backend_cpu" {
 }
 
 resource "aws_appautoscaling_policy" "backend_memory" {
-  name               = "${local.name_prefix}-backend-mem"
+  name               = "${var.name_prefix}-backend-mem"
   policy_type        = "TargetTrackingScaling"
   resource_id        = aws_appautoscaling_target.backend.resource_id
   scalable_dimension = aws_appautoscaling_target.backend.scalable_dimension

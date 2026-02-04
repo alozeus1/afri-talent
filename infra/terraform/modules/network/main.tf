@@ -12,7 +12,7 @@ resource "aws_vpc" "main" {
   enable_dns_hostnames = true
 
   tags = {
-    Name = "${local.name_prefix}-vpc"
+    Name = "${var.name_prefix}-vpc"
   }
 }
 
@@ -20,7 +20,7 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${local.name_prefix}-igw"
+    Name = "${var.name_prefix}-igw"
   }
 }
 
@@ -32,7 +32,7 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "${local.name_prefix}-public-${count.index + 1}"
+    Name = "${var.name_prefix}-public-${count.index + 1}"
   }
 }
 
@@ -43,7 +43,7 @@ resource "aws_subnet" "private" {
   availability_zone = local.azs[count.index]
 
   tags = {
-    Name = "${local.name_prefix}-private-${count.index + 1}"
+    Name = "${var.name_prefix}-private-${count.index + 1}"
   }
 }
 
@@ -56,7 +56,7 @@ resource "aws_route_table" "public" {
   }
 
   tags = {
-    Name = "${local.name_prefix}-public-rt"
+    Name = "${var.name_prefix}-public-rt"
   }
 }
 
@@ -71,7 +71,7 @@ resource "aws_eip" "nat" {
   domain = "vpc"
 
   tags = {
-    Name = "${local.name_prefix}-nat-eip"
+    Name = "${var.name_prefix}-nat-eip"
   }
 }
 
@@ -81,7 +81,7 @@ resource "aws_nat_gateway" "main" {
   subnet_id     = aws_subnet.public[0].id
 
   tags = {
-    Name = "${local.name_prefix}-nat"
+    Name = "${var.name_prefix}-nat"
   }
 }
 
@@ -97,7 +97,7 @@ resource "aws_route_table" "private" {
   }
 
   tags = {
-    Name = "${local.name_prefix}-private-rt"
+    Name = "${var.name_prefix}-private-rt"
   }
 }
 
@@ -106,4 +106,3 @@ resource "aws_route_table_association" "private" {
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
 }
-

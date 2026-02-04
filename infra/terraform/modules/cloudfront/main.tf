@@ -1,5 +1,5 @@
 resource "aws_cloudfront_cache_policy" "disabled" {
-  name        = "${local.name_prefix}-cache-disabled"
+  name        = "${var.name_prefix}-cache-disabled"
   comment     = "Disable caching for dynamic content"
   default_ttl = 0
   max_ttl     = 0
@@ -7,15 +7,15 @@ resource "aws_cloudfront_cache_policy" "disabled" {
 
   parameters_in_cache_key_and_forwarded_to_origin {
     cookies_config {
-      cookie_behavior = "all"
+      cookie_behavior = "none"
     }
 
     headers_config {
-      header_behavior = "allViewer"
+      header_behavior = "none"
     }
 
     query_strings_config {
-      query_string_behavior = "all"
+      query_string_behavior = "none"
     }
 
     enable_accept_encoding_brotli = true
@@ -24,7 +24,7 @@ resource "aws_cloudfront_cache_policy" "disabled" {
 }
 
 resource "aws_cloudfront_origin_request_policy" "all_viewer" {
-  name    = "${local.name_prefix}-all-viewer"
+  name    = "${var.name_prefix}-all-viewer"
   comment = "Forward all headers, cookies, and query strings"
 
   cookies_config {
@@ -41,14 +41,14 @@ resource "aws_cloudfront_origin_request_policy" "all_viewer" {
 }
 
 resource "aws_cloudfront_distribution" "app" {
-  enabled         = true
-  is_ipv6_enabled = true
-  price_class     = var.cloudfront_price_class
-  aliases         = var.cloudfront_aliases
+  enabled             = true
+  is_ipv6_enabled     = true
+  price_class         = var.price_class
+  aliases             = var.aliases
   default_root_object = ""
 
   origin {
-    domain_name = aws_lb.app.dns_name
+    domain_name = var.alb_dns_name
     origin_id   = "alb-origin"
 
     custom_origin_config {
@@ -60,12 +60,12 @@ resource "aws_cloudfront_distribution" "app" {
   }
 
   default_cache_behavior {
-    target_origin_id       = "alb-origin"
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
-    cached_methods         = ["GET", "HEAD"]
-    compress               = true
-    cache_policy_id        = aws_cloudfront_cache_policy.disabled.id
+    target_origin_id         = "alb-origin"
+    viewer_protocol_policy   = "redirect-to-https"
+    allowed_methods          = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+    cached_methods           = ["GET", "HEAD"]
+    compress                 = true
+    cache_policy_id          = aws_cloudfront_cache_policy.disabled.id
     origin_request_policy_id = aws_cloudfront_origin_request_policy.all_viewer.id
   }
 
@@ -76,12 +76,9 @@ resource "aws_cloudfront_distribution" "app" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = var.cloudfront_acm_certificate_arn == ""
-    acm_certificate_arn            = var.cloudfront_acm_certificate_arn == "" ? null : var.cloudfront_acm_certificate_arn
-    ssl_support_method             = var.cloudfront_acm_certificate_arn == "" ? null : "sni-only"
-    minimum_protocol_version       = var.cloudfront_acm_certificate_arn == "" ? null : "TLSv1.2_2021"
+    cloudfront_default_certificate = var.acm_certificate_arn == ""
+    acm_certificate_arn            = var.acm_certificate_arn == "" ? null : var.acm_certificate_arn
+    ssl_support_method             = var.acm_certificate_arn == "" ? null : "sni-only"
+    minimum_protocol_version       = var.acm_certificate_arn == "" ? null : "TLSv1.2_2021"
   }
-
-  depends_on = [aws_lb.app]
 }
-

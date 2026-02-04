@@ -41,6 +41,20 @@ terraform init
 terraform apply
 ```
 
+### Module Layout
+
+- `modules/network`: VPC, subnets, routing, NAT
+- `modules/security`: ALB/ECS/RDS security groups
+- `modules/alb`: Application Load Balancer + target groups
+- `modules/cloudfront`: CDN in front of the ALB
+- `modules/ecr`: ECR repositories and lifecycle policies
+- `modules/rds`: PostgreSQL instance + subnet group
+- `modules/secrets`: Secrets Manager for DB/JWT
+- `modules/iam-ecs`: ECS task execution and task roles
+- `modules/ecs`: ECS cluster, services, autoscaling
+- `modules/github-oidc`: GitHub Actions OIDC provider + role
+- `modules/route53`: DNS records for `frontend`, `admin`, `api`
+
 ### Step-by-step Deployment
 
 1. **Provision infrastructure**

@@ -1,20 +1,20 @@
 resource "aws_lb" "app" {
-  name               = "${local.name_prefix}-alb"
+  name               = "${var.name_prefix}-alb"
   load_balancer_type = "application"
-  subnets            = aws_subnet.public[*].id
-  security_groups    = [aws_security_group.alb.id]
+  subnets            = var.public_subnet_ids
+  security_groups    = [var.alb_sg_id]
   idle_timeout       = 60
 
   tags = {
-    Name = "${local.name_prefix}-alb"
+    Name = "${var.name_prefix}-alb"
   }
 }
 
 resource "aws_lb_target_group" "frontend" {
-  name        = "${local.name_prefix}-fe"
-  port        = var.frontend_container_port
+  name        = "${var.name_prefix}-fe"
+  port        = var.frontend_port
   protocol    = "HTTP"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = var.vpc_id
   target_type = "ip"
 
   health_check {
@@ -28,10 +28,10 @@ resource "aws_lb_target_group" "frontend" {
 }
 
 resource "aws_lb_target_group" "backend" {
-  name        = "${local.name_prefix}-be"
-  port        = var.backend_container_port
+  name        = "${var.name_prefix}-be"
+  port        = var.backend_port
   protocol    = "HTTP"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = var.vpc_id
   target_type = "ip"
 
   health_check {

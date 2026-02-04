@@ -28,7 +28,7 @@ resource "aws_route53_record" "frontend_aaaa" {
 }
 
 resource "aws_route53_record" "admin_a" {
-  count  = local.create_admin ? 1 : 0
+  count   = local.create_admin ? 1 : 0
   zone_id = var.zone_id
   name    = var.admin_domain_name
   type    = "A"
@@ -41,7 +41,7 @@ resource "aws_route53_record" "admin_a" {
 }
 
 resource "aws_route53_record" "admin_aaaa" {
-  count  = local.create_admin ? 1 : 0
+  count   = local.create_admin ? 1 : 0
   zone_id = var.zone_id
   name    = var.admin_domain_name
   type    = "AAAA"
@@ -54,7 +54,7 @@ resource "aws_route53_record" "admin_aaaa" {
 }
 
 resource "aws_route53_record" "api_a" {
-  count  = local.create_api ? 1 : 0
+  count   = local.create_api ? 1 : 0
   zone_id = var.zone_id
   name    = var.api_domain_name
   type    = "A"
@@ -67,7 +67,7 @@ resource "aws_route53_record" "api_a" {
 }
 
 resource "aws_route53_record" "api_aaaa" {
-  count  = local.create_api ? 1 : 0
+  count   = local.create_api ? 1 : 0
   zone_id = var.zone_id
   name    = var.api_domain_name
   type    = "AAAA"

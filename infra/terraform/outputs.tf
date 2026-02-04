@@ -1,16 +1,16 @@
 output "alb_dns_name" {
   description = "ALB DNS name"
-  value       = aws_lb.app.dns_name
+  value       = module.alb.alb_dns_name
 }
 
 output "cloudfront_domain_name" {
   description = "CloudFront distribution domain"
-  value       = aws_cloudfront_distribution.app.domain_name
+  value       = module.cloudfront.domain_name
 }
 
 output "cloudfront_distribution_id" {
   description = "CloudFront distribution ID"
-  value       = aws_cloudfront_distribution.app.id
+  value       = module.cloudfront.distribution_id
 }
 
 output "frontend_url" {
@@ -25,32 +25,32 @@ output "backend_url" {
 
 output "frontend_ecr_repository" {
   description = "Frontend ECR repository URL"
-  value       = aws_ecr_repository.frontend.repository_url
+  value       = module.ecr.frontend_repo_url
 }
 
 output "backend_ecr_repository" {
   description = "Backend ECR repository URL"
-  value       = aws_ecr_repository.backend.repository_url
+  value       = module.ecr.backend_repo_url
 }
 
 output "database_endpoint" {
   description = "RDS endpoint"
-  value       = aws_db_instance.postgres.address
+  value       = module.rds.db_endpoint
 }
 
 output "app_secrets_arn" {
   description = "Secrets Manager ARN for app config"
-  value       = aws_secretsmanager_secret.app.arn
+  value       = module.secrets.secret_arn
 }
 
 output "github_actions_role_arn" {
   description = "IAM role ARN for GitHub Actions OIDC"
-  value       = aws_iam_role.github_actions.arn
+  value       = module.github_oidc.role_arn
 }
 
 output "github_oidc_provider_arn" {
   description = "GitHub OIDC provider ARN"
-  value       = aws_iam_openid_connect_provider.github.arn
+  value       = module.github_oidc.provider_arn
 }
 
 output "frontend_dns_record" {

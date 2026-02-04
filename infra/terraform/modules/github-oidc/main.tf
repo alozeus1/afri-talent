@@ -26,21 +26,19 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = [local.github_oidc_subject]
+      values   = ["repo:${var.github_repo}:ref:${var.github_ref}"]
     }
   }
 }
 
 resource "aws_iam_role" "github_actions" {
-  name               = local.github_role_name
+  name               = var.role_name
   assume_role_policy = data.aws_iam_policy_document.github_actions_assume_role.json
 }
 
 data "aws_iam_policy_document" "github_actions_deploy" {
   statement {
-    actions = [
-      "ecr:GetAuthorizationToken"
-    ]
+    actions   = ["ecr:GetAuthorizationToken"]
     resources = ["*"]
   }
 
@@ -54,10 +52,7 @@ data "aws_iam_policy_document" "github_actions_deploy" {
       "ecr:PutImage",
       "ecr:UploadLayerPart"
     ]
-    resources = [
-      aws_ecr_repository.frontend.arn,
-      aws_ecr_repository.backend.arn
-    ]
+    resources = var.ecr_repository_arns
   }
 
   statement {
@@ -69,12 +64,7 @@ data "aws_iam_policy_document" "github_actions_deploy" {
       "ecs:ListTasks",
       "ecs:DescribeTasks"
     ]
-    resources = [
-      aws_ecs_service.frontend.arn,
-      aws_ecs_service.backend.arn,
-      aws_ecs_cluster.main.arn,
-      "*"
-    ]
+    resources = concat(var.ecs_service_arns, [var.ecs_cluster_arn, "*"])
   }
 
   statement {
@@ -82,8 +72,8 @@ data "aws_iam_policy_document" "github_actions_deploy" {
       "iam:PassRole"
     ]
     resources = [
-      aws_iam_role.ecs_task_execution.arn,
-      aws_iam_role.ecs_task.arn
+      var.ecs_task_execution_role_arn,
+      var.ecs_task_role_arn
     ]
     condition {
       test     = "StringEquals"
@@ -94,7 +84,7 @@ data "aws_iam_policy_document" "github_actions_deploy" {
 }
 
 resource "aws_iam_policy" "github_actions_deploy" {
-  name   = "${local.name_prefix}-github-deploy"
+  name   = "${var.name_prefix}-github-deploy"
   policy = data.aws_iam_policy_document.github_actions_deploy.json
 }
 
@@ -104,7 +94,7 @@ resource "aws_iam_role_policy_attachment" "github_actions_deploy" {
 }
 
 resource "aws_iam_role_policy_attachment" "github_actions_additional" {
-  count      = var.github_actions_additional_policy_arn == "" ? 0 : 1
+  count      = var.additional_policy_arn == "" ? 0 : 1
   role       = aws_iam_role.github_actions.name
-  policy_arn = var.github_actions_additional_policy_arn
+  policy_arn = var.additional_policy_arn
 }

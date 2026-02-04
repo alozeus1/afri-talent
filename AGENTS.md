@@ -5,6 +5,7 @@
 - `backend/`: Express + Prisma API (TypeScript). Entry: `src/server.ts`. Prisma schema/seed in `prisma/`.
 - `frontend/`: Next.js App Router UI (TypeScript). Pages in `src/app`, shared UI in `src/components`.
 - `infra/terraform/`: AWS ECS + RDS + CloudFront infrastructure, CI/CD workflows.
+- `infra/terraform/modules/`: Terraform submodules (`network`, `security`, `alb`, `cloudfront`, `ecr`, `rds`, `secrets`, `iam-ecs`, `ecs`, `route53`, `github-oidc`).
 - `docs`: Root markdown files describe deployment, security, and ops.
 
 ## Build, Test, and Development Commands
