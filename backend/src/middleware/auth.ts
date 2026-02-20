@@ -69,3 +69,7 @@ export function authorize(...roles: Role[]) {
     next();
   };
 }
+
+// Aliases for convenience
+export const requireAuth = authenticate;
+export const requireRole = (roles: Role[]) => authorize(...roles);

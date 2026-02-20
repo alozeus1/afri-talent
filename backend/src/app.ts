@@ -24,6 +24,9 @@ import billingRoutes from "./routes/billing.js";
 import webhookRoutes from "./routes/webhooks.js";
 import notificationsRoutes from "./routes/notifications.js";
 import orchestratorRoutes from "./routes/orchestrator.js";
+import aggregatorRoutes from "./routes/aggregator.js";
+import savedSearchesRoutes from "./routes/saved-searches.js";
+import companiesRoutes from "./routes/companies.js";
 
 dotenv.config();
 
@@ -169,6 +172,9 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/files", filesRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/aggregator", aggregatorRoutes);
+app.use("/api/saved-searches", savedSearchesRoutes);
+app.use("/api/companies", companiesRoutes);
 
 // Orchestrator route needs a larger body limit (resume + raw job texts can be ~200 KB combined)
 app.use(
