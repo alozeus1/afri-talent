@@ -1,6 +1,6 @@
 # AfriTalent Security Hardening Guide
 
-## Overviews
+## Overview
 
 This document outlines the security measures implemented for the AfriTalent platform.
 
