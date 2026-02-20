@@ -68,8 +68,10 @@ jobs:
     name: Terraform Plan
     runs-on: ubuntu-latest
     needs: validate
-    # vars context is allowed in job-level if; secrets context is not
-    if: ${{ vars.AWS_ROLE_ARN != '' }}
+    env:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+    if: ${{ env.AWS_ROLE_ARN != '' && env.TF_STATE_BUCKET != '' }}
     defaults:
       run:
         working-directory: infra/terraform
@@ -86,7 +88,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform Init
