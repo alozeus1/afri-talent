@@ -1,4 +1,5 @@
 # ── SNS Topic for alerts ──────────────────────────────────────────────────────
+# Formatting nudge to keep fmt clean
 
 resource "aws_sns_topic" "alerts" {
   name = "${local.name_prefix}-alerts"
