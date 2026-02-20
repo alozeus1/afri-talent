@@ -20,7 +20,7 @@ This document outlines the security measures implemented for the AfriTalent plat
 - Use minimum 64 characters of random data
 - Generate with: `openssl rand -base64 64`
 
-### Token Strategy Decision
+### Token Strategy Decisions
 
 **Current: Stateless JWT in Authorization Header**
 
