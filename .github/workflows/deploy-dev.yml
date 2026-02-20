@@ -75,6 +75,18 @@ jobs:
             echo "DynamoDB table $TABLE already exists"
           fi
 
+      - name: Verify IAM permissions for Terraform
+        run: |
+          echo "Checking EC2/VPC permissions (required for Terraform to provision infra)..."
+          OUTPUT=$(aws ec2 describe-vpcs --max-items 1 --region us-east-1 2>&1)
+          if echo "$OUTPUT" | grep -q "AccessDenied\|not authorized"; then
+            echo "::error::GitHubActionsDeployRole is missing EC2/infrastructure permissions."
+            echo "::error::Run this once in the AWS console or CLI with admin credentials:"
+            echo "::error::  aws iam attach-role-policy --role-name GitHubActionsDeployRole --policy-arn arn:aws:iam::aws:policy/AdministratorAccess"
+            exit 1
+          fi
+          echo "IAM permissions OK — proceeding with Terraform."
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
