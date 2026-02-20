@@ -29,13 +29,25 @@ export async function loginAs(
   request: APIRequestContext,
   creds: { email: string; password: string }
 ): Promise<void> {
-  const res = await request.post(`${API}/api/auth/login`, {
-    data: creds,
-  });
-  if (!res.ok()) {
-    throw new Error(
-      `Login failed (${res.status()}): ${await res.text()}`
-    );
+  const maxRetries = 3;
+  const backoffMs = 1500;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const res = await request.post(`${API}/api/auth/login`, {
+      data: creds,
+    });
+
+    if (res.ok()) return;
+
+    const status = res.status();
+    const body = await res.text();
+
+    if (status === 429 && attempt < maxRetries - 1) {
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      continue;
+    }
+
+    throw new Error(`Login failed (${status}): ${body}`);
   }
 }
 

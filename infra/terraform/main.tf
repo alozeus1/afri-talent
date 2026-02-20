@@ -162,7 +162,7 @@ module "github_oidc" {
   name_prefix                 = local.name_prefix
   role_name                   = local.github_role_name
   github_repo                 = var.github_repo
-  github_ref                  = var.github_ref
+  github_ref                  = local.github_ref_normalized
   ecr_repository_arns         = [module.ecr.frontend_repo_arn, module.ecr.backend_repo_arn]
   ecs_cluster_arn             = "" # Not used with App Runner
   ecs_service_arns            = []
