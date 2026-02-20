@@ -49,7 +49,7 @@ variable "enable_nat_gateway" {
 variable "enable_interface_endpoints" {
   type        = bool
   description = "Create VPC interface/gateway endpoints for ECR and Secrets Manager"
-  default     = true
+  default     = false
 }
 
 variable "acm_certificate_arn" {

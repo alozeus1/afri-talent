@@ -5,7 +5,7 @@ aws_region   = "us-east-1"
 
 # Network - keep NAT for dev (ECS needs internet for Anthropic API)
 enable_nat_gateway   = true
-enable_interface_endpoints = true
+enable_interface_endpoints = false
 vpc_cidr             = "10.20.0.0/16"
 public_subnet_cidrs  = ["10.20.0.0/24", "10.20.1.0/24"]
 private_subnet_cidrs = ["10.20.10.0/24", "10.20.11.0/24"]
