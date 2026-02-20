@@ -71,7 +71,6 @@ jobs:
     env:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
-    if: ${{ env.AWS_ROLE_ARN != '' && env.TF_STATE_BUCKET != '' }}
     defaults:
       run:
         working-directory: infra/terraform
@@ -79,6 +78,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Ensure required secrets are present
+        if: ${{ env.AWS_ROLE_ARN == '' || env.TF_STATE_BUCKET == '' }}
+        run: |
+          echo "Missing required secrets: AWS_ROLE_ARN and/or TF_STATE_BUCKET." >&2
+          exit 1
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
