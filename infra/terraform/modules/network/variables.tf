@@ -27,3 +27,9 @@ variable "enable_nat_gateway" {
   type        = bool
   description = "Enable NAT gateway for private subnets"
 }
+
+variable "enable_interface_endpoints" {
+  type        = bool
+  description = "Create VPC interface/gateway endpoints for AWS APIs (ECR, Secrets Manager, S3)"
+  default     = true
+}
