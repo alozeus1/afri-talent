@@ -1,0 +1,201 @@
+name: Deploy App Runner (Cost-Effective)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 108188564905.dkr.ecr.us-east-1.amazonaws.com
+
+jobs:
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      backend_image: ${{ steps.build-backend.outputs.image }}
+      frontend_image: ${{ steps.build-frontend.outputs.image }}
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend
+        id: build-backend
+        env:
+          ECR_REPOSITORY: afritalent-${{ inputs.environment }}-backend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
+          docker build -t $IMAGE:$IMAGE_TAG -t $IMAGE:latest ./backend
+          docker push $IMAGE:$IMAGE_TAG
+          docker push $IMAGE:latest
+          echo "image=$IMAGE:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push frontend
+        id: build-frontend
+        env:
+          ECR_REPOSITORY: afritalent-${{ inputs.environment }}-frontend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=https://api.${{ inputs.environment }}.afri-talent.com \
+            --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.${{ inputs.environment }}.afri-talent.com \
+            -t $IMAGE:$IMAGE_TAG -t $IMAGE:latest ./frontend
+          docker push $IMAGE:$IMAGE_TAG
+          docker push $IMAGE:latest
+          echo "image=$IMAGE:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+  deploy-apprunner:
+    name: Deploy to App Runner
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get App Runner service ARNs
+        id: services
+        run: |
+          BACKEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-backend'].ServiceArn" --output text)
+          FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-frontend'].ServiceArn" --output text)
+          echo "backend_arn=$BACKEND_ARN" >> "$GITHUB_OUTPUT"
+          echo "frontend_arn=$FRONTEND_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy backend
+        run: |
+          aws apprunner start-deployment \
+            --service-arn ${{ steps.services.outputs.backend_arn }}
+          echo "Backend deployment initiated"
+
+      - name: Deploy frontend
+        run: |
+          aws apprunner start-deployment \
+            --service-arn ${{ steps.services.outputs.frontend_arn }}
+          echo "Frontend deployment initiated"
+
+      - name: Wait for backend deployment
+        run: |
+          echo "Waiting for backend service to become running..."
+          for i in {1..30}; do
+            STATUS=$(aws apprunner describe-service --service-arn ${{ steps.services.outputs.backend_arn }} --query 'Service.Status' --output text)
+            echo "Backend status: $STATUS"
+            if [ "$STATUS" = "RUNNING" ]; then
+              echo "Backend is running!"
+              break
+            fi
+            sleep 20
+          done
+
+      - name: Wait for frontend deployment
+        run: |
+          echo "Waiting for frontend service to become running..."
+          for i in {1..30}; do
+            STATUS=$(aws apprunner describe-service --service-arn ${{ steps.services.outputs.frontend_arn }} --query 'Service.Status' --output text)
+            echo "Frontend status: $STATUS"
+            if [ "$STATUS" = "RUNNING" ]; then
+              echo "Frontend is running!"
+              break
+            fi
+            sleep 20
+          done
+
+  health-check:
+    name: Post-Deploy Health Check
+    runs-on: ubuntu-latest
+    needs: [deploy-apprunner]
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get service URLs
+        id: urls
+        run: |
+          BACKEND_URL=$(aws apprunner describe-service \
+            --service-arn $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-backend'].ServiceArn" --output text) \
+            --query 'Service.ServiceUrl' --output text)
+          FRONTEND_URL=$(aws apprunner describe-service \
+            --service-arn $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-frontend'].ServiceArn" --output text) \
+            --query 'Service.ServiceUrl' --output text)
+          echo "backend_url=https://$BACKEND_URL" >> "$GITHUB_OUTPUT"
+          echo "frontend_url=https://$FRONTEND_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Check backend health
+        run: |
+          echo "Checking backend health at ${{ steps.urls.outputs.backend_url }}/health"
+          for i in {1..5}; do
+            if curl -sf "${{ steps.urls.outputs.backend_url }}/health" | grep -q "ok"; then
+              echo "Backend health check passed!"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "Backend health check failed!"
+          exit 1
+
+      - name: Check frontend health
+        run: |
+          echo "Checking frontend at ${{ steps.urls.outputs.frontend_url }}"
+          for i in {1..5}; do
+            if curl -sf "${{ steps.urls.outputs.frontend_url }}" | grep -q "AfriTalent"; then
+              echo "Frontend health check passed!"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "Frontend health check failed!"
+          exit 1
+
+      - name: Deployment Summary
+        run: |
+          echo "## Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Backend URL:** ${{ steps.urls.outputs.backend_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Frontend URL:** ${{ steps.urls.outputs.frontend_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Estimated Monthly Cost: ~\$30-50" >> $GITHUB_STEP_SUMMARY

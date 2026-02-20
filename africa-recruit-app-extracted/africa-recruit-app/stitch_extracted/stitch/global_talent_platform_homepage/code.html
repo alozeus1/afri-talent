@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Global Talent Platform | Connecting African Talent to the World</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#136dec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#111418] dark:text-white transition-colors duration-200">
+<!-- Top Navigation -->
+<header class="sticky top-0 z-50 w-full bg-white dark:bg-background-dark border-b border-[#f0f2f4] dark:border-[#2a3441] px-4 md:px-10 lg:px-40 py-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4 text-primary">
+<div class="size-8">
+<svg fill="none" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path d="M42.4379 44C42.4379 44 36.0744 33.9038 41.1692 24C46.8624 12.9336 42.2078 4 42.2078 4L7.01134 4C7.01134 4 11.6577 12.932 5.96912 23.9969C0.876273 33.9029 7.27094 44 7.27094 44L42.4379 44Z" fill="currentColor"></path>
+</svg>
+</div>
+<h2 class="text-[#111418] dark:text-white text-xl font-black leading-tight tracking-tight">AfriTalent</h2>
+</div>
+<div class="hidden lg:flex items-center gap-8">
+<nav class="flex items-center gap-6">
+<a class="text-sm font-medium hover:text-primary" href="#">Jobs</a>
+<a class="text-sm font-medium hover:text-primary" href="#">Locations</a>
+<a class="text-sm font-medium hover:text-primary" href="#">For Candidates</a>
+<a class="text-sm font-medium hover:text-primary" href="#">For Employers</a>
+<a class="text-sm font-medium hover:text-primary" href="#">Resources</a>
+<a class="text-sm font-medium hover:text-primary" href="#">About</a>
+</nav>
+<div class="flex items-center gap-4 border-l border-[#f0f2f4] dark:border-[#2a3441] pl-8">
+<button class="text-sm font-bold hover:text-primary">Sign In</button>
+<button class="bg-primary text-white text-sm font-bold h-10 px-6 rounded-lg hover:bg-blue-700 transition-colors">
+                        Get Started
+                    </button>
+</div>
+</div>
+</div>
+</header>
+<!-- Hero Section -->
+<section class="relative px-4 md:px-10 lg:px-40 py-16 md:py-24 bg-white dark:bg-background-dark">
+<div class="max-w-[1200px] mx-auto flex flex-col items-center text-center">
+<h1 class="text-4xl md:text-6xl font-black leading-tight tracking-tight text-[#111418] dark:text-white max-w-4xl">
+                Unlock Global Opportunities for African Talent
+            </h1>
+<p class="mt-6 text-lg text-[#617289] dark:text-gray-400 max-w-2xl leading-relaxed">
+                Connecting skilled professionals across the continent and the diaspora with inclusive, world-class employers.
+            </p>
+<!-- Search Bar Component -->
+<div class="mt-12 w-full max-w-4xl">
+<div class="bg-white dark:bg-[#1a2430] p-2 rounded-xl shadow-xl border border-[#dbe0e6] dark:border-[#2a3441] flex flex-col md:flex-row items-center gap-2">
+<div class="flex-1 flex items-center px-4 py-2 w-full border-b md:border-b-0 md:border-r border-[#f0f2f4] dark:border-[#2a3441]">
+<span class="material-symbols-outlined text-[#617289]">search</span>
+<input class="w-full border-none focus:ring-0 bg-transparent text-[#111418] dark:text-white placeholder:text-[#617289] text-base" placeholder="Job title, skill..." type="text"/>
+</div>
+<div class="flex-1 flex items-center px-4 py-2 w-full">
+<span class="material-symbols-outlined text-[#617289]">location_on</span>
+<input class="w-full border-none focus:ring-0 bg-transparent text-[#111418] dark:text-white placeholder:text-[#617289] text-base" placeholder="Country or City" type="text"/>
+</div>
+<button class="w-full md:w-auto bg-primary text-white font-bold h-12 px-8 rounded-lg hover:bg-blue-700 transition-colors">
+                        Find Jobs
+                    </button>
+</div>
+<!-- Chips Component -->
+<div class="flex flex-wrap justify-center gap-3 mt-6">
+<span class="text-sm font-medium text-[#617289] dark:text-gray-400 py-1">Popular:</span>
+<div class="flex h-8 items-center justify-center gap-x-2 rounded-full bg-primary/10 text-primary border border-primary/20 px-4 cursor-pointer hover:bg-primary/20">
+<p class="text-xs font-bold uppercase tracking-wider">Remote</p>
+</div>
+<div class="flex h-8 items-center justify-center gap-x-2 rounded-full bg-[#f0f2f4] dark:bg-[#2a3441] text-[#111418] dark:text-white px-4 cursor-pointer hover:bg-[#e2e5e9] dark:hover:bg-[#344150]">
+<p class="text-xs font-bold uppercase tracking-wider">Visa Sponsorship</p>
+</div>
+<div class="flex h-8 items-center justify-center gap-x-2 rounded-full bg-[#f0f2f4] dark:bg-[#2a3441] text-[#111418] dark:text-white px-4 cursor-pointer hover:bg-[#e2e5e9] dark:hover:bg-[#344150]">
+<p class="text-xs font-bold uppercase tracking-wider">Relocation</p>
+</div>
+<button class="ml-4 text-sm font-bold text-primary hover:underline">Post a Job</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Value Propositions Section -->
+<section class="px-4 md:px-10 lg:px-40 py-20 bg-background-light dark:bg-background-dark/50">
+<div class="max-w-[1200px] mx-auto">
+<div class="flex flex-col gap-4 mb-12">
+<h2 class="text-[#111418] dark:text-white text-3xl md:text-4xl font-black tracking-tight">
+                    Why Professionals Choose Us
+                </h2>
+<p class="text-[#617289] dark:text-gray-400 text-lg max-w-2xl">Empowering your career journey across borders with specialized tools and insights.</p>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+<div class="flex flex-col gap-4 rounded-xl border border-[#dbe0e6] dark:border-[#2a3441] bg-white dark:bg-[#1a2430] p-6 shadow-sm hover:shadow-md transition-shadow">
+<div class="bg-primary/10 text-primary w-12 h-12 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined">wifi_tethering</span>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-[#111418] dark:text-white text-lg font-bold">Remote-friendly jobs</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm leading-relaxed">Work from anywhere with top global companies hiring from Africa.</p>
+</div>
+</div>
+<div class="flex flex-col gap-4 rounded-xl border border-[#dbe0e6] dark:border-[#2a3441] bg-white dark:bg-[#1a2430] p-6 shadow-sm hover:shadow-md transition-shadow">
+<div class="bg-primary/10 text-primary w-12 h-12 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined">contact_page</span>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-[#111418] dark:text-white text-lg font-bold">Visa sponsorship clarity</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm leading-relaxed">Clear info on visa support and legal requirements for every role.</p>
+</div>
+</div>
+<div class="flex flex-col gap-4 rounded-xl border border-[#dbe0e6] dark:border-[#2a3441] bg-white dark:bg-[#1a2430] p-6 shadow-sm hover:shadow-md transition-shadow">
+<div class="bg-primary/10 text-primary w-12 h-12 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined">flight_takeoff</span>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-[#111418] dark:text-white text-lg font-bold">Relocation support</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm leading-relaxed">Guidance and logistical assistance for moving abroad for your dream job.</p>
+</div>
+</div>
+<div class="flex flex-col gap-4 rounded-xl border border-[#dbe0e6] dark:border-[#2a3441] bg-white dark:bg-[#1a2430] p-6 shadow-sm hover:shadow-md transition-shadow">
+<div class="bg-primary/10 text-primary w-12 h-12 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined">handshake</span>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-[#111418] dark:text-white text-lg font-bold">Africa-inclusive employers</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm leading-relaxed">Partnering with companies committed to hiring African excellence.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Featured Jobs Section -->
+<section class="px-4 md:px-10 lg:px-40 py-20 bg-white dark:bg-background-dark">
+<div class="max-w-[1200px] mx-auto">
+<div class="flex items-center justify-between mb-10">
+<h2 class="text-[#111418] dark:text-white text-3xl font-black tracking-tight">Featured Opportunities</h2>
+<a class="text-primary font-bold hover:underline" href="#">View All Jobs</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Job Card 1 -->
+<div class="group border border-[#dbe0e6] dark:border-[#2a3441] p-6 rounded-xl hover:border-primary transition-all bg-white dark:bg-background-dark/30">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+<img alt="Tech Company Logo" class="w-full h-full object-contain" data-alt="Tech company minimalist logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDI7OSnpVFsClk_3ko8ON77NLJqR_OEs17A-z1rPmbu-vOJBJLLx1GLkOmqRWgpEsR4qnIcSUdnDLRNZyYD8rYg3UREr22kRgByCs4R2Ao9XxDVNjKrCTJotNj-UzbzNNWn0H9TBVR8BIRPvmtwX1J9pHriK2zrDNGrVlTsEVdfzjaOADgJ0KSh1eI6xp82S2P_O2iJHs2JSSF0xbhT4C0j7RM-33vGZGL4blVnqVVSHyAmUZKVxhLJitNwgp5cMR3we4LIAOekNhI"/>
+</div>
+<span class="bg-green-100 text-green-700 text-[10px] font-bold uppercase px-2 py-1 rounded">New</span>
+</div>
+<h3 class="text-[#111418] dark:text-white font-bold text-lg group-hover:text-primary transition-colors">Senior Software Engineer</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm font-medium mt-1">TechSphere Global</p>
+<p class="text-[#617289] dark:text-gray-400 text-xs mt-3 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">location_on</span> Lagos, Nigeria • Remote
+                    </p>
+<div class="flex gap-2 mt-4">
+<span class="bg-primary/10 text-primary text-[10px] font-bold px-2 py-1 rounded uppercase">Visa Sponsored</span>
+<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Relocation</span>
+</div>
+<button class="w-full mt-6 py-2 border border-primary text-primary font-bold rounded-lg group-hover:bg-primary group-hover:text-white transition-all">View Job</button>
+</div>
+<!-- Job Card 2 -->
+<div class="group border border-[#dbe0e6] dark:border-[#2a3441] p-6 rounded-xl hover:border-primary transition-all bg-white dark:bg-background-dark/30">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+<img alt="Fintech Logo" class="w-full h-full object-contain" data-alt="Fintech brand logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBL7ME_IbSIFBA8DHdE4-uhu01fuKe24zN-tnJ5QbMQ1Koe9Xl7v50U8ojhOnd851ArtgoxNJSCFiGLYck49g_feQv0v7Q6dXObtcKMUOA9kfOW4TyvGYfcNY5etHg8EJ1E9p5JfkDth2e_GrJLqrg_QC_7rLS3friAVMuaLjcSibZFnm8yFTJDpPQz6hwhOWH0uf5Ypf9FxcGj1u8xGJnAjFe0IdVoqdWsv4dmd4tqi3xamJUUCC9ukr5BIln_xTWxmGFd1bu6TW8"/>
+</div>
+</div>
+<h3 class="text-[#111418] dark:text-white font-bold text-lg group-hover:text-primary transition-colors">Product Designer</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm font-medium mt-1">FinFlow Solutions</p>
+<p class="text-[#617289] dark:text-gray-400 text-xs mt-3 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">location_on</span> Nairobi, Kenya • Hybrid
+                    </p>
+<div class="flex gap-2 mt-4">
+<span class="bg-primary/10 text-primary text-[10px] font-bold px-2 py-1 rounded uppercase">Visa Sponsored</span>
+</div>
+<button class="w-full mt-6 py-2 border border-primary text-primary font-bold rounded-lg group-hover:bg-primary group-hover:text-white transition-all">View Job</button>
+</div>
+<!-- Job Card 3 -->
+<div class="group border border-[#dbe0e6] dark:border-[#2a3441] p-6 rounded-xl hover:border-primary transition-all bg-white dark:bg-background-dark/30">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+<img alt="Logistics Logo" class="w-full h-full object-contain" data-alt="Logistics company logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAnLgL8b_e8VyXG4Jfy8EdejWpsAD8NC75h9He8KflZCPsQhTePZaly_NvTxyqsBF6uHb-q9zAN-VEH-PRCpfe2u2dNXQ5hAefMCnjjmVKykl4jNbfY4wsi-GHGHOzPYiraHN0w9D2qQm7aq8pRxAXxHCOn9ihdAEJSERtQ2_t_LPPtL-YX4bZXqyRNKvXCAsluG1N_z_mBg5Nt6vquSSUo6t8IpQhEsNsozSpe-RNK9qpRPWH15yWY784KBPG9gr5dgdwhM8CwZFg"/>
+</div>
+</div>
+<h3 class="text-[#111418] dark:text-white font-bold text-lg group-hover:text-primary transition-colors">Data Analyst</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm font-medium mt-1">Global Logistics Co.</p>
+<p class="text-[#617289] dark:text-gray-400 text-xs mt-3 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">location_on</span> Berlin, Germany • Relocation
+                    </p>
+<div class="flex gap-2 mt-4">
+<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Relocation Assistance</span>
+</div>
+<button class="w-full mt-6 py-2 border border-primary text-primary font-bold rounded-lg group-hover:bg-primary group-hover:text-white transition-all">View Job</button>
+</div>
+<!-- Job Card 4 -->
+<div class="group border border-[#dbe0e6] dark:border-[#2a3441] p-6 rounded-xl hover:border-primary transition-all bg-white dark:bg-background-dark/30">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+<img alt="SaaS Logo" class="w-full h-full object-contain" data-alt="SaaS platform logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgqsWR_079Y3RJU6mLa83a3VhpxXddlwqJynVacFFsOykOpPIuTIVLY533SSScvPa6-ZVEPtWixcXa0agvarH_jz3dBv2CkQXVuqHAjj6P0H0UEAJQH4UCfCIysaHJql0NHwWkUleyLoxJUxfdsR_G9OeLQqGnmd1Ugp_GwcDOoIdm4yyZp_RPQTj8XzDQUKu-zQiCfvdcbtEKFVuEVxY-4xq-y2uTNToTK1oOsVgoDgT--SK7vg2VVkYbMpptKH3v1VVi5X9I1pM"/>
+</div>
+</div>
+<h3 class="text-[#111418] dark:text-white font-bold text-lg group-hover:text-primary transition-colors">Marketing Manager</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm font-medium mt-1">CloudSprint</p>
+<p class="text-[#617289] dark:text-gray-400 text-xs mt-3 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">location_on</span> Cape Town, SA • Remote
+                    </p>
+<div class="flex gap-2 mt-4">
+<span class="bg-primary/10 text-primary text-[10px] font-bold px-2 py-1 rounded uppercase">Visa Sponsored</span>
+</div>
+<button class="w-full mt-6 py-2 border border-primary text-primary font-bold rounded-lg group-hover:bg-primary group-hover:text-white transition-all">View Job</button>
+</div>
+<!-- Job Card 5 -->
+<div class="group border border-[#dbe0e6] dark:border-[#2a3441] p-6 rounded-xl hover:border-primary transition-all bg-white dark:bg-background-dark/30">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+<img alt="Healthtech Logo" class="w-full h-full object-contain" data-alt="Healthtech company logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6ErasqIzzuHp85xvjG7vDYiO43r2TDCEbyLnq2mh1P1SN1gM3XZ07zKeO13GWV2rqMz2f6BjqmTaDhDxdtzhUHTkHqrqBXPbJrPJPnQUg2U6PCFrcIAfwgNW7f7W5rwvI2XazHNcCRsxw0pTljUWLa4LHoxTsiGNUtigU7jjTJKhNXhnVDidbXlGU2dfj_ybxfSBAqaoeoDgghi3o4ZTixWhV9rO40D1ovkkVYy258sgCmwsApdCypOHYvKP1EE_zJ_Ngz3tywn0"/>
+</div>
+</div>
+<h3 class="text-[#111418] dark:text-white font-bold text-lg group-hover:text-primary transition-colors">Full Stack Developer</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm font-medium mt-1">HealthHub International</p>
+<p class="text-[#617289] dark:text-gray-400 text-xs mt-3 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">location_on</span> Accra, Ghana • Remote
+                    </p>
+<div class="flex gap-2 mt-4">
+<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Relocation</span>
+</div>
+<button class="w-full mt-6 py-2 border border-primary text-primary font-bold rounded-lg group-hover:bg-primary group-hover:text-white transition-all">View Job</button>
+</div>
+<!-- Job Card 6 -->
+<div class="group border border-[#dbe0e6] dark:border-[#2a3441] p-6 rounded-xl hover:border-primary transition-all bg-white dark:bg-background-dark/30">
+<div class="flex justify-between items-start mb-4">
+<div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+<img alt="AI Startup Logo" class="w-full h-full object-contain" data-alt="AI startup minimalist logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDpUp9UTD4VAdKxNKYN6HZ9R9XWYhtS48OCgAjX4OZQVGUC2ngXXHIM4GF7AAi7NyQ0BwkKEnGZ5Eh9lKZUiSSrsI6_zHZXCmnmpmHP2VV3TPNpqn9jkvr3H_bnyO_IxLMS6rY5KtHXqkyznAG-T42qikdaQ98YfQtjfFM6Y8V3_1i5LXsTSs0uCN6tY7wLZ5RrX4o1LBXeXcxcdGJn_qlmbm7ke2Noe-BToDEKHmFARNH13YWj_GJJH4JZrqf6iqnlGv0L3nz9o60"/>
+</div>
+</div>
+<h3 class="text-[#111418] dark:text-white font-bold text-lg group-hover:text-primary transition-colors">AI Research Scientist</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm font-medium mt-1">NeuroMind Labs</p>
+<p class="text-[#617289] dark:text-gray-400 text-xs mt-3 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">location_on</span> London, UK • Visa Support
+                    </p>
+<div class="flex gap-2 mt-4">
+<span class="bg-primary/10 text-primary text-[10px] font-bold px-2 py-1 rounded uppercase">Visa Sponsored</span>
+<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Relocation</span>
+</div>
+<button class="w-full mt-6 py-2 border border-primary text-primary font-bold rounded-lg group-hover:bg-primary group-hover:text-white transition-all">View Job</button>
+</div>
+</div>
+</div>
+</section>
+<!-- How It Works Section -->
+<section class="px-4 md:px-10 lg:px-40 py-20 bg-background-light dark:bg-background-dark/50">
+<div class="max-w-[1200px] mx-auto">
+<h2 class="text-center text-[#111418] dark:text-white text-3xl font-black mb-16 tracking-tight">How It Works</h2>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+<!-- For Candidates -->
+<div class="bg-white dark:bg-[#1a2430] p-8 rounded-2xl shadow-sm border border-[#dbe0e6] dark:border-[#2a3441]">
+<div class="flex items-center gap-3 mb-8">
+<div class="bg-primary p-2 rounded-lg text-white">
+<span class="material-symbols-outlined">person</span>
+</div>
+<h3 class="text-2xl font-bold">For Candidates</h3>
+</div>
+<div class="space-y-8">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">1</div>
+<div>
+<h4 class="font-bold mb-1">Create Profile</h4>
+<p class="text-[#617289] dark:text-gray-400 text-sm">Highlight your skills and set your global preferences.</p>
+</div>
+</div>
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">2</div>
+<div>
+<h4 class="font-bold mb-1">Apply with One Click</h4>
+<p class="text-[#617289] dark:text-gray-400 text-sm">Connect directly with vetted international employers.</p>
+</div>
+</div>
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">3</div>
+<div>
+<h4 class="font-bold mb-1">Get Hired</h4>
+<p class="text-[#617289] dark:text-gray-400 text-sm">Land your dream role with full relocation or remote support.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- For Employers -->
+<div class="bg-white dark:bg-[#1a2430] p-8 rounded-2xl shadow-sm border border-[#dbe0e6] dark:border-[#2a3441]">
+<div class="flex items-center gap-3 mb-8">
+<div class="bg-primary p-2 rounded-lg text-white">
+<span class="material-symbols-outlined">business</span>
+</div>
+<h3 class="text-2xl font-bold">For Employers</h3>
+</div>
+<div class="space-y-8">
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">1</div>
+<div>
+<h4 class="font-bold mb-1">Post Job</h4>
+<p class="text-[#617289] dark:text-gray-400 text-sm">Reach the top 1% of African and diaspora talent.</p>
+</div>
+</div>
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">2</div>
+<div>
+<h4 class="font-bold mb-1">Filter Talent</h4>
+<p class="text-[#617289] dark:text-gray-400 text-sm">Use our AI tools to find the perfect cultural and skill fit.</p>
+</div>
+</div>
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">3</div>
+<div>
+<h4 class="font-bold mb-1">Hire Excellence</h4>
+<p class="text-[#617289] dark:text-gray-400 text-sm">Build an inclusive, world-class team with ease.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Resources Preview Section -->
+<section class="px-4 md:px-10 lg:px-40 py-20 bg-white dark:bg-background-dark">
+<div class="max-w-[1200px] mx-auto">
+<h2 class="text-[#111418] dark:text-white text-3xl font-black mb-10 tracking-tight">Resources &amp; Insights</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="group cursor-pointer">
+<div class="aspect-video bg-[#f0f2f4] dark:bg-[#1a2430] rounded-xl overflow-hidden mb-4 relative">
+<div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+<img alt="Resource 1" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Informative business chart on global hiring" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCG8PO1YB2a0FkX4JJ-YX8q_gKpa9WR_oHmBLLZWb_CNlzNIGzCR9673ov4R5TUJ9xn03-BsaFl9Zb1N_C-ZMnXssOWTzOAtmg2c_KV7m7erGe6KkCWu1ygocbX2s_CE3F8pyFvMEd-oEFL5nimoC37H7XPtylAsRhSsXIjKoQS4b7CbwYE0k5qvaIg5Roq-H_IF47sdQl9qWAcFJR0UJiPT8t6VGveSKMMluL9ru1aApsHnXW17X2AtWUYZ71ob5W0kwxQeCQMb6Q"/>
+</div>
+<h3 class="font-bold text-lg mb-2">Visa &amp; Relocation Info</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm">Essential guides for navigating international work permits and travel.</p>
+</div>
+<div class="group cursor-pointer">
+<div class="aspect-video bg-[#f0f2f4] dark:bg-[#1a2430] rounded-xl overflow-hidden mb-4 relative">
+<div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+<img alt="Resource 2" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Candidate interview coaching session" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCEXjcoyD_NbrcpF1nGTzvOvmOKbNPJnLgFo5Nr2kNY87E2JPFtA5s5i0w81vMEKEweBgisXcYEK_kJS9d9CPF4zxsp7GQaHxNyN74VcqaHyTVTplTveOVKRYwXlt4vGUL0olzSi9Ew_3fuNqz9461Fmu9l_OZaV_nxuJAaHDioHQMqLBJVPpP6jlysvaFhjSNdVwcW2ctI_KcrWhpXCmiGggy4QTKiA_bmiDCTe-CMnYEyEL20whxgn4DQUxOjEb9-OId4Imj26XA"/>
+</div>
+<h3 class="font-bold text-lg mb-2">Career Guides</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm">Master your CV, portfolio, and interview skills for global companies.</p>
+</div>
+<div class="group cursor-pointer">
+<div class="aspect-video bg-[#f0f2f4] dark:bg-[#1a2430] rounded-xl overflow-hidden mb-4 relative">
+<div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+<img alt="Resource 3" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Software developer learning new skills" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0jJYbU9b8t9eES3AA0glvgsL9wGJhjEdF-zT0AztKMObvMKX0tc_VaIwmjXqJMp_HOie_SDlrQEo8BVN81F3rQSSxhJEW2J0adTLxTwZTjS-kyVA9PiILkDlY09CbUXvhPpCc9O4kxnv28JRu0NsuYYfd3gxYKBw4ovItoi4SpF65pGUy5q84Gw6CccKha4zbTJQ2naJE0mw8v4rGMx3qQ7FeLu3WHR46gATJgf8x4PbXiGMc2JP6YQU0V8CLgFwGCQCCJbWesYY"/>
+</div>
+<h3 class="font-bold text-lg mb-2">Skills &amp; Learning</h3>
+<p class="text-[#617289] dark:text-gray-400 text-sm">Curated courses and certifications to stay competitive globally.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Trust Section -->
+<section class="px-4 md:px-10 lg:px-40 py-24 bg-primary text-white">
+<div class="max-w-[960px] mx-auto text-center">
+<h2 class="text-3xl md:text-4xl font-black mb-6">Bridging the Global Talent Gap</h2>
+<p class="text-lg md:text-xl font-medium text-white/90 leading-relaxed mb-10">
+                We believe in a world where talent has no borders. AfriTalent is dedicated to ensuring that African professionals have equal access to world-class opportunities, while helping global companies tap into one of the most vibrant talent pools in the world.
+            </p>
+<div class="flex flex-col sm:flex-row gap-4 justify-center">
+<button class="bg-white text-primary font-bold h-12 px-8 rounded-lg hover:bg-gray-100 transition-colors">Join Our Community</button>
+<button class="bg-transparent border-2 border-white text-white font-bold h-12 px-8 rounded-lg hover:bg-white/10 transition-colors">Learn Our Story</button>
+</div>
+</div>
+</section>
+<!-- Footer -->
+<footer class="bg-white dark:bg-[#0c1219] border-t border-[#f0f2f4] dark:border-[#2a3441] pt-16 pb-8 px-4 md:px-10 lg:px-40">
+<div class="max-w-[1200px] mx-auto">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-10 mb-16">
+<div class="flex flex-col gap-4">
+<h4 class="font-bold text-sm uppercase tracking-wider text-[#111418] dark:text-white">Jobs</h4>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Browse All</a>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Remote Jobs</a>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Visa Sponsored</a>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">By Location</a>
+</div>
+<div class="flex flex-col gap-4">
+<h4 class="font-bold text-sm uppercase tracking-wider text-[#111418] dark:text-white">Candidates</h4>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Create Profile</a>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Success Stories</a>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Career Advice</a>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Learning Hub</a>
+</div>
+<div class="flex flex-col gap-4">
+<h4 class="font-bold text-sm uppercase tracking-wider text-[#111418] dark:text-white">Employers</h4>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Post a Job</a>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Talent Search</a>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Pricing</a>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Partner Program</a>
+</div>
+<div class="flex flex-col gap-4">
+<h4 class="font-bold text-sm uppercase tracking-wider text-[#111418] dark:text-white">Company</h4>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">About Us</a>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Contact</a>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Press</a>
+<a class="text-sm text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Blog</a>
+</div>
+</div>
+<div class="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-[#f0f2f4] dark:border-[#2a3441] pt-8">
+<div class="flex gap-6 items-center">
+<p class="text-xs text-[#617289] dark:text-gray-400">© 2024 AfriTalent. All rights reserved.</p>
+<a class="text-xs text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Privacy Policy</a>
+<a class="text-xs text-[#617289] dark:text-gray-400 hover:text-primary" href="#">Terms of Service</a>
+</div>
+<div class="flex gap-4">
+<a class="text-[#617289] dark:text-gray-400 hover:text-primary" href="#"><span class="material-symbols-outlined text-lg">public</span></a>
+<a class="text-[#617289] dark:text-gray-400 hover:text-primary" href="#"><span class="material-symbols-outlined text-lg">share</span></a>
+<a class="text-[#617289] dark:text-gray-400 hover:text-primary" href="#"><span class="material-symbols-outlined text-lg">mail</span></a>
+</div>
+</div>
+</div>
+</footer>
+</body></html>

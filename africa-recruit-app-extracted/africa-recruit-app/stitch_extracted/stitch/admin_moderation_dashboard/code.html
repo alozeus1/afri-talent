@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Admin Moderation Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1162d4",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#111418] dark:text-white min-h-screen">
+<!-- Header Component -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-[#dbe0e6] dark:border-[#343d4a] bg-white dark:bg-[#1c2632] px-10 py-3">
+<div class="flex items-center gap-4 text-primary">
+<div class="size-6">
+<span class="material-symbols-outlined text-3xl">verified_user</span>
+</div>
+<h2 class="text-[#111418] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">Moderation Portal</h2>
+</div>
+<div class="flex flex-1 justify-end gap-4 items-center">
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-background-light dark:bg-[#2c3745] text-[#111418] dark:text-white text-sm font-bold leading-normal tracking-[0.015em]">
+<span class="truncate">Admin Account</span>
+</button>
+<div class="flex items-center justify-center bg-primary text-white font-bold rounded-full size-10" title="User Profile">
+                JD
+            </div>
+</div>
+</header>
+<main class="max-w-[1280px] mx-auto p-8">
+<!-- Moderation Overview Stats -->
+<div class="flex flex-wrap gap-4 mb-8">
+<div class="flex min-w-[158px] flex-1 flex-col gap-2 rounded-lg p-6 border-2 border-primary bg-primary/5 dark:bg-primary/10">
+<p class="text-primary text-sm font-semibold uppercase tracking-wider">Jobs Pending Review</p>
+<p class="text-[#111418] dark:text-white tracking-light text-3xl font-bold leading-tight">124</p>
+</div>
+<div class="flex min-w-[158px] flex-1 flex-col gap-2 rounded-lg p-6 border border-[#dbe0e6] dark:border-[#343d4a] bg-white dark:bg-[#1c2632]">
+<p class="text-[#617289] dark:text-gray-400 text-sm font-semibold uppercase tracking-wider">Jobs Approved Today</p>
+<p class="text-[#111418] dark:text-white tracking-light text-3xl font-bold leading-tight">86</p>
+</div>
+<div class="flex min-w-[158px] flex-1 flex-col gap-2 rounded-lg p-6 border border-[#dbe0e6] dark:border-[#343d4a] bg-white dark:bg-[#1c2632]">
+<p class="text-[#617289] dark:text-gray-400 text-sm font-semibold uppercase tracking-wider">Jobs Rejected Today</p>
+<p class="text-[#111418] dark:text-white tracking-light text-3xl font-bold leading-tight">12</p>
+</div>
+</div>
+<div class="flex flex-col lg:flex-row gap-8">
+<!-- Main Content Area -->
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between px-2 pb-4">
+<h2 class="text-[#111418] dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em]">Pending Job Moderation</h2>
+</div>
+<!-- Table Component -->
+<div class="overflow-hidden rounded-lg border border-[#dbe0e6] dark:border-[#343d4a] bg-white dark:bg-[#1c2632]">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-background-light dark:bg-[#2c3745]">
+<th class="px-4 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider">Job Title</th>
+<th class="px-4 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider">Company</th>
+<th class="px-4 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider">Submitted</th>
+<th class="px-4 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider">Eligibility</th>
+<th class="px-4 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider">Status</th>
+<th class="px-4 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#dbe0e6] dark:divide-[#343d4a]">
+<!-- Row 1 -->
+<tr class="hover:bg-background-light/50 dark:hover:bg-[#2c3745]/50 transition-colors">
+<td class="px-4 py-4 text-[#111418] dark:text-white text-sm font-medium">Senior Software Engineer</td>
+<td class="px-4 py-4 text-[#617289] dark:text-gray-400 text-sm">TechCorp</td>
+<td class="px-4 py-4 text-[#617289] dark:text-gray-400 text-sm whitespace-nowrap">Oct 24, 2023</td>
+<td class="px-4 py-4">
+<div class="flex gap-1">
+<span class="p-1 bg-primary/10 text-primary rounded" title="Visa Sponsorship"><span class="material-symbols-outlined text-sm">3p</span></span>
+<span class="p-1 bg-primary/10 text-primary rounded" title="Remote Work"><span class="material-symbols-outlined text-sm">distance</span></span>
+</div>
+</td>
+<td class="px-4 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Pending Review</span>
+</td>
+<td class="px-4 py-4 whitespace-nowrap">
+<div class="flex items-center gap-3 text-sm">
+<button class="text-primary font-bold hover:underline">View</button>
+<button class="border border-green-600 text-green-600 px-2 py-1 rounded-lg hover:bg-green-600 hover:text-white transition-colors font-bold">Approve</button>
+<button class="text-red-600 font-bold hover:underline">Reject</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-background-light/50 dark:hover:bg-[#2c3745]/50 transition-colors bg-blue-50/30 dark:bg-primary/5">
+<td class="px-4 py-4 text-[#111418] dark:text-white text-sm font-medium">Product Designer</td>
+<td class="px-4 py-4 text-[#617289] dark:text-gray-400 text-sm">Designly</td>
+<td class="px-4 py-4 text-[#617289] dark:text-gray-400 text-sm whitespace-nowrap">Oct 23, 2023</td>
+<td class="px-4 py-4">
+<div class="flex gap-1">
+<span class="p-1 bg-primary/10 text-primary rounded" title="Relocation Support"><span class="material-symbols-outlined text-sm">package_2</span></span>
+</div>
+</td>
+<td class="px-4 py-4">
+<span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Pending Review</span>
+</td>
+<td class="px-4 py-4 whitespace-nowrap">
+<div class="flex items-center gap-3 text-sm">
+<button class="text-primary font-bold hover:underline">View</button>
+<button class="border border-green-600 text-green-600 px-2 py-1 rounded-lg hover:bg-green-600 hover:text-white transition-colors font-bold">Approve</button>
+<button class="text-red-600 font-bold hover:underline">Reject</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Rejection Reason Section (Visible on click) -->
+<div class="mt-6 p-6 bg-white dark:bg-[#1c2632] border border-[#dbe0e6] dark:border-[#343d4a] rounded-lg">
+<h3 class="text-[#111418] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] mb-4">Rejection Reason (Selection)</h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<button class="flex items-center gap-3 p-3 border border-[#dbe0e6] dark:border-[#343d4a] rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 text-sm font-medium transition-colors">
+<span class="material-symbols-outlined text-red-500">error</span>
+                            Incomplete Info
+                        </button>
+<button class="flex items-center gap-3 p-3 border border-[#dbe0e6] dark:border-[#343d4a] rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 text-sm font-medium transition-colors">
+<span class="material-symbols-outlined text-red-500">gavel</span>
+                            Non-compliant
+                        </button>
+<button class="flex items-center gap-3 p-3 border border-[#dbe0e6] dark:border-[#343d4a] rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 text-sm font-medium transition-colors">
+<span class="material-symbols-outlined text-red-500">wrong_location</span>
+                            Inaccurate Eligibility
+                        </button>
+</div>
+</div>
+</div>
+<!-- Side Panel Job Preview -->
+<aside class="w-full lg:w-96 flex flex-col gap-4">
+<div class="bg-white dark:bg-[#1c2632] border border-[#dbe0e6] dark:border-[#343d4a] rounded-lg sticky top-8">
+<div class="p-4 border-b border-[#dbe0e6] dark:border-[#343d4a] flex justify-between items-center bg-background-light dark:bg-[#2c3745]">
+<h3 class="font-bold text-[#111418] dark:text-white">Job Preview</h3>
+<span class="text-xs text-[#617289] dark:text-gray-400 uppercase font-bold">Read-Only</span>
+</div>
+<div class="p-6">
+<h4 class="text-xl font-bold mb-1">Product Designer</h4>
+<p class="text-primary font-medium mb-6">Designly</p>
+<div class="mb-6">
+<h5 class="text-xs font-bold text-[#617289] dark:text-gray-400 uppercase mb-2">Description</h5>
+<p class="text-sm text-[#111418] dark:text-gray-200 leading-relaxed">
+                                We are looking for a Senior Product Designer to join our core product team. You will be responsible for creating intuitive user experiences for our million-plus user base. 
+                                <br/><br/>
+                                Requirements: 5+ years experience, proficiency in Figma, and a strong portfolio of shipped products.
+                            </p>
+</div>
+<div class="mb-6">
+<h5 class="text-xs font-bold text-[#617289] dark:text-gray-400 uppercase mb-2">Eligibility Claims</h5>
+<div class="space-y-3">
+<div class="flex items-center gap-3 text-sm">
+<span class="material-symbols-outlined text-primary">package_2</span>
+<span>Relocation Support Provided</span>
+</div>
+<div class="flex items-center gap-3 text-sm opacity-50">
+<span class="material-symbols-outlined">3p</span>
+<span>No Visa Sponsorship</span>
+</div>
+<div class="flex items-center gap-3 text-sm opacity-50">
+<span class="material-symbols-outlined">distance</span>
+<span>On-site Role (London, UK)</span>
+</div>
+</div>
+</div>
+<div class="pt-4 border-t border-[#dbe0e6] dark:border-[#343d4a]">
+<p class="text-xs text-[#617289] dark:text-gray-400">Submitted by: Michael Chen (Recruiter)</p>
+<p class="text-xs text-[#617289] dark:text-gray-400 mt-1">IP: 192.168.1.45</p>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<!-- Footer Component -->
+<footer class="mt-12 border-t border-[#dbe0e6] dark:border-[#343d4a] bg-white dark:bg-[#1c2632] py-8">
+<div class="max-w-[1280px] mx-auto px-8 flex justify-between items-center text-sm text-[#617289] dark:text-gray-400">
+<p>© 2023 Global Job Platform. All rights reserved.</p>
+<div class="flex gap-4 items-center">
+<span class="px-2 py-0.5 bg-background-light dark:bg-[#2c3745] rounded text-xs font-mono uppercase">Admin System v2.4.0</span>
+<span>Confidential</span>
+</div>
+</div>
+</footer>
+</body></html>

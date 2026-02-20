@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Candidate Dashboard | Global Talent Platform</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1162d4",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
+<!-- Header -->
+<header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between items-center h-16">
+<div class="flex items-center gap-8">
+<div class="flex-shrink-0 flex items-center gap-2">
+<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+<span class="text-white font-bold text-xl">G</span>
+</div>
+<span class="font-bold text-xl tracking-tight text-slate-900 dark:text-white">GlobalTalent</span>
+</div>
+<nav class="hidden md:flex space-x-6">
+<a class="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary" href="#">Jobs</a>
+<a class="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary" href="#">Locations</a>
+<a class="text-sm font-medium text-primary border-b-2 border-primary pb-5" href="#">For Candidates</a>
+<a class="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary" href="#">For Employers</a>
+<a class="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary" href="#">Resources</a>
+<a class="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary" href="#">About</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+<span class="material-icons-outlined">notifications</span>
+</button>
+<div class="flex items-center gap-3 pl-4 border-l border-slate-200 dark:border-slate-800">
+<div class="text-right hidden sm:block">
+<p class="text-sm font-semibold leading-none">Chidi O.</p>
+<p class="text-xs text-slate-500 mt-1">Candidate Account</p>
+</div>
+<div class="w-10 h-10 bg-primary/10 text-primary flex items-center justify-center rounded-full font-bold border-2 border-primary/20">
+                            CO
+                        </div>
+<span class="material-icons-outlined text-slate-400 text-sm">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+</header>
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<!-- Dashboard Header -->
+<div class="mb-8">
+<h1 class="text-3xl font-bold text-slate-900 dark:text-white">Welcome back, Chidi</h1>
+<p class="text-slate-600 dark:text-slate-400 mt-1">Track your applications and global career progress.</p>
+</div>
+<!-- Profile Completion Card -->
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 mb-8 shadow-sm">
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+<div class="flex-1">
+<div class="flex items-center justify-between mb-2">
+<h2 class="text-lg font-bold">Profile Completion</h2>
+<span class="text-primary font-bold">75% Complete</span>
+</div>
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 mb-6">
+<div class="bg-primary h-3 rounded-full" style="width: 75%"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+<span class="material-icons-outlined text-green-500 text-sm">check_circle</span>
+<span class="text-sm">Personal details added</span>
+</div>
+<div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+<span class="material-icons-outlined text-slate-300 text-sm">radio_button_unchecked</span>
+<span class="text-sm">Upload Resume</span>
+</div>
+<div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+<span class="material-icons-outlined text-green-500 text-sm">check_circle</span>
+<span class="text-sm">Experience history</span>
+</div>
+<div class="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+<span class="material-icons-outlined text-slate-300 text-sm">radio_button_unchecked</span>
+<span class="text-sm">Add Skills (3 more)</span>
+</div>
+</div>
+</div>
+<div class="lg:pl-8 lg:border-l border-slate-200 dark:border-slate-800">
+<button class="w-full lg:w-auto px-6 py-3 bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 transition-colors">
+                        Complete Profile
+                    </button>
+</div>
+</div>
+</div>
+<!-- Applications Section -->
+<section class="mb-8">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-xl font-bold text-slate-900 dark:text-white">Your Applications</h2>
+<a class="text-primary text-sm font-semibold hover:underline" href="#">View All</a>
+</div>
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Job</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date Applied</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+<tr>
+<td class="px-6 py-4">
+<div>
+<p class="font-semibold text-slate-900 dark:text-white">Senior Frontend Engineer</p>
+<p class="text-sm text-slate-500">TechFlow Global • Remote</p>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Oct 24, 2023</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Under Review</span>
+</td>
+<td class="px-6 py-4">
+<a class="text-primary text-sm font-medium hover:underline" href="#">View Job</a>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4">
+<div>
+<p class="font-semibold text-slate-900 dark:text-white">Product Designer</p>
+<p class="text-sm text-slate-500">Creative Hub • London, UK</p>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Oct 20, 2023</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Shortlisted</span>
+</td>
+<td class="px-6 py-4">
+<a class="text-primary text-sm font-medium hover:underline" href="#">View Job</a>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4">
+<div>
+<p class="font-semibold text-slate-900 dark:text-white">Fullstack Developer</p>
+<p class="text-sm text-slate-500">Startup Lane • Lagos, Nigeria</p>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Oct 15, 2023</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Applied</span>
+</td>
+<td class="px-6 py-4">
+<a class="text-primary text-sm font-medium hover:underline" href="#">View Job</a>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- Saved & Recommended Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+<!-- Saved Jobs -->
+<section>
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-xl font-bold text-slate-900 dark:text-white">Saved Jobs</h2>
+<a class="text-primary text-sm font-semibold hover:underline" href="#">Manage</a>
+</div>
+<div class="space-y-4">
+<div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-start gap-4">
+<div class="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center flex-shrink-0">
+<span class="material-icons-outlined text-slate-400">business</span>
+</div>
+<div class="flex-1">
+<h3 class="font-bold text-slate-900 dark:text-white leading-tight">Engineering Manager</h3>
+<p class="text-sm text-slate-500">PayStack • Remote (Africa)</p>
+<div class="mt-2 flex items-center gap-4 text-xs text-slate-400">
+<span>Saved 2 days ago</span>
+<span class="flex items-center gap-1"><span class="material-icons-outlined text-[14px]">payments</span> $120k - $150k</span>
+</div>
+</div>
+<button class="text-slate-300 hover:text-red-500 transition-colors">
+<span class="material-icons-outlined">bookmark</span>
+</button>
+</div>
+<div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-start gap-4">
+<div class="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center flex-shrink-0">
+<span class="material-icons-outlined text-slate-400">bolt</span>
+</div>
+<div class="flex-1">
+<h3 class="font-bold text-slate-900 dark:text-white leading-tight">Growth Lead</h3>
+<p class="text-sm text-slate-500">Andela • Nairobi, Kenya</p>
+<div class="mt-2 flex items-center gap-4 text-xs text-slate-400">
+<span>Saved 5 days ago</span>
+<span class="flex items-center gap-1"><span class="material-icons-outlined text-[14px]">schedule</span> Full-time</span>
+</div>
+</div>
+<button class="text-slate-300 hover:text-red-500 transition-colors">
+<span class="material-icons-outlined">bookmark</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Recommended Jobs -->
+<section>
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-xl font-bold text-slate-900 dark:text-white">Recommended for You</h2>
+<a class="text-primary text-sm font-semibold hover:underline" href="#">View All</a>
+</div>
+<div class="space-y-4">
+<div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm border-l-4 border-l-primary flex items-start gap-4">
+<div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+<span class="material-icons-outlined text-primary">auto_awesome</span>
+</div>
+<div class="flex-1">
+<div class="flex items-center justify-between">
+<h3 class="font-bold text-slate-900 dark:text-white leading-tight">Lead UX Researcher</h3>
+<span class="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded">Top Match</span>
+</div>
+<p class="text-sm text-slate-500">Flutterwave • San Francisco / Remote</p>
+<div class="mt-2 flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-medium text-slate-600 dark:text-slate-400">User Experience</span>
+<span class="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-medium text-slate-600 dark:text-slate-400">Figma</span>
+<span class="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-medium text-slate-600 dark:text-slate-400">Research</span>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-start gap-4">
+<div class="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center flex-shrink-0">
+<span class="material-icons-outlined text-slate-400">cloud</span>
+</div>
+<div class="flex-1">
+<h3 class="font-bold text-slate-900 dark:text-white leading-tight">Cloud Architect</h3>
+<p class="text-sm text-slate-500">MainOne • Accra, Ghana</p>
+<div class="mt-2 flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-medium text-slate-600 dark:text-slate-400">AWS</span>
+<span class="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-medium text-slate-600 dark:text-slate-400">DevOps</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 mt-16 pt-12 pb-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-12">
+<div class="col-span-2">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+<span class="text-white font-bold text-xl">G</span>
+</div>
+<span class="font-bold text-xl tracking-tight text-slate-900 dark:text-white">GlobalTalent</span>
+</div>
+<p class="text-slate-500 dark:text-slate-400 max-w-xs mb-6">
+                        The #1 global platform connecting African and diaspora talent with leading organizations worldwide.
+                    </p>
+<div class="flex gap-4">
+<a class="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-primary hover:border-primary transition-colors" href="#">
+<svg class="w-5 h-5 fill-current" viewbox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg>
+</a>
+<a class="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-primary hover:border-primary transition-colors" href="#">
+<svg class="w-5 h-5 fill-current" viewbox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.84 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"></path></svg>
+</a>
+</div>
+</div>
+<div>
+<h4 class="font-bold text-slate-900 dark:text-white mb-4">Platform</h4>
+<ul class="space-y-2">
+<li><a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">Browse Jobs</a></li>
+<li><a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">Companies</a></li>
+<li><a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">Career Advice</a></li>
+<li><a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">Salaries</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-slate-900 dark:text-white mb-4">Support</h4>
+<ul class="space-y-2">
+<li><a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">Help Center</a></li>
+<li><a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">Contact Us</a></li>
+<li><a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">Privacy Policy</a></li>
+<li><a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">Terms of Service</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-slate-900 dark:text-white mb-4">Business</h4>
+<ul class="space-y-2">
+<li><a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">Post a Job</a></li>
+<li><a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">Hiring Solutions</a></li>
+<li><a class="text-sm text-slate-500 hover:text-primary transition-colors" href="#">Advertising</a></li>
+</ul>
+</div>
+</div>
+<div class="border-t border-slate-200 dark:border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+<p class="text-sm text-slate-500">© 2023 GlobalTalent. All rights reserved.</p>
+<div class="flex gap-6 text-sm text-slate-500">
+<a class="hover:text-primary" href="#">English (US)</a>
+<a class="hover:text-primary" href="#">USD ($)</a>
+</div>
+</div>
+</div>
+</footer>
+</body></html>

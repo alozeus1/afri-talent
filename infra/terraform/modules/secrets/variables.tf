@@ -34,3 +34,37 @@ variable "jwt_secret" {
   description = "JWT secret"
   sensitive   = true
 }
+
+variable "anthropic_api_key" {
+  type        = string
+  description = "Anthropic API key for Claude AI"
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_secret_key" {
+  type        = string
+  description = "Stripe secret key for payments"
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_webhook_secret" {
+  type        = string
+  description = "Stripe webhook signing secret"
+  sensitive   = true
+  default     = ""
+}
+
+variable "adzuna_app_id" {
+  type        = string
+  description = "Adzuna API app ID for job aggregation"
+  default     = ""
+}
+
+variable "adzuna_api_key" {
+  type        = string
+  description = "Adzuna API key for job aggregation"
+  sensitive   = true
+  default     = ""
+}

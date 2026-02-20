@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1162d4",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#111418] dark:text-white">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<!-- Header -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-[#f0f2f4] dark:border-zinc-800 bg-white dark:bg-zinc-900 px-10 py-3">
+<div class="flex items-center gap-4 text-[#111418] dark:text-white">
+<div class="size-6 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-3xl">public</span>
+</div>
+<h2 class="text-[#111418] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">AfroConnect</h2>
+</div>
+<div class="flex flex-1 justify-end gap-8 items-center">
+<nav class="hidden md:flex items-center gap-9">
+<a class="text-[#111418] dark:text-zinc-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="#">Find Talent</a>
+<a class="text-[#111418] dark:text-zinc-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="#">Pricing</a>
+<a class="text-[#111418] dark:text-zinc-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="#">Resources</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="flex min-w-[120px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em]">
+<span class="truncate">Post a Job</span>
+</button>
+<div class="flex items-center gap-3 border-l border-[#f0f2f4] dark:border-zinc-800 pl-4">
+<span class="text-sm font-semibold hidden lg:block">Google Hiring</span>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border border-zinc-200 dark:border-zinc-700" data-alt="Google company logo icon" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuB0Y1Gv20Xd0HYcmYoIj10d2MQU1PMbb6tiZg1TsaPbgwnwaguoP45rWLxsCFwSa1msprEvr0xx4__tEInjofb2QKkbQmns6hf749qBIFQinIgj_npK5RYspYRxrnX-SFCNDAbUL1k89hKCQtt6dlLiR9strAl6iCdxA3w3dqWxsz5U9HIffbaQhE8DIGXqYm7ec3j8JHbuVQH6J1g9jtrJjzXetYb5khF9sgRv3feENCcc1WOQ2NajfmWLPdLJywd3ud2RpN-BHPM");'></div>
+</div>
+</div>
+</div>
+</header>
+<main class="flex flex-1 justify-center py-8">
+<div class="layout-content-container flex flex-col max-w-[1024px] flex-1 px-4 md:px-10">
+<!-- Page Heading -->
+<div class="flex flex-wrap justify-between items-end gap-4 p-4 mb-4">
+<div class="flex min-w-72 flex-col gap-2">
+<h1 class="text-[#111418] dark:text-white text-3xl md:text-4xl font-black leading-tight tracking-[-0.033em]">Welcome back, Google Hiring Team</h1>
+<p class="text-[#617289] dark:text-zinc-400 text-base font-normal leading-normal">Manage your global job listings and track application volume.</p>
+</div>
+</div>
+<!-- Stats Row -->
+<div class="flex flex-wrap gap-4 p-4">
+<div class="flex min-w-[158px] flex-1 flex-col gap-2 rounded-xl p-6 border border-[#dbe0e6] dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
+<div class="flex items-center justify-between mb-1">
+<p class="text-[#617289] dark:text-zinc-400 text-sm font-medium leading-normal">Active Jobs</p>
+<span class="material-symbols-outlined text-primary text-xl">work</span>
+</div>
+<p class="text-[#111418] dark:text-white tracking-light text-3xl font-bold leading-tight">4</p>
+</div>
+<div class="flex min-w-[158px] flex-1 flex-col gap-2 rounded-xl p-6 border border-[#dbe0e6] dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
+<div class="flex items-center justify-between mb-1">
+<p class="text-[#617289] dark:text-zinc-400 text-sm font-medium leading-normal">Pending Approval</p>
+<span class="material-symbols-outlined text-amber-500 text-xl">hourglass_empty</span>
+</div>
+<p class="text-[#111418] dark:text-white tracking-light text-3xl font-bold leading-tight">1</p>
+</div>
+<div class="flex min-w-[158px] flex-1 flex-col gap-2 rounded-xl p-6 border border-[#dbe0e6] dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
+<div class="flex items-center justify-between mb-1">
+<p class="text-[#617289] dark:text-zinc-400 text-sm font-medium leading-normal">Total Applications</p>
+<span class="material-symbols-outlined text-emerald-500 text-xl">group</span>
+</div>
+<p class="text-[#111418] dark:text-white tracking-light text-3xl font-bold leading-tight">156</p>
+</div>
+</div>
+<!-- Section Header with CTA -->
+<div class="flex items-center justify-between px-4 pb-3 pt-8">
+<h2 class="text-[#111418] dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em]">Your Job Listings</h2>
+<button class="flex min-w-[140px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] transition-transform active:scale-95">
+<span class="material-symbols-outlined text-lg">add</span>
+<span class="truncate">Post a New Job</span>
+</button>
+</div>
+<!-- Job Listings Table -->
+<div class="px-4 py-3 @container">
+<div class="flex overflow-hidden rounded-xl border border-[#dbe0e6] dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
+<table class="flex-1 text-left border-collapse">
+<thead>
+<tr class="bg-zinc-50 dark:bg-zinc-800/50 border-b border-[#dbe0e6] dark:border-zinc-800">
+<th class="px-6 py-4 text-[#111418] dark:text-white text-sm font-bold uppercase tracking-wider">Job Title</th>
+<th class="px-6 py-4 text-[#111418] dark:text-white text-sm font-bold uppercase tracking-wider">Status</th>
+<th class="px-6 py-4 text-[#111418] dark:text-white text-sm font-bold uppercase tracking-wider">Applications</th>
+<th class="px-6 py-4 text-[#111418] dark:text-white text-sm font-bold uppercase tracking-wider">Date Posted</th>
+<th class="px-6 py-4 text-[#617289] dark:text-zinc-400 text-sm font-bold uppercase tracking-wider text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#dbe0e6] dark:divide-zinc-800">
+<tr>
+<td class="px-6 py-5 text-[#111418] dark:text-white">
+<h3 class="text-base font-bold">Senior Software Engineer</h3>
+<p class="text-xs text-[#617289] dark:text-zinc-400">Lagos, Nigeria • Remote Friendly</p>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                            Active
+                                        </span>
+</td>
+<td class="px-6 py-5 text-[#617289] dark:text-zinc-400 text-sm font-medium">45</td>
+<td class="px-6 py-5 text-[#617289] dark:text-zinc-400 text-sm">Oct 12, 2023</td>
+<td class="px-6 py-5 text-right whitespace-nowrap">
+<a class="text-primary hover:underline text-sm font-bold mr-4" href="#">View</a>
+<a class="text-rose-500 hover:underline text-sm font-bold" href="#">Close</a>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-5 text-[#111418] dark:text-white">
+<h3 class="text-base font-bold">Product Designer</h3>
+<p class="text-xs text-[#617289] dark:text-zinc-400">Accra, Ghana • On-site</p>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                            Pending
+                                        </span>
+</td>
+<td class="px-6 py-5 text-[#617289] dark:text-zinc-400 text-sm font-medium">0</td>
+<td class="px-6 py-5 text-[#617289] dark:text-zinc-400 text-sm">Oct 24, 2023</td>
+<td class="px-6 py-5 text-right whitespace-nowrap">
+<a class="text-primary hover:underline text-sm font-bold mr-4" href="#">View</a>
+<a class="text-rose-500 hover:underline text-sm font-bold" href="#">Close</a>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-5 text-[#111418] dark:text-white">
+<h3 class="text-base font-bold">Marketing Manager</h3>
+<p class="text-xs text-[#617289] dark:text-zinc-400">Nairobi, Kenya • Hybrid</p>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                                            Closed
+                                        </span>
+</td>
+<td class="px-6 py-5 text-[#617289] dark:text-zinc-400 text-sm font-medium">111</td>
+<td class="px-6 py-5 text-[#617289] dark:text-zinc-400 text-sm">Sept 15, 2023</td>
+<td class="px-6 py-5 text-right whitespace-nowrap">
+<a class="text-primary hover:underline text-sm font-bold mr-4" href="#">View</a>
+<a class="text-zinc-400 cursor-not-allowed text-sm font-bold" href="#">Closed</a>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-white dark:bg-zinc-900 border-t border-[#f0f2f4] dark:border-zinc-800 py-12">
+<div class="max-w-[1024px] mx-auto px-10">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+<div class="col-span-1 md:col-span-1">
+<div class="flex items-center gap-4 text-[#111418] dark:text-white mb-6">
+<span class="material-symbols-outlined text-primary text-2xl">public</span>
+<h2 class="text-lg font-bold">AfroConnect</h2>
+</div>
+<p class="text-[#617289] dark:text-zinc-400 text-sm leading-relaxed">
+                            Empowering African talent and the diaspora to find global opportunities.
+                        </p>
+</div>
+<div>
+<h4 class="text-[#111418] dark:text-white font-bold mb-4">Employers</h4>
+<ul class="space-y-2 text-sm text-[#617289] dark:text-zinc-400">
+<li><a class="hover:text-primary" href="#">Hire Talent</a></li>
+<li><a class="hover:text-primary" href="#">Pricing Plans</a></li>
+<li><a class="hover:text-primary" href="#">Success Stories</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-[#111418] dark:text-white font-bold mb-4">Talent</h4>
+<ul class="space-y-2 text-sm text-[#617289] dark:text-zinc-400">
+<li><a class="hover:text-primary" href="#">Search Jobs</a></li>
+<li><a class="hover:text-primary" href="#">Career Advice</a></li>
+<li><a class="hover:text-primary" href="#">Resume Builder</a></li>
+</ul>
+</div>
+<div>
+<h4 class="text-[#111418] dark:text-white font-bold mb-4">Company</h4>
+<ul class="space-y-2 text-sm text-[#617289] dark:text-zinc-400">
+<li><a class="hover:text-primary" href="#">About Us</a></li>
+<li><a class="hover:text-primary" href="#">Contact</a></li>
+<li><a class="hover:text-primary" href="#">Privacy Policy</a></li>
+</ul>
+</div>
+</div>
+<div class="border-t border-[#f0f2f4] dark:border-zinc-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+<p class="text-[#617289] dark:text-zinc-500 text-xs">© 2024 AfroConnect. All rights reserved.</p>
+<div class="flex gap-6">
+<span class="material-symbols-outlined text-[#617289] cursor-pointer hover:text-primary">social_leaderboard</span>
+<span class="material-symbols-outlined text-[#617289] cursor-pointer hover:text-primary">alternate_email</span>
+<span class="material-symbols-outlined text-[#617289] cursor-pointer hover:text-primary">share</span>
+</div>
+</div>
+</div>
+</footer>
+</div>
+</body></html>

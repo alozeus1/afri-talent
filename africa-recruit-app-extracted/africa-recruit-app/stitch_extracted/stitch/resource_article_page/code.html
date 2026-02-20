@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1162d4",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<title>Resource Article Page</title>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#111418] dark:text-white transition-colors duration-200">
+<!-- Header Section -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-[#f0f2f4] dark:border-[#2a3038] bg-white dark:bg-[#111418] px-10 py-3 sticky top-0 z-50">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-4 text-primary">
+<div class="size-6">
+<svg fill="none" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M24 0.757355L47.2426 24L24 47.2426L0.757355 24L24 0.757355ZM21 35.7574V12.2426L9.24264 24L21 35.7574Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h2 class="text-[#111418] dark:text-white text-xl font-bold leading-tight tracking-[-0.015em]">JobPlatform</h2>
+</div>
+<nav class="hidden md:flex items-center gap-9">
+<a class="text-[#111418] dark:text-white text-sm font-medium leading-normal hover:text-primary" href="#">Find Jobs</a>
+<a class="text-primary text-sm font-bold leading-normal" href="#">Resources</a>
+<a class="text-[#111418] dark:text-white text-sm font-medium leading-normal hover:text-primary" href="#">Companies</a>
+<a class="text-[#111418] dark:text-white text-sm font-medium leading-normal hover:text-primary" href="#">About</a>
+</nav>
+</div>
+<div class="flex flex-1 justify-end gap-6 items-center">
+<label class="flex flex-col min-w-40 !h-10 max-w-64">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full">
+<div class="text-[#617289] flex border-none bg-background-light dark:bg-[#1a232e] items-center justify-center pl-4 rounded-l-lg">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-[#111418] dark:text-white focus:outline-0 focus:ring-0 border-none bg-background-light dark:bg-[#1a232e] h-full placeholder:text-[#617289] px-4 rounded-l-none pl-2 text-sm font-normal" placeholder="Search resources..." value=""/>
+</div>
+</label>
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center rounded-lg h-10 px-5 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-blue-700 transition-colors">
+                Sign Up
+            </button>
+</div>
+</header>
+<main class="flex flex-col items-center w-full pb-20">
+<!-- Breadcrumbs -->
+<div class="w-full max-w-[960px] px-6 py-8">
+<div class="flex flex-wrap items-center gap-2">
+<a class="text-[#617289] dark:text-slate-400 text-sm font-medium leading-normal hover:text-primary" href="#">Resources</a>
+<span class="text-[#617289] dark:text-slate-400 material-symbols-outlined text-[16px]">chevron_right</span>
+<a class="text-[#617289] dark:text-slate-400 text-sm font-medium leading-normal hover:text-primary" href="#">Visa &amp; Relocation Guides</a>
+<span class="text-[#617289] dark:text-slate-400 material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="text-[#111418] dark:text-white text-sm font-medium leading-normal">Getting a Tech Visa</span>
+</div>
+</div>
+<!-- Article Header -->
+<div class="w-full max-w-[800px] px-6 text-center">
+<p class="text-primary text-xs font-bold leading-normal tracking-widest uppercase mb-4">VISA &amp; RELOCATION</p>
+<h1 class="text-[#111418] dark:text-white tracking-tight text-[36px] md:text-[48px] font-bold leading-[1.15] mb-6">
+                The Complete Guide to Tech Visa Sponsorship for African Developers
+            </h1>
+<p class="text-[#617289] dark:text-slate-300 text-lg md:text-xl font-normal leading-relaxed max-w-[720px] mx-auto mb-12">
+                Everything you need to know about navigating the visa sponsorship landscape as a developer from the continent or diaspora.
+            </p>
+</div>
+<!-- Featured Image -->
+<div class="w-full max-w-[1000px] px-6 mb-16">
+<div class="aspect-[21/9] w-full bg-slate-200 dark:bg-slate-800 rounded-xl overflow-hidden">
+<img alt="Modern office architecture with global perspective" class="w-full h-full object-cover" data-alt="Modern glass building reflecting blue sky and clouds" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8dj4-027YtOWEaPHmilu-ogg8P98KouyfzB8Jt_YKvdrQCW0tb67rsdqKvE6qxRuaQcbHgAEjdhYHSciPwKcv1LpozCsD42dns125jTVl7cpyQ6Hlqu7K6jwdErmcoRpF4DQ7cY2ZNbJH6tmS8E8IF8OR4Fya2YxvnDV4r3SWEha0Tf1iJjYUaBbuUXs2J9vYAvqdK0XXu5UjxUAgFMWym2BtX0eUzuMFj0QiGp8fhgTtk_GWJnIU7sw7svmUaG4ryEbZAJb9hpA"/>
+</div>
+</div>
+<!-- Article Content -->
+<article class="w-full max-w-[720px] px-6 text-[#111418] dark:text-slate-200">
+<div class="prose prose-lg dark:prose-invert max-w-none">
+<p class="mb-8 text-lg leading-relaxed">
+                    Relocating for a software engineering role is one of the most transformative steps an African developer can take in their career. However, the complexity of visa sponsorship often feels like a barrier. This guide breaks down the process into actionable steps for talent looking to move to tech hubs in Europe, North America, and beyond.
+                </p>
+<h2 class="text-2xl font-bold mt-12 mb-6">Understanding the Landscape</h2>
+<p class="mb-6">
+                    Not all companies are created equal when it comes to sponsorship. Large-scale tech giants (MAMAA) and Series B+ startups often have the infrastructure to handle international relocations. In countries like Germany or the UK, employers must be registered as official sponsors before they can offer you a job that qualifies for a visa.
+                </p>
+<div class="bg-primary/5 border border-primary/20 p-8 rounded-xl my-10">
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-primary">info</span>
+<div>
+<p class="font-bold text-primary mb-1">Pro Tip: Verify Sponsorship Status</p>
+<p class="text-sm text-[#4d5b6d] dark:text-slate-400">Always verify your potential employer's sponsorship license status before starting the interview process. In the UK, you can check the public Register of Licensed Sponsors.</p>
+</div>
+</div>
+</div>
+<h2 class="text-2xl font-bold mt-12 mb-6">Key Documents Needed</h2>
+<p class="mb-6">Preparing your documentation early can save weeks of processing time. Most skilled worker visas require a baseline set of credentials:</p>
+<ul class="list-disc pl-6 space-y-4 mb-8">
+<li><strong>Proof of Professional Experience:</strong> Standardized CV and portfolio of work (GitHub/Live projects).</li>
+<li><strong>Academic Certificates:</strong> Degree certificates, often requiring official translation or equivalence verification (e.g., ZAB in Germany).</li>
+<li><strong>Language Proficiency:</strong> Standardized test results (IELTS/TOEFL) if moving to an English-speaking country.</li>
+<li><strong>Passport Validity:</strong> Ensure your travel document is valid for at least 2 years.</li>
+</ul>
+<h3 class="text-xl font-bold mt-10 mb-4">Navigating the Interview Process</h3>
+<p class="mb-12">
+                    When interviewing for a sponsored role, be transparent about your location early. Highlight your willingness to relocate and mention any specific visa categories you might be eligible for (like the EU Blue Card or the UK's Global Talent Visa).
+                </p>
+</div>
+</article>
+<!-- Related Resources -->
+<section class="w-full bg-white dark:bg-[#111418] py-20 mt-10 border-t border-b border-[#f0f2f4] dark:border-[#2a3038]">
+<div class="max-w-[960px] mx-auto px-6">
+<h2 class="text-2xl font-bold mb-10">You might also find helpful</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Card 1 -->
+<div class="flex flex-col gap-4 group cursor-pointer">
+<div class="aspect-video w-full rounded-lg overflow-hidden bg-slate-100">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Close up of person working on laptop keyboard" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7zdvZotF9efc-puqUBgWiili6_CmQjntNMYBAaJgnG_j0rU_2aeTmcJEk4kak22fGuQCxydK8G4tCBAEWSN5okJ3QR9db8zUO6pNF0K5GeTdXFkex3LIjgLWh2QiG6NqierYvEHwvQzUHswtIEUwhZlTePsy4qAMK-sN7DtAUnhIejxowDA_s-Fp_AN_MXaHvYpOdHZR8hsqg7tb5MRz8dlCxsnwnfjKYj65WsLQN5nK_5Ovw0INcKlSvqDmUXtE6IgEd6uy7-Zs"/>
+</div>
+<div>
+<p class="text-xs font-bold text-primary uppercase mb-2">Interview Prep</p>
+<h3 class="font-bold text-lg leading-tight group-hover:text-primary">Cracking the Remote Tech Interview</h3>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="flex flex-col gap-4 group cursor-pointer">
+<div class="aspect-video w-full rounded-lg overflow-hidden bg-slate-100">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Team of people collaborating in modern office" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVj6dgELnbLRwLXRdUtOwBsYcI6ySwCJ8XKrBImVxdGPFKIiUEXROh7XwpNY1EPBt6oj0jNPhI0BRiGc-vtWJ0dEW6EioMFJryO7E1xjCRY3qNahBlI2VlV8XjtXmAnVqQSAmM0_PUdK4gq6SPklyf-zpAPvmqolDVWjfdfQfwy0wzpHbS76hQ_2moRKUVWouPX_n5WCYdyKu5kkvOxDTZy0MxJx-D0Otq7lVP0g9LVqzeWcUm-LvTSWL1ZmUZue3xtC08gdnqM2A"/>
+</div>
+<div>
+<p class="text-xs font-bold text-primary uppercase mb-2">Relocation</p>
+<h3 class="font-bold text-lg leading-tight group-hover:text-primary">Top 5 Tech Hubs in Europe for African Talent</h3>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="flex flex-col gap-4 group cursor-pointer">
+<div class="aspect-video w-full rounded-lg overflow-hidden bg-slate-100">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Professional documents and legal paperwork on desk" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJByHyjCNlTCpDSwY9T_G_VLlVtJaBDLoW3hYm4Hg43pF6wMPmtKBobniW0qySp4SFiq3_O7zSfBbl7fmXImEXZBpBhQp45AA-kkyhPuv5Fd9alkZoG4ffqwSFCNb2DrVgYz1wM8y5sGW6vEu5py3E1ujZGcLh2vYeqt1l8lZBinBRnFB3BNjF984-BOCgj8ZLFi2GEKjeQPmBXdrSARNrlUmRNOL78PxMkevYA0C76mKjHJ3w09b7gMzBAbKnVs7TE_QK6L5672Y"/>
+</div>
+<div>
+<p class="text-xs font-bold text-primary uppercase mb-2">Legal</p>
+<h3 class="font-bold text-lg leading-tight group-hover:text-primary">Understanding the EU Blue Card for Devs</h3>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Bottom CTA Section -->
+<section class="w-full max-w-[960px] px-6 py-24 text-center">
+<h2 class="text-3xl font-bold mb-4">Ready to find your next global role?</h2>
+<p class="text-[#617289] dark:text-slate-400 mb-10 text-lg">Browse thousands of jobs with visa sponsorship for African talent.</p>
+<div class="flex flex-col sm:flex-row gap-4 justify-center">
+<button class="flex min-w-[180px] cursor-pointer items-center justify-center rounded-lg h-12 px-8 bg-primary text-white text-base font-bold leading-normal hover:bg-blue-700 transition-colors">
+                    Explore Jobs
+                </button>
+<button class="flex min-w-[180px] cursor-pointer items-center justify-center rounded-lg h-12 px-8 border border-primary text-primary text-base font-bold leading-normal hover:bg-primary/5 transition-colors">
+                    Create a Profile
+                </button>
+</div>
+</section>
+</main>
+<!-- Footer Section -->
+<footer class="bg-white dark:bg-[#111418] border-t border-[#f0f2f4] dark:border-[#2a3038] py-16">
+<div class="max-w-[960px] mx-auto px-10">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+<div class="col-span-1 md:col-span-1">
+<div class="flex items-center gap-4 text-primary mb-6">
+<div class="size-6">
+<svg fill="none" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M24 0.757355L47.2426 24L24 47.2426L0.757355 24L24 0.757355ZM21 35.7574V12.2426L9.24264 24L21 35.7574Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h2 class="text-[#111418] dark:text-white text-xl font-bold">JobPlatform</h2>
+</div>
+<p class="text-[#617289] dark:text-slate-400 text-sm leading-relaxed">
+                        Connecting African talent with global opportunities.
+                    </p>
+</div>
+<div>
+<h4 class="font-bold text-[#111418] dark:text-white mb-6">Platform</h4>
+<ul class="space-y-4 text-sm text-[#617289] dark:text-slate-400">
+<li><a class="hover:text-primary" href="#">Find Jobs</a></li>
+<li><a class="hover:text-primary" href="#">Browse Companies</a></li>
+<li><a class="hover:text-primary" href="#">Pricing</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-[#111418] dark:text-white mb-6">Resources</h4>
+<ul class="space-y-4 text-sm text-[#617289] dark:text-slate-400">
+<li><a class="hover:text-primary" href="#">Articles</a></li>
+<li><a class="hover:text-primary" href="#">Visa Guide</a></li>
+<li><a class="hover:text-primary" href="#">Career Advice</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-[#111418] dark:text-white mb-6">Support</h4>
+<ul class="space-y-4 text-sm text-[#617289] dark:text-slate-400">
+<li><a class="hover:text-primary" href="#">Help Center</a></li>
+<li><a class="hover:text-primary" href="#">Contact Us</a></li>
+<li><a class="hover:text-primary" href="#">Privacy</a></li>
+</ul>
+</div>
+</div>
+<div class="flex flex-col md:flex-row justify-between items-center border-t border-[#f0f2f4] dark:border-[#2a3038] pt-8 gap-4">
+<p class="text-[#617289] dark:text-slate-400 text-sm">© 2024 JobPlatform. All rights reserved.</p>
+<div class="flex gap-6">
+<span class="material-symbols-outlined text-[#617289] dark:text-slate-400 cursor-pointer hover:text-primary">public</span>
+<span class="material-symbols-outlined text-[#617289] dark:text-slate-400 cursor-pointer hover:text-primary">mail</span>
+<span class="material-symbols-outlined text-[#617289] dark:text-slate-400 cursor-pointer hover:text-primary">alternate_email</span>
+</div>
+</div>
+</div>
+</footer>
+</body></html>

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Senior Backend Engineer - Global Tech Solutions | JobPlatform</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#136dec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#111418] dark:text-white">
+<div class="relative flex min-h-screen flex-col overflow-x-hidden">
+<!-- Header -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-[#f0f2f4] dark:border-[#2d3748] bg-white dark:bg-[#1a202c] px-6 lg:px-40 py-3">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-4 text-primary">
+<div class="size-6">
+<svg fill="none" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_6_330)">
+<path clip-rule="evenodd" d="M24 0.757355L47.2426 24L24 47.2426L0.757355 24L24 0.757355ZM21 35.7574V12.2426L9.24264 24L21 35.7574Z" fill="currentColor" fill-rule="evenodd"></path>
+</g>
+<defs><clippath id="clip0_6_330"><rect fill="white" height="48" width="48"></rect></clippath></defs>
+</svg>
+</div>
+<h2 class="text-[#111418] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">JobPlatform</h2>
+</div>
+<nav class="hidden md:flex items-center gap-9">
+<a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal" href="#">Find Jobs</a>
+<a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal" href="#">Companies</a>
+<a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal" href="#">Salaries</a>
+<a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal" href="#">Resources</a>
+</nav>
+</div>
+<div class="flex flex-1 justify-end gap-4 lg:gap-8">
+<label class="hidden sm:flex flex-col min-w-40 !h-10 max-w-64">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full">
+<div class="text-[#617289] flex border-none bg-[#f0f2f4] dark:bg-[#2d3748] items-center justify-center pl-4 rounded-l-lg">
+<span class="material-symbols-outlined text-xl">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 border-none bg-[#f0f2f4] dark:bg-[#2d3748] text-[#111418] dark:text-white focus:outline-0 focus:ring-0 h-full placeholder:text-[#617289] px-4 rounded-r-lg text-sm" placeholder="Search jobs, skills..." value=""/>
+</div>
+</label>
+<div class="flex gap-2">
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold">Sign In</button>
+<button class="hidden lg:flex min-w-[84px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-[#f0f2f4] dark:bg-[#2d3748] text-[#111418] dark:text-white text-sm font-bold">Post a Job</button>
+</div>
+</div>
+</header>
+<main class="flex flex-1 flex-col items-center px-6 lg:px-40 py-8">
+<div class="w-full max-w-[1024px]">
+<!-- Breadcrumbs -->
+<nav class="flex flex-wrap gap-2 py-4 mb-2">
+<a class="text-[#617289] text-sm font-medium hover:text-primary" href="#">Jobs</a>
+<span class="text-[#617289] text-sm font-medium">/</span>
+<a class="text-[#617289] text-sm font-medium hover:text-primary" href="#">Engineering</a>
+<span class="text-[#617289] text-sm font-medium">/</span>
+<span class="text-[#111418] dark:text-white text-sm font-medium">Software Engineer</span>
+</nav>
+<!-- Job Header -->
+<div class="bg-white dark:bg-[#1a202c] border border-[#f0f2f4] dark:border-[#2d3748] rounded-xl p-6 lg:p-8 mb-6 shadow-sm">
+<div class="flex flex-col lg:flex-row justify-between gap-6">
+<div class="flex flex-col gap-4">
+<h1 class="text-[#111418] dark:text-white text-4xl font-black leading-tight tracking-tight">Senior Backend Engineer</h1>
+<div class="flex items-center gap-2 text-[#617289] dark:text-gray-400 text-lg">
+<span class="font-semibold text-primary">Global Tech Solutions</span>
+<span>•</span>
+<span>Nairobi, Kenya</span>
+<span>•</span>
+<span class="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded text-sm font-bold">Remote</span>
+</div>
+<div class="flex gap-3 flex-wrap pt-2">
+<div class="flex h-8 items-center justify-center gap-2 rounded-lg bg-primary/10 text-primary px-4">
+<span class="material-symbols-outlined text-lg">public</span>
+<p class="text-sm font-bold">Remote friendly</p>
+</div>
+<div class="flex h-8 items-center justify-center gap-2 rounded-lg bg-primary/10 text-primary px-4">
+<span class="material-symbols-outlined text-lg">credit_card</span>
+<p class="text-sm font-bold">Visa Sponsorship</p>
+</div>
+<div class="flex h-8 items-center justify-center gap-2 rounded-lg bg-primary/10 text-primary px-4">
+<span class="material-symbols-outlined text-lg">flight_takeoff</span>
+<p class="text-sm font-bold">Relocation Assistance</p>
+</div>
+</div>
+</div>
+<div class="flex flex-row lg:flex-col gap-3 min-w-[160px]">
+<button class="flex-1 lg:flex-none flex min-w-[140px] cursor-pointer items-center justify-center rounded-lg h-12 px-6 bg-primary text-white text-base font-bold">Apply Now</button>
+<button class="flex-1 lg:flex-none flex min-w-[140px] cursor-pointer items-center justify-center rounded-lg h-12 px-6 bg-[#f0f2f4] dark:bg-[#2d3748] text-[#111418] dark:text-white text-base font-bold">
+<span class="material-symbols-outlined mr-2">bookmark</span> Save
+                            </button>
+</div>
+</div>
+</div>
+<!-- Top Info Bar -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+<div class="bg-white dark:bg-[#1a202c] p-4 rounded-xl border border-[#f0f2f4] dark:border-[#2d3748] flex items-center gap-4">
+<div class="bg-primary/10 p-2 rounded-lg text-primary">
+<span class="material-symbols-outlined">payments</span>
+</div>
+<div>
+<p class="text-xs text-[#617289] font-medium uppercase tracking-wider">Salary Range</p>
+<p class="text-[#111418] dark:text-white font-bold">$70k - $100k</p>
+</div>
+</div>
+<div class="bg-white dark:bg-[#1a202c] p-4 rounded-xl border border-[#f0f2f4] dark:border-[#2d3748] flex items-center gap-4">
+<div class="bg-primary/10 p-2 rounded-lg text-primary">
+<span class="material-symbols-outlined">work</span>
+</div>
+<div>
+<p class="text-xs text-[#617289] font-medium uppercase tracking-wider">Job Type</p>
+<p class="text-[#111418] dark:text-white font-bold">Full-time</p>
+</div>
+</div>
+<div class="bg-white dark:bg-[#1a202c] p-4 rounded-xl border border-[#f0f2f4] dark:border-[#2d3748] flex items-center gap-4">
+<div class="bg-primary/10 p-2 rounded-lg text-primary">
+<span class="material-symbols-outlined">trending_up</span>
+</div>
+<div>
+<p class="text-xs text-[#617289] font-medium uppercase tracking-wider">Experience</p>
+<p class="text-[#111418] dark:text-white font-bold">Senior Level</p>
+</div>
+</div>
+<div class="bg-white dark:bg-[#1a202c] p-4 rounded-xl border border-[#f0f2f4] dark:border-[#2d3748] flex items-center gap-4">
+<div class="bg-primary/10 p-2 rounded-lg text-primary">
+<span class="material-symbols-outlined">apartment</span>
+</div>
+<div>
+<p class="text-xs text-[#617289] font-medium uppercase tracking-wider">Industry</p>
+<p class="text-[#111418] dark:text-white font-bold">Technology</p>
+</div>
+</div>
+</div>
+<!-- Main Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Left Column -->
+<div class="lg:col-span-2 space-y-8">
+<section class="space-y-4">
+<h3 class="text-2xl font-bold">About the Role</h3>
+<p class="text-[#4e5b6b] dark:text-gray-300 leading-relaxed text-lg">
+                                We are looking for a Senior Backend Engineer to join our growing core platform team. You will be responsible for designing and implementing high-performance services that power our global job marketplace. You'll work closely with product managers and other engineers to deliver seamless experiences for talent across Africa and the diaspora.
+                            </p>
+</section>
+<section class="space-y-4">
+<h3 class="text-2xl font-bold">Key Responsibilities</h3>
+<ul class="list-none space-y-3">
+<li class="flex items-start gap-3 text-[#4e5b6b] dark:text-gray-300 leading-relaxed">
+<span class="material-symbols-outlined text-primary mt-1">check_circle</span>
+<span>Architect and maintain scalable microservices using Python and Go.</span>
+</li>
+<li class="flex items-start gap-3 text-[#4e5b6b] dark:text-gray-300 leading-relaxed">
+<span class="material-symbols-outlined text-primary mt-1">check_circle</span>
+<span>Optimize database queries and system performance for low-latency responses.</span>
+</li>
+<li class="flex items-start gap-3 text-[#4e5b6b] dark:text-gray-300 leading-relaxed">
+<span class="material-symbols-outlined text-primary mt-1">check_circle</span>
+<span>Lead technical design discussions and mentor junior backend engineers.</span>
+</li>
+<li class="flex items-start gap-3 text-[#4e5b6b] dark:text-gray-300 leading-relaxed">
+<span class="material-symbols-outlined text-primary mt-1">check_circle</span>
+<span>Collaborate with devops to ensure high availability and security of production systems.</span>
+</li>
+</ul>
+</section>
+<section class="space-y-4">
+<h3 class="text-2xl font-bold">Requirements</h3>
+<ul class="list-none space-y-3">
+<li class="flex items-start gap-3 text-[#4e5b6b] dark:text-gray-300 leading-relaxed">
+<span class="material-symbols-outlined text-primary mt-1">arrow_forward</span>
+<span>5+ years of experience in backend software development.</span>
+</li>
+<li class="flex items-start gap-3 text-[#4e5b6b] dark:text-gray-300 leading-relaxed">
+<span class="material-symbols-outlined text-primary mt-1">arrow_forward</span>
+<span>Strong proficiency in Python, Go, or Java.</span>
+</li>
+<li class="flex items-start gap-3 text-[#4e5b6b] dark:text-gray-300 leading-relaxed">
+<span class="material-symbols-outlined text-primary mt-1">arrow_forward</span>
+<span>Experience with cloud infrastructure (AWS/GCP) and Kubernetes.</span>
+</li>
+<li class="flex items-start gap-3 text-[#4e5b6b] dark:text-gray-300 leading-relaxed">
+<span class="material-symbols-outlined text-primary mt-1">arrow_forward</span>
+<span>Previous experience working in a remote, distributed team.</span>
+</li>
+</ul>
+</section>
+<!-- Eligibility & Support Section -->
+<section class="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-xl p-6 space-y-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-3xl">verified_user</span>
+<h3 class="text-xl font-bold text-primary">Eligibility &amp; Diaspora Support</h3>
+</div>
+<div class="space-y-3 text-[#4e5b6b] dark:text-gray-300">
+<p class="font-medium">This position is open to global talent with specific support for African diaspora professionals:</p>
+<ul class="list-disc pl-5 space-y-2">
+<li>Full visa sponsorship for the candidate and immediate family.</li>
+<li>Relocation stipend including flights and first month's accommodation in Nairobi.</li>
+<li>Cultural integration support and local community networking.</li>
+<li>Remote work flexibility within GMT-2 to GMT+3 timezones.</li>
+</ul>
+</div>
+</section>
+</div>
+<!-- Right Column -->
+<aside class="space-y-6">
+<div class="bg-white dark:bg-[#1a202c] border border-[#f0f2f4] dark:border-[#2d3748] rounded-xl p-6 shadow-sm sticky top-6">
+<div class="flex items-center gap-4 mb-6">
+<div class="size-16 rounded-lg bg-[#f0f2f4] dark:bg-[#2d3748] flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-4xl">domain</span>
+</div>
+<div>
+<h4 class="text-xl font-bold">Global Tech Solutions</h4>
+<p class="text-sm text-primary font-medium">Verified Employer</p>
+</div>
+</div>
+<p class="text-[#617289] dark:text-gray-400 text-sm leading-relaxed mb-6">
+                                Global Tech Solutions is a leading fintech company headquartered in Nairobi, building the next generation of financial infrastructure for the African continent.
+                            </p>
+<div class="space-y-4">
+<div class="flex items-center gap-3 text-sm">
+<span class="material-symbols-outlined text-[#617289]">language</span>
+<a class="text-primary hover:underline font-medium" href="#">globaltech.solutions</a>
+</div>
+<div class="flex items-center gap-3 text-sm">
+<span class="material-symbols-outlined text-[#617289]">groups</span>
+<span class="dark:text-gray-300">500-1,000 employees</span>
+</div>
+<div class="flex items-center gap-3 text-sm">
+<span class="material-symbols-outlined text-[#617289]">location_on</span>
+<span class="dark:text-gray-300">Nairobi, KE • London, UK</span>
+</div>
+</div>
+<button class="w-full mt-8 flex cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-[#f0f2f4] dark:bg-[#2d3748] text-[#111418] dark:text-white text-sm font-bold border border-transparent hover:border-primary transition-all">
+                                View Company Profile
+                            </button>
+</div>
+</aside>
+</div>
+<!-- Bottom Apply Section -->
+<div class="mt-12 mb-16 p-8 bg-white dark:bg-[#1a202c] border border-[#f0f2f4] dark:border-[#2d3748] rounded-xl text-center space-y-6 shadow-sm">
+<h3 class="text-2xl font-bold">Ready to take the next step?</h3>
+<p class="text-[#617289] dark:text-gray-400">Join a team that values your talent and supports your global journey.</p>
+<div class="flex flex-col items-center gap-4">
+<button class="flex min-w-[240px] cursor-pointer items-center justify-center rounded-lg h-14 px-8 bg-primary text-white text-lg font-bold shadow-lg shadow-primary/20">Apply Now</button>
+<p class="text-sm text-[#617289]">
+<a class="text-primary font-bold" href="#">Sign in</a> to auto-fill your application from your profile.
+                        </p>
+</div>
+</div>
+<!-- Related Jobs Section -->
+<section class="border-t border-[#f0f2f4] dark:border-[#2d3748] pt-12 mb-20">
+<h3 class="text-2xl font-bold mb-8">Related Jobs in Engineering</h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Card 1 -->
+<div class="bg-white dark:bg-[#1a202c] border border-[#f0f2f4] dark:border-[#2d3748] p-5 rounded-xl hover:shadow-md transition-shadow cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<div class="size-12 rounded bg-[#f0f2f4] dark:bg-[#2d3748] flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">developer_board</span>
+</div>
+<span class="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded">New</span>
+</div>
+<h4 class="font-bold text-lg mb-1">Frontend Lead (React)</h4>
+<p class="text-sm text-[#617289] mb-4">FintechX • Lagos, Nigeria</p>
+<div class="flex items-center gap-2 text-xs font-medium text-[#111418] dark:text-gray-300">
+<span class="bg-[#f0f2f4] dark:bg-[#2d3748] px-2 py-1 rounded">Full-time</span>
+<span class="bg-[#f0f2f4] dark:bg-[#2d3748] px-2 py-1 rounded">$60k - $90k</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-white dark:bg-[#1a202c] border border-[#f0f2f4] dark:border-[#2d3748] p-5 rounded-xl hover:shadow-md transition-shadow cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<div class="size-12 rounded bg-[#f0f2f4] dark:bg-[#2d3748] flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">security</span>
+</div>
+</div>
+<h4 class="font-bold text-lg mb-1">Site Reliability Engineer</h4>
+<p class="text-sm text-[#617289] mb-4">DataFlow • Remote (Africa)</p>
+<div class="flex items-center gap-2 text-xs font-medium text-[#111418] dark:text-gray-300">
+<span class="bg-[#f0f2f4] dark:bg-[#2d3748] px-2 py-1 rounded">Remote</span>
+<span class="bg-[#f0f2f4] dark:bg-[#2d3748] px-2 py-1 rounded">$80k - $120k</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-white dark:bg-[#1a202c] border border-[#f0f2f4] dark:border-[#2d3748] p-5 rounded-xl hover:shadow-md transition-shadow cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<div class="size-12 rounded bg-[#f0f2f4] dark:bg-[#2d3748] flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">database</span>
+</div>
+</div>
+<h4 class="font-bold text-lg mb-1">Database Architect</h4>
+<p class="text-sm text-[#617289] mb-4">AfriPay • Nairobi, Kenya</p>
+<div class="flex items-center gap-2 text-xs font-medium text-[#111418] dark:text-gray-300">
+<span class="bg-[#f0f2f4] dark:bg-[#2d3748] px-2 py-1 rounded">On-site</span>
+<span class="bg-[#f0f2f4] dark:bg-[#2d3748] px-2 py-1 rounded">$75k+</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-white dark:bg-[#1a202c] border-t border-[#f0f2f4] dark:border-[#2d3748] px-6 lg:px-40 py-12">
+<div class="max-w-[1024px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
+<div class="col-span-1 md:col-span-1 space-y-4">
+<div class="flex items-center gap-2 text-primary font-bold text-xl">
+<svg class="size-6" fill="currentColor" viewbox="0 0 48 48"><path d="M24 0.757355L47.2426 24L24 47.2426L0.757355 24L24 0.757355ZM21 35.7574V12.2426L9.24264 24L21 35.7574Z"></path></svg>
+                        JobPlatform
+                    </div>
+<p class="text-sm text-[#617289] leading-relaxed">Connecting African talent to global opportunities. High-quality jobs with relocation and visa support.</p>
+</div>
+<div class="space-y-4">
+<h5 class="font-bold text-sm uppercase tracking-wider">Job Seekers</h5>
+<ul class="space-y-2 text-sm text-[#617289]">
+<li><a class="hover:text-primary" href="#">Browse Jobs</a></li>
+<li><a class="hover:text-primary" href="#">Salary Tools</a></li>
+<li><a class="hover:text-primary" href="#">Career Advice</a></li>
+<li><a class="hover:text-primary" href="#">Visa Info</a></li>
+</ul>
+</div>
+<div class="space-y-4">
+<h5 class="font-bold text-sm uppercase tracking-wider">Employers</h5>
+<ul class="space-y-2 text-sm text-[#617289]">
+<li><a class="hover:text-primary" href="#">Post a Job</a></li>
+<li><a class="hover:text-primary" href="#">Hiring Solutions</a></li>
+<li><a class="hover:text-primary" href="#">Pricing</a></li>
+<li><a class="hover:text-primary" href="#">Employer Branding</a></li>
+</ul>
+</div>
+<div class="space-y-4">
+<h5 class="font-bold text-sm uppercase tracking-wider">Connect</h5>
+<div class="flex gap-4">
+<a class="size-10 rounded-full bg-[#f0f2f4] dark:bg-[#2d3748] flex items-center justify-center text-[#111418] dark:text-white hover:bg-primary hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-lg">share</span>
+</a>
+<a class="size-10 rounded-full bg-[#f0f2f4] dark:bg-[#2d3748] flex items-center justify-center text-[#111418] dark:text-white hover:bg-primary hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-lg">mail</span>
+</a>
+</div>
+</div>
+</div>
+<div class="max-w-[1024px] mx-auto mt-12 pt-8 border-t border-[#f0f2f4] dark:border-[#2d3748] text-center text-xs text-[#617289]">
+                © 2024 JobPlatform Global. All rights reserved.
+            </div>
+</footer>
+</div>
+</body></html>
