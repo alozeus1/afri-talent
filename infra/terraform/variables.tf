@@ -296,6 +296,24 @@ variable "github_actions_additional_policy_arn" {
   default     = ""
 }
 
+variable "create_oidc_provider" {
+  type        = bool
+  description = "Create the GitHub OIDC provider. Set false if it already exists in the account."
+  default     = true
+}
+
+variable "existing_oidc_provider_arn" {
+  type        = string
+  description = "ARN of the existing GitHub OIDC provider (used when create_oidc_provider=false)."
+  default     = ""
+}
+
+variable "s3_uploads_bucket_name" {
+  type        = string
+  description = "Name for the S3 uploads bucket. Defaults to <name_prefix>-uploads."
+  default     = ""
+}
+
 variable "alerts_email" {
   type        = string
   description = "Email address for CloudWatch alarm notifications"

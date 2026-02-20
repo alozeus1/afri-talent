@@ -123,6 +123,19 @@ module "ecs" {
   ecs_task_role_arn           = module.iam_ecs.task_role_arn
 }
 
+module "s3" {
+  source          = "./modules/s3"
+  bucket_name     = var.s3_uploads_bucket_name != "" ? var.s3_uploads_bucket_name : "${local.name_prefix}-uploads"
+  environment     = var.environment
+  allowed_origins = [local.frontend_url]
+}
+
+# Grant ECS task role access to the uploads S3 bucket
+resource "aws_iam_role_policy_attachment" "ecs_task_s3" {
+  role       = module.iam_ecs.task_role_name
+  policy_arn = module.s3.iam_policy_arn
+}
+
 module "github_oidc" {
   source                      = "./modules/github-oidc"
   name_prefix                 = local.name_prefix
@@ -134,5 +147,7 @@ module "github_oidc" {
   ecs_service_arns            = [module.ecs.frontend_service_arn, module.ecs.backend_service_arn]
   ecs_task_execution_role_arn = module.iam_ecs.execution_role_arn
   ecs_task_role_arn           = module.iam_ecs.task_role_arn
+  create_oidc_provider        = var.create_oidc_provider
+  existing_oidc_provider_arn  = var.existing_oidc_provider_arn
   additional_policy_arn       = var.github_actions_additional_policy_arn
 }

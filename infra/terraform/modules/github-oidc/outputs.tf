@@ -3,5 +3,5 @@ output "role_arn" {
 }
 
 output "provider_arn" {
-  value = aws_iam_openid_connect_provider.github.arn
+  value = local.oidc_provider_arn
 }

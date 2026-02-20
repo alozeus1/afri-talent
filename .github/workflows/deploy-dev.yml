@@ -15,12 +15,55 @@ permissions:
 env:
   AWS_REGION: us-east-1
   ECR_REGISTRY: 108188564905.dkr.ecr.us-east-1.amazonaws.com
-  ECS_CLUSTER: afritalent-dev-cluster
 
 jobs:
+  # ── Step 1: Provision all AWS infrastructure via Terraform ─────────────────
+  provision-infra:
+    name: Provision Infrastructure (Terraform)
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      ecs_cluster:       ${{ steps.tf-outputs.outputs.ecs_cluster }}
+      backend_service:   ${{ steps.tf-outputs.outputs.backend_service }}
+      frontend_service:  ${{ steps.tf-outputs.outputs.frontend_service }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init -backend-config=envs/dev/backend.config
+
+      - name: Terraform Apply
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve -var-file=envs/dev/terraform.tfvars
+
+      - name: Capture Terraform outputs
+        id: tf-outputs
+        working-directory: infra/terraform
+        run: |
+          echo "ecs_cluster=$(terraform output -raw ecs_cluster_name)"           >> "$GITHUB_OUTPUT"
+          echo "backend_service=$(terraform output -raw ecs_backend_service_name)"  >> "$GITHUB_OUTPUT"
+          echo "frontend_service=$(terraform output -raw ecs_frontend_service_name)" >> "$GITHUB_OUTPUT"
+
+  # ── Step 2a: Build & push backend image to ECR ─────────────────────────────
   build-push-backend:
     name: Build & Push Backend
     runs-on: ubuntu-latest
+    needs: [provision-infra]
     permissions:
       id-token: write
       contents: read
@@ -50,9 +93,11 @@ jobs:
           docker push $IMAGE:latest
           echo "image=$IMAGE:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
+  # ── Step 2b: Build & push frontend image to ECR ────────────────────────────
   build-push-frontend:
     name: Build & Push Frontend
     runs-on: ubuntu-latest
+    needs: [provision-infra]
     permissions:
       id-token: write
       contents: read
@@ -85,13 +130,18 @@ jobs:
           docker push $IMAGE:latest
           echo "image=$IMAGE:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
+  # ── Step 3: Deploy new images to ECS ───────────────────────────────────────
   deploy-ecs:
     name: Deploy to ECS
     runs-on: ubuntu-latest
-    needs: [build-push-backend, build-push-frontend]
+    needs: [provision-infra, build-push-backend, build-push-frontend]
     permissions:
       id-token: write
       contents: read
+    env:
+      ECS_CLUSTER:      ${{ needs.provision-infra.outputs.ecs_cluster }}
+      BACKEND_SERVICE:  ${{ needs.provision-infra.outputs.backend_service }}
+      FRONTEND_SERVICE: ${{ needs.provision-infra.outputs.frontend_service }}
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -99,40 +149,29 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # To run migrations before deploy, use:
-      # aws ecs run-task --cluster afritalent-dev-cluster \
-      #   --task-definition afritalent-dev-migrate \
-      #   --launch-type FARGATE \
-      #   --network-configuration <from-terraform-outputs> \
-      #   --region us-east-1
-      # The migrate task definition is provisioned by Terraform.
-
-      - name: Update backend ECS service
+      - name: Force new backend deployment
         run: |
           aws ecs update-service \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --service afritalent-dev-backend \
+            --cluster "$ECS_CLUSTER" \
+            --service "$BACKEND_SERVICE" \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
 
-      - name: Update frontend ECS service
+      - name: Force new frontend deployment
         run: |
           aws ecs update-service \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --service afritalent-dev-frontend \
+            --cluster "$ECS_CLUSTER" \
+            --service "$FRONTEND_SERVICE" \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
 
       - name: Wait for services stable
         run: |
           aws ecs wait services-stable \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --services afritalent-dev-backend afritalent-dev-frontend \
+            --cluster "$ECS_CLUSTER" \
+            --services "$BACKEND_SERVICE" "$FRONTEND_SERVICE" \
             --region ${{ env.AWS_REGION }}
 
-      # Rollback: If deployment fails, revert by redeploying the previous commit:
-      #   git revert <sha> && git push origin develop
-      # Or force a previous image via:
-      #   aws ecs update-service --cluster afritalent-dev-cluster \
-      #     --service <service-name> --force-new-deployment
-      #     --task-definition <previous-task-def-arn>
+      # Rollback: revert the commit and push, or run:
+      #   aws ecs update-service --cluster <cluster> --service <svc> \
+      #     --task-definition <previous-task-def-arn> --force-new-deployment

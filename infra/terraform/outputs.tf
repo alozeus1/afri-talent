@@ -1,3 +1,23 @@
+output "ecs_cluster_name" {
+  description = "ECS cluster name (used by deploy workflow)"
+  value       = module.ecs.cluster_name
+}
+
+output "ecs_backend_service_name" {
+  description = "ECS backend service name (used by deploy workflow)"
+  value       = module.ecs.backend_service_name
+}
+
+output "ecs_frontend_service_name" {
+  description = "ECS frontend service name (used by deploy workflow)"
+  value       = module.ecs.frontend_service_name
+}
+
+output "s3_uploads_bucket" {
+  description = "S3 uploads bucket name"
+  value       = module.s3.bucket_name
+}
+
 output "alb_dns_name" {
   description = "ALB DNS name"
   value       = module.alb.alb_dns_name

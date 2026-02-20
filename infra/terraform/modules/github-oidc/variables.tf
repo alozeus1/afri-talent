@@ -48,3 +48,15 @@ variable "additional_policy_arn" {
   description = "Optional additional IAM policy ARN"
   default     = ""
 }
+
+variable "create_oidc_provider" {
+  type        = bool
+  description = "Create the GitHub OIDC provider. Set false if it already exists in the account."
+  default     = true
+}
+
+variable "existing_oidc_provider_arn" {
+  type        = string
+  description = "ARN of an existing GitHub OIDC provider. Used when create_oidc_provider=false."
+  default     = ""
+}

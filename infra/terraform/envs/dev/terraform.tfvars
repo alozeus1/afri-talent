@@ -46,26 +46,30 @@ enable_container_insights = false
 # CloudFront - skip for dev, use ALB directly
 # We'll set cloudfront_aliases to empty and use ALB with HTTPS
 
-# Route53
-enable_route53       = true
-route53_zone_id      = "REPLACE_WITH_ZONE_ID"
+# Route53 - disabled until zone ID is known; set enable_route53=true once you have it
+enable_route53       = false
+route53_zone_id      = ""
 frontend_domain_name = "dev.afri-talent.com"
 api_domain_name      = "api.dev.afri-talent.com"
 
-# ACM cert ARN (must be in us-east-1, for *.afri-talent.com or dev.afri-talent.com)
-acm_certificate_arn = "REPLACE_WITH_ACM_CERT_ARN"
+# ACM cert - leave empty until cert is issued; ALB and CloudFront skip HTTPS when empty
+acm_certificate_arn = ""
 
-# CloudFront (using ALB origin for dev - no extra CF cost)
-cloudfront_aliases             = ["dev.afri-talent.com"]
-cloudfront_acm_certificate_arn = "REPLACE_WITH_ACM_CERT_ARN"
+# CloudFront - no custom aliases without a cert; uses CloudFront default domain for now
+cloudfront_aliases             = []
+cloudfront_acm_certificate_arn = ""
 cloudfront_price_class         = "PriceClass_100"
 
-# GitHub OIDC - allow both develop and main
+# GitHub OIDC
 github_repo = "alozeus1/afri-talent"
 github_ref  = "refs/heads/develop"
 
-# Do NOT create new OIDC role - existing GitHubActionsDeployRole is used
-# github_actions_role_name = "GitHubActionsDeployRole"  # already exists
+# Re-use the existing OIDC provider rather than creating a duplicate
+create_oidc_provider       = false
+existing_oidc_provider_arn = "arn:aws:iam::108188564905:oidc-provider/token.actions.githubusercontent.com"
+
+# Grant the Terraform-managed GitHub Actions role broad permissions for infra provisioning
+github_actions_additional_policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 
 # Monitoring
 alerts_email = "alozeus1@gmail.com"
