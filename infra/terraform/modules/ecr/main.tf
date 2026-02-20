@@ -1,4 +1,5 @@
 resource "aws_ecr_repository" "frontend" {
+  count                = var.create ? 1 : 0
   name                 = "${var.name_prefix}-frontend"
   image_tag_mutability = "MUTABLE"
   force_delete         = true
@@ -9,6 +10,7 @@ resource "aws_ecr_repository" "frontend" {
 }
 
 resource "aws_ecr_repository" "backend" {
+  count                = var.create ? 1 : 0
   name                 = "${var.name_prefix}-backend"
   image_tag_mutability = "MUTABLE"
   force_delete         = true
@@ -19,7 +21,8 @@ resource "aws_ecr_repository" "backend" {
 }
 
 resource "aws_ecr_lifecycle_policy" "frontend" {
-  repository = aws_ecr_repository.frontend.name
+  count      = var.create ? 1 : 0
+  repository = aws_ecr_repository.frontend[0].name
 
   policy = jsonencode({
     rules = [
@@ -40,7 +43,8 @@ resource "aws_ecr_lifecycle_policy" "frontend" {
 }
 
 resource "aws_ecr_lifecycle_policy" "backend" {
-  repository = aws_ecr_repository.backend.name
+  count      = var.create ? 1 : 0
+  repository = aws_ecr_repository.backend[0].name
 
   policy = jsonencode({
     rules = [
@@ -58,4 +62,14 @@ resource "aws_ecr_lifecycle_policy" "backend" {
       }
     ]
   })
+}
+
+data "aws_ecr_repository" "frontend" {
+  count = var.create ? 0 : 1
+  name  = "${var.name_prefix}-frontend"
+}
+
+data "aws_ecr_repository" "backend" {
+  count = var.create ? 0 : 1
+  name  = "${var.name_prefix}-backend"
 }

@@ -13,6 +13,7 @@ az_count             = 2
 # Images (CI will update these; placeholders for first plan)
 frontend_image = "108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest"
 backend_image  = "108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest"
+create_ecr     = false
 
 # Container sizing - dev: smallest viable
 frontend_container_cpu    = 256
@@ -35,7 +36,7 @@ db_multi_az              = false
 db_deletion_protection   = false
 db_skip_final_snapshot   = true
 db_backup_retention_days = 7
-db_engine_version        = "16.3"
+db_engine_version        = "16.1"
 db_name                  = "afritalent"
 db_username              = "afritalent"
 

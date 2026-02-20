@@ -30,6 +30,7 @@ module "security" {
 module "ecr" {
   source      = "./modules/ecr"
   name_prefix = local.name_prefix
+  create      = var.create_ecr
 }
 
 module "rds" {

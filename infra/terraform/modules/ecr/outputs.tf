@@ -1,15 +1,15 @@
 output "frontend_repo_url" {
-  value = aws_ecr_repository.frontend.repository_url
+  value = var.create ? aws_ecr_repository.frontend[0].repository_url : data.aws_ecr_repository.frontend[0].repository_url
 }
 
 output "backend_repo_url" {
-  value = aws_ecr_repository.backend.repository_url
+  value = var.create ? aws_ecr_repository.backend[0].repository_url : data.aws_ecr_repository.backend[0].repository_url
 }
 
 output "frontend_repo_arn" {
-  value = aws_ecr_repository.frontend.arn
+  value = var.create ? aws_ecr_repository.frontend[0].arn : data.aws_ecr_repository.frontend[0].arn
 }
 
 output "backend_repo_arn" {
-  value = aws_ecr_repository.backend.arn
+  value = var.create ? aws_ecr_repository.backend[0].arn : data.aws_ecr_repository.backend[0].arn
 }

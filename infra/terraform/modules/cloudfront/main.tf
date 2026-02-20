@@ -18,8 +18,8 @@ resource "aws_cloudfront_cache_policy" "disabled" {
       query_string_behavior = "none"
     }
 
-    enable_accept_encoding_brotli = true
-    enable_accept_encoding_gzip   = true
+    enable_accept_encoding_brotli = false
+    enable_accept_encoding_gzip   = false
   }
 }
 

@@ -62,6 +62,12 @@ variable "backend_image" {
   description = "Container image URI for the backend service"
 }
 
+variable "create_ecr" {
+  type        = bool
+  description = "Whether to create/manage ECR repositories"
+  default     = true
+}
+
 variable "frontend_container_port" {
   type        = number
   description = "Frontend container port"
@@ -173,7 +179,7 @@ variable "db_username" {
 variable "db_engine_version" {
   type        = string
   description = "Postgres engine version"
-  default     = "16.3"
+  default     = "16.1"
 }
 
 variable "db_instance_class" {
