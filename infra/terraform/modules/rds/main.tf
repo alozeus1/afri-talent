@@ -10,7 +10,7 @@ resource "aws_db_subnet_group" "main" {
 resource "aws_db_instance" "postgres" {
   identifier              = "${var.name_prefix}-postgres"
   engine                  = "postgres"
-  engine_version          = var.db_engine_version
+  engine_version          = var.db_engine_version != null && var.db_engine_version != "" ? var.db_engine_version : null
   instance_class          = var.db_instance_class
   allocated_storage       = var.db_allocated_storage
   db_name                 = var.db_name
