@@ -110,6 +110,11 @@ model User {
   threadParticipants ThreadParticipant[]
   sentMessages       Message[]           @relation("MessageSender")
   aiRuns             AiRun[]
+  savedSearches      SavedSearch[]
+  jobAlerts          JobAlert[]
+  companyReviews     CompanyReview[]
+  skillAssessments   SkillAssessment[]
+  assessmentInvites  AssessmentInvite[]
 
   @@index([role])
   @@index([createdAt])
@@ -160,9 +165,11 @@ model Job {
   employerId String?
   employer   Employer? @relation(fields: [employerId], references: [id])
 
-  applications Application[]
-  adminReviews AdminReview[]   @relation("JobReviews")
-  threads      MessageThread[]
+  applications      Application[]
+  adminReviews      AdminReview[]       @relation("JobReviews")
+  threads           MessageThread[]
+  jobAlerts         JobAlert[]
+  assessmentInvites AssessmentInvite[]
 
   @@index([status])
   @@index([status, publishedAt(sort: Desc)])
@@ -286,14 +293,28 @@ model Company {
   id                    String                    @id @default(uuid())
   name                  String                    @db.VarChar(200)
   domain                String?                   @db.VarChar(255)
+  logo                  String?                   @db.VarChar(500)
+  description           String?                   @db.Text
+  industry              String?                   @db.VarChar(100)
+  size                  String?                   @db.VarChar(50) // 1-10, 11-50, 51-200, 201-500, 500+
+  headquarters          String?                   @db.VarChar(200)
+  founded               Int?
+  website               String?                   @db.VarChar(500)
+  linkedinUrl           String?                   @db.VarChar(500)
   verificationStatus    CompanyVerificationStatus @default(UNVERIFIED)
   sponsorshipTrustScore Float?
+  hiresFromAfrica       Boolean                   @default(false)
+  remotePolicy          String?                   @db.VarChar(50) // fully-remote, hybrid, office
   verifiedAt            DateTime?
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
 
+  reviews         CompanyReview[]
+  ratingAggregate CompanyRatingAggregate?
+
   @@index([domain])
   @@index([verificationStatus])
+  @@index([hiresFromAfrica])
 }
 
 model MessageThread {
@@ -422,4 +443,156 @@ model AiRunJob {
   createdAt         DateTime @default(now())
 
   @@index([aiRunId])
+}
+
+// ──────────────── Saved Searches & Job Alerts ────────────────
+
+enum AlertFrequency {
+  INSTANT
+  DAILY
+  WEEKLY
+}
+
+model SavedSearch {
+  id              String         @id @default(uuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String         @db.VarChar(100)
+  keywords        String[]
+  locations       String[]
+  jobTypes        String[]
+  seniorities     String[]
+  salaryMin       Int?
+  salaryMax       Int?
+  remoteOnly      Boolean        @default(false)
+  visaSponsorship Boolean        @default(false)
+  alertEnabled    Boolean        @default(true)
+  alertFrequency  AlertFrequency @default(DAILY)
+  lastAlertAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([alertEnabled, alertFrequency])
+}
+
+model JobAlert {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId        String
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  searchId     String?
+  matchScore   Int?
+  sentAt       DateTime?
+  clickedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, jobId])
+  @@index([userId, sentAt])
+  @@index([jobId])
+}
+
+// ──────────────── Company Reviews & Ratings ────────────────
+
+model CompanyReview {
+  id                String   @id @default(uuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  overallRating     Int      // 1-5
+  cultureRating     Int?     // 1-5
+  salaryRating      Int?     // 1-5
+  workLifeRating    Int?     // 1-5
+  managementRating  Int?     // 1-5
+  growthRating      Int?     // 1-5
+  title             String   @db.VarChar(200)
+  pros              String   @db.Text
+  cons              String   @db.Text
+  advice            String?  @db.Text
+  isCurrentEmployee Boolean  @default(false)
+  employmentStatus  String?  @db.VarChar(50) // full-time, contract, intern
+  jobTitle          String?  @db.VarChar(100)
+  yearsAtCompany    Int?
+  isVerified        Boolean  @default(false)
+  isApproved        Boolean  @default(false)
+  helpfulCount      Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([companyId, isApproved])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model CompanyRatingAggregate {
+  id                    String   @id @default(uuid())
+  companyId             String   @unique
+  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  totalReviews          Int      @default(0)
+  averageOverall        Float?
+  averageCulture        Float?
+  averageSalary         Float?
+  averageWorkLife       Float?
+  averageManagement     Float?
+  averageGrowth         Float?
+  recommendationPct     Float?   // % who would recommend
+  updatedAt             DateTime @updatedAt
+}
+
+// ──────────────── Skills Assessment Integration ────────────────
+
+enum AssessmentProvider {
+  INTERNAL
+  TESTGORILLA
+  HACKERRANK
+  CODILITY
+  CUSTOM
+}
+
+enum AssessmentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+  FAILED
+}
+
+model SkillAssessment {
+  id              String             @id @default(uuid())
+  userId          String
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skillName       String             @db.VarChar(100)
+  provider        AssessmentProvider
+  externalId      String?            @db.VarChar(255)
+  status          AssessmentStatus   @default(PENDING)
+  score           Int?               // 0-100
+  percentile      Int?               // 0-100
+  level           String?            @db.VarChar(50) // beginner, intermediate, advanced, expert
+  resultUrl       String?            @db.VarChar(500)
+  metadata        Json?
+  completedAt     DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime           @default(now())
+
+  @@index([userId, skillName])
+  @@index([status])
+}
+
+model AssessmentInvite {
+  id            String             @id @default(uuid())
+  userId        String
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId         String?
+  job           Job?               @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  applicationId String?
+  provider      AssessmentProvider
+  assessmentUrl String             @db.VarChar(500)
+  expiresAt     DateTime
+  completedAt   DateTime?
+  createdAt     DateTime           @default(now())
+
+  @@index([userId])
+  @@index([jobId])
 }
