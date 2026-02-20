@@ -1,5 +1,16 @@
 // backend/prisma/seed.ts
-import { PrismaClient, Role, JobStatus, ApplicationStatus, ReviewStatus, ReviewTargetType } from "@prisma/client";
+import {
+  PrismaClient,
+  Role,
+  JobStatus,
+  ApplicationStatus,
+  ReviewStatus,
+  ReviewTargetType,
+  VisaSponsorshipStatus,
+  JobSource,
+  SubscriptionPlan,
+  SubscriptionStatus,
+} from "@prisma/client";
 import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
@@ -7,6 +18,14 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Starting seed...");
 
+  // Tear down in dependency order
+  await prisma.message.deleteMany();
+  await prisma.threadParticipant.deleteMany();
+  await prisma.messageThread.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.subscription.deleteMany();
+  await prisma.resume.deleteMany();
+  await prisma.candidateProfile.deleteMany();
   await prisma.adminReview.deleteMany();
   await prisma.application.deleteMany();
   await prisma.job.deleteMany();
@@ -16,7 +35,9 @@ async function main() {
 
   const passwordHash = await bcrypt.hash("Password123!", 10);
 
-  const admin = await prisma.user.create({
+  // ── Users ──────────────────────────────────────────────
+
+  const adminUser = await prisma.user.create({
     data: {
       email: "admin@example.com",
       password: passwordHash,
@@ -25,7 +46,7 @@ async function main() {
     },
   });
 
-  const candidate = await prisma.user.create({
+  const candidateUser = await prisma.user.create({
     data: {
       email: "candidate@example.com",
       password: passwordHash,
@@ -43,6 +64,8 @@ async function main() {
     },
   });
 
+  // ── Employer profile ───────────────────────────────────
+
   const employer = await prisma.employer.create({
     data: {
       userId: employerUser.id,
@@ -52,6 +75,42 @@ async function main() {
       bio: "We hire and support global African tech talent.",
     },
   });
+
+  // ── Candidate profile + resume ─────────────────────────
+
+  const candidateProfile = await prisma.candidateProfile.create({
+    data: {
+      userId: candidateUser.id,
+      headline: "Full-Stack Engineer seeking EU / Canada sponsorship",
+      bio: "5 years building products in FinTech and e-commerce.",
+      skills: ["TypeScript", "React", "Node.js", "PostgreSQL", "Docker"],
+      targetRoles: ["Full-Stack Engineer", "Backend Engineer"],
+      targetCountries: ["Canada", "Germany", "United Kingdom"],
+      yearsExperience: 5,
+      visaStatus: "eligible-for-sponsorship",
+    },
+  });
+
+  await prisma.resume.create({
+    data: {
+      profileId: candidateProfile.id,
+      s3Key: `resumes/${candidateUser.id}/sample-resume.pdf`,
+      fileName: "sample-resume.pdf",
+      isActive: true,
+    },
+  });
+
+  // ── Subscription (candidate on FREE plan) ─────────────
+
+  await prisma.subscription.create({
+    data: {
+      userId: candidateUser.id,
+      plan: SubscriptionPlan.FREE,
+      status: SubscriptionStatus.ACTIVE,
+    },
+  });
+
+  // ── Jobs ───────────────────────────────────────────────
 
   const job1 = await prisma.job.create({
     data: {
@@ -68,18 +127,51 @@ async function main() {
       employerId: employer.id,
       status: JobStatus.PUBLISHED,
       publishedAt: new Date(),
+      visaSponsorship: VisaSponsorshipStatus.YES,
+      relocationAssistance: true,
+      eligibleCountries: ["NG", "GH", "KE", "ZA", "EG"],
+      jobSource: JobSource.EMPLOYER_POSTED,
     },
   });
+
+  // Aggregated job (no employer profile in DB)
+  await prisma.job.create({
+    data: {
+      title: "Backend Engineer (Visa Sponsored)",
+      slug: "backend-engineer-visa-sponsored",
+      description: "Join a fast-growing EU startup. Full visa sponsorship provided.",
+      location: "Berlin, Germany",
+      type: "Full-time",
+      seniority: "Mid-level",
+      salaryMin: 55000,
+      salaryMax: 75000,
+      currency: "EUR",
+      tags: ["Python", "FastAPI", "Kubernetes"],
+      status: JobStatus.PUBLISHED,
+      publishedAt: new Date(),
+      visaSponsorship: VisaSponsorshipStatus.YES,
+      relocationAssistance: true,
+      eligibleCountries: ["NG", "GH", "KE", "ZA", "EG", "CM"],
+      jobSource: JobSource.AGGREGATED,
+      sourceName: "Greenhouse / GlobalTech GmbH",
+      sourceUrl: "https://boards.greenhouse.io/globaltech/jobs/123",
+      sourceId: "greenhouse-123",
+    },
+  });
+
+  // ── Application ────────────────────────────────────────
 
   await prisma.application.create({
     data: {
       jobId: job1.id,
-      candidateId: candidate.id,
+      candidateId: candidateUser.id,
       status: ApplicationStatus.PENDING,
-      cvUrl: "https://example.com/cv.pdf",
-      coverLetter: "Excited to apply!",
+      cvUrl: "https://s3.amazonaws.com/example/cv.pdf",
+      coverLetter: "Excited to apply and contribute to AfriTalent's mission.",
     },
   });
+
+  // ── Resource ───────────────────────────────────────────
 
   await prisma.resource.create({
     data: {
@@ -93,9 +185,11 @@ async function main() {
     },
   });
 
+  // ── Admin review ───────────────────────────────────────
+
   await prisma.adminReview.create({
     data: {
-      reviewerId: admin.id,
+      reviewerId: adminUser.id,
       targetType: ReviewTargetType.JOB,
       targetJobId: job1.id,
       status: ReviewStatus.PENDING,
@@ -103,7 +197,22 @@ async function main() {
     },
   });
 
+  // ── Notification (sample) ──────────────────────────────
+
+  await prisma.notification.create({
+    data: {
+      userId: candidateUser.id,
+      type: "JOB_MATCH",
+      title: "New visa-sponsored job match",
+      body: "A new Senior Full-Stack Engineer role matches your profile.",
+    },
+  });
+
   console.log("✅ Seed completed successfully");
+  console.log("   Demo credentials (password: Password123!):");
+  console.log(`   Admin:     ${adminUser.email}`);
+  console.log(`   Candidate: ${candidateUser.email}`);
+  console.log(`   Employer:  ${employerUser.email}`);
 }
 
 main()
@@ -114,4 +223,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

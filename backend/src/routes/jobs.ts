@@ -12,8 +12,8 @@ const createJobSchema = z.object({
   location: z.string(),
   type: z.string(),
   seniority: z.string(),
-  salaryMin: z.number().optional(),
-  salaryMax: z.number().optional(),
+  salaryMin: z.coerce.number().optional(),
+  salaryMax: z.coerce.number().optional(),
   currency: z.string().optional(),
   tags: z.array(z.string()).optional(),
 });
@@ -55,17 +55,68 @@ router.get("/employer/my-jobs", authenticate, authorize(Role.EMPLOYER), async (r
   }
 });
 
+// GET /api/jobs/ai-search - AI-optimized job search for orchestrator job picker
+router.get("/ai-search", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response) => {
+  try {
+    const { query = "", limit = "10" } = req.query;
+    const take = Math.min(parseInt(limit as string) || 10, 50);
+
+    const jobs = await prisma.job.findMany({
+      where: {
+        status: JobStatus.PUBLISHED,
+        ...(query ? {
+          OR: [
+            { title: { contains: query as string, mode: "insensitive" } },
+            { description: { contains: query as string, mode: "insensitive" } },
+            { sourceName: { contains: query as string, mode: "insensitive" } },
+          ],
+        } : {}),
+      },
+      select: {
+        id: true,
+        title: true,
+        location: true,
+        type: true,
+        seniority: true,
+        description: true,
+        sourceName: true,
+        sourceUrl: true,
+        employer: { select: { companyName: true } },
+      },
+      orderBy: { publishedAt: "desc" },
+      take,
+    });
+
+    res.json({
+      jobs: jobs.map((j) => ({
+        id: j.id,
+        title: j.title,
+        company: j.employer?.companyName ?? j.sourceName ?? "Unknown",
+        location: j.location,
+        type: j.type,
+        seniority: j.seniority,
+        rawText: j.description,
+        url: j.sourceUrl ?? null,
+      })),
+    });
+  } catch (err) {
+    console.error("AI job search error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /api/jobs - Public: list published jobs
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const { search, location, type, seniority, page = "1", limit = "10" } = req.query;
+    const { search, query: queryAlias, location, type, seniority, page = "1", limit = "10", forAI } = req.query;
+    const searchTerm = (search || queryAlias) as string | undefined;
 
     const where: any = { status: JobStatus.PUBLISHED };
 
-    if (search) {
+    if (searchTerm) {
       where.OR = [
-        { title: { contains: search as string, mode: "insensitive" } },
-        { description: { contains: search as string, mode: "insensitive" } },
+        { title: { contains: searchTerm, mode: "insensitive" } },
+        { description: { contains: searchTerm, mode: "insensitive" } },
       ];
     }
 
@@ -81,8 +132,9 @@ router.get("/", async (req: Request, res: Response) => {
       where.seniority = seniority as string;
     }
 
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
-    const take = parseInt(limit as string);
+    const parsedLimit = Math.min(parseInt(limit as string) || 10, 100);
+    const skip = (parseInt(page as string) - 1) * parsedLimit;
+    const take = parsedLimit;
 
     const [jobs, total] = await Promise.all([
       prisma.job.findMany({
@@ -99,11 +151,25 @@ router.get("/", async (req: Request, res: Response) => {
       prisma.job.count({ where }),
     ]);
 
+    if (forAI === "true") {
+      const aiJobs = jobs.map(job => ({
+        id: job.id,
+        title: job.title,
+        company: job.employer?.companyName ?? job.sourceName ?? "Unknown",
+        location: job.location,
+        type: job.type,
+        seniority: job.seniority,
+        description: job.description,
+      }));
+      res.json({ jobs: aiJobs, total });
+      return;
+    }
+
     res.json({
       jobs,
       pagination: {
         page: parseInt(page as string),
-        limit: parseInt(limit as string),
+        limit: take,
         total,
         totalPages: Math.ceil(total / take),
       },

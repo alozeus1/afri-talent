@@ -18,7 +18,7 @@ const statusVariants: Record<string, "default" | "success" | "warning" | "danger
 
 export default function EmployerDashboard() {
   const router = useRouter();
-  const { user, token, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
   const [myJobs, setMyJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,14 +29,14 @@ export default function EmployerDashboard() {
   }, [user, isLoading, router]);
 
   useEffect(() => {
-    if (token && user?.role === "EMPLOYER") {
+    if (user?.role === "EMPLOYER") {
       jobs
-        .myJobs(token)
+        .myJobs()
         .then(setMyJobs)
         .catch(console.error)
         .finally(() => setLoading(false));
     }
-  }, [token, user]);
+  }, [user]);
 
   if (isLoading || !user) {
     return (

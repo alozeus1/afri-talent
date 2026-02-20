@@ -20,7 +20,7 @@ const statusVariants: Record<string, "default" | "success" | "warning" | "danger
 export default function JobApplicationsPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, token, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
   const [jobApplications, setJobApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -32,20 +32,20 @@ export default function JobApplicationsPage() {
   }, [user, isLoading, router]);
 
   useEffect(() => {
-    if (token && user?.role === "EMPLOYER") {
+    if (user?.role === "EMPLOYER") {
       applications
-        .forJob(params.id as string, token)
+        .forJob(params.id as string)
         .then(setJobApplications)
         .catch(console.error)
         .finally(() => setLoading(false));
     }
-  }, [token, user, params.id]);
+  }, [user, params.id]);
 
   const updateStatus = async (applicationId: string, status: string) => {
-    if (!token) return;
+    if (!user) return;
     setUpdating(applicationId);
     try {
-      const updated = await applications.updateStatus(applicationId, { status }, token);
+      const updated = await applications.updateStatus(applicationId, { status });
       setJobApplications((prev) =>
         prev.map((a) => (a.id === applicationId ? { ...a, status: updated.status } : a))
       );

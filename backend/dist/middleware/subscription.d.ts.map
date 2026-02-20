@@ -1,0 +1,1 @@
+{"version":3,"file":"subscription.d.ts","sourceRoot":"","sources":["../../src/middleware/subscription.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,QAAQ,EAAE,YAAY,EAAE,MAAM,SAAS,CAAC;AAE1D,OAAO,EAAE,gBAAgB,EAAsB,MAAM,gBAAgB,CAAC;AAQtE;;;GAGG;AACH,wBAAgB,WAAW,CAAC,WAAW,EAAE,gBAAgB,IACzC,KAAK,OAAO,EAAE,KAAK,QAAQ,EAAE,MAAM,YAAY,KAAG,OAAO,CAAC,IAAI,CAAC,CAkC9E"}

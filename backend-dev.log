@@ -1,0 +1,6 @@
+
+> backend@1.0.0 start
+> node dist/server.js
+
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+{"level":"info","time":"2026-02-19T21:59:34.967Z","pid":72804,"host":"Godwills-MacBook-Pro-2.local","node_version":"v20.15.0","port":"4000","env":"development","msg":"Server started"}

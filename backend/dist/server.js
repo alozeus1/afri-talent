@@ -12,6 +12,12 @@ import jobsRoutes from "./routes/jobs.js";
 import applicationsRoutes from "./routes/applications.js";
 import resourcesRoutes from "./routes/resources.js";
 import adminRoutes from "./routes/admin.js";
+import profileRoutes from "./routes/profile.js";
+import filesRoutes from "./routes/files.js";
+import billingRoutes from "./routes/billing.js";
+import webhookRoutes from "./routes/webhooks.js";
+import notificationsRoutes from "./routes/notifications.js";
+import orchestratorRoutes from "./routes/orchestrator.js";
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -29,14 +35,28 @@ if (isProduction) {
 // Security: CORS configuration
 const allowedOrigins = [
     process.env.FRONTEND_URL || "http://localhost:3000",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3100",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3100",
 ];
+const isAllowedOrigin = (origin) => {
+    if (!origin) {
+        return !isProduction;
+    }
+    if (allowedOrigins.includes(origin)) {
+        return true;
+    }
+    if (!isProduction) {
+        return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    }
+    return false;
+};
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, etc.) in development
-        if (!origin && !isProduction) {
-            return callback(null, true);
-        }
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (isAllowedOrigin(origin)) {
             callback(null, true);
         }
         else {
@@ -50,7 +70,10 @@ app.use(cors({
 }));
 // Security: Rate limiting (general)
 app.use(generalLimiter);
-// Body parsing with size limits
+// Stripe webhook — MUST be registered BEFORE express.json().
+// Stripe signature verification requires the raw request body bytes.
+app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoutes);
+// Body parsing with size limits (all other routes)
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 // Security: Request sanitization
@@ -111,6 +134,12 @@ app.use("/api/jobs", jobsRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/resources", resourcesRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/files", filesRoutes);
+app.use("/api/billing", billingRoutes);
+app.use("/api/notifications", notificationsRoutes);
+// Orchestrator route needs a larger body limit (resume + raw job texts can be ~200 KB combined)
+app.use("/api/orchestrator", express.json({ limit: "250kb" }), orchestratorRoutes);
 // 404 handler
 app.use((_req, res) => {
     res.status(404).json({ error: "Not found" });

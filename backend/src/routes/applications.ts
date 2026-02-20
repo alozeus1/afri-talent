@@ -6,9 +6,35 @@ import { ApplicationStatus, JobStatus, Role } from "@prisma/client";
 
 const router = Router();
 
+// Parse allowed CV domains from env (empty = any HTTPS accepted)
+const ALLOWED_CV_DOMAINS = process.env.ALLOWED_CV_DOMAINS
+  ? process.env.ALLOWED_CV_DOMAINS.split(",").map((d) => d.trim()).filter(Boolean)
+  : [];
+
+function validateCvUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    if (ALLOWED_CV_DOMAINS.length > 0) {
+      return ALLOWED_CV_DOMAINS.some((domain) => parsed.hostname.endsWith(domain));
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const applySchema = z.object({
   jobId: z.string().uuid(),
-  cvUrl: z.string().url().optional(),
+  cvUrl: z
+    .string()
+    .url()
+    .refine(validateCvUrl, {
+      message: ALLOWED_CV_DOMAINS.length > 0
+        ? `CV URL must use HTTPS and be from an allowed domain: ${ALLOWED_CV_DOMAINS.join(", ")}`
+        : "CV URL must use HTTPS",
+    })
+    .optional(),
   coverLetter: z.string().optional(),
 });
 
@@ -211,6 +237,14 @@ router.get("/:id", authenticate, async (req: Request, res: Response) => {
     const isCandidate = req.user!.userId === application.candidateId;
     const isEmployer = req.user!.role === Role.EMPLOYER;
     const isAdmin = req.user!.role === Role.ADMIN;
+
+    if (isEmployer) {
+      const employer = await prisma.employer.findUnique({ where: { userId: req.user!.userId } });
+      if (!employer || application.job.employerId !== employer.id) {
+        res.status(403).json({ error: "Not authorized to view this application" });
+        return;
+      }
+    }
 
     if (!isCandidate && !isEmployer && !isAdmin) {
       res.status(403).json({ error: "Not authorized to view this application" });

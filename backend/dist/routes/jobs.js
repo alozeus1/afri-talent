@@ -10,8 +10,8 @@ const createJobSchema = z.object({
     location: z.string(),
     type: z.string(),
     seniority: z.string(),
-    salaryMin: z.number().optional(),
-    salaryMax: z.number().optional(),
+    salaryMin: z.coerce.number().optional(),
+    salaryMax: z.coerce.number().optional(),
     currency: z.string().optional(),
     tags: z.array(z.string()).optional(),
 });
@@ -67,8 +67,9 @@ router.get("/", async (req, res) => {
         if (seniority) {
             where.seniority = seniority;
         }
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-        const take = parseInt(limit);
+        const parsedLimit = Math.min(parseInt(limit) || 10, 100);
+        const skip = (parseInt(page) - 1) * parsedLimit;
+        const take = parsedLimit;
         const [jobs, total] = await Promise.all([
             prisma.job.findMany({
                 where,
@@ -87,7 +88,7 @@ router.get("/", async (req, res) => {
             jobs,
             pagination: {
                 page: parseInt(page),
-                limit: parseInt(limit),
+                limit: take,
                 total,
                 totalPages: Math.ceil(total / take),
             },

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const { user, token, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [pendingJobs, setPendingJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,8 +23,8 @@ export default function AdminDashboard() {
   }, [user, isLoading, router]);
 
   useEffect(() => {
-    if (token && user?.role === "ADMIN") {
-      Promise.all([admin.stats(token), admin.pendingJobs(token)])
+    if (user?.role === "ADMIN") {
+      Promise.all([admin.stats(), admin.pendingJobs()])
         .then(([statsData, jobsData]) => {
           setStats(statsData);
           setPendingJobs(jobsData);
@@ -32,13 +32,13 @@ export default function AdminDashboard() {
         .catch(console.error)
         .finally(() => setLoading(false));
     }
-  }, [token, user]);
+  }, [user]);
 
   const reviewJob = async (jobId: string, status: "APPROVED" | "REJECTED") => {
-    if (!token) return;
+    if (!user) return;
     setReviewing(jobId);
     try {
-      await admin.reviewJob(jobId, { status }, token);
+      await admin.reviewJob(jobId, { status });
       setPendingJobs((prev) => prev.filter((j) => j.id !== jobId));
       if (stats) {
         setStats({ ...stats, pendingJobs: stats.pendingJobs - 1 });

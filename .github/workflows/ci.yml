@@ -45,6 +45,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Run backend tests (mock mode)
+        run: MOCK_AI=1 DATABASE_URL=postgresql://x:x@localhost:5432/x npx tsx --test tests/orchestrator.test.ts
+        continue-on-error: false
+
   # Frontend CI
   frontend:
     name: Frontend CI

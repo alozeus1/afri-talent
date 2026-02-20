@@ -1,0 +1,32 @@
+Kofi Mensah
+kofi.mensah@example.com | +233 24 555 7890 | Accra, Ghana
+
+PROFESSIONAL SUMMARY
+Backend software engineer with 4 years of experience building REST APIs and
+payment integrations for fintech companies across West Africa.
+
+EXPERIENCE
+
+Software Engineer — TechBridge Africa (Accra, Ghana)
+Jan 2021 – Present
+- Built and maintained REST APIs in Node.js and TypeScript serving 50K daily users
+- Integrated Stripe and MTN Mobile Money payment gateways
+- Improved API response time by 35% using Redis caching
+- Maintained 85% test coverage with Jest; reviewed PRs for 4 junior engineers
+
+Junior Developer — Andela (Remote)
+Jun 2019 – Dec 2020
+- Developed new features for a US SaaS product using Node.js and PostgreSQL
+- Collaborated across time zones with engineers in US and UK
+
+EDUCATION
+B.Sc. Computer Science — Kwame Nkrumah University of Science and Technology, 2019
+
+SKILLS
+Node.js, TypeScript, Express.js, PostgreSQL, Redis, REST APIs, Jest, Docker, Git, Stripe
+
+LANGUAGES
+English (fluent), Twi (native)
+
+CERTIFICATIONS
+AWS Certified Cloud Practitioner (2022)

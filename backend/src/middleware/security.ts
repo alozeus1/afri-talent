@@ -88,3 +88,24 @@ function sanitizeObject(obj: Record<string, unknown>): void {
     }
   }
 }
+
+// Orchestrator rate limiter — per user, 10 requests per minute
+// This is more restrictive than the general limiter due to Claude API costs
+export const orchestratorLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request): string => {
+    // Use user ID if authenticated (more precise), fallback to IP
+    return (req as Request & { user?: { userId: string } }).user?.userId ?? req.ip ?? "anonymous";
+  },
+  message: {
+    error: "rate_limit_exceeded",
+    message: "Too many AI assistant requests. Please wait a minute before trying again.",
+    retryAfter: 60,
+  },
+  handler: (_req, res, _next, options) => {
+    res.status(429).json(options.message);
+  },
+});

@@ -5,7 +5,6 @@ import { auth, User } from "./api";
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: {
@@ -16,37 +15,35 @@ interface AuthContextType {
     companyName?: string;
     location?: string;
   }) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // On mount, restore session from HttpOnly cookie via /api/auth/me.
+    // No localStorage — the browser sends the cookie automatically.
     const initAuth = async () => {
-      const storedToken = localStorage.getItem("token");
-      if (storedToken) {
-        try {
-          const userData = await auth.me(storedToken);
-          setToken(storedToken);
-          setUser(userData);
-        } catch {
-          localStorage.removeItem("token");
-        }
+      try {
+        const userData = await auth.me();
+        setUser(userData);
+      } catch {
+        // No valid session — stay logged out
+        setUser(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     initAuth();
   }, []);
 
   const login = async (email: string, password: string) => {
     const response = await auth.login(email, password);
-    localStorage.setItem("token", response.token);
-    setToken(response.token);
+    // Token is set as HttpOnly cookie by the server — we only store the user object
     setUser(response.user);
   };
 
@@ -59,19 +56,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     location?: string;
   }) => {
     const response = await auth.register(data);
-    localStorage.setItem("token", response.token);
-    setToken(response.token);
+    // Token is set as HttpOnly cookie by the server — we only store the user object
     setUser(response.user);
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    setToken(null);
+  const logout = async () => {
+    try {
+      await auth.logout();
+    } catch {
+      // Even if the server call fails, clear local state
+    }
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

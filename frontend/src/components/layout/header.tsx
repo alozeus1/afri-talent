@@ -24,10 +24,10 @@ export function Header() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setShowLogoutConfirm(false);
     setMobileMenuOpen(false);
-    logout();
+    await logout();
   };
 
   return (
@@ -70,7 +70,12 @@ export function Header() {
               <Link href="/resources" className="text-gray-600 hover:text-gray-900 font-medium">
                 Resources
               </Link>
-              
+              {user?.role === "CANDIDATE" && (
+                <Link href="/candidate/ai-assistant" className="text-gray-600 hover:text-gray-900 font-medium">
+                  AI Assistant
+                </Link>
+              )}
+
               {/* Auth Buttons */}
               {isLoading ? (
                 <div className="flex items-center space-x-3">
@@ -148,6 +153,15 @@ export function Header() {
                     >
                       Dashboard
                     </Link>
+                    {user.role === "CANDIDATE" && (
+                      <Link
+                        href="/candidate/ai-assistant"
+                        className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        AI Assistant
+                      </Link>
+                    )}
                     <button
                       onClick={() => setShowLogoutConfirm(true)}
                       className="text-left text-gray-600 hover:text-gray-900 font-medium py-2"

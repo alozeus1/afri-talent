@@ -12,6 +12,8 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
     ...options.headers,
   };
 
+  // If a token is explicitly provided (API clients, tests), send as Bearer.
+  // Browser clients authenticate via HttpOnly cookie (credentials: "include").
   if (token) {
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
@@ -19,6 +21,7 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...fetchOptions,
     headers,
+    credentials: "include", // send HttpOnly cookie on every request
   });
 
   if (!response.ok) {
@@ -32,19 +35,22 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
 // Auth
 export const auth = {
   login: (email: string, password: string) =>
-    fetchAPI<{ user: User; token: string }>("/api/auth/login", {
+    fetchAPI<{ user: User; expiresIn: string }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
 
   register: (data: RegisterData) =>
-    fetchAPI<{ user: User; token: string }>("/api/auth/register", {
+    fetchAPI<{ user: User; expiresIn: string }>("/api/auth/register", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  me: (token: string) =>
+  me: (token?: string) =>
     fetchAPI<User>("/api/auth/me", { token }),
+
+  logout: () =>
+    fetchAPI<{ message: string }>("/api/auth/logout", { method: "POST" }),
 };
 
 // Jobs
@@ -65,33 +71,33 @@ export const jobs = {
   get: (slug: string) =>
     fetchAPI<Job>(`/api/jobs/${slug}`),
 
-  create: (data: CreateJobData, token: string) =>
+  create: (data: CreateJobData, token?: string) =>
     fetchAPI<Job>("/api/jobs", {
       method: "POST",
       body: JSON.stringify(data),
       token,
     }),
 
-  myJobs: (token: string) =>
+  myJobs: (token?: string) =>
     fetchAPI<Job[]>("/api/jobs/employer/my-jobs", { token }),
 };
 
 // Applications
 export const applications = {
-  apply: (data: { jobId: string; cvUrl?: string; coverLetter?: string }, token: string) =>
+  apply: (data: { jobId: string; cvUrl?: string; coverLetter?: string }, token?: string) =>
     fetchAPI<Application>("/api/applications", {
       method: "POST",
       body: JSON.stringify(data),
       token,
     }),
 
-  my: (token: string) =>
+  my: (token?: string) =>
     fetchAPI<Application[]>("/api/applications/my", { token }),
 
-  forJob: (jobId: string, token: string) =>
+  forJob: (jobId: string, token?: string) =>
     fetchAPI<Application[]>(`/api/applications/job/${jobId}`, { token }),
 
-  updateStatus: (id: string, data: { status: string; notes?: string }, token: string) =>
+  updateStatus: (id: string, data: { status: string; notes?: string }, token?: string) =>
     fetchAPI<Application>(`/api/applications/${id}/status`, {
       method: "PUT",
       body: JSON.stringify(data),
@@ -121,20 +127,20 @@ export const resources = {
 
 // Admin
 export const admin = {
-  stats: (token: string) =>
+  stats: (token?: string) =>
     fetchAPI<AdminStats>("/api/admin/stats", { token }),
 
-  pendingJobs: (token: string) =>
+  pendingJobs: (token?: string) =>
     fetchAPI<Job[]>("/api/admin/jobs/pending", { token }),
 
-  reviewJob: (id: string, data: { status: "APPROVED" | "REJECTED"; notes?: string }, token: string) =>
+  reviewJob: (id: string, data: { status: "APPROVED" | "REJECTED"; notes?: string }, token?: string) =>
     fetchAPI<Job>(`/api/admin/jobs/${id}/review`, {
       method: "PUT",
       body: JSON.stringify(data),
       token,
     }),
 
-  users: (token: string, params?: { role?: string; page?: number }) => {
+  users: (token?: string, params?: { role?: string; page?: number }) => {
     const searchParams = new URLSearchParams();
     if (params?.role) searchParams.set("role", params.role);
     if (params?.page) searchParams.set("page", params.page.toString());

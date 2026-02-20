@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,6 +9,8 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ──────────────── Existing Enums ────────────────
 
 enum Role {
   ADMIN
@@ -46,6 +46,52 @@ enum ReviewTargetType {
   RESOURCE
 }
 
+// ──────────────── Phase A New Enums ────────────────
+
+enum VisaSponsorshipStatus {
+  YES
+  NO
+  UNKNOWN
+}
+
+enum JobSource {
+  EMPLOYER_POSTED
+  AGGREGATED
+}
+
+enum CompanyVerificationStatus {
+  VERIFIED
+  UNVERIFIED
+  PENDING
+}
+
+enum NotificationType {
+  NEW_MESSAGE
+  APPLICATION_STATUS
+  JOB_MATCH
+  VERIFICATION
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PROFESSIONAL
+}
+
+// ──────────────── Existing Models ────────────────
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -55,9 +101,15 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  employer      Employer?
-  applications  Application[]
-  adminReviews  AdminReview[] @relation("AdminReviewer")
+  employer           Employer?
+  applications       Application[]
+  adminReviews       AdminReview[]       @relation("AdminReviewer")
+  candidateProfile   CandidateProfile?
+  subscription       Subscription?
+  notifications      Notification[]
+  threadParticipants ThreadParticipant[]
+  sentMessages       Message[]           @relation("MessageSender")
+  aiRuns             AiRun[]
 
   @@index([role])
   @@index([createdAt])
@@ -95,11 +147,22 @@ model Job {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  employerId String
-  employer   Employer @relation(fields: [employerId], references: [id])
+  // Phase A — AfriTalent differentiators
+  visaSponsorship      VisaSponsorshipStatus @default(UNKNOWN)
+  relocationAssistance Boolean               @default(false)
+  eligibleCountries    String[]
+  jobSource            JobSource             @default(EMPLOYER_POSTED)
+  sourceUrl            String?
+  sourceId             String?               // external ATS/job board ID (for dedup)
+  sourceName           String?               // company name for aggregated jobs
+
+  // Nullable for aggregated jobs (no Employer profile in DB)
+  employerId String?
+  employer   Employer? @relation(fields: [employerId], references: [id])
 
   applications Application[]
-  adminReviews AdminReview[] @relation("JobReviews")
+  adminReviews AdminReview[]   @relation("JobReviews")
+  threads      MessageThread[]
 
   @@index([status])
   @@index([status, publishedAt(sort: Desc)])
@@ -107,6 +170,9 @@ model Job {
   @@index([location])
   @@index([type])
   @@index([seniority])
+  @@index([visaSponsorship])
+  @@index([jobSource])
+  @@index([sourceId])
 }
 
 model Application {
@@ -124,7 +190,8 @@ model Application {
   candidateId String
   candidate   User              @relation(fields: [candidateId], references: [id])
 
-  adminReviews AdminReview[] @relation("ApplicationReviews")
+  adminReviews AdminReview[]  @relation("ApplicationReviews")
+  thread       MessageThread?
 
   @@unique([jobId, candidateId])
   @@index([jobId])
@@ -134,17 +201,17 @@ model Application {
 }
 
 model Resource {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   title       String
-  slug        String   @unique
+  slug        String    @unique
   excerpt     String
   content     String
   category    String
   coverImage  String?
-  published   Boolean  @default(false)
+  published   Boolean   @default(false)
   publishedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   adminReviews AdminReview[] @relation("ResourceReviews")
 
@@ -154,10 +221,10 @@ model Resource {
 }
 
 model AdminReview {
-  id        String            @id @default(uuid())
+  id        String           @id @default(uuid())
   status    ReviewStatus
   notes     String?
-  createdAt DateTime          @default(now())
+  createdAt DateTime         @default(now())
 
   reviewerId String
   reviewer   User @relation("AdminReviewer", fields: [reviewerId], references: [id])
@@ -165,7 +232,7 @@ model AdminReview {
   targetType ReviewTargetType
 
   targetJobId         String?
-  targetJob           Job?        @relation("JobReviews", fields: [targetJobId], references: [id])
+  targetJob           Job?         @relation("JobReviews", fields: [targetJobId], references: [id])
 
   targetApplicationId String?
   targetApplication   Application? @relation("ApplicationReviews", fields: [targetApplicationId], references: [id])
@@ -178,3 +245,181 @@ model AdminReview {
   @@index([createdAt(sort: Desc)])
 }
 
+// ──────────────── Phase A New Models ────────────────
+
+model CandidateProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline        String?  @db.VarChar(200)
+  bio             String?  @db.Text
+  skills          String[]
+  targetRoles     String[]
+  targetCountries String[]
+  yearsExperience Int?
+  visaStatus      String?  @db.VarChar(100)
+  linkedinUrl     String?  @db.VarChar(500)
+  githubUrl       String?  @db.VarChar(500)
+  portfolioUrl    String?  @db.VarChar(500)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  resumes Resume[]
+
+  @@index([userId])
+}
+
+model Resume {
+  id         String           @id @default(uuid())
+  profileId  String
+  profile    CandidateProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  s3Key      String           @db.VarChar(500)
+  fileName   String           @db.VarChar(255)
+  isActive   Boolean          @default(false)
+  uploadedAt DateTime         @default(now())
+
+  @@index([profileId])
+  @@index([profileId, isActive])
+}
+
+model Company {
+  id                    String                    @id @default(uuid())
+  name                  String                    @db.VarChar(200)
+  domain                String?                   @db.VarChar(255)
+  verificationStatus    CompanyVerificationStatus @default(UNVERIFIED)
+  sponsorshipTrustScore Float?
+  verifiedAt            DateTime?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@index([domain])
+  @@index([verificationStatus])
+}
+
+model MessageThread {
+  id            String       @id @default(uuid())
+  jobId         String?
+  job           Job?         @relation(fields: [jobId], references: [id])
+  applicationId String?      @unique
+  application   Application? @relation(fields: [applicationId], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  participants ThreadParticipant[]
+  messages     Message[]
+
+  @@index([jobId])
+}
+
+model ThreadParticipant {
+  id       String        @id @default(uuid())
+  threadId String
+  thread   MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User          @relation(fields: [userId], references: [id])
+  joinedAt DateTime      @default(now())
+
+  @@unique([threadId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id        String        @id @default(uuid())
+  threadId  String
+  thread    MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User          @relation("MessageSender", fields: [senderId], references: [id])
+  body      String        @db.Text
+  createdAt DateTime      @default(now())
+
+  @@index([threadId, createdAt])
+  @@index([senderId])
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  userId    String
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  status    NotificationStatus @default(UNREAD)
+  title     String             @db.VarChar(255)
+  body      String             @db.VarChar(1000)
+  metadata  Json?
+  createdAt DateTime           @default(now())
+
+  @@index([userId, status])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model Subscription {
+  id               String             @id @default(uuid())
+  userId           String             @unique
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan             SubscriptionPlan   @default(FREE)
+  status           SubscriptionStatus @default(INACTIVE)
+  stripeCustomerId String?            @db.VarChar(255)
+  stripeSubId      String?            @db.VarChar(255)
+  currentPeriodEnd DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([stripeCustomerId])
+  @@index([stripeSubId])
+}
+
+// ──────────────── AI Run Persistence ────────────────
+
+enum AiRunStatus {
+  RUNNING
+  COMPLETE
+  PARTIAL
+  BLOCKED
+}
+
+enum AiRunType {
+  RESUME_REVIEW
+  JOB_MATCH
+  APPLY_PACK
+}
+
+model AiRun {
+  id               String      @id @default(uuid())
+  runId            String      @unique
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runType          AiRunType
+  status           AiRunStatus @default(RUNNING)
+  resumeHash       String?
+  tokenBudgetTotal Int
+  tokenBudgetUsed  Int         @default(0)
+  agentCalls       Json?
+  notes            String[]
+  createdAt        DateTime    @default(now())
+  completedAt      DateTime?
+
+  jobs AiRunJob[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([runId])
+}
+
+model AiRunJob {
+  id                String   @id @default(uuid())
+  aiRunId           String
+  aiRun             AiRun    @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  jobIndex          Int
+  jobDbId           String?
+  jobHash           String?
+  jobTitle          String?
+  jobCompany        String?
+  jobUrl            String?
+  score             Int?
+  mustHavePct       Float?
+  tailoredOutput    Json?
+  coverLetterOutput Json?
+  guardReport       Json?
+  createdAt         DateTime @default(now())
+
+  @@index([aiRunId])
+}

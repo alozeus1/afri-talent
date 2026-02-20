@@ -14,7 +14,7 @@ const seniorityLevels = ["Junior", "Mid-level", "Senior", "Lead", "Executive"];
 
 export default function NewJobPage() {
   const router = useRouter();
-  const { user, token } = useAuth();
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -32,8 +32,6 @@ export default function NewJobPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
-
     setError(null);
     setLoading(true);
 
@@ -49,8 +47,7 @@ export default function NewJobPage() {
           salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : undefined,
           currency: formData.currency || undefined,
           tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()) : undefined,
-        },
-        token
+        }
       );
       router.push("/employer");
     } catch (err) {

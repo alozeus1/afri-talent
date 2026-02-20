@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 export default function JobDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +35,7 @@ export default function JobDetailPage() {
   }, [params.slug]);
 
   const handleApply = async () => {
-    if (!user || !token) {
+    if (!user) {
       router.push(`/login?redirect=/jobs/${params.slug}`);
       return;
     }
@@ -49,7 +49,7 @@ export default function JobDetailPage() {
     setApplyError(null);
 
     try {
-      await applications.apply({ jobId: job!.id }, token);
+      await applications.apply({ jobId: job!.id });
       setApplied(true);
     } catch (err) {
       setApplyError(err instanceof Error ? err.message : "Failed to apply");

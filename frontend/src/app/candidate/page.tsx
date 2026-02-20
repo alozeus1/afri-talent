@@ -19,7 +19,7 @@ const statusVariants: Record<string, "default" | "success" | "warning" | "danger
 
 export default function CandidateDashboard() {
   const router = useRouter();
-  const { user, token, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
   const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -30,14 +30,14 @@ export default function CandidateDashboard() {
   }, [user, isLoading, router]);
 
   useEffect(() => {
-    if (token && user?.role === "CANDIDATE") {
+    if (user?.role === "CANDIDATE") {
       applications
-        .my(token)
+        .my()
         .then(setMyApplications)
         .catch(console.error)
         .finally(() => setLoading(false));
     }
-  }, [token, user]);
+  }, [user]);
 
   if (isLoading || !user) {
     return (
@@ -52,6 +52,13 @@ export default function CandidateDashboard() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, {user.name}</h1>
         <p className="text-gray-600">Track your job applications and career progress</p>
+        <div className="mt-4">
+          <Link href="/candidate/ai-assistant">
+            <Button variant="outline" size="sm">
+              ✦ AI Assistant — match jobs & generate apply packs
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6 mb-8">

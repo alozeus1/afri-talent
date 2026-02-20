@@ -1,0 +1,20 @@
+Senior Backend Engineer — PayPath UK
+Location: London, UK (remote-friendly for Africa-based candidates)
+Type: Full-time | Salary: £55,000 – £70,000
+
+About PayPath:
+PayPath connects African SMEs to UK and EU payment rails. Series A, 40-person team.
+
+REQUIRED (must have):
+- 3+ years of backend engineering experience
+- Strong Node.js and TypeScript skills
+- Experience designing and maintaining REST APIs
+- PostgreSQL or equivalent relational database experience
+
+NICE TO HAVE:
+- Payment gateway integration (Stripe, Flutterwave, or similar)
+- Redis or other caching layer experience
+- Docker and basic AWS knowledge
+
+Visa sponsorship: YES — we sponsor Skilled Worker visas for strong candidates
+Relocation assistance: YES — we support candidates relocating from Africa

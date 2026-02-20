@@ -5,9 +5,32 @@ import prisma from "../lib/prisma.js";
 import { signToken, getTokenExpiresIn } from "../lib/jwt.js";
 import { authenticate } from "../middleware/auth.js";
 import { authLimiter, registerLimiter } from "../middleware/security.js";
+import { blockToken } from "../lib/redis.js";
 import { Role } from "@prisma/client";
 
 const router = Router();
+
+const COOKIE_NAME = "auth_token";
+const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+
+function setAuthCookie(res: Response, token: string): void {
+  res.cookie(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: COOKIE_MAX_AGE_MS,
+    path: "/",
+  });
+}
+
+function clearAuthCookie(res: Response): void {
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+  });
+}
 
 // Validation schemas with improved security rules
 const registerSchema = z.object({
@@ -36,6 +59,11 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
   try {
     const data = registerSchema.parse(req.body);
 
+    if (data.role === "EMPLOYER" && (!data.companyName || !data.location)) {
+      res.status(400).json({ error: "Employer registration requires companyName and location" });
+      return;
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
     });
@@ -57,11 +85,11 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     });
 
     // If employer, create employer profile
-    if (data.role === "EMPLOYER" && data.companyName) {
+    if (data.role === "EMPLOYER") {
       await prisma.employer.create({
         data: {
           userId: user.id,
-          companyName: data.companyName,
+          companyName: data.companyName!,
           location: data.location || "Remote",
         },
       });
@@ -73,6 +101,8 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       role: user.role,
     });
 
+    setAuthCookie(res, token);
+
     res.status(201).json({
       user: {
         id: user.id,
@@ -80,7 +110,6 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
         name: user.name,
         role: user.role,
       },
-      token,
       expiresIn: getTokenExpiresIn(),
     });
   } catch (error) {
@@ -121,6 +150,8 @@ router.post("/login", authLimiter, async (req: Request, res: Response) => {
       role: user.role,
     });
 
+    setAuthCookie(res, token);
+
     res.json({
       user: {
         id: user.id,
@@ -129,7 +160,6 @@ router.post("/login", authLimiter, async (req: Request, res: Response) => {
         role: user.role,
         employer: user.employer,
       },
-      token,
       expiresIn: getTokenExpiresIn(),
     });
   } catch (error) {
@@ -138,6 +168,27 @@ router.post("/login", authLimiter, async (req: Request, res: Response) => {
       return;
     }
     console.error("Login error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/auth/logout - revoke token and clear cookie
+router.post("/logout", authenticate, async (req: Request, res: Response) => {
+  try {
+    const token = req.rawToken;
+    const exp = req.user?.exp;
+
+    if (token && exp) {
+      const ttlSeconds = exp - Math.floor(Date.now() / 1000);
+      if (ttlSeconds > 0) {
+        await blockToken(token, ttlSeconds);
+      }
+    }
+
+    clearAuthCookie(res);
+    res.json({ message: "Logged out successfully" });
+  } catch (error) {
+    console.error("Logout error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
