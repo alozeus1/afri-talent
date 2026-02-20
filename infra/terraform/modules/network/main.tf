@@ -149,12 +149,12 @@ resource "aws_vpc_endpoint" "s3" {
 
 # Interface endpoints for ECR and Secrets Manager
 resource "aws_vpc_endpoint" "interface" {
-  count              = var.enable_interface_endpoints ? length(local.interface_services) : 0
-  vpc_id             = aws_vpc.main.id
-  service_name       = "com.amazonaws.${data.aws_region.current.name}.${local.interface_services[count.index]}"
-  vpc_endpoint_type  = "Interface"
-  subnet_ids         = aws_subnet.private[*].id
-  security_group_ids = [aws_security_group.vpce[0].id]
+  count               = var.enable_interface_endpoints ? length(local.interface_services) : 0
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.${data.aws_region.current.name}.${local.interface_services[count.index]}"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = aws_subnet.private[*].id
+  security_group_ids  = [aws_security_group.vpce[0].id]
   private_dns_enabled = true
 
   tags = {

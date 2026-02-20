@@ -4,12 +4,12 @@ environment  = "dev"
 aws_region   = "us-east-1"
 
 # Network - keep NAT for dev (ECS needs internet for Anthropic API)
-enable_nat_gateway   = true
+enable_nat_gateway         = true
 enable_interface_endpoints = false
-vpc_cidr             = "10.20.0.0/16"
-public_subnet_cidrs  = ["10.20.0.0/24", "10.20.1.0/24"]
-private_subnet_cidrs = ["10.20.10.0/24", "10.20.11.0/24"]
-az_count             = 2
+vpc_cidr                   = "10.20.0.0/16"
+public_subnet_cidrs        = ["10.20.0.0/24", "10.20.1.0/24"]
+private_subnet_cidrs       = ["10.20.10.0/24", "10.20.11.0/24"]
+az_count                   = 2
 
 # Images (CI will update these; placeholders for first plan)
 frontend_image = "108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest"
@@ -42,7 +42,7 @@ db_name                  = "afritalent"
 db_username              = "afritalent"
 
 # Logging
-log_retention_in_days    = 14
+log_retention_in_days     = 14
 enable_container_insights = false
 
 # CloudFront - skip for dev, use ALB directly
