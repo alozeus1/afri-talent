@@ -12,6 +12,7 @@ import { createHash, randomUUID } from "crypto";
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { authenticate, authorize } from "../middleware/auth.js";
+import { checkDailyQuota } from "../middleware/quotas.js";
 import { runOrchestrator } from "../lib/ai/orchestrator/index.js";
 import { createAiRun, completeAiRun, getRunHistory } from "../lib/ai/persistence.js";
 import logger from "../lib/logger.js";
@@ -24,6 +25,9 @@ function safeHash(text: string): string {
 
 // Env-configurable token budget cap
 const ORCHESTRATOR_BUDGET_MAX = parseInt(process.env.ORCHESTRATOR_TOKEN_BUDGET_MAX || "120000", 10);
+
+// AI Kill Switch — set AI_DISABLED=1 to block all orchestrator calls
+const AI_DISABLED = process.env.AI_DISABLED === "1";
 
 const router = Router();
 
@@ -115,10 +119,25 @@ router.post(
   "/run",
   authenticate,
   authorize(Role.CANDIDATE),
+  checkDailyQuota,
   async (req: Request, res: Response): Promise<void> => {
 
     // Generate run_id before anything so all error responses carry it.
     const run_id = randomUUID();
+
+    // AI Kill Switch
+    if (AI_DISABLED) {
+      res.status(503).json({
+        status: "blocked",
+        run_id,
+        budget: { token_budget_total: 0, token_used_estimate: 0, stopped_reason: "ai_disabled" },
+        ranked_jobs: [],
+        tailored_outputs: [],
+        notes_for_ui: ["AI features are temporarily disabled for maintenance. Please try again later."],
+        error: "AI features are temporarily disabled",
+      });
+      return;
+    }
 
     // ── Request validation ──────────────────────────────────────────────────
     const parsed = OrchestratorRequestSchema.safeParse(req.body);

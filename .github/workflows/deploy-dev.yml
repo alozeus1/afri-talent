@@ -1,0 +1,138 @@
+name: Deploy Dev
+
+on:
+  push:
+    branches: [develop]
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 108188564905.dkr.ecr.us-east-1.amazonaws.com
+  ECS_CLUSTER: afritalent-dev-cluster
+
+jobs:
+  build-push-backend:
+    name: Build & Push Backend
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        id: build
+        env:
+          ECR_REPOSITORY: afritalent-dev-backend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
+          docker build -t $IMAGE:$IMAGE_TAG -t $IMAGE:latest ./backend
+          docker push $IMAGE:$IMAGE_TAG
+          docker push $IMAGE:latest
+          echo "image=$IMAGE:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+  build-push-frontend:
+    name: Build & Push Frontend
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push frontend image
+        id: build
+        env:
+          ECR_REPOSITORY: afritalent-dev-frontend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=https://api.dev.afri-talent.com \
+            --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.dev.afri-talent.com \
+            -t $IMAGE:$IMAGE_TAG -t $IMAGE:latest ./frontend
+          docker push $IMAGE:$IMAGE_TAG
+          docker push $IMAGE:latest
+          echo "image=$IMAGE:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+  deploy-ecs:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    needs: [build-push-backend, build-push-frontend]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # To run migrations before deploy, use:
+      # aws ecs run-task --cluster afritalent-dev-cluster \
+      #   --task-definition afritalent-dev-migrate \
+      #   --launch-type FARGATE \
+      #   --network-configuration <from-terraform-outputs> \
+      #   --region us-east-1
+      # The migrate task definition is provisioned by Terraform.
+
+      - name: Update backend ECS service
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service afritalent-dev-backend \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Update frontend ECS service
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service afritalent-dev-frontend \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for services stable
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services afritalent-dev-backend afritalent-dev-frontend \
+            --region ${{ env.AWS_REGION }}
+
+      # Rollback: If deployment fails, revert by redeploying the previous commit:
+      #   git revert <sha> && git push origin develop
+      # Or force a previous image via:
+      #   aws ecs update-service --cluster afritalent-dev-cluster \
+      #     --service <service-name> --force-new-deployment
+      #     --task-definition <previous-task-def-arn>

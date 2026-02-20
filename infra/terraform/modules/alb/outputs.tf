@@ -25,3 +25,11 @@ output "listener_http_arn" {
 output "listener_https_arn" {
   value = length(aws_lb_listener.https) > 0 ? aws_lb_listener.https[0].arn : ""
 }
+
+output "alb_arn_suffix" {
+  value = aws_lb.app.arn_suffix
+}
+
+output "backend_target_group_arn_suffix" {
+  value = aws_lb_target_group.backend.arn_suffix
+}

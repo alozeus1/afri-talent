@@ -295,3 +295,9 @@ variable "github_actions_additional_policy_arn" {
   description = "Optional additional IAM policy ARN attached to the GitHub Actions role"
   default     = ""
 }
+
+variable "alerts_email" {
+  type        = string
+  description = "Email address for CloudWatch alarm notifications"
+  default     = "alozeus1@gmail.com"
+}

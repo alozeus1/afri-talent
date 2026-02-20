@@ -13,3 +13,7 @@ output "private_subnet_ids" {
 output "availability_zones" {
   value = local.azs
 }
+
+output "private_route_table_ids" {
+  value = [aws_route_table.private.id]
+}

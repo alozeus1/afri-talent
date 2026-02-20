@@ -96,9 +96,14 @@ export const orchestratorLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip rate limiting in test environment so the test suite can make
+  // many requests without exhausting the in-memory window counter.
+  skip: () => process.env.NODE_ENV === "test",
   keyGenerator: (req: Request): string => {
-    // Use user ID if authenticated (more precise), fallback to IP
-    return (req as Request & { user?: { userId: string } }).user?.userId ?? req.ip ?? "anonymous";
+    // Use user ID if authenticated (more precise), fallback to IP via the
+    // ipKeyGenerator helper (required by express-rate-limit v8 for IPv6 safety).
+    const userId = (req as Request & { user?: { userId: string } }).user?.userId;
+    return userId ?? req.ip ?? req.socket?.remoteAddress ?? "anonymous";
   },
   message: {
     error: "rate_limit_exceeded",

@@ -9,6 +9,8 @@ locals {
   tags = {
     Project     = var.project_name
     Environment = var.environment
+    Owner       = "alozeus1"
+    CostCenter  = "AfriTalent"
     ManagedBy   = "Terraform"
   }
 }
