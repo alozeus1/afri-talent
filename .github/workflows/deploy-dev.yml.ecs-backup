@@ -1,0 +1,3 @@
+# ECS deployment workflow - backed up
+# See deploy-dev.yml for the active App Runner deployment
+# To restore ECS: mv deploy-dev.yml.ecs-backup deploy-dev.yml

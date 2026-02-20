@@ -3,8 +3,9 @@ locals {
   protocol            = var.acm_certificate_arn == "" ? "http" : "https"
   github_role_name    = var.github_actions_role_name != "" ? var.github_actions_role_name : "${local.name_prefix}-github-actions"
   github_oidc_subject = "repo:${var.github_repo}:ref:${var.github_ref}"
-  cloudfront_domain   = length(var.cloudfront_aliases) > 0 ? var.cloudfront_aliases[0] : module.cloudfront.domain_name
-  frontend_url        = "https://${local.cloudfront_domain}"
+  
+  # For App Runner, we'll use the service URL or custom domain if configured
+  frontend_url = var.frontend_domain_name != "" ? "https://${var.frontend_domain_name}" : "https://app-runner-frontend.amazonaws.com"
 
   tags = {
     Project     = var.project_name
