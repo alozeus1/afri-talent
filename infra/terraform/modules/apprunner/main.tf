@@ -81,7 +81,7 @@ resource "aws_apprunner_vpc_connector" "main" {
 # ── Backend Service ──────────────────────────────────────────────────────────
 
 resource "aws_apprunner_service" "backend" {
-  service_name = "${var.name_prefix}-appr-backend"
+  service_name = "${var.name_prefix}-appr-backend-managed"
 
   source_configuration {
     authentication_configuration {
@@ -149,7 +149,7 @@ resource "aws_apprunner_auto_scaling_configuration_version" "backend" {
 # ── Frontend Service ─────────────────────────────────────────────────────────
 
 resource "aws_apprunner_service" "frontend" {
-  service_name = "${var.name_prefix}-appr-frontend"
+  service_name = "${var.name_prefix}-appr-frontend-managed"
 
   source_configuration {
     authentication_configuration {
