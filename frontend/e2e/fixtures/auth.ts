@@ -29,8 +29,8 @@ export async function loginAs(
   request: APIRequestContext,
   creds: { email: string; password: string }
 ): Promise<void> {
-  const maxRetries = 3;
-  const backoffMs = 1500;
+  const maxRetries = 5;
+  const backoffMs = 3000;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     const res = await request.post(`${API}/api/auth/login`, {
