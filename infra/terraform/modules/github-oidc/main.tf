@@ -12,6 +12,8 @@ resource "aws_iam_openid_connect_provider" "github" {
 
 locals {
   oidc_provider_arn = var.create_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : var.existing_oidc_provider_arn
+  ecs_targets       = compact(concat(var.ecs_service_arns, [var.ecs_cluster_arn]))
+  passrole_targets  = compact([var.ecs_task_execution_role_arn, var.ecs_task_role_arn])
 }
 
 data "aws_iam_policy_document" "github_actions_assume_role" {
@@ -61,30 +63,31 @@ data "aws_iam_policy_document" "github_actions_deploy" {
     resources = var.ecr_repository_arns
   }
 
-  statement {
-    actions = [
-      "ecs:DescribeServices",
-      "ecs:DescribeTaskDefinition",
-      "ecs:RegisterTaskDefinition",
-      "ecs:UpdateService",
-      "ecs:ListTasks",
-      "ecs:DescribeTasks"
-    ]
-    resources = concat(var.ecs_service_arns, [var.ecs_cluster_arn, "*"])
+  dynamic "statement" {
+    for_each = length(local.ecs_targets) > 0 ? [1] : []
+    content {
+      actions = [
+        "ecs:DescribeServices",
+        "ecs:DescribeTaskDefinition",
+        "ecs:RegisterTaskDefinition",
+        "ecs:UpdateService",
+        "ecs:ListTasks",
+        "ecs:DescribeTasks"
+      ]
+      resources = concat(local.ecs_targets, ["*"])
+    }
   }
 
-  statement {
-    actions = [
-      "iam:PassRole"
-    ]
-    resources = [
-      var.ecs_task_execution_role_arn,
-      var.ecs_task_role_arn
-    ]
-    condition {
-      test     = "StringEquals"
-      variable = "iam:PassedToService"
-      values   = ["ecs-tasks.amazonaws.com"]
+  dynamic "statement" {
+    for_each = length(local.passrole_targets) > 0 ? [1] : []
+    content {
+      actions   = ["iam:PassRole"]
+      resources = local.passrole_targets
+      condition {
+        test     = "StringEquals"
+        variable = "iam:PassedToService"
+        values   = ["ecs-tasks.amazonaws.com"]
+      }
     }
   }
 }
