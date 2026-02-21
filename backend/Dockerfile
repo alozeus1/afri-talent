@@ -1,56 +1,50 @@
-# Backend Dockerfile - Production
-FROM node:20-alpine AS base
+# Backend Dockerfile - Production (Debian/Prisma OpenSSL compatible)
+FROM node:20-bookworm-slim AS base
 
-# Install dependencies only when needed
-FROM base AS deps
-WORKDIR /app
+RUN apt-get update \ 
+  && apt-get install -y --no-install-recommends ca-certificates openssl curl \ 
+  && rm -rf /var/lib/apt/lists/*
 
-# Copy package files
-COPY package.json package-lock.json ./
-COPY prisma ./prisma/
-
-# Install dependencies
-RUN npm ci --only=production=false
-
-# Generate Prisma client
-RUN npx prisma generate
-
-# Build stage
+# Install dependencies and build
 FROM base AS builder
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
-COPY . .
+COPY package.json package-lock.json ./
+COPY prisma ./prisma/
 
-# Build TypeScript
+# Install full deps for build and Prisma generate
+RUN npm ci
+
+# Generate Prisma client targeting OpenSSL 3 (Debian/glibc)
+RUN npx prisma generate
+
+# Copy source and build
+COPY . .
 RUN npm run build
 
-# Production stage
+# Prune dev deps for runtime
+RUN npm prune --production
+
+# Production image
 FROM base AS runner
 WORKDIR /app
-
 ENV NODE_ENV=production
 
-# Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 expressjs
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs \ 
+  && adduser --system --uid 1001 --ingroup nodejs expressjs
 
-# Copy built application
-COPY --from=builder /app/dist ./dist
+# Copy built app and production deps
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
 
-# Set ownership
 RUN chown -R expressjs:nodejs /app
-
 USER expressjs
 
 EXPOSE 4000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD curl -fsS http://localhost:4000/health || exit 1
 
 CMD ["node", "dist/server.js"]
