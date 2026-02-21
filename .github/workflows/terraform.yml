@@ -31,6 +31,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Debug Terraform fmt inputs
+        run: |
+          pwd
+          terraform -version
+          ls -l locals.tf envs/dev
+          sed -n '1,160p' locals.tf
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
