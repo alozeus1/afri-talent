@@ -6,6 +6,10 @@ resource "aws_cloudfront_origin_request_policy" "all_viewer" {
   name    = "${var.name_prefix}-all-viewer"
   comment = "Forward all headers, cookies, and query strings"
 
+  lifecycle {
+    prevent_destroy = true
+  }
+
   cookies_config {
     cookie_behavior = "all"
   }
