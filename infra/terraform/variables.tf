@@ -61,11 +61,13 @@ variable "acm_certificate_arn" {
 variable "frontend_image" {
   type        = string
   description = "Container image URI for the frontend service"
+  default     = "108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest"
 }
 
 variable "backend_image" {
   type        = string
   description = "Container image URI for the backend service"
+  default     = "108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest"
 }
 
 variable "create_ecr" {
