@@ -27,13 +27,38 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/companies" className="text-gray-400 hover:text-white transition-colors">
+                  Company Reviews
+                </Link>
+              </li>
+              <li>
+                <Link href="/salaries" className="text-gray-400 hover:text-white transition-colors">
+                  Salary Comparison
+                </Link>
+              </li>
+              <li>
+                <Link href="/interviews" className="text-gray-400 hover:text-white transition-colors">
+                  Interview Prep
+                </Link>
+              </li>
+              <li>
+                <Link href="/immigration" className="text-gray-400 hover:text-white transition-colors">
+                  Visa Tracker
+                </Link>
+              </li>
+              <li>
+                <Link href="/learning" className="text-gray-400 hover:text-white transition-colors">
+                  Learning Hub
+                </Link>
+              </li>
+              <li>
                 <Link href="/resources" className="text-gray-400 hover:text-white transition-colors">
                   Career Resources
                 </Link>
               </li>
               <li>
-                <Link href="/register" className="text-gray-400 hover:text-white transition-colors">
-                  Create Profile
+                <Link href="/billing" className="text-gray-400 hover:text-white transition-colors">
+                  Pricing
                 </Link>
               </li>
             </ul>
@@ -45,6 +70,11 @@ export function Footer() {
               <li>
                 <Link href="/register?role=employer" className="text-gray-400 hover:text-white transition-colors">
                   Post a Job
+                </Link>
+              </li>
+              <li>
+                <Link href="/employer/talent" className="text-gray-400 hover:text-white transition-colors">
+                  Browse Talent
                 </Link>
               </li>
               <li>

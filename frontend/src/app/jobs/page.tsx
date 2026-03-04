@@ -15,6 +15,9 @@ export default function JobsPage() {
   const [location, setLocation] = useState("");
   const [type, setType] = useState("");
   const [seniority, setSeniority] = useState("");
+  const [visaSponsorship, setVisaSponsorship] = useState("");
+  const [relocationAssistance, setRelocationAssistance] = useState("");
+  const [remote, setRemote] = useState("");
   const [page, setPage] = useState(1);
 
   const fetchJobs = useCallback(async () => {
@@ -26,6 +29,9 @@ export default function JobsPage() {
         location: location || undefined,
         type: type || undefined,
         seniority: seniority || undefined,
+        visaSponsorship: visaSponsorship || undefined,
+        relocationAssistance: relocationAssistance || undefined,
+        remote: remote || undefined,
         page,
         limit: 12,
       });
@@ -35,7 +41,7 @@ export default function JobsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, location, type, seniority, page]);
+  }, [search, location, type, seniority, visaSponsorship, relocationAssistance, remote, page]);
 
   useEffect(() => {
     const debounce = setTimeout(() => {
@@ -49,6 +55,9 @@ export default function JobsPage() {
     setLocation("");
     setType("");
     setSeniority("");
+    setVisaSponsorship("");
+    setRelocationAssistance("");
+    setRemote("");
     setPage(1);
   };
 
@@ -68,6 +77,12 @@ export default function JobsPage() {
         onLocationChange={(v) => { setLocation(v); setPage(1); }}
         onTypeChange={(v) => { setType(v); setPage(1); }}
         onSeniorityChange={(v) => { setSeniority(v); setPage(1); }}
+        visaSponsorship={visaSponsorship}
+        relocationAssistance={relocationAssistance}
+        remote={remote}
+        onVisaSponsorshipChange={(v) => { setVisaSponsorship(v); setPage(1); }}
+        onRelocationChange={(v) => { setRelocationAssistance(v); setPage(1); }}
+        onRemoteChange={(v) => { setRemote(v); setPage(1); }}
         onClear={clearFilters}
       />
 

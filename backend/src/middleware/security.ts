@@ -26,9 +26,10 @@ export const securityHeaders = helmet({
 });
 
 // General API rate limiter
+const isTestEnv = process.env.NODE_ENV === "test" || process.env.E2E === "1";
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per window
+  max: isTestEnv ? 10000 : 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later" },
@@ -37,11 +38,9 @@ export const generalLimiter = rateLimit({
     return req.path === "/health";
   },
 });
-
-// Strict rate limiter for auth endpoints
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 auth attempts per window
+  max: isTestEnv ? 1000 : 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many authentication attempts, please try again later" },
@@ -51,7 +50,7 @@ export const authLimiter = rateLimit({
 // Very strict limiter for registration
 export const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5, // 5 registrations per hour per IP
+  max: isTestEnv ? 1000 : 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many registration attempts, please try again later" },
@@ -60,7 +59,7 @@ export const registerLimiter = rateLimit({
 // Password reset limiter (for future use)
 export const passwordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3, // 3 reset requests per hour
+  max: isTestEnv ? 1000 : 3,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many password reset attempts, please try again later" },

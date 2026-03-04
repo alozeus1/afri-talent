@@ -55,6 +55,25 @@ export default function ResourcesPage() {
         <p className="text-gray-600">Career advice, industry insights, and guides for African tech professionals</p>
       </div>
 
+      {/* Featured Guides */}
+      <div className="mb-10">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Featured Guides</h2>
+        <div className="grid md:grid-cols-3 gap-4">
+          {[
+            { title: "Canada Express Entry for African Developers", category: "Immigration", color: "bg-red-50 text-red-700 border-red-200", icon: "🇨🇦" },
+            { title: "German Blue Card: Complete Guide", category: "Immigration", color: "bg-yellow-50 text-yellow-700 border-yellow-200", icon: "🇩🇪" },
+            { title: "UK Skilled Worker Visa from Nigeria", category: "Immigration", color: "bg-blue-50 text-blue-700 border-blue-200", icon: "🇬🇧" },
+          ].map((guide) => (
+            <div key={guide.title} className={`rounded-xl border p-5 ${guide.color}`}>
+              <span className="text-2xl mb-2 block">{guide.icon}</span>
+              <Badge variant="default" className="mb-2">{guide.category}</Badge>
+              <h3 className="font-semibold text-gray-900">{guide.title}</h3>
+              <p className="text-sm text-gray-600 mt-1">Coming soon</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input

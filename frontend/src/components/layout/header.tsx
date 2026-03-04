@@ -3,12 +3,26 @@
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { notifications as notificationsApi, messages as messagesApi } from "@/lib/api";
 
 export function Header() {
   const { user, isLoading, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    notificationsApi.unreadCount().then(d => setUnreadNotifs(d.count)).catch(() => {});
+    messagesApi.unreadCount().then(d => setUnreadMessages(d.count)).catch(() => {});
+    const interval = setInterval(() => {
+      notificationsApi.unreadCount().then(d => setUnreadNotifs(d.count)).catch(() => {});
+      messagesApi.unreadCount().then(d => setUnreadMessages(d.count)).catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const getDashboardLink = () => {
     if (!user) return "/login";
@@ -63,16 +77,47 @@ export function Header() {
             </div>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
+            <div className="hidden md:flex items-center space-x-6">
               <Link href="/jobs" className="text-gray-600 hover:text-gray-900 font-medium">
                 Find Jobs
               </Link>
-              <Link href="/resources" className="text-gray-600 hover:text-gray-900 font-medium">
-                Resources
+              <Link href="/companies" className="text-gray-600 hover:text-gray-900 font-medium">
+                Companies
+              </Link>
+              <Link href="/salaries" className="text-gray-600 hover:text-gray-900 font-medium">
+                Salaries
+              </Link>
+              <Link href="/interviews" className="text-gray-600 hover:text-gray-900 font-medium">
+                Interviews
+              </Link>
+              <Link href="/learning" className="text-gray-600 hover:text-gray-900 font-medium">
+                Learn
               </Link>
               {user?.role === "CANDIDATE" && (
                 <Link href="/candidate/ai-assistant" className="text-gray-600 hover:text-gray-900 font-medium">
                   AI Assistant
+                </Link>
+              )}
+              {user && (
+                <Link href="/messages" className="relative text-gray-600 hover:text-gray-900 font-medium">
+                  Messages
+                  {unreadMessages > 0 && (
+                    <span className="absolute -top-1 -right-3 bg-emerald-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                      {unreadMessages > 9 ? "9+" : unreadMessages}
+                    </span>
+                  )}
+                </Link>
+              )}
+              {user && (
+                <Link href="/notifications" className="relative text-gray-600 hover:text-gray-900">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  {unreadNotifs > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                      {unreadNotifs > 9 ? "9+" : unreadNotifs}
+                    </span>
+                  )}
                 </Link>
               )}
 
@@ -136,6 +181,34 @@ export function Header() {
                   Find Jobs
                 </Link>
                 <Link
+                  href="/companies"
+                  className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Companies
+                </Link>
+                <Link
+                  href="/salaries"
+                  className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Salaries
+                </Link>
+                <Link
+                  href="/interviews"
+                  className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Interviews
+                </Link>
+                <Link
+                  href="/learning"
+                  className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Learn
+                </Link>
+                <Link
                   href="/resources"
                   className="text-gray-600 hover:text-gray-900 font-medium py-2"
                   onClick={() => setMobileMenuOpen(false)}
@@ -162,6 +235,36 @@ export function Header() {
                         AI Assistant
                       </Link>
                     )}
+                    <Link
+                      href="/messages"
+                      className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Messages {unreadMessages > 0 && <span className="ml-1 bg-emerald-600 text-white text-xs rounded-full px-1.5">{unreadMessages}</span>}
+                    </Link>
+                    <Link
+                      href="/notifications"
+                      className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Notifications {unreadNotifs > 0 && <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5">{unreadNotifs}</span>}
+                    </Link>
+                    {user.role === "CANDIDATE" && (
+                      <Link
+                        href="/immigration"
+                        className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Visa Tracker
+                      </Link>
+                    )}
+                    <Link
+                      href="/billing"
+                      className="text-gray-600 hover:text-gray-900 font-medium py-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Pricing
+                    </Link>
                     <button
                       onClick={() => setShowLogoutConfirm(true)}
                       className="text-left text-gray-600 hover:text-gray-900 font-medium py-2"

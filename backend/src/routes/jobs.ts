@@ -108,7 +108,12 @@ router.get("/ai-search", authenticate, authorize(Role.CANDIDATE), async (req: Re
 // GET /api/jobs - Public: list published jobs
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const { search, query: queryAlias, location, type, seniority, page = "1", limit = "10", forAI } = req.query;
+    const {
+      search, query: queryAlias, location, type, seniority,
+      visaSponsorship, relocationAssistance, remote,
+      salaryMin, salaryMax, country,
+      page = "1", limit = "10", forAI,
+    } = req.query;
     const searchTerm = (search || queryAlias) as string | undefined;
 
     const where: any = { status: JobStatus.PUBLISHED };
@@ -130,6 +135,30 @@ router.get("/", async (req: Request, res: Response) => {
 
     if (seniority) {
       where.seniority = seniority as string;
+    }
+
+    if (visaSponsorship) {
+      where.visaSponsorship = visaSponsorship as string;
+    }
+
+    if (relocationAssistance === "true") {
+      where.relocationAssistance = true;
+    }
+
+    if (remote === "true") {
+      where.location = { contains: "remote", mode: "insensitive" };
+    }
+
+    if (salaryMin) {
+      where.salaryMax = { gte: parseInt(salaryMin as string) };
+    }
+
+    if (salaryMax) {
+      where.salaryMin = { lte: parseInt(salaryMax as string) };
+    }
+
+    if (country) {
+      where.eligibleCountries = { has: country as string };
     }
 
     const parsedLimit = Math.min(parseInt(limit as string) || 10, 100);
@@ -189,6 +218,7 @@ router.get("/:slug", async (req: Request, res: Response) => {
         employer: {
           select: { companyName: true, location: true, website: true, bio: true },
         },
+        _count: { select: { applications: true } },
       },
     });
 

@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { QuickApplyModal } from "@/components/jobs/quick-apply-modal";
 
 export default function JobDetailPage() {
   const params = useParams();
@@ -19,6 +20,7 @@ export default function JobDetailPage() {
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [quickApplyOpen, setQuickApplyOpen] = useState(false);
 
   useEffect(() => {
     async function fetchJob() {
@@ -105,7 +107,7 @@ export default function JobDetailPage() {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{job.title}</h1>
-                <p className="text-emerald-600 font-semibold text-lg">{job.employer.companyName}</p>
+                <p className="text-emerald-600 font-semibold text-lg">{job.employer?.companyName || job.sourceName || "Company"}</p>
               </div>
               <Badge variant="success" className="text-sm">{job.type}</Badge>
             </div>
@@ -139,6 +141,45 @@ export default function JobDetailPage() {
                 {job.tags.map((tag) => (
                   <Badge key={tag} variant="default">{tag}</Badge>
                 ))}
+              </div>
+            )}
+
+            {(job.visaSponsorship === "YES" || job.relocationAssistance || (job.eligibleCountries && job.eligibleCountries.length > 0)) && (
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6 border border-blue-100">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  International Opportunities
+                </h3>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {job.visaSponsorship === "YES" && (
+                    <div className="flex items-start gap-2">
+                      <span className="text-green-600 mt-0.5">&#10003;</span>
+                      <div>
+                        <p className="font-medium text-gray-900">Visa Sponsorship</p>
+                        <p className="text-sm text-gray-600">Employer provides visa support</p>
+                      </div>
+                    </div>
+                  )}
+                  {job.relocationAssistance && (
+                    <div className="flex items-start gap-2">
+                      <span className="text-green-600 mt-0.5">&#10003;</span>
+                      <div>
+                        <p className="font-medium text-gray-900">Relocation Assistance</p>
+                        <p className="text-sm text-gray-600">Help with moving and settling in</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {job.eligibleCountries && job.eligibleCountries.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-blue-200">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Eligible Countries:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {job.eligibleCountries.map((c: string) => (
+                        <span key={c} className="px-2 py-0.5 bg-white rounded text-xs font-medium text-gray-700 border border-gray-200">{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -181,13 +222,26 @@ export default function JobDetailPage() {
                     </p>
                   )}
                   <Button
-                    className="w-full mb-4"
+                    className="w-full mb-3"
                     size="lg"
                     onClick={handleApply}
                     disabled={applying}
                   >
                     {applying ? "Applying..." : user ? "Apply Now" : "Sign in to Apply"}
                   </Button>
+                  {user && user.role === "CANDIDATE" && (
+                    <Button
+                      className="w-full mb-4 bg-emerald-600 text-white hover:bg-emerald-700"
+                      size="lg"
+                      variant="outline"
+                      onClick={() => setQuickApplyOpen(true)}
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Quick Apply
+                    </Button>
+                  )}
                   {!user && (
                     <p className="text-xs text-gray-400 text-center">
                       Don&apos;t have an account?{" "}
@@ -200,12 +254,12 @@ export default function JobDetailPage() {
               )}
 
               <div className="border-t border-gray-200 pt-4">
-                <h4 className="font-medium text-gray-900 mb-3">About {job.employer.companyName}</h4>
-                <p className="text-gray-600 text-sm mb-2">{job.employer.location}</p>
-                {job.employer.bio && (
+                <h4 className="font-medium text-gray-900 mb-3">About {job.employer?.companyName || job.sourceName || "Company"}</h4>
+                <p className="text-gray-600 text-sm mb-2">{job.employer?.location}</p>
+                {job.employer?.bio && (
                   <p className="text-gray-600 text-sm mb-3">{job.employer.bio}</p>
                 )}
-                {job.employer.website && (
+                {job.employer?.website && (
                   <a
                     href={job.employer.website}
                     target="_blank"
@@ -216,10 +270,66 @@ export default function JobDetailPage() {
                   </a>
                 )}
               </div>
+
+              {/* Interview Insights */}
+              {(job.employer?.companyName || job.sourceName) && (
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    Interview Insights
+                  </h4>
+                  <Link
+                    href={`/interviews?company=${encodeURIComponent(job.employer?.companyName || job.sourceName || "")}`}
+                    className="inline-flex items-center text-sm text-emerald-600 hover:text-emerald-700"
+                  >
+                    View interview experiences
+                    <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                </div>
+              )}
+
+              {/* Salary Data */}
+              {salary && (
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Salary Data
+                  </h4>
+                  <Link
+                    href={`/salaries?jobTitle=${encodeURIComponent(job.title)}`}
+                    className="inline-flex items-center text-sm text-emerald-600 hover:text-emerald-700"
+                  >
+                    Compare salaries for this role
+                    <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Quick Apply Modal */}
+      {user && user.role === "CANDIDATE" && job && (
+        <QuickApplyModal
+          jobId={job.id}
+          jobTitle={job.title}
+          isOpen={quickApplyOpen}
+          onClose={() => setQuickApplyOpen(false)}
+          onSuccess={() => {
+            setQuickApplyOpen(false);
+            setApplied(true);
+          }}
+        />
+      )}
     </div>
   );
 }

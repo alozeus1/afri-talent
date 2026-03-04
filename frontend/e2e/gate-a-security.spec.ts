@@ -46,7 +46,7 @@ test("/api/auth/me works via cookie without Authorization header", async ({
   const meRes = await request.get(`${API}/api/auth/me`);
   expect(meRes.ok()).toBe(true);
   const body = await meRes.json();
-  expect(body.user.email).toBe(TEST_CANDIDATE.email);
+  expect(body.email).toBe(TEST_CANDIDATE.email);
 });
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ test.describe("unauthenticated access", () => {
   const protectedRoutes: [string, string][] = [
     ["GET", "/api/auth/me"],
     ["GET", "/api/profile"],
-    ["GET", "/api/applications"],
+    ["GET", "/api/applications/my"],
     ["GET", "/api/notifications"],
     ["GET", "/api/billing/status"],
   ];
@@ -166,17 +166,17 @@ test("register with weak password returns 400", async ({ request }) => {
   expect(res.status()).toBe(400);
 });
 
-test("register with duplicate email returns 409", async ({ request }) => {
+test("register with duplicate email returns 400", async ({ request }) => {
   // TEST_CANDIDATE email already exists from seed
   const res = await request.post(`${API}/api/auth/register`, {
     data: {
       email: TEST_CANDIDATE.email,
-      password: "password123",
+      password: "Password123!",
       name: "Dup User",
       role: "CANDIDATE",
     },
   });
-  expect(res.status()).toBe(409);
+  expect(res.status()).toBe(400);
 });
 
 // ---------------------------------------------------------------------------

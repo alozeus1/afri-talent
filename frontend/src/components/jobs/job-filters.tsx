@@ -8,10 +8,16 @@ interface JobFiltersProps {
   location: string;
   type: string;
   seniority: string;
+  visaSponsorship: string;
+  relocationAssistance: string;
+  remote: string;
   onSearchChange: (value: string) => void;
   onLocationChange: (value: string) => void;
   onTypeChange: (value: string) => void;
   onSeniorityChange: (value: string) => void;
+  onVisaSponsorshipChange: (value: string) => void;
+  onRelocationChange: (value: string) => void;
+  onRemoteChange: (value: string) => void;
   onClear: () => void;
 }
 
@@ -23,13 +29,19 @@ export function JobFilters({
   location,
   type,
   seniority,
+  visaSponsorship,
+  relocationAssistance,
+  remote,
   onSearchChange,
   onLocationChange,
   onTypeChange,
   onSeniorityChange,
+  onVisaSponsorshipChange,
+  onRelocationChange,
+  onRemoteChange,
   onClear,
 }: JobFiltersProps) {
-  const hasFilters = search || location || type || seniority;
+  const hasFilters = search || location || type || seniority || visaSponsorship || relocationAssistance || remote;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
@@ -68,6 +80,32 @@ export function JobFilters({
             </option>
           ))}
         </select>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-4">
+        <button
+          onClick={() => onRemoteChange(remote ? "" : "true")}
+          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+            remote ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-gray-700 border-gray-300 hover:border-emerald-500"
+          }`}
+        >
+          Remote
+        </button>
+        <button
+          onClick={() => onVisaSponsorshipChange(visaSponsorship ? "" : "YES")}
+          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+            visaSponsorship ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300 hover:border-blue-500"
+          }`}
+        >
+          Visa Sponsored
+        </button>
+        <button
+          onClick={() => onRelocationChange(relocationAssistance ? "" : "true")}
+          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+            relocationAssistance ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-700 border-gray-300 hover:border-purple-500"
+          }`}
+        >
+          Relocation Support
+        </button>
       </div>
       {hasFilters && (
         <div className="mt-4 flex justify-end">

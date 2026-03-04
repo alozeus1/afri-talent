@@ -257,3 +257,31 @@ afri-tech/
 | Variable | Description |
 |----------|-------------|
 | `NEXT_PUBLIC_API_URL` | Backend API URL |
+
+
+   •  Frontend: http://localhost:3000
+   •  Backend API: http://localhost:4000
+
+   Demo credentials (from seed data):
+
+   Role      │ Email                 │ Password    
+   ----------+-----------------------+-------------
+   Candidate │ candidate@example.com │ Password123!
+   Employer  │ employer@example.com  │ Password123!
+   Admin     │ admin@example.com     │ Password123!
+
+   Key pages to test:
+   •  /jobs -- Job search with Quick Apply, visa/relocation filters
+   •  /salaries -- Salary comparison tool
+   •  /interviews -- Interview experiences
+   •  /immigration -- Visa tracker (candidate only)
+   •  /learning -- Learning hub
+   •  /notifications -- Notification center
+   •  /candidate/profile -- Profile editor
+   •  /candidate/applications -- Application tracker
+   •  /candidate/skills -- Skills assessments
+   •  /candidate/calendar -- Interview calendar
+   •  /candidate/referrals -- Referral system
+   •  /candidate/analytics -- Profile analytics
+   •  /admin/users -- User management (admin only)
+   •  /admin/reviews -- Review moderation (admin only)

@@ -55,6 +55,14 @@ export default function EmployerDashboard() {
           {user.employer?.companyName || "Employer"} Dashboard
         </h1>
         <p className="text-gray-600">Manage your job postings and review applications</p>
+        <div className="flex flex-wrap gap-3 mt-4">
+          <Link href="/employer/talent">
+            <Button variant="outline" size="sm">Browse Talent</Button>
+          </Link>
+          <Link href="/employer/analytics">
+            <Button variant="outline" size="sm">Analytics</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-4 gap-6 mb-8">

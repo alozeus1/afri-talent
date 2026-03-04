@@ -116,6 +116,13 @@ model User {
   companyReviews     CompanyReview[]
   skillAssessments   SkillAssessment[]
   assessmentInvites  AssessmentInvite[]
+  passwordResets          PasswordResetToken[]
+  interviewExperiences   InterviewExperience[]
+  salaryReports          SalaryReport[]
+  immigrationProcesses   ImmigrationProcess[]
+  referralsMade          Referral[]         @relation("ReferralsMade")
+  referralsReceived      Referral[]         @relation("ReferralsReceived")
+  calendarEvents         CalendarEvent[]
 
   @@index([role])
   @@index([createdAt])
@@ -256,25 +263,29 @@ model AdminReview {
 // ──────────────── Phase A New Models ────────────────
 
 model CandidateProfile {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  headline        String?  @db.VarChar(200)
-  bio             String?  @db.Text
-  skills          String[]
-  targetRoles     String[]
-  targetCountries String[]
-  yearsExperience Int?
-  visaStatus      String?  @db.VarChar(100)
-  linkedinUrl     String?  @db.VarChar(500)
-  githubUrl       String?  @db.VarChar(500)
-  portfolioUrl    String?  @db.VarChar(500)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline            String?  @db.VarChar(200)
+  bio                 String?  @db.Text
+  skills              String[]
+  targetRoles         String[]
+  targetCountries     String[]
+  yearsExperience     Int?
+  visaStatus          String?  @db.VarChar(100)
+  linkedinUrl         String?  @db.VarChar(500)
+  githubUrl           String?  @db.VarChar(500)
+  portfolioUrl        String?  @db.VarChar(500)
+  openToWork          Boolean  @default(false)
+  profileCompleteness Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   resumes Resume[]
 
   @@index([userId])
+  @@index([openToWork])
+  @@index([skills])
 }
 
 model Resume {
@@ -310,8 +321,10 @@ model Company {
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
 
-  reviews         CompanyReview[]
-  ratingAggregate CompanyRatingAggregate?
+  reviews              CompanyReview[]
+  ratingAggregate      CompanyRatingAggregate?
+  interviewExperiences InterviewExperience[]
+  salaryReports        SalaryReport[]
 
   @@index([domain])
   @@index([verificationStatus])
@@ -596,4 +609,208 @@ model AssessmentInvite {
 
   @@index([userId])
   @@index([jobId])
+}
+
+// ──────────────── Interview Experiences ────────────────
+
+model InterviewExperience {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobTitle        String   @db.VarChar(200)
+  difficulty      String   @db.VarChar(20) // easy, medium, hard
+  outcome         String   @db.VarChar(20) // offered, rejected, no_response, withdrew
+  interviewType   String   @db.VarChar(50) // phone, video, onsite, take_home, panel
+  process         String   @db.Text
+  questions       String[] // array of interview questions
+  tips            String?  @db.Text
+  duration        String?  @db.VarChar(50) // e.g., "2 weeks", "1 month"
+  isApproved      Boolean  @default(false)
+  helpfulCount    Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@index([companyId, isApproved])
+  @@index([userId])
+  @@index([jobTitle])
+}
+
+// ──────────────── Salary Reports ────────────────
+
+model SalaryReport {
+  id              String   @id @default(uuid())
+  companyId       String?
+  company         Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobTitle        String   @db.VarChar(200)
+  location        String   @db.VarChar(200)
+  country         String   @db.VarChar(100)
+  salaryCurrency  String   @db.VarChar(10) @default("USD")
+  salaryAmount    Int
+  salaryPeriod    String   @db.VarChar(20) @default("yearly") // yearly, monthly
+  yearsExperience Int?
+  employmentType  String?  @db.VarChar(50) // full-time, contract, part-time
+  isVerified      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([jobTitle, country])
+  @@index([companyId])
+  @@index([userId])
+  @@index([country])
+}
+
+// ──────────────── Immigration Process Tracker ────────────────
+
+enum ImmigrationStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  DENIED
+  EXPIRED
+}
+
+model ImmigrationProcess {
+  id              String            @id @default(uuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  visaType        String            @db.VarChar(100)
+  targetCountry   String            @db.VarChar(100)
+  status          ImmigrationStatus @default(NOT_STARTED)
+  startDate       DateTime?
+  expectedEndDate DateTime?
+  notes           String?           @db.Text
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  steps ImmigrationStep[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model ImmigrationStep {
+  id                  String              @id @default(uuid())
+  processId           String
+  process             ImmigrationProcess  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  name                String              @db.VarChar(200)
+  description         String?             @db.Text
+  status              ImmigrationStatus   @default(NOT_STARTED)
+  dueDate             DateTime?
+  completedAt         DateTime?
+  documents           String[]
+  sortOrder           Int                 @default(0)
+  createdAt           DateTime            @default(now())
+
+  @@index([processId])
+}
+
+// ──────────────── Referrals ────────────────
+
+enum ReferralStatus {
+  PENDING
+  ACCEPTED
+  HIRED
+  EXPIRED
+}
+
+model Referral {
+  id              String         @id @default(uuid())
+  referrerId      String
+  referrer        User           @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
+  refereeEmail    String         @db.VarChar(255)
+  refereeId       String?
+  referee         User?          @relation("ReferralsReceived", fields: [refereeId], references: [id], onDelete: SetNull)
+  jobId           String?
+  companyName     String?        @db.VarChar(200)
+  message         String?        @db.Text
+  status          ReferralStatus @default(PENDING)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([referrerId])
+  @@index([refereeEmail])
+  @@index([refereeId])
+}
+
+// ──────────────── Learning Resources ────────────────
+
+model LearningResource {
+  id              String   @id @default(uuid())
+  title           String   @db.VarChar(300)
+  description     String?  @db.Text
+  url             String   @db.VarChar(500)
+  provider        String   @db.VarChar(100) // Coursera, Udemy, YouTube, etc.
+  category        String   @db.VarChar(100) // programming, design, data-science, etc.
+  skills          String[]
+  difficulty      String   @db.VarChar(20) // beginner, intermediate, advanced
+  durationHours   Float?
+  isFree          Boolean  @default(false)
+  imageUrl        String?  @db.VarChar(500)
+  featured        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([category])
+  @@index([skills])
+  @@index([featured])
+}
+
+// ──────────────── Calendar Events / Interview Scheduling ────────────────
+
+enum CalendarEventType {
+  INTERVIEW
+  FOLLOW_UP
+  DEADLINE
+  CUSTOM
+}
+
+model CalendarEvent {
+  id              String            @id @default(uuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String            @db.VarChar(300)
+  description     String?           @db.Text
+  eventType       CalendarEventType @default(CUSTOM)
+  startTime       DateTime
+  endTime         DateTime?
+  location        String?           @db.VarChar(300)
+  meetingUrl      String?           @db.VarChar(500)
+  jobId           String?
+  applicationId   String?
+  reminderMinutes Int?              @default(30)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([userId, startTime])
+  @@index([userId, eventType])
+}
+
+// ──────────────── Job Views / Profile Analytics ────────────────
+
+model ProfileView {
+  id          String   @id @default(uuid())
+  profileId   String
+  viewerId    String?
+  viewerRole  String?  @db.VarChar(20)
+  createdAt   DateTime @default(now())
+
+  @@index([profileId, createdAt(sort: Desc)])
+  @@index([viewerId])
+}
+
+// ──────────────── Password Reset ────────────────
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
 }

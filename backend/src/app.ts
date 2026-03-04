@@ -14,6 +14,7 @@ import {
 } from "./middleware/security.js";
 
 import authRoutes from "./routes/auth.js";
+import passwordResetRoutes from "./routes/password-reset.js";
 import jobsRoutes from "./routes/jobs.js";
 import applicationsRoutes from "./routes/applications.js";
 import resourcesRoutes from "./routes/resources.js";
@@ -23,10 +24,22 @@ import filesRoutes from "./routes/files.js";
 import billingRoutes from "./routes/billing.js";
 import webhookRoutes from "./routes/webhooks.js";
 import notificationsRoutes from "./routes/notifications.js";
+import messagesRoutes from "./routes/messages.js";
 import orchestratorRoutes from "./routes/orchestrator.js";
 import aggregatorRoutes from "./routes/aggregator.js";
 import savedSearchesRoutes from "./routes/saved-searches.js";
 import companiesRoutes from "./routes/companies.js";
+import talentRoutes from "./routes/talent.js";
+import employerAnalyticsRoutes from "./routes/employer-analytics.js";
+import quickApplyRoutes from "./routes/quick-apply.js";
+import skillsAssessmentsRoutes from "./routes/skills-assessments.js";
+import salaryReportsRoutes from "./routes/salary-reports.js";
+import interviewExperiencesRoutes from "./routes/interview-experiences.js";
+import immigrationRoutes from "./routes/immigration.js";
+import referralsRoutes from "./routes/referrals.js";
+import learningRoutes from "./routes/learning.js";
+import calendarRoutes from "./routes/calendar.js";
+import candidateAnalyticsRoutes from "./routes/candidate-analytics.js";
 
 dotenv.config();
 
@@ -164,6 +177,7 @@ app.get("/live", (_req, res) => {
 
 // API Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/auth", passwordResetRoutes);
 app.use("/api/jobs", jobsRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/resources", resourcesRoutes);
@@ -172,9 +186,21 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/files", filesRoutes);
 app.use("/api/billing", billingRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/messages", messagesRoutes);
 app.use("/api/aggregator", aggregatorRoutes);
 app.use("/api/saved-searches", savedSearchesRoutes);
 app.use("/api/companies", companiesRoutes);
+app.use("/api/talent", talentRoutes);
+app.use("/api/employer", employerAnalyticsRoutes);
+app.use("/api/quick-apply", quickApplyRoutes);
+app.use("/api/skills-assessments", skillsAssessmentsRoutes);
+app.use("/api/salary-reports", salaryReportsRoutes);
+app.use("/api/interview-experiences", interviewExperiencesRoutes);
+app.use("/api/immigration", immigrationRoutes);
+app.use("/api/referrals", referralsRoutes);
+app.use("/api/learning", learningRoutes);
+app.use("/api/calendar", calendarRoutes);
+app.use("/api/candidate-analytics", candidateAnalyticsRoutes);
 
 // Orchestrator route needs a larger body limit (resume + raw job texts can be ~200 KB combined)
 app.use(

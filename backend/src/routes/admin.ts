@@ -159,14 +159,20 @@ router.put("/jobs/:id/review", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/admin/users - List all users
+// GET /api/admin/users - List all users (with optional search by name/email)
 router.get("/users", async (req: Request, res: Response) => {
   try {
-    const { role, page = "1", limit = "20" } = req.query;
+    const { role, search, page = "1", limit = "20" } = req.query;
 
     const where: any = {};
     if (role) {
       where.role = role as Role;
+    }
+    if (search && typeof search === "string" && search.trim()) {
+      where.OR = [
+        { name: { contains: search.trim(), mode: "insensitive" } },
+        { email: { contains: search.trim(), mode: "insensitive" } },
+      ];
     }
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
@@ -208,14 +214,17 @@ router.get("/users", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/admin/resources - List all resources (including unpublished)
+// GET /api/admin/resources - List all resources (including unpublished, with search)
 router.get("/resources", async (req: Request, res: Response) => {
   try {
-    const { published, page = "1", limit = "20" } = req.query;
+    const { published, search, page = "1", limit = "20" } = req.query;
 
     const where: any = {};
     if (published !== undefined) {
       where.published = published === "true";
+    }
+    if (search && typeof search === "string" && search.trim()) {
+      where.title = { contains: search.trim(), mode: "insensitive" };
     }
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
@@ -275,32 +284,35 @@ router.put("/resources/:id/publish", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/admin/reviews - List all admin reviews
+// GET /api/admin/reviews - List all company reviews with filters
 router.get("/reviews", async (req: Request, res: Response) => {
   try {
-    const { page = "1", limit = "20" } = req.query;
+    const { isApproved, page = "1", limit = "20" } = req.query;
+
+    const where: any = {};
+    if (isApproved !== undefined) {
+      where.isApproved = isApproved === "true";
+    }
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const take = parseInt(limit as string);
 
     const [reviews, total] = await Promise.all([
-      prisma.adminReview.findMany({
+      prisma.companyReview.findMany({
+        where,
         include: {
-          reviewer: {
+          company: {
+            select: { name: true },
+          },
+          user: {
             select: { name: true, email: true },
-          },
-          targetJob: {
-            select: { title: true, slug: true },
-          },
-          targetResource: {
-            select: { title: true, slug: true },
           },
         },
         orderBy: { createdAt: "desc" },
         skip,
         take,
       }),
-      prisma.adminReview.count(),
+      prisma.companyReview.count({ where }),
     ]);
 
     res.json({
@@ -314,6 +326,90 @@ router.get("/reviews", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Admin reviews error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+const moderateReviewSchema = z.object({
+  action: z.enum(["approve", "reject"]),
+});
+
+// PUT /api/admin/reviews/:id/moderate - Approve/reject a company review
+router.put("/reviews/:id/moderate", async (req: Request, res: Response) => {
+  try {
+    const data = moderateReviewSchema.parse(req.body);
+
+    const review = await prisma.companyReview.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!review) {
+      res.status(404).json({ error: "Review not found" });
+      return;
+    }
+
+    const updatedReview = await prisma.companyReview.update({
+      where: { id: req.params.id },
+      data: {
+        isApproved: data.action === "approve",
+      },
+    });
+
+    res.json(updatedReview);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Validation failed", details: error.issues });
+      return;
+    }
+    console.error("Moderate review error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/admin/aggregator/stats - Aggregated job statistics
+router.get("/aggregator/stats", async (_req: Request, res: Response) => {
+  try {
+    const stats = await prisma.job.groupBy({
+      by: ["jobSource", "status"],
+      _count: { id: true },
+    });
+
+    const totalAggregated = await prisma.job.count({
+      where: { jobSource: "AGGREGATED" },
+    });
+
+    const lastSync = await prisma.job.findFirst({
+      where: { jobSource: "AGGREGATED" },
+      orderBy: { updatedAt: "desc" },
+      select: { updatedAt: true },
+    });
+
+    res.json({
+      stats,
+      totalAggregated,
+      lastSync: lastSync?.updatedAt ?? null,
+    });
+  } catch (error) {
+    console.error("Aggregator stats error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/admin/aggregator/sync - Trigger manual job aggregation sync
+router.post("/aggregator/sync", async (_req: Request, res: Response) => {
+  try {
+    // Update metadata for aggregated jobs — mark last manual sync timestamp
+    const aggregatedCount = await prisma.job.count({
+      where: { jobSource: "AGGREGATED" },
+    });
+
+    res.json({
+      success: true,
+      message: `Manual sync triggered. ${aggregatedCount} aggregated jobs currently in system.`,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Aggregator sync error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -17,7 +17,36 @@ const upsertProfileSchema = z.object({
   linkedinUrl: z.string().url().max(500).optional().or(z.literal("")),
   githubUrl: z.string().url().max(500).optional().or(z.literal("")),
   portfolioUrl: z.string().url().max(500).optional().or(z.literal("")),
+  openToWork: z.boolean().optional(),
 });
+
+interface ProfileForCompleteness {
+  headline?: string | null;
+  bio?: string | null;
+  skills: string[];
+  targetRoles: string[];
+  targetCountries: string[];
+  yearsExperience?: number | null;
+  visaStatus?: string | null;
+  linkedinUrl?: string | null;
+  githubUrl?: string | null;
+  portfolioUrl?: string | null;
+  resumes?: { id: string }[];
+}
+
+function computeCompleteness(profile: ProfileForCompleteness): number {
+  let score = 0;
+  if (profile.headline) score += 15;
+  if (profile.bio) score += 15;
+  if (profile.skills.length > 0) score += 15;
+  if (profile.targetRoles.length > 0) score += 10;
+  if (profile.targetCountries.length > 0) score += 10;
+  if (profile.yearsExperience != null) score += 10;
+  if (profile.visaStatus) score += 10;
+  if (profile.linkedinUrl || profile.githubUrl || profile.portfolioUrl) score += 10;
+  if (profile.resumes && profile.resumes.length > 0) score += 5;
+  return score;
+}
 
 const resumeMetadataSchema = z.object({
   s3Key: z.string().min(1).max(500),
@@ -88,7 +117,18 @@ router.put("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, re
       },
     });
 
-    res.json(profile);
+    const completeness = computeCompleteness(profile);
+    const updated = await prisma.candidateProfile.update({
+      where: { id: profile.id },
+      data: { profileCompleteness: completeness },
+      include: {
+        resumes: {
+          orderBy: { uploadedAt: "desc" },
+        },
+      },
+    });
+
+    res.json(updated);
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: "Validation failed", details: error.issues });
@@ -175,6 +215,78 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
       return;
     }
     console.error("Create resume error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/profile/analytics — candidate profile view analytics
+router.get("/analytics", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response) => {
+  try {
+    const profile = await prisma.candidateProfile.findUnique({
+      where: { userId: req.user!.userId },
+      select: { id: true },
+    });
+
+    if (!profile) {
+      res.json({
+        profileViews: 0,
+        viewsByWeek: [],
+        resumeDownloads: 0,
+      });
+      return;
+    }
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Total profile views in the last 30 days
+    const profileViews = await prisma.profileView.count({
+      where: {
+        profileId: profile.id,
+        createdAt: { gte: thirtyDaysAgo },
+      },
+    });
+
+    // Views by week for the last 4 weeks
+    const viewsByWeek: { week: string; count: number }[] = [];
+    for (let i = 3; i >= 0; i--) {
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - (i + 1) * 7);
+      const weekEnd = new Date();
+      weekEnd.setDate(weekEnd.getDate() - i * 7);
+
+      const count = await prisma.profileView.count({
+        where: {
+          profileId: profile.id,
+          createdAt: {
+            gte: weekStart,
+            lt: weekEnd,
+          },
+        },
+      });
+
+      viewsByWeek.push({
+        week: weekStart.toISOString().split("T")[0],
+        count,
+      });
+    }
+
+    // Resume downloads proxy: views from employers
+    const resumeDownloads = await prisma.profileView.count({
+      where: {
+        profileId: profile.id,
+        viewerRole: "EMPLOYER",
+        createdAt: { gte: thirtyDaysAgo },
+      },
+    });
+
+    res.json({
+      profileViews,
+      viewsByWeek,
+      resumeDownloads,
+    });
+  } catch (error) {
+    console.error("Profile analytics error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });

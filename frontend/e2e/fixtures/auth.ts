@@ -3,17 +3,17 @@ import { APIRequestContext } from "@playwright/test";
 /** Shared test credentials — seeded by backend/prisma/seed.ts */
 export const TEST_CANDIDATE = {
   email: "candidate@example.com",
-  password: "password123",
+  password: "Password123!",
 };
 
 export const TEST_EMPLOYER = {
   email: "employer@example.com",
-  password: "password123",
+  password: "Password123!",
 };
 
 export const TEST_ADMIN = {
   email: "admin@example.com",
-  password: "password123",
+  password: "Password123!",
 };
 
 /** Base URL for the backend API (matches playwright.config.ts baseURL) */
