@@ -182,6 +182,8 @@ module "apprunner" {
   api_domain_name                   = var.api_domain_name
   frontend_domain_name              = var.frontend_domain_name
   create_custom_domain_associations = var.create_custom_domain_associations
+
+  depends_on = [module.secrets]
 }
 
 # Grant App Runner instance role access to S3
