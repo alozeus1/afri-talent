@@ -2,6 +2,11 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+data "aws_ssm_parameter" "nat_ami" {
+  count = var.enable_nat_gateway && var.nat_strategy == "instance" ? 1 : 0
+  name  = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+}
+
 locals {
   azs = slice(data.aws_availability_zones.available.names, 0, var.az_count)
 }
@@ -67,7 +72,7 @@ resource "aws_route_table_association" "public" {
 }
 
 resource "aws_eip" "nat" {
-  count  = var.enable_nat_gateway ? 1 : 0
+  count  = var.enable_nat_gateway && var.nat_strategy == "gateway" ? 1 : 0
   domain = "vpc"
 
   tags = {
@@ -76,7 +81,7 @@ resource "aws_eip" "nat" {
 }
 
 resource "aws_nat_gateway" "main" {
-  count         = var.enable_nat_gateway ? 1 : 0
+  count         = var.enable_nat_gateway && var.nat_strategy == "gateway" ? 1 : 0
   allocation_id = aws_eip.nat[0].id
   subnet_id     = aws_subnet.public[0].id
 
@@ -85,14 +90,81 @@ resource "aws_nat_gateway" "main" {
   }
 }
 
+resource "aws_security_group" "nat_instance" {
+  count       = var.enable_nat_gateway && var.nat_strategy == "instance" ? 1 : 0
+  name        = "${var.name_prefix}-nat-instance-sg"
+  description = "Security group for NAT instance"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.name_prefix}-nat-instance-sg"
+  }
+}
+
+resource "aws_instance" "nat" {
+  count                       = var.enable_nat_gateway && var.nat_strategy == "instance" ? 1 : 0
+  ami                         = data.aws_ssm_parameter.nat_ami[0].value
+  instance_type               = "t3.nano"
+  subnet_id                   = aws_subnet.public[0].id
+  vpc_security_group_ids      = [aws_security_group.nat_instance[0].id]
+  associate_public_ip_address = true
+  source_dest_check           = false
+
+  user_data = <<-EOF
+    #!/bin/bash
+    set -eux
+    dnf install -y iptables-services
+    cat >/etc/sysctl.d/99-nat.conf <<SYSCTL
+    net.ipv4.ip_forward = 1
+    SYSCTL
+    sysctl --system
+    iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+    iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+    iptables -A FORWARD -s ${var.vpc_cidr} -j ACCEPT
+    service iptables save
+    systemctl enable iptables
+    systemctl restart iptables
+  EOF
+
+  metadata_options {
+    http_tokens = "required"
+  }
+
+  tags = {
+    Name = "${var.name_prefix}-nat-instance"
+  }
+}
+
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
   dynamic "route" {
-    for_each = var.enable_nat_gateway ? [1] : []
+    for_each = var.enable_nat_gateway && var.nat_strategy == "gateway" ? [1] : []
     content {
       cidr_block     = "0.0.0.0/0"
       nat_gateway_id = aws_nat_gateway.main[0].id
+    }
+  }
+
+  dynamic "route" {
+    for_each = var.enable_nat_gateway && var.nat_strategy == "instance" ? [1] : []
+    content {
+      cidr_block           = "0.0.0.0/0"
+      network_interface_id = aws_instance.nat[0].primary_network_interface_id
     }
   }
 

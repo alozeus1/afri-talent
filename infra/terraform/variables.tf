@@ -46,6 +46,17 @@ variable "enable_nat_gateway" {
   default     = true
 }
 
+variable "nat_strategy" {
+  type        = string
+  description = "Private subnet egress strategy when NAT is enabled: gateway or instance"
+  default     = "gateway"
+
+  validation {
+    condition     = contains(["gateway", "instance"], var.nat_strategy)
+    error_message = "nat_strategy must be either gateway or instance."
+  }
+}
+
 variable "enable_interface_endpoints" {
   type        = bool
   description = "Create VPC interface/gateway endpoints for ECR and Secrets Manager"

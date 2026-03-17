@@ -28,6 +28,12 @@ variable "enable_nat_gateway" {
   description = "Enable NAT gateway for private subnets"
 }
 
+variable "nat_strategy" {
+  type        = string
+  description = "Private subnet egress strategy when NAT is enabled: gateway or instance"
+  default     = "gateway"
+}
+
 variable "enable_interface_endpoints" {
   type        = bool
   description = "Create VPC interface/gateway endpoints for AWS APIs (ECR, Secrets Manager, S3)"
