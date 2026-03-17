@@ -3,6 +3,11 @@
 # Reduces compute costs from ~$70/month to ~$25/month
 # ─────────────────────────────────────────────────────────────────────────────
 
+locals {
+  backend_scaling_name  = substr("${var.name_prefix}-be-scale", 0, 32)
+  frontend_scaling_name = substr("${var.name_prefix}-fe-scale", 0, 32)
+}
+
 # ── IAM Role for App Runner to pull from ECR ─────────────────────────────────
 
 resource "aws_iam_role" "apprunner_ecr_access" {
@@ -138,7 +143,7 @@ resource "aws_apprunner_service" "backend" {
 }
 
 resource "aws_apprunner_auto_scaling_configuration_version" "backend" {
-  auto_scaling_configuration_name = "${var.name_prefix}-backend-scaling"
+  auto_scaling_configuration_name = local.backend_scaling_name
   min_size                        = var.backend_min_size
   max_size                        = var.backend_max_size
   max_concurrency                 = var.backend_max_concurrency
@@ -193,7 +198,7 @@ resource "aws_apprunner_service" "frontend" {
 }
 
 resource "aws_apprunner_auto_scaling_configuration_version" "frontend" {
-  auto_scaling_configuration_name = "${var.name_prefix}-frontend-scaling"
+  auto_scaling_configuration_name = local.frontend_scaling_name
   min_size                        = var.frontend_min_size
   max_size                        = var.frontend_max_size
   max_concurrency                 = var.frontend_max_concurrency
