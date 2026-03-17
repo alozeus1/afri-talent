@@ -13,7 +13,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { API, TEST_CANDIDATE, TEST_EMPLOYER, loginAs } from "./fixtures/auth";
+import { API, TEST_CANDIDATE, loginAs } from "./fixtures/auth";
 
 // ---------------------------------------------------------------------------
 // 1. HttpOnly cookie — not accessible to JavaScript

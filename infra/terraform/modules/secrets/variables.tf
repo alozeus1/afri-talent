@@ -68,3 +68,17 @@ variable "adzuna_api_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "redis_url" {
+  type        = string
+  description = "Optional Redis connection string"
+  sensitive   = true
+  default     = ""
+}
+
+variable "sentry_dsn" {
+  type        = string
+  description = "Optional backend Sentry DSN"
+  sensitive   = true
+  default     = ""
+}

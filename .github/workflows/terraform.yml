@@ -76,8 +76,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: validate
     env:
-      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
     defaults:
       run:
         working-directory: infra/terraform

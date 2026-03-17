@@ -1,29 +1,66 @@
 # AfriTalent Production Runbook
 
-> ⚠️ Production is not yet deployed. Use this as the blueprint when ready.
+## Platform Baseline
 
-## Pre-Production Checklist
-- [ ] Separate prod tfvars with prod-grade sizing
-- [ ] RDS: db.t4g.small, Multi-AZ, deletion_protection=true, 30-day backups
-- [ ] ECS: min 2 tasks each service, max 6
-- [ ] CloudFront: WAF attached
-- [ ] Secrets rotated from dev
-- [ ] ANTHROPIC_API_KEY set with separate prod key
-- [ ] Stripe production keys configured
-- [ ] DNS: prod.afri-talent.com or afri-talent.com
-- [ ] ACM cert for production domain
-- [ ] GitHub branch protection on main (require PR + CI pass)
-- [ ] DAILY_APPLY_PACK_LIMIT reviewed for prod
+- Frontend: AWS App Runner
+- Backend: AWS App Runner
+- Database: Amazon RDS PostgreSQL
+- Images: Amazon ECR
+- Secrets: AWS Secrets Manager
+- IaC: Terraform in `infra/terraform`
 
-## Deploy to Prod (when ready)
+## Pre-Production Gates
+
+- `infra/terraform/envs/prod/terraform.tfvars` reviewed from a clean plan
+- backend and frontend App Runner min size set to `2`
+- RDS configured with Multi-AZ, deletion protection, and `30` day backups
+- production secrets rotated independently from non-prod
+- Sentry ingest confirmed for frontend and backend
+- Prisma migrations tested in staging and then run in production
+- DNS and TLS validated for `afri-talent.com` and `api.afri-talent.com`
+
+## Deploy Production
+
 ```bash
 cd infra/terraform
-./bootstrap.sh prod
 terraform init -backend-config=envs/prod/backend.config
-terraform apply -var-file=envs/prod/terraform.tfvars
+terraform plan -var-file=envs/prod/terraform.tfvars -out=prod.plan
+terraform apply prod.plan
 ```
 
+Then deploy application images with the `Deploy App Runner (Cost-Effective)` workflow.
+
+Run migrations:
+
+```bash
+cd backend
+DATABASE_URL="<production-database-url>" npx prisma migrate deploy
+```
+
+## Post-Deploy Smoke Tests
+
+```bash
+curl -fsS https://api.afri-talent.com/health
+curl -fsS https://api.afri-talent.com/api/health
+curl -I https://afri-talent.com
+```
+
+Validate:
+
+- auth flows
+- jobs list and detail
+- applications submission path
+- billing bootstrap
+- Sentry frontend and backend events
+
 ## Emergency Procedures
-- AI kill switch: set AI_DISABLED=1 in ECS task environment → redeploy
-- DB failover: RDS Multi-AZ handles automatically (Multi-AZ required for prod)
-- Full rollback: `terraform destroy` (DANGEROUS — data loss risk; backup first)
+
+- AI kill switch: set `AI_DISABLED=1` in backend runtime configuration and redeploy
+- app rollback: redeploy the previous ECR image tag
+- database incident: use RDS failover first, restore from snapshot only if needed
+
+## Guardrails
+
+- never use `terraform destroy` as a production rollback
+- keep production image tags immutable and tied to commits
+- confirm source map upload before closing a deployment window

@@ -4,10 +4,10 @@
 set -euo pipefail
 
 ENV=${1:-dev}
-ACCOUNT_ID=108188564905
+ACCOUNT_ID=260820061731
 REGION=us-east-1
-BUCKET="afritalent-${ENV}-terraform-state"
-TABLE="afritalent-${ENV}-terraform-locks"
+BUCKET="afritalent-${ACCOUNT_ID}-${ENV}-terraform-state"
+TABLE="afritalent-${ACCOUNT_ID}-${ENV}-terraform-locks"
 PROJECT="AfriTalent"
 
 echo "Bootstrapping Terraform state for environment: $ENV"

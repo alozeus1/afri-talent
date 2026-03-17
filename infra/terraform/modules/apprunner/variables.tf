@@ -87,6 +87,18 @@ variable "backend_url" {
   description = "Public URL for backend API"
 }
 
+variable "backend_environment_variables" {
+  type        = map(string)
+  description = "Additional backend runtime environment variables"
+  default     = {}
+}
+
+variable "backend_secret_names" {
+  type        = list(string)
+  description = "Secret JSON keys to expose as backend runtime environment secrets"
+  default     = ["DATABASE_URL", "JWT_SECRET", "ANTHROPIC_API_KEY"]
+}
+
 # Frontend configuration
 variable "frontend_image" {
   type        = string
@@ -138,6 +150,12 @@ variable "frontend_health_path" {
 variable "frontend_url" {
   type        = string
   description = "Public URL for frontend"
+}
+
+variable "frontend_environment_variables" {
+  type        = map(string)
+  description = "Additional frontend runtime environment variables"
+  default     = {}
 }
 
 # Custom domains (optional)

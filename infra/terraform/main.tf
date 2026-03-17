@@ -1,13 +1,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# AfriTalent Infrastructure - Cost-Effective App Runner Configuration
-# 
-# This configuration uses AWS App Runner instead of ECS Fargate to reduce costs.
-# Estimated monthly cost: ~$30-50/month vs ~$150-200/month for ECS
+# AfriTalent Infrastructure - Active AWS App Runner Stack
 #
-# To use this configuration:
-#   1. Rename main.tf to main-ecs.tf (backup)
-#   2. Rename this file to main.tf
-#   3. Run terraform init && terraform apply
+# This root module provisions the currently supported managed deployment path
+# for the application. It keeps compute simpler than ECS while still using
+# private networking, RDS, ECR, Secrets Manager, and GitHub OIDC.
 # ─────────────────────────────────────────────────────────────────────────────
 
 resource "random_password" "db" {
@@ -30,8 +26,8 @@ module "network" {
   vpc_cidr                   = var.vpc_cidr
   public_subnet_cidrs        = var.public_subnet_cidrs
   private_subnet_cidrs       = var.private_subnet_cidrs
-  enable_nat_gateway         = false # App Runner handles egress, saves ~$32/month
-  enable_interface_endpoints = false
+  enable_nat_gateway         = var.enable_nat_gateway
+  enable_interface_endpoints = var.enable_interface_endpoints
 }
 
 # ── Security Groups ──────────────────────────────────────────────────────────
@@ -125,24 +121,55 @@ module "apprunner" {
   # Backend configuration
   backend_image           = var.backend_image
   backend_port            = var.backend_container_port
-  backend_cpu             = "256" # Smallest: 0.25 vCPU
-  backend_memory          = "512" # Smallest: 512 MB
-  backend_min_size        = 1
-  backend_max_size        = 3
+  backend_cpu             = tostring(var.backend_container_cpu)
+  backend_memory          = tostring(var.backend_container_memory)
+  backend_min_size        = var.backend_min_capacity
+  backend_max_size        = var.backend_max_capacity
   backend_max_concurrency = 100
   backend_health_path     = var.backend_health_check_path
   backend_url             = var.api_domain_name != "" ? "https://${var.api_domain_name}" : ""
+  backend_environment_variables = {
+    AWS_REGION                        = var.aws_region
+    SES_REGION                        = var.ses_region
+    SES_FROM_EMAIL                    = var.ses_from_email
+    FRONTEND_URL                      = local.frontend_url
+    S3_UPLOADS_BUCKET                 = module.s3.bucket_name
+    AI_FAST_MODEL                     = var.ai_fast_model
+    AI_QUALITY_MODEL                  = var.ai_quality_model
+    ORCHESTRATOR_TOKEN_BUDGET_MAX     = tostring(var.orchestrator_token_budget_max)
+    AI_DISABLED                       = var.ai_disabled ? "1" : "0"
+    DAILY_APPLY_PACK_LIMIT            = tostring(var.daily_apply_pack_limit)
+    DAILY_JOB_MATCH_LIMIT             = tostring(var.daily_job_match_limit)
+    DAILY_RESUME_REVIEW_LIMIT         = tostring(var.daily_resume_review_limit)
+    STRIPE_PRICE_BASIC_MONTHLY        = var.stripe_price_basic_monthly
+    STRIPE_PRICE_PROFESSIONAL_MONTHLY = var.stripe_price_professional_monthly
+  }
+  backend_secret_names = [
+    "DATABASE_URL",
+    "JWT_SECRET",
+    "ANTHROPIC_API_KEY",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "ADZUNA_APP_ID",
+    "ADZUNA_API_KEY",
+    "REDIS_URL",
+    "SENTRY_DSN"
+  ]
 
   # Frontend configuration
   frontend_image           = var.frontend_image
   frontend_port            = var.frontend_container_port
-  frontend_cpu             = "256"
-  frontend_memory          = "512"
-  frontend_min_size        = 1
-  frontend_max_size        = 3
+  frontend_cpu             = tostring(var.frontend_container_cpu)
+  frontend_memory          = tostring(var.frontend_container_memory)
+  frontend_min_size        = var.frontend_min_capacity
+  frontend_max_size        = var.frontend_max_capacity
   frontend_max_concurrency = 100
   frontend_health_path     = var.frontend_health_check_path
   frontend_url             = local.frontend_url
+  frontend_environment_variables = var.api_domain_name != "" ? {
+    NEXT_PUBLIC_API_URL     = "https://${var.api_domain_name}"
+    NEXT_PUBLIC_BACKEND_URL = "https://${var.api_domain_name}"
+  } : {}
 
   # Custom domains (optional - requires ACM cert)
   api_domain_name      = var.api_domain_name
@@ -238,13 +265,14 @@ output "estimated_monthly_cost" {
     - App Runner Backend:  ~$5-15/month (pay per request + min instance)
     - App Runner Frontend: ~$5-15/month (pay per request + min instance)
     - RDS db.t4g.micro:    ~$12-15/month
+    - NAT Gateway:         ~$32/month when enabled
     - Secrets Manager:     ~$0.40/month
     - S3 (minimal usage):  ~$1-5/month
     - ECR (storage):       ~$1-3/month
     ─────────────────────
-    TOTAL:                 ~$25-55/month
+    TOTAL:                 ~$25-90/month depending on NAT and traffic
     
     Compare to ECS setup:  ~$150-200/month
-    SAVINGS:               ~$100-150/month
+    SAVINGS:               ~$60-150/month
   EOT
 }

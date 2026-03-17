@@ -6,7 +6,7 @@
 - Database: RDS PostgreSQL db.t4g.micro (private subnet, us-east-1)
 - Secrets: AWS Secrets Manager (afritalent-dev/app-secrets)
 - Container Registry: ECR (afritalent-dev-backend, afritalent-dev-frontend)
-- State: S3 afritalent-dev-terraform-state / DynamoDB afritalent-dev-terraform-locks
+- State: S3 afritalent-260820061731-dev-terraform-state / DynamoDB afritalent-260820061731-dev-terraform-locks
 
 ## Prerequisites
 - AWS CLI configured (aws sso login or credentials)
@@ -71,19 +71,19 @@ aws secretsmanager put-secret-value \
 # Authenticate to ECR
 aws ecr get-login-password --region us-east-1 | \
   docker login --username AWS --password-stdin \
-  108188564905.dkr.ecr.us-east-1.amazonaws.com
+  260820061731.dkr.ecr.us-east-1.amazonaws.com
 
 # Build and push backend
-docker build -t 108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest ./backend
-docker push 108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest
+docker build -t 260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest ./backend
+docker push 260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest
 
 # Build and push frontend (with correct API URL)
 docker build \
   --build-arg NEXT_PUBLIC_API_URL=https://api.dev.afri-talent.com \
   --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.dev.afri-talent.com \
-  -t 108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest \
+  -t 260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest \
   ./frontend
-docker push 108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest
+docker push 260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest
 ```
 
 ### 7. Run database migrations

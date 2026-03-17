@@ -1,5 +1,5 @@
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { Request, Response, NextFunction } from "express";
 
 // Helmet configuration for security headers
@@ -102,7 +102,7 @@ export const orchestratorLimiter = rateLimit({
     // Use user ID if authenticated (more precise), fallback to IP via the
     // ipKeyGenerator helper (required by express-rate-limit v8 for IPv6 safety).
     const userId = (req as Request & { user?: { userId: string } }).user?.userId;
-    return userId ?? req.ip ?? req.socket?.remoteAddress ?? "anonymous";
+    return userId ?? ipKeyGenerator(req.ip ?? req.socket?.remoteAddress ?? "anonymous");
   },
   message: {
     error: "rate_limit_exceeded",

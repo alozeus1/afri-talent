@@ -23,7 +23,7 @@ permissions:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REGISTRY: 108188564905.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
 
 jobs:
   build-and-push:
@@ -65,11 +65,19 @@ jobs:
         env:
           ECR_REPOSITORY: afritalent-${{ inputs.environment }}-frontend
           IMAGE_TAG: ${{ github.sha }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: |
           IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
           docker build \
             --build-arg NEXT_PUBLIC_API_URL=https://api.${{ inputs.environment }}.afri-talent.com \
             --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.${{ inputs.environment }}.afri-talent.com \
+            --build-arg NEXT_PUBLIC_SENTRY_DSN="$NEXT_PUBLIC_SENTRY_DSN" \
+            --build-arg SENTRY_ORG="$SENTRY_ORG" \
+            --build-arg SENTRY_PROJECT="$SENTRY_PROJECT" \
+            --secret id=sentry_auth_token,env=SENTRY_AUTH_TOKEN \
             -t $IMAGE:$IMAGE_TAG -t $IMAGE:latest ./frontend
           docker push $IMAGE:$IMAGE_TAG
           docker push $IMAGE:latest
@@ -95,8 +103,8 @@ jobs:
       - name: Get App Runner service ARNs
         id: services
         run: |
-          BACKEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-backend'].ServiceArn" --output text)
-          FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-frontend'].ServiceArn" --output text)
+          BACKEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-appr-backend-managed'].ServiceArn" --output text)
+          FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-appr-frontend-managed'].ServiceArn" --output text)
           echo "backend_arn=$BACKEND_ARN" >> "$GITHUB_OUTPUT"
           echo "frontend_arn=$FRONTEND_ARN" >> "$GITHUB_OUTPUT"
 
@@ -154,10 +162,10 @@ jobs:
         id: urls
         run: |
           BACKEND_URL=$(aws apprunner describe-service \
-            --service-arn $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-backend'].ServiceArn" --output text) \
+            --service-arn $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-appr-backend-managed'].ServiceArn" --output text) \
             --query 'Service.ServiceUrl' --output text)
           FRONTEND_URL=$(aws apprunner describe-service \
-            --service-arn $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-frontend'].ServiceArn" --output text) \
+            --service-arn $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-appr-frontend-managed'].ServiceArn" --output text) \
             --query 'Service.ServiceUrl' --output text)
           echo "backend_url=https://$BACKEND_URL" >> "$GITHUB_OUTPUT"
           echo "frontend_url=https://$FRONTEND_URL" >> "$GITHUB_OUTPUT"

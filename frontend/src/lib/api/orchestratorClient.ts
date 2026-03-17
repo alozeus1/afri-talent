@@ -119,7 +119,7 @@ export async function runOrchestrator(
       credentials: "include", // send HttpOnly auth_token cookie
       body: JSON.stringify(payload),
     });
-  } catch (networkErr) {
+  } catch {
     throw new OrchestratorError(
       "Unable to reach the server. Check your internet connection.",
       0,

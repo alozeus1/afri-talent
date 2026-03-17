@@ -5,6 +5,7 @@ import pinoHttpModule from "pino-http";
 const pinoHttp = pinoHttpModule as unknown as typeof import("pino-http").default;
 import prisma from "./lib/prisma.js";
 import logger from "./lib/logger.js";
+import { initSentry, setupExpressErrorHandler } from "./lib/sentry.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import {
   securityHeaders,
@@ -42,6 +43,7 @@ import calendarRoutes from "./routes/calendar.js";
 import candidateAnalyticsRoutes from "./routes/candidate-analytics.js";
 
 dotenv.config();
+initSentry();
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
@@ -116,7 +118,7 @@ app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(sanitizeRequest);
 
 // Health check endpoint (for load balancers, k8s probes)
-app.get("/health", async (_req, res) => {
+const healthHandler = async (_req: express.Request, res: express.Response) => {
   // Skip DB check in test environment — no DB required to run tests
   if (isTest) {
     res.json({ status: "ok", db: "skipped-in-test", timestamp: new Date().toISOString() });
@@ -136,10 +138,13 @@ app.get("/health", async (_req, res) => {
       timestamp: new Date().toISOString(),
     });
   }
-});
+};
+
+app.get("/health", healthHandler);
+app.get("/api/health", healthHandler);
 
 // Readiness check (for k8s readiness probes)
-app.get("/ready", async (_req, res) => {
+const readyHandler = async (_req: express.Request, res: express.Response) => {
   // Skip DB check in test environment
   if (isTest) {
     res.json({
@@ -164,16 +169,22 @@ app.get("/ready", async (_req, res) => {
       timestamp: new Date().toISOString(),
     });
   }
-});
+};
+
+app.get("/ready", readyHandler);
+app.get("/api/ready", readyHandler);
 
 // Liveness check (for k8s liveness probes)
-app.get("/live", (_req, res) => {
+const liveHandler = (_req: express.Request, res: express.Response) => {
   res.json({
     status: "alive",
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
-});
+};
+
+app.get("/live", liveHandler);
+app.get("/api/live", liveHandler);
 
 // API Routes
 app.use("/api/auth", authRoutes);
@@ -209,6 +220,9 @@ app.use(
   orchestratorLimiter,
   orchestratorRoutes
 );
+
+// Sentry error handler (must be before any other error middleware and after all controllers)
+setupExpressErrorHandler(app);
 
 // 404 handler
 app.use((_req, res) => {

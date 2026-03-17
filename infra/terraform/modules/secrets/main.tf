@@ -14,6 +14,8 @@ resource "aws_secretsmanager_secret_version" "app" {
     STRIPE_WEBHOOK_SECRET = var.stripe_webhook_secret
     ADZUNA_APP_ID         = var.adzuna_app_id
     ADZUNA_API_KEY        = var.adzuna_api_key
+    REDIS_URL             = var.redis_url
+    SENTRY_DSN            = var.sentry_dsn
   })
 
   lifecycle {

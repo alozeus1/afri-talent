@@ -1,8 +1,8 @@
 # Backend Dockerfile - Production (Debian/Prisma OpenSSL compatible)
 FROM node:20-bookworm-slim AS base
 
-RUN apt-get update \ 
-  && apt-get install -y --no-install-recommends ca-certificates openssl curl \ 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates openssl curl \
   && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies and build
@@ -31,7 +31,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Create non-root user
-RUN addgroup --system --gid 1001 nodejs \ 
+RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 --ingroup nodejs expressjs
 
 # Copy built app and production deps
@@ -47,4 +47,4 @@ EXPOSE 4000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD curl -fsS http://localhost:4000/health || exit 1
 
-CMD ["node", "dist/server.js"]
+CMD ["node", "--import", "./dist/instrument.js", "dist/server.js"]

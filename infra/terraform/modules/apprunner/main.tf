@@ -93,15 +93,13 @@ resource "aws_apprunner_service" "backend" {
       image_repository_type = "ECR"
       image_configuration {
         port = tostring(var.backend_port)
-        runtime_environment_variables = {
+        runtime_environment_variables = merge({
           NODE_ENV     = "production"
           PORT         = tostring(var.backend_port)
           FRONTEND_URL = var.frontend_url
-        }
+        }, var.backend_environment_variables)
         runtime_environment_secrets = {
-          DATABASE_URL      = "${var.secret_arn}:DATABASE_URL::"
-          JWT_SECRET        = "${var.secret_arn}:JWT_SECRET::"
-          ANTHROPIC_API_KEY = "${var.secret_arn}:ANTHROPIC_API_KEY::"
+          for name in var.backend_secret_names : name => "${var.secret_arn}:${name}::"
         }
       }
     }
@@ -161,11 +159,11 @@ resource "aws_apprunner_service" "frontend" {
       image_repository_type = "ECR"
       image_configuration {
         port = tostring(var.frontend_port)
-        runtime_environment_variables = {
+        runtime_environment_variables = merge({
           NODE_ENV                = "production"
           NEXT_PUBLIC_API_URL     = var.backend_url
           NEXT_PUBLIC_BACKEND_URL = var.backend_url
-        }
+        }, var.frontend_environment_variables)
       }
     }
 

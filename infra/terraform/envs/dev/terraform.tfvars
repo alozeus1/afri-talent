@@ -12,8 +12,8 @@ private_subnet_cidrs       = ["10.20.10.0/24", "10.20.11.0/24"]
 az_count                   = 2
 
 # Images (CI will update these; placeholders for first plan)
-frontend_image = "108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest"
-backend_image  = "108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest"
+frontend_image = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest"
+backend_image  = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest"
 create_ecr     = false
 
 # Container sizing - dev: smallest viable
@@ -68,7 +68,7 @@ github_ref  = "refs/heads/develop"
 
 # Re-use the existing OIDC provider rather than creating a duplicate
 create_oidc_provider       = false
-existing_oidc_provider_arn = "arn:aws:iam::108188564905:oidc-provider/token.actions.githubusercontent.com"
+existing_oidc_provider_arn = "arn:aws:iam::260820061731:oidc-provider/token.actions.githubusercontent.com"
 
 # Grant the Terraform-managed GitHub Actions role broad permissions for infra provisioning
 github_actions_additional_policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"

@@ -1,6 +1,7 @@
 import app from "./app.js";
 import prisma from "./lib/prisma.js";
 import logger from "./lib/logger.js";
+import { captureException, flushSentry } from "./lib/sentry.js";
 
 const PORT = process.env.PORT || 4000;
 
@@ -9,21 +10,35 @@ const server = app.listen(PORT, () => {
   logger.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "Server started");
 });
 
-// Handle graceful shutdown
-process.on("SIGTERM", () => {
-  logger.info("SIGTERM received, shutting down gracefully");
+async function closeServer(signal: NodeJS.Signals): Promise<void> {
+  logger.info({ signal }, `${signal} received, shutting down gracefully`);
   server.close(async () => {
     await prisma.$disconnect();
+    await flushSentry();
     logger.info("Server closed");
     process.exit(0);
   });
+}
+
+async function handleFatalError(error: unknown, origin: "uncaughtException" | "unhandledRejection"): Promise<void> {
+  logger.error({ err: error, origin }, `Captured ${origin}`);
+  captureException(error, { origin });
+  await flushSentry();
+  process.exit(1);
+}
+
+process.on("SIGTERM", () => {
+  void closeServer("SIGTERM");
 });
 
 process.on("SIGINT", () => {
-  logger.info("SIGINT received, shutting down gracefully");
-  server.close(async () => {
-    await prisma.$disconnect();
-    logger.info("Server closed");
-    process.exit(0);
-  });
+  void closeServer("SIGINT");
+});
+
+process.on("uncaughtException", (error) => {
+  void handleFatalError(error, "uncaughtException");
+});
+
+process.on("unhandledRejection", (reason) => {
+  void handleFatalError(reason, "unhandledRejection");
 });

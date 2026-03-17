@@ -61,13 +61,13 @@ variable "acm_certificate_arn" {
 variable "frontend_image" {
   type        = string
   description = "Container image URI for the frontend service"
-  default     = "108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest"
+  default     = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest"
 }
 
 variable "backend_image" {
   type        = string
   description = "Container image URI for the backend service"
-  default     = "108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest"
+  default     = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest"
 }
 
 variable "create_ecr" {
@@ -211,7 +211,7 @@ variable "db_multi_az" {
 variable "db_backup_retention_days" {
   type        = number
   description = "Backup retention period"
-  default     = 7
+  default     = 30
 }
 
 variable "db_deletion_protection" {
@@ -332,4 +332,70 @@ variable "alerts_email" {
   type        = string
   description = "Email address for CloudWatch alarm notifications"
   default     = "alozeus1@gmail.com"
+}
+
+variable "ses_region" {
+  type        = string
+  description = "AWS region used for SES sends"
+  default     = "us-east-1"
+}
+
+variable "ses_from_email" {
+  type        = string
+  description = "Verified SES from address for transactional email"
+  default     = ""
+}
+
+variable "ai_fast_model" {
+  type        = string
+  description = "Fast AI model identifier"
+  default     = "claude-haiku-4-5-20251001"
+}
+
+variable "ai_quality_model" {
+  type        = string
+  description = "Quality AI model identifier"
+  default     = "claude-sonnet-4-6"
+}
+
+variable "orchestrator_token_budget_max" {
+  type        = number
+  description = "Maximum token budget for orchestrator workloads"
+  default     = 120000
+}
+
+variable "ai_disabled" {
+  type        = bool
+  description = "Emergency kill switch for AI features"
+  default     = false
+}
+
+variable "daily_apply_pack_limit" {
+  type        = number
+  description = "Per-user daily limit for apply pack generation"
+  default     = 5
+}
+
+variable "daily_job_match_limit" {
+  type        = number
+  description = "Per-user daily limit for job match generation"
+  default     = 20
+}
+
+variable "daily_resume_review_limit" {
+  type        = number
+  description = "Per-user daily limit for resume review generation"
+  default     = 10
+}
+
+variable "stripe_price_basic_monthly" {
+  type        = string
+  description = "Stripe price ID for the Basic monthly plan"
+  default     = ""
+}
+
+variable "stripe_price_professional_monthly" {
+  type        = string
+  description = "Stripe price ID for the Professional monthly plan"
+  default     = ""
 }
