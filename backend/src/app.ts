@@ -42,7 +42,7 @@ import learningRoutes from "./routes/learning.js";
 import calendarRoutes from "./routes/calendar.js";
 import candidateAnalyticsRoutes from "./routes/candidate-analytics.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 initSentry();
 
 const app = express();

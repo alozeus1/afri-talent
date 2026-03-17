@@ -2,6 +2,6 @@ import dotenv from "dotenv";
 import { validateRuntimeEnv } from "./config/env.js";
 import { initSentry } from "./lib/sentry.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 validateRuntimeEnv();
 initSentry();

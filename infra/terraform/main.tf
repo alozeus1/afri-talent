@@ -7,9 +7,14 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 resource "random_password" "db" {
-  length           = 24
-  special          = true
-  override_special = "!@#%^*()-_=+[]{}"
+  length  = 32
+  special = false
+
+  # Rotate away from any previously generated values that included characters
+  # RDS rejects for the master password.
+  keepers = {
+    password_policy = "rds-safe-ascii-v2"
+  }
 }
 
 resource "random_password" "jwt" {

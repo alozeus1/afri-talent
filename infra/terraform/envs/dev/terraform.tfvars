@@ -12,9 +12,10 @@ private_subnet_cidrs       = ["10.20.10.0/24", "10.20.11.0/24"]
 az_count                   = 2
 
 # Images (CI will update these; placeholders for first plan)
-frontend_image = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest"
-backend_image  = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest"
-create_ecr     = false
+frontend_image         = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest"
+backend_image          = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest"
+create_ecr             = false
+s3_uploads_bucket_name = "afritalent-260820061731-dev-uploads"
 
 # Container sizing - dev: smallest viable
 frontend_container_cpu    = 256

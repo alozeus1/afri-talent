@@ -16,7 +16,7 @@ on:
 
 env:
   TF_VERSION: "1.10.5"
-  TFLINT_VERSION: "0.50.3"
+  TFLINT_VERSION: "0.60.0"
   AWS_REGION: us-east-1
 
 jobs:
@@ -50,7 +50,7 @@ jobs:
         run: terraform init -backend=false
 
       - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v4
+        uses: terraform-linters/setup-tflint@v6
         with:
           tflint_version: ${{ env.TFLINT_VERSION }}
 
