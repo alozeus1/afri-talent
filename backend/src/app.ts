@@ -81,7 +81,8 @@ const allowedOriginRegex = process.env.ALLOWED_ORIGIN_REGEX
 
 const isAllowedOrigin = (origin?: string | null) => {
   if (!origin) {
-    return !isProduction;
+    // Non-browser callers such as App Runner health checks won't send Origin.
+    return true;
   }
   if (allowedOrigins.includes(origin)) {
     return true;
