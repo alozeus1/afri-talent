@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { getStripe, getPlanFromPriceId } from "../lib/stripe.js";
+import { getStripe, getPlanFromPriceId, isStripeConfigured } from "../lib/stripe.js";
 import prisma from "../lib/prisma.js";
 import { SubscriptionStatus, SubscriptionPlan } from "@prisma/client";
 
@@ -14,6 +14,12 @@ const processedEvents = new Set<string>();
 router.post("/stripe", async (req: Request, res: Response) => {
   const sig = req.headers["stripe-signature"] as string;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!isStripeConfigured()) {
+    console.error("[webhook] STRIPE_SECRET_KEY not set");
+    res.status(503).json({ error: "Stripe is not configured" });
+    return;
+  }
 
   if (!webhookSecret) {
     console.error("[webhook] STRIPE_WEBHOOK_SECRET not set");

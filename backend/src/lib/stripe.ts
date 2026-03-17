@@ -1,11 +1,7 @@
 import Stripe from "stripe";
 import { SubscriptionPlan } from "@prisma/client";
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-
-if (!STRIPE_SECRET_KEY && process.env.NODE_ENV === "production") {
-  throw new Error("STRIPE_SECRET_KEY must be set in production");
-}
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY?.trim() || "";
 
 export const STRIPE_PRICES: Record<SubscriptionPlan, string | undefined> = {
   FREE: undefined, // No Stripe price for free tier
@@ -15,9 +11,13 @@ export const STRIPE_PRICES: Record<SubscriptionPlan, string | undefined> = {
 
 let _stripe: Stripe | null = null;
 
+export function isStripeConfigured(): boolean {
+  return STRIPE_SECRET_KEY.length > 0;
+}
+
 export function getStripe(): Stripe {
-  if (!STRIPE_SECRET_KEY) {
-    throw new Error("STRIPE_SECRET_KEY is not set — billing features are unavailable");
+  if (!isStripeConfigured()) {
+    throw new Error("STRIPE_SECRET_KEY is not set - billing features are unavailable");
   }
   if (!_stripe) {
     _stripe = new Stripe(STRIPE_SECRET_KEY, {
