@@ -75,12 +75,18 @@ const allowedOrigins = [
   "http://127.0.0.1:3001",
   "http://127.0.0.1:3100",
 ];
+const allowedOriginRegex = process.env.ALLOWED_ORIGIN_REGEX
+  ? new RegExp(process.env.ALLOWED_ORIGIN_REGEX)
+  : null;
 
 const isAllowedOrigin = (origin?: string | null) => {
   if (!origin) {
     return !isProduction;
   }
   if (allowedOrigins.includes(origin)) {
+    return true;
+  }
+  if (allowedOriginRegex?.test(origin)) {
     return true;
   }
   if (!isProduction) {

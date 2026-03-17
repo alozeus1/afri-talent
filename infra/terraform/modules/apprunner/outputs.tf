@@ -46,10 +46,10 @@ output "instance_role_name" {
 # Custom domain validation records (for Route53)
 output "backend_custom_domain_records" {
   description = "DNS validation records for backend custom domain"
-  value       = var.api_domain_name != "" ? aws_apprunner_custom_domain_association.backend[0].certificate_validation_records : []
+  value       = var.create_custom_domain_associations && var.api_domain_name != "" ? aws_apprunner_custom_domain_association.backend[0].certificate_validation_records : []
 }
 
 output "frontend_custom_domain_records" {
   description = "DNS validation records for frontend custom domain"
-  value       = var.frontend_domain_name != "" ? aws_apprunner_custom_domain_association.frontend[0].certificate_validation_records : []
+  value       = var.create_custom_domain_associations && var.frontend_domain_name != "" ? aws_apprunner_custom_domain_association.frontend[0].certificate_validation_records : []
 }

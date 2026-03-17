@@ -20,6 +20,12 @@ export declare function jobMatchEmail(opts: {
     visaSponsored: boolean;
     jobUrl: string;
 }): Promise<void>;
+export declare function passwordResetEmail(opts: {
+    to: string;
+    userName: string;
+    resetUrl: string;
+    expiresInHours: number;
+}): Promise<void>;
 export declare function verificationEmail(opts: {
     to: string;
     companyName: string;

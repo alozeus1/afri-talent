@@ -1,5 +1,5 @@
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 // Helmet configuration for security headers
 export const securityHeaders = helmet({
     contentSecurityPolicy: {
@@ -23,9 +23,10 @@ export const securityHeaders = helmet({
     },
 });
 // General API rate limiter
+const isTestEnv = process.env.NODE_ENV === "test" || process.env.E2E === "1";
 export const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // 100 requests per window
+    max: isTestEnv ? 10000 : 100,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many requests, please try again later" },
@@ -34,10 +35,9 @@ export const generalLimiter = rateLimit({
         return req.path === "/health";
     },
 });
-// Strict rate limiter for auth endpoints
 export const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // 10 auth attempts per window
+    max: isTestEnv ? 1000 : 10,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many authentication attempts, please try again later" },
@@ -46,7 +46,7 @@ export const authLimiter = rateLimit({
 // Very strict limiter for registration
 export const registerLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5, // 5 registrations per hour per IP
+    max: isTestEnv ? 1000 : 5,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many registration attempts, please try again later" },
@@ -54,7 +54,7 @@ export const registerLimiter = rateLimit({
 // Password reset limiter (for future use)
 export const passwordResetLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 3, // 3 reset requests per hour
+    max: isTestEnv ? 1000 : 3,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many password reset attempts, please try again later" },
@@ -81,4 +81,29 @@ function sanitizeObject(obj) {
         }
     }
 }
+// Orchestrator rate limiter — per user, 10 requests per minute
+// This is more restrictive than the general limiter due to Claude API costs
+export const orchestratorLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Skip rate limiting in test environment so the test suite can make
+    // many requests without exhausting the in-memory window counter.
+    skip: () => process.env.NODE_ENV === "test",
+    keyGenerator: (req) => {
+        // Use user ID if authenticated (more precise), fallback to IP via the
+        // ipKeyGenerator helper (required by express-rate-limit v8 for IPv6 safety).
+        const userId = req.user?.userId;
+        return userId ?? ipKeyGenerator(req.ip ?? req.socket?.remoteAddress ?? "anonymous");
+    },
+    message: {
+        error: "rate_limit_exceeded",
+        message: "Too many AI assistant requests. Please wait a minute before trying again.",
+        retryAfter: 60,
+    },
+    handler: (_req, res, _next, options) => {
+        res.status(429).json(options.message);
+    },
+});
 //# sourceMappingURL=security.js.map

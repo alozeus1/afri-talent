@@ -6,6 +6,7 @@
 // return typed schema objects plus a token estimate.
 // ─────────────────────────────────────────────────────────────────────────────
 import Anthropic from "@anthropic-ai/sdk";
+import { validateAgentOutput, ResumeSchemaValidator, JobSchemaValidator, MatchSchemaValidator, TailoredResumeSchemaValidator, CoverLetterPackSchemaValidator, GuardReportSchemaValidator, } from "./validators.js";
 // ── Shared Claude client (reuse process-level singleton) ─────────────────────
 const FAST = process.env.AI_FAST_MODEL || "claude-haiku-4-5-20251001";
 const QUAL = process.env.AI_QUALITY_MODEL || "claude-sonnet-4-6";
@@ -30,7 +31,7 @@ function extractJSON(text) {
     const raw = fenced ? fenced[1].trim() : text.trim();
     return JSON.parse(raw);
 }
-async function agentCall(model, maxTokens, systemPrompt, userContent) {
+async function agentCall(model, maxTokens, systemPrompt, userContent, validate) {
     const client = getClient();
     const response = await client.messages.create({
         model,
@@ -41,7 +42,9 @@ async function agentCall(model, maxTokens, systemPrompt, userContent) {
     const content = response.content[0];
     if (content.type !== "text")
         throw new Error("Unexpected non-text response from Claude");
-    const data = extractJSON(content.text);
+    // Parse JSON then validate against schema — throws descriptively on mismatch
+    const raw = extractJSON(content.text);
+    const data = validate(raw);
     // Use actual usage if available, else estimate
     const token_estimate = (response.usage?.input_tokens ?? estimateTokens(systemPrompt + userContent)) +
         (response.usage?.output_tokens ?? estimateTokens(content.text));
@@ -92,7 +95,7 @@ Output this exact schema:
   "work_auth_status": string|null
 }`;
 export async function ResumeParserAgent(resumeText) {
-    return agentCall(FAST, 2048, RESUME_PARSER_SYSTEM, `RESUME TEXT:\n${resumeText}`);
+    return agentCall(FAST, 2048, RESUME_PARSER_SYSTEM, `RESUME TEXT:\n${resumeText}`, (raw) => validateAgentOutput(ResumeSchemaValidator, raw, "ResumeParserAgent"));
 }
 // ─────────────────────────────────────────────────────────────────────────────
 // JobParserAgent
@@ -127,20 +130,43 @@ Output this exact schema:
   "responsibilities": string[]
 }`;
 export async function JobParserAgent(rawJobText) {
-    return agentCall(FAST, 2048, JOB_PARSER_SYSTEM, `JOB POSTING:\n${rawJobText}`);
+    return agentCall(FAST, 2048, JOB_PARSER_SYSTEM, `JOB POSTING:\n${rawJobText}`, (raw) => validateAgentOutput(JobSchemaValidator, raw, "JobParserAgent"));
 }
 // ─────────────────────────────────────────────────────────────────────────────
 // MatchScorerAgent
 // ─────────────────────────────────────────────────────────────────────────────
-const MATCH_SCORER_SYSTEM = `You are MatchScorerAgent. Score the fit between a candidate's resume and a job.
+const MATCH_SCORER_SYSTEM = `You are MatchScorerAgent. Score the fit between a candidate’s resume and a job.
 
-SCORING RULES:
-- score (0–100): weighted composite. Weights: skills 50%, seniority 20%, location/auth 20%, other 10%.
-- must_have_coverage_pct: % of must_have_skills the candidate satisfies (0–100).
-- nice_to_have_coverage_pct: % of nice_to_have_skills the candidate satisfies (0–100).
+# Consumer rule: score<55 OR must_have_coverage_pct<60 → skip tailoring. Do not try to inflate scores to help a candidate.
+
+SCORING RUBRIC (compute in this exact order):
+
+1. must_have_coverage_pct  = (# of must_have_skills satisfied by candidate / total must_have_skills) * 100
+   nice_to_have_coverage_pct = (# of nice_to_have_skills satisfied by candidate / total nice_to_have_skills) * 100
+   If a list is empty, treat coverage as 100.
+
+2. skill_match_pct = (must_have_coverage_pct * 0.7) + (nice_to_have_coverage_pct * 0.3)
+
+3. seniority_match_score:
+   "match"   → 100
+   "over"    → 60
+   "under"   → 40
+   "unknown" → 50
+
+4. location_auth_score (out of 100):
+   location_match = true  → +50 pts
+   work_auth_ok   = true  → +30 pts
+   visa_ok        = true  → +20 pts
+   (Each flag contributes independently; total capped at 100)
+
+5. score = (skill_match_pct * 0.50) + (seniority_match_score * 0.20) + (location_auth_score * 0.20) + (other_score * 0.10)
+   other_score: use 100 if years_of_experience and education broadly fit; 50 if uncertain; 0 if clearly mismatched.
+   Round score to the nearest integer.
+
+FIELD DEFINITIONS:
 - location_match: true if candidate location overlaps job location OR job is remote.
-- work_auth_ok: true if candidate's work_auth_status is compatible with the job's eligible countries OR unknown.
-- visa_ok: true if visa_sponsorship = "YES" OR candidate doesn't need it.
+- work_auth_ok: true if candidate’s work_auth_status is compatible with the job’s eligible countries OR status is unknown.
+- visa_ok: true if visa_sponsorship = "YES" OR candidate does not need sponsorship.
 - seniority_match: "match" | "over" | "under" | "unknown".
 - recommendation: "apply" if score≥70, "stretch" if 55–69, "skip" if <55.
 - explanation: 2–3 sentences. Be specific. No fabrication.
@@ -172,7 +198,7 @@ export async function MatchScorerAgent(resume, job, candidateProfile) {
             ? `\nCANDIDATE PROFILE HINTS:\n${JSON.stringify(candidateProfile, null, 2)}`
             : "",
     ].join("\n");
-    return agentCall(FAST, 1024, MATCH_SCORER_SYSTEM, userContent);
+    return agentCall(FAST, 1024, MATCH_SCORER_SYSTEM, userContent, (raw) => validateAgentOutput(MatchSchemaValidator, raw, "MatchScorerAgent"));
 }
 // ─────────────────────────────────────────────────────────────────────────────
 // ResumeTailorAgent
@@ -185,6 +211,8 @@ NON-NEGOTIABLE:
 - If a metric would strengthen a bullet but is missing, include it as a placeholder like
   "[X%]" or "[N projects]" and add it to the warnings array with "requires_user_confirmation".
 - Keep ats_keywords strictly to terms found in the job description.
+- change_log must have one entry per modified bullet or section. If you change 4 bullets, there must be 4 change_log entries.
+- claims_requiring_user_confirmation must list every '[X...]' placeholder you used.
 - Return ONLY valid JSON — no prose, no markdown fences.
 
 Output this exact schema:
@@ -200,7 +228,9 @@ Output this exact schema:
     }
   ],
   "ats_keywords": string[],
-  "warnings": string[]
+  "warnings": string[],
+  "change_log": ["array of strings: one entry per bullet or section changed, e.g. 'rewrote Acme Corp bullet 2 to emphasize Python'"],
+  "claims_requiring_user_confirmation": ["same as warnings — list of placeholder metrics needing candidate input, e.g. '[X%] improvement in test coverage'"]
 }`;
 export async function ResumeTailorAgent(resume, job) {
     const userContent = [
@@ -209,7 +239,7 @@ export async function ResumeTailorAgent(resume, job) {
         "\nTARGET JOB JSON:",
         JSON.stringify(job, null, 2),
     ].join("\n");
-    return agentCall(QUAL, 4096, RESUME_TAILOR_SYSTEM, userContent);
+    return agentCall(QUAL, 4096, RESUME_TAILOR_SYSTEM, userContent, (raw) => validateAgentOutput(TailoredResumeSchemaValidator, raw, "ResumeTailorAgent"));
 }
 // ─────────────────────────────────────────────────────────────────────────────
 // CoverLetterAgent
@@ -219,7 +249,9 @@ const COVER_LETTER_SYSTEM = `You are CoverLetterAgent. Write a compelling, truth
 NON-NEGOTIABLE:
 - Use only facts from the resume. No fabrication of projects, metrics, or roles.
 - 3 paragraphs: (1) hook + role fit, (2) key evidence from experience, (3) motivation + call-to-action.
-- 200–300 words in the body.
+- body must contain exactly 3 paragraphs separated by double newlines (\\n\\n). Do not include the salutation or closing in the body.
+- Count the words in the body field yourself and put the exact integer in word_count. The body MUST be 200-300 words — rewrite it if not.
+- salutation must address the hiring manager by title if known from job JSON, else "Dear Hiring Manager,"
 - Tone: professional but warm.
 - Return ONLY valid JSON — no prose, no markdown fences.
 
@@ -241,7 +273,7 @@ export async function CoverLetterAgent(resume, job, tailoredResume) {
         "\nTAILORED RESUME (context):",
         JSON.stringify(tailoredResume, null, 2),
     ].join("\n");
-    return agentCall(QUAL, 2048, COVER_LETTER_SYSTEM, userContent);
+    return agentCall(QUAL, 2048, COVER_LETTER_SYSTEM, userContent, (raw) => validateAgentOutput(CoverLetterPackSchemaValidator, raw, "CoverLetterAgent"));
 }
 // ─────────────────────────────────────────────────────────────────────────────
 // TruthConsistencyGuardAgent
@@ -252,9 +284,12 @@ YOUR JOB:
 - Compare the tailored resume and cover letter against the original resume.
 - Flag any employer, title, date, metric, tool, certification, or claim that does NOT appear in the original.
 - Flag exaggerations (e.g. "led a team of 50" when original says "worked in a team").
+- If the tailored resume claims a technology stack or tool that does not appear in the original resume experience or skills, that is a "fabrication" issue with severity "high".
 - Items marked "[X%]" or "[N...]" are placeholders — add them to requires_user_confirmation, not issues.
+- requires_user_confirmation must list every '[X...]' placeholder found in tailored resume or cover letter body.
 - Verdict: "PASS" if no high/medium issues found; "FAIL" otherwise.
-- confidence: your certainty in the verdict (0.0–1.0).
+- A verdict of FAIL is triggered by ANY issue of severity "high" OR two or more issues of severity "medium".
+- confidence: your certainty in the verdict (0.0–1.0). Confidence must reflect how many original resume fields you were able to cross-check. If original has <3 jobs, set confidence 0.7 max.
 
 Return ONLY valid JSON — no prose, no markdown fences.
 
@@ -282,6 +317,6 @@ export async function TruthConsistencyGuardAgent(originalResume, tailoredResume,
         "\nCOVER LETTER JSON:",
         JSON.stringify(coverLetter, null, 2),
     ].join("\n");
-    return agentCall(QUAL, 2048, GUARD_SYSTEM, userContent);
+    return agentCall(QUAL, 2048, GUARD_SYSTEM, userContent, (raw) => validateAgentOutput(GuardReportSchemaValidator, raw, "TruthConsistencyGuardAgent"));
 }
 //# sourceMappingURL=agents.js.map

@@ -161,8 +161,8 @@ resource "aws_apprunner_service" "frontend" {
         port = tostring(var.frontend_port)
         runtime_environment_variables = merge({
           NODE_ENV                = "production"
-          NEXT_PUBLIC_API_URL     = var.backend_url
-          NEXT_PUBLIC_BACKEND_URL = var.backend_url
+          NEXT_PUBLIC_API_URL     = var.backend_url != "" ? var.backend_url : "https://${aws_apprunner_service.backend.service_url}"
+          NEXT_PUBLIC_BACKEND_URL = var.backend_url != "" ? var.backend_url : "https://${aws_apprunner_service.backend.service_url}"
         }, var.frontend_environment_variables)
       }
     }
@@ -202,7 +202,7 @@ resource "aws_apprunner_auto_scaling_configuration_version" "frontend" {
 # ── Custom Domain Associations (optional) ────────────────────────────────────
 
 resource "aws_apprunner_custom_domain_association" "backend" {
-  count = var.api_domain_name != "" ? 1 : 0
+  count = var.create_custom_domain_associations && var.api_domain_name != "" ? 1 : 0
 
   domain_name          = var.api_domain_name
   service_arn          = aws_apprunner_service.backend.arn
@@ -210,7 +210,7 @@ resource "aws_apprunner_custom_domain_association" "backend" {
 }
 
 resource "aws_apprunner_custom_domain_association" "frontend" {
-  count = var.frontend_domain_name != "" ? 1 : 0
+  count = var.create_custom_domain_associations && var.frontend_domain_name != "" ? 1 : 0
 
   domain_name          = var.frontend_domain_name
   service_arn          = aws_apprunner_service.frontend.arn

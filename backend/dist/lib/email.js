@@ -81,6 +81,21 @@ export async function jobMatchEmail(opts) {
         text: `Hi ${opts.candidateName},\n\nNew job match: ${opts.jobTitle} at ${opts.companyName}.\n${opts.visaSponsored ? "Visa Sponsorship: YES\n" : ""}\nView it: ${opts.jobUrl}`,
     });
 }
+export async function passwordResetEmail(opts) {
+    await sendEmail({
+        to: opts.to,
+        subject: "Reset your AfriTalent password",
+        html: `
+      <h2>Hi ${opts.userName},</h2>
+      <p>We received a request to reset your password. Click the button below to choose a new password:</p>
+      <p><a href="${opts.resetUrl}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;">Reset Password</a></p>
+      <p style="color:#6b7280;font-size:14px;">This link will expire in ${opts.expiresInHours} hour${opts.expiresInHours > 1 ? "s" : ""}.</p>
+      <p style="color:#6b7280;font-size:14px;">If you did not request a password reset, you can safely ignore this email.</p>
+      <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+    `,
+        text: `Hi ${opts.userName},\n\nWe received a request to reset your password.\n\nReset your password here: ${opts.resetUrl}\n\nThis link expires in ${opts.expiresInHours} hour(s).\n\nIf you did not request this, you can safely ignore this email.`,
+    });
+}
 export async function verificationEmail(opts) {
     const statusMessages = {
         VERIFIED: "Your company has been verified on AfriTalent. Candidates can now see your Verified Employer badge.",

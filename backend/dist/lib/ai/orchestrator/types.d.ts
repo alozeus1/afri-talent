@@ -1,7 +1,7 @@
 export type RunType = "resume_review" | "job_match" | "apply_pack";
 export interface JobInput {
-    job_id: string;
-    source: "linkedin" | "indeed" | "company_site" | "internal";
+    job_id?: string;
+    source?: "linkedin" | "indeed" | "company_site" | "internal";
     url?: string;
     raw_text: string;
 }
@@ -22,6 +22,8 @@ export interface OrchestratorInput {
     candidate_profile?: CandidateProfile;
     jobs?: JobInput[];
     limits?: OrchestratorLimits;
+    /** Caller-supplied run_id for log correlation; generated internally if omitted. */
+    run_id?: string;
     /** Pre-computed cache to avoid redundant AI calls */
     cached?: {
         resume_json?: ResumeSchema | null;
@@ -104,6 +106,7 @@ export interface TailoredResumeSchema {
     experience: TailoredExperience[];
     ats_keywords: string[];
     warnings: string[];
+    change_log?: string[];
 }
 export interface CoverLetterPackSchema {
     subject_line: string;
@@ -146,6 +149,7 @@ export interface BudgetInfo {
 }
 export type OrchestratorStatus = "ok" | "partial" | "blocked";
 export interface OrchestratorOutput {
+    run_id: string;
     status: OrchestratorStatus;
     budget: BudgetInfo;
     resume_json: ResumeSchema;

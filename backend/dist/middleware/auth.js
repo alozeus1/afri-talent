@@ -49,4 +49,7 @@ export function authorize(...roles) {
         next();
     };
 }
+// Aliases for convenience
+export const requireAuth = authenticate;
+export const requireRole = (roles) => authorize(...roles);
 //# sourceMappingURL=auth.js.map

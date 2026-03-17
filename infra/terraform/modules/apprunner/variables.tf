@@ -170,3 +170,9 @@ variable "frontend_domain_name" {
   description = "Custom domain for frontend"
   default     = ""
 }
+
+variable "create_custom_domain_associations" {
+  type        = bool
+  description = "Whether to create App Runner custom domain associations"
+  default     = false
+}

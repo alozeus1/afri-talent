@@ -262,6 +262,24 @@ variable "enable_route53" {
   default     = false
 }
 
+variable "create_custom_domain_associations" {
+  type        = bool
+  description = "Create App Runner custom domain associations for the configured domains"
+  default     = false
+}
+
+variable "use_custom_domain_urls" {
+  type        = bool
+  description = "Use the configured custom domains for runtime/public URLs instead of App Runner service URLs"
+  default     = false
+}
+
+variable "frontend_public_url_override" {
+  type        = string
+  description = "Optional explicit public frontend URL to use for backend redirects/CORS/S3 CORS"
+  default     = ""
+}
+
 variable "route53_zone_id" {
   type        = string
   description = "Route53 hosted zone ID"

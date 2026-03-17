@@ -47,15 +47,64 @@ router.get("/employer/my-jobs", authenticate, authorize(Role.EMPLOYER), async (r
         res.status(500).json({ error: "Internal server error" });
     }
 });
+// GET /api/jobs/ai-search - AI-optimized job search for orchestrator job picker
+router.get("/ai-search", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+    try {
+        const { query = "", limit = "10" } = req.query;
+        const take = Math.min(parseInt(limit) || 10, 50);
+        const jobs = await prisma.job.findMany({
+            where: {
+                status: JobStatus.PUBLISHED,
+                ...(query ? {
+                    OR: [
+                        { title: { contains: query, mode: "insensitive" } },
+                        { description: { contains: query, mode: "insensitive" } },
+                        { sourceName: { contains: query, mode: "insensitive" } },
+                    ],
+                } : {}),
+            },
+            select: {
+                id: true,
+                title: true,
+                location: true,
+                type: true,
+                seniority: true,
+                description: true,
+                sourceName: true,
+                sourceUrl: true,
+                employer: { select: { companyName: true } },
+            },
+            orderBy: { publishedAt: "desc" },
+            take,
+        });
+        res.json({
+            jobs: jobs.map((j) => ({
+                id: j.id,
+                title: j.title,
+                company: j.employer?.companyName ?? j.sourceName ?? "Unknown",
+                location: j.location,
+                type: j.type,
+                seniority: j.seniority,
+                rawText: j.description,
+                url: j.sourceUrl ?? null,
+            })),
+        });
+    }
+    catch (err) {
+        console.error("AI job search error:", err);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
 // GET /api/jobs - Public: list published jobs
 router.get("/", async (req, res) => {
     try {
-        const { search, location, type, seniority, page = "1", limit = "10" } = req.query;
+        const { search, query: queryAlias, location, type, seniority, visaSponsorship, relocationAssistance, remote, salaryMin, salaryMax, country, page = "1", limit = "10", forAI, } = req.query;
+        const searchTerm = (search || queryAlias);
         const where = { status: JobStatus.PUBLISHED };
-        if (search) {
+        if (searchTerm) {
             where.OR = [
-                { title: { contains: search, mode: "insensitive" } },
-                { description: { contains: search, mode: "insensitive" } },
+                { title: { contains: searchTerm, mode: "insensitive" } },
+                { description: { contains: searchTerm, mode: "insensitive" } },
             ];
         }
         if (location) {
@@ -66,6 +115,24 @@ router.get("/", async (req, res) => {
         }
         if (seniority) {
             where.seniority = seniority;
+        }
+        if (visaSponsorship) {
+            where.visaSponsorship = visaSponsorship;
+        }
+        if (relocationAssistance === "true") {
+            where.relocationAssistance = true;
+        }
+        if (remote === "true") {
+            where.location = { contains: "remote", mode: "insensitive" };
+        }
+        if (salaryMin) {
+            where.salaryMax = { gte: parseInt(salaryMin) };
+        }
+        if (salaryMax) {
+            where.salaryMin = { lte: parseInt(salaryMax) };
+        }
+        if (country) {
+            where.eligibleCountries = { has: country };
         }
         const parsedLimit = Math.min(parseInt(limit) || 10, 100);
         const skip = (parseInt(page) - 1) * parsedLimit;
@@ -84,6 +151,19 @@ router.get("/", async (req, res) => {
             }),
             prisma.job.count({ where }),
         ]);
+        if (forAI === "true") {
+            const aiJobs = jobs.map(job => ({
+                id: job.id,
+                title: job.title,
+                company: job.employer?.companyName ?? job.sourceName ?? "Unknown",
+                location: job.location,
+                type: job.type,
+                seniority: job.seniority,
+                description: job.description,
+            }));
+            res.json({ jobs: aiJobs, total });
+            return;
+        }
         res.json({
             jobs,
             pagination: {
@@ -108,6 +188,7 @@ router.get("/:slug", async (req, res) => {
                 employer: {
                     select: { companyName: true, location: true, website: true, bio: true },
                 },
+                _count: { select: { applications: true } },
             },
         });
         if (!job) {

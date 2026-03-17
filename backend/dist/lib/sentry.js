@@ -1,76 +1,45 @@
-/**
- * Sentry Error Tracking Integration (Optional)
- *
- * To enable Sentry:
- * 1. Install: npm install @sentry/node
- * 2. Set SENTRY_DSN environment variable
- * 3. Import and call initSentry() in server.ts before routes
- *
- * Example:
- *   import { initSentry, sentryErrorHandler } from "./lib/sentry.js";
- *   initSentry();
- *   // ... routes ...
- *   app.use(sentryErrorHandler);
- */
-// Sentry DSN from environment
-const SENTRY_DSN = process.env.SENTRY_DSN;
-// Placeholder for Sentry module (loaded dynamically)
-let Sentry = null;
-export async function initSentry() {
-    if (!SENTRY_DSN) {
-        console.log("Sentry DSN not configured, error tracking disabled");
+import * as Sentry from "@sentry/node";
+import { nodeProfilingIntegration } from "@sentry/profiling-node";
+const isProduction = process.env.NODE_ENV === "production";
+const isTest = process.env.NODE_ENV === "test";
+export function initSentry() {
+    if (Sentry.getClient()) {
         return;
     }
-    try {
-        // Dynamic import to avoid requiring @sentry/node if not installed
-        // @ts-expect-error - @sentry/node is optional, may not be installed
-        const sentryModule = await import("@sentry/node").catch(() => null);
-        if (!sentryModule) {
-            console.warn("@sentry/node not installed, error tracking disabled");
-            return;
-        }
-        Sentry = sentryModule;
-        Sentry.init({
-            dsn: SENTRY_DSN,
-            environment: process.env.NODE_ENV || "development",
-            tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
-        });
-        console.log("Sentry initialized successfully");
-    }
-    catch (error) {
-        console.warn("Failed to initialize Sentry:", error);
-    }
+    const dsn = process.env.SENTRY_DSN;
+    Sentry.init({
+        dsn,
+        enabled: Boolean(dsn) && !isTest,
+        environment: process.env.NODE_ENV || "development",
+        integrations: (defaultIntegrations) => [...defaultIntegrations, nodeProfilingIntegration()],
+        tracesSampleRate: isProduction ? 0.2 : 1.0,
+        profilesSampleRate: isProduction ? 0.2 : 1.0,
+    });
 }
-export function setupSentryRequestHandler(app) {
-    if (Sentry) {
-        app.use(Sentry.Handlers.requestHandler());
-    }
+export function setupExpressErrorHandler(app) {
+    initSentry();
+    Sentry.setupExpressErrorHandler(app);
 }
-export function setupSentryTracingHandler(app) {
-    if (Sentry) {
-        app.use(Sentry.Handlers.tracingHandler());
-    }
-}
-export function sentryErrorHandler(err, req, res, next) {
-    if (Sentry) {
-        Sentry.captureException(err, {
-            extra: {
-                requestId: req.requestId,
-                method: req.method,
-                url: req.url,
-            },
-        });
-    }
+export function sentryErrorHandler(err, req, _res, next) {
+    captureException(err, {
+        requestId: req.requestId,
+        method: req.method,
+        url: req.url,
+    });
     next(err);
 }
 export function captureException(error, context) {
-    if (Sentry) {
-        Sentry.captureException(error, { extra: context });
-    }
+    initSentry();
+    return Sentry.captureException(error, context ? { extra: context } : undefined);
 }
 export function captureMessage(message, level = "info") {
-    if (Sentry) {
-        Sentry.captureMessage(message, level);
+    initSentry();
+    return Sentry.captureMessage(message, level);
+}
+export async function flushSentry(timeout = 2000) {
+    if (!Sentry.getClient()) {
+        return true;
     }
+    return Sentry.flush(timeout);
 }
 //# sourceMappingURL=sentry.js.map

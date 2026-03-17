@@ -92,7 +92,7 @@ module "s3" {
 # ── ACM Certificate (auto-validated if Route53 zone available) ───────────────
 
 module "acm" {
-  count = var.frontend_domain_name != "" ? 1 : 0
+  count = var.enable_route53 && var.route53_zone_id != "" && var.frontend_domain_name != "" ? 1 : 0
 
   source      = "./modules/acm"
   name_prefix = local.name_prefix
@@ -127,12 +127,13 @@ module "apprunner" {
   backend_max_size        = var.backend_max_capacity
   backend_max_concurrency = 100
   backend_health_path     = var.backend_health_check_path
-  backend_url             = var.api_domain_name != "" ? "https://${var.api_domain_name}" : ""
+  backend_url             = local.backend_public_url
   backend_environment_variables = {
     AWS_REGION                        = var.aws_region
     SES_REGION                        = var.ses_region
     SES_FROM_EMAIL                    = var.ses_from_email
     FRONTEND_URL                      = local.frontend_url
+    ALLOWED_ORIGIN_REGEX              = var.use_custom_domain_urls ? "" : "^https://[a-z0-9-]+\\.us-east-1\\.awsapprunner\\.com$"
     S3_UPLOADS_BUCKET                 = module.s3.bucket_name
     AI_FAST_MODEL                     = var.ai_fast_model
     AI_QUALITY_MODEL                  = var.ai_quality_model
@@ -166,14 +167,15 @@ module "apprunner" {
   frontend_max_concurrency = 100
   frontend_health_path     = var.frontend_health_check_path
   frontend_url             = local.frontend_url
-  frontend_environment_variables = var.api_domain_name != "" ? {
-    NEXT_PUBLIC_API_URL     = "https://${var.api_domain_name}"
-    NEXT_PUBLIC_BACKEND_URL = "https://${var.api_domain_name}"
+  frontend_environment_variables = local.backend_public_url != "" ? {
+    NEXT_PUBLIC_API_URL     = local.backend_public_url
+    NEXT_PUBLIC_BACKEND_URL = local.backend_public_url
   } : {}
 
   # Custom domains (optional - requires ACM cert)
-  api_domain_name      = var.api_domain_name
-  frontend_domain_name = var.frontend_domain_name
+  api_domain_name                   = var.api_domain_name
+  frontend_domain_name              = var.frontend_domain_name
+  create_custom_domain_associations = var.create_custom_domain_associations
 }
 
 # Grant App Runner instance role access to S3

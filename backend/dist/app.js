@@ -1,0 +1,222 @@
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import pinoHttpModule from "pino-http";
+const pinoHttp = pinoHttpModule;
+import prisma from "./lib/prisma.js";
+import logger from "./lib/logger.js";
+import { initSentry, setupExpressErrorHandler } from "./lib/sentry.js";
+import { requestIdMiddleware } from "./middleware/requestId.js";
+import { securityHeaders, generalLimiter, sanitizeRequest, orchestratorLimiter, } from "./middleware/security.js";
+import authRoutes from "./routes/auth.js";
+import passwordResetRoutes from "./routes/password-reset.js";
+import jobsRoutes from "./routes/jobs.js";
+import applicationsRoutes from "./routes/applications.js";
+import resourcesRoutes from "./routes/resources.js";
+import adminRoutes from "./routes/admin.js";
+import profileRoutes from "./routes/profile.js";
+import filesRoutes from "./routes/files.js";
+import billingRoutes from "./routes/billing.js";
+import webhookRoutes from "./routes/webhooks.js";
+import notificationsRoutes from "./routes/notifications.js";
+import messagesRoutes from "./routes/messages.js";
+import orchestratorRoutes from "./routes/orchestrator.js";
+import aggregatorRoutes from "./routes/aggregator.js";
+import savedSearchesRoutes from "./routes/saved-searches.js";
+import companiesRoutes from "./routes/companies.js";
+import talentRoutes from "./routes/talent.js";
+import employerAnalyticsRoutes from "./routes/employer-analytics.js";
+import quickApplyRoutes from "./routes/quick-apply.js";
+import skillsAssessmentsRoutes from "./routes/skills-assessments.js";
+import salaryReportsRoutes from "./routes/salary-reports.js";
+import interviewExperiencesRoutes from "./routes/interview-experiences.js";
+import immigrationRoutes from "./routes/immigration.js";
+import referralsRoutes from "./routes/referrals.js";
+import learningRoutes from "./routes/learning.js";
+import calendarRoutes from "./routes/calendar.js";
+import candidateAnalyticsRoutes from "./routes/candidate-analytics.js";
+dotenv.config();
+initSentry();
+const app = express();
+const isProduction = process.env.NODE_ENV === "production";
+const isTest = process.env.NODE_ENV === "test";
+// Request ID middleware (must be first)
+app.use(requestIdMiddleware);
+// Structured logging with Pino (suppress in tests to keep output clean)
+if (!isTest) {
+    app.use(pinoHttp({ logger }));
+}
+// Security: Helmet headers
+app.use(securityHeaders);
+// Security: Trust proxy (required for rate limiting behind reverse proxy)
+if (isProduction) {
+    app.set("trust proxy", 1);
+}
+// Security: CORS configuration
+const allowedOrigins = [
+    process.env.FRONTEND_URL || "http://localhost:3000",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3100",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3100",
+];
+const allowedOriginRegex = process.env.ALLOWED_ORIGIN_REGEX
+    ? new RegExp(process.env.ALLOWED_ORIGIN_REGEX)
+    : null;
+const isAllowedOrigin = (origin) => {
+    if (!origin) {
+        return !isProduction;
+    }
+    if (allowedOrigins.includes(origin)) {
+        return true;
+    }
+    if (allowedOriginRegex?.test(origin)) {
+        return true;
+    }
+    if (!isProduction) {
+        return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    }
+    return false;
+};
+app.use(cors({
+    origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) {
+            callback(null, true);
+        }
+        else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    maxAge: 86400,
+}));
+// Security: Rate limiting (general)
+app.use(generalLimiter);
+// Stripe webhook — MUST be registered BEFORE express.json().
+// Stripe signature verification requires the raw request body bytes.
+app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoutes);
+// Body parsing with size limits (all other routes)
+app.use(express.json({ limit: "10kb" }));
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+// Security: Request sanitization
+app.use(sanitizeRequest);
+// Health check endpoint (for load balancers, k8s probes)
+const healthHandler = async (_req, res) => {
+    // Skip DB check in test environment — no DB required to run tests
+    if (isTest) {
+        res.json({ status: "ok", db: "skipped-in-test", timestamp: new Date().toISOString() });
+        return;
+    }
+    try {
+        await prisma.$queryRaw `SELECT 1`;
+        res.json({
+            status: "ok",
+            db: "connected",
+            timestamp: new Date().toISOString(),
+        });
+    }
+    catch {
+        res.status(500).json({
+            status: "error",
+            db: "disconnected",
+            timestamp: new Date().toISOString(),
+        });
+    }
+};
+app.get("/health", healthHandler);
+app.get("/api/health", healthHandler);
+// Readiness check (for k8s readiness probes)
+const readyHandler = async (_req, res) => {
+    // Skip DB check in test environment
+    if (isTest) {
+        res.json({
+            status: "ready",
+            checks: { database: "skipped-in-test" },
+            timestamp: new Date().toISOString(),
+        });
+        return;
+    }
+    try {
+        await prisma.$queryRaw `SELECT 1`;
+        res.json({
+            status: "ready",
+            checks: { database: "ok" },
+            timestamp: new Date().toISOString(),
+        });
+    }
+    catch (error) {
+        logger.error({ error }, "Readiness check failed");
+        res.status(503).json({
+            status: "not_ready",
+            checks: { database: "failed" },
+            timestamp: new Date().toISOString(),
+        });
+    }
+};
+app.get("/ready", readyHandler);
+app.get("/api/ready", readyHandler);
+// Liveness check (for k8s liveness probes)
+const liveHandler = (_req, res) => {
+    res.json({
+        status: "alive",
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+    });
+};
+app.get("/live", liveHandler);
+app.get("/api/live", liveHandler);
+// API Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/auth", passwordResetRoutes);
+app.use("/api/jobs", jobsRoutes);
+app.use("/api/applications", applicationsRoutes);
+app.use("/api/resources", resourcesRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/files", filesRoutes);
+app.use("/api/billing", billingRoutes);
+app.use("/api/notifications", notificationsRoutes);
+app.use("/api/messages", messagesRoutes);
+app.use("/api/aggregator", aggregatorRoutes);
+app.use("/api/saved-searches", savedSearchesRoutes);
+app.use("/api/companies", companiesRoutes);
+app.use("/api/talent", talentRoutes);
+app.use("/api/employer", employerAnalyticsRoutes);
+app.use("/api/quick-apply", quickApplyRoutes);
+app.use("/api/skills-assessments", skillsAssessmentsRoutes);
+app.use("/api/salary-reports", salaryReportsRoutes);
+app.use("/api/interview-experiences", interviewExperiencesRoutes);
+app.use("/api/immigration", immigrationRoutes);
+app.use("/api/referrals", referralsRoutes);
+app.use("/api/learning", learningRoutes);
+app.use("/api/calendar", calendarRoutes);
+app.use("/api/candidate-analytics", candidateAnalyticsRoutes);
+// Orchestrator route needs a larger body limit (resume + raw job texts can be ~200 KB combined)
+app.use("/api/orchestrator", express.json({ limit: "250kb" }), orchestratorLimiter, orchestratorRoutes);
+// Sentry error handler (must be before any other error middleware and after all controllers)
+setupExpressErrorHandler(app);
+// 404 handler
+app.use((_req, res) => {
+    res.status(404).json({ error: "Not found" });
+});
+// Global error handler
+app.use((err, req, res, _next) => {
+    logger.error({
+        err,
+        requestId: req.requestId,
+        method: req.method,
+        url: req.url,
+    }, "Unhandled error");
+    if (isProduction) {
+        res.status(500).json({ error: "Internal server error", requestId: req.requestId });
+    }
+    else {
+        res.status(500).json({ error: err.message, requestId: req.requestId });
+    }
+});
+export default app;
+//# sourceMappingURL=app.js.map
