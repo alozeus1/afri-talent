@@ -18,16 +18,13 @@ env:
   ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
 
 jobs:
-  # ── Step 1: Provision App Runner infrastructure via Terraform ──────────────
+  # ── Step 1: Provision base infrastructure via Terraform ────────────────────
   provision-infra:
-    name: Provision Infrastructure
+    name: Provision Base Infrastructure
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
-    outputs:
-      backend_url: ${{ steps.outputs.outputs.backend_url }}
-      frontend_url: ${{ steps.outputs.outputs.frontend_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -70,16 +67,19 @@ jobs:
         working-directory: infra/terraform
         run: terraform init -backend-config=envs/dev/backend.config
 
-      - name: Terraform Apply
-        working-directory: infra/terraform
-        run: terraform apply -auto-approve -var-file=envs/dev/terraform.tfvars
-
-      - name: Get Terraform outputs
-        id: outputs
+      - name: Terraform Apply Base Infrastructure
         working-directory: infra/terraform
         run: |
-          echo "backend_url=$(terraform output -raw backend_url 2>/dev/null || echo '')" >> "$GITHUB_OUTPUT"
-          echo "frontend_url=$(terraform output -raw frontend_url 2>/dev/null || echo '')" >> "$GITHUB_OUTPUT"
+          terraform apply -auto-approve \
+            -var-file=envs/dev/terraform.tfvars \
+            -target=random_password.db \
+            -target=random_password.jwt \
+            -target=module.network \
+            -target=module.security \
+            -target=module.ecr \
+            -target=module.rds \
+            -target=module.secrets \
+            -target=module.s3
 
   # ── Step 2: Build & Push Images to ECR (parallel) ──────────────────────────
   build-backend:
@@ -141,10 +141,20 @@ jobs:
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: |
+          EXISTING_SERVICE_URL=$(aws apprunner list-services \
+            --query "ServiceSummaryList[?ServiceName=='afritalent-dev-appr-backend-managed'].ServiceUrl" \
+            --output text)
+
+          if [ -n "$EXISTING_SERVICE_URL" ] && [ "$EXISTING_SERVICE_URL" != "None" ]; then
+            PUBLIC_API_URL="https://$EXISTING_SERVICE_URL"
+          else
+            PUBLIC_API_URL="https://api.dev.afri-talent.com"
+          fi
+
           IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
           docker build \
-            --build-arg NEXT_PUBLIC_API_URL=${{ needs.provision-infra.outputs.backend_url }} \
-            --build-arg NEXT_PUBLIC_BACKEND_URL=${{ needs.provision-infra.outputs.backend_url }} \
+            --build-arg NEXT_PUBLIC_API_URL="$PUBLIC_API_URL" \
+            --build-arg NEXT_PUBLIC_BACKEND_URL="$PUBLIC_API_URL" \
             --build-arg NEXT_PUBLIC_SENTRY_DSN="$NEXT_PUBLIC_SENTRY_DSN" \
             --build-arg SENTRY_ORG="$SENTRY_ORG" \
             --build-arg SENTRY_PROJECT="$SENTRY_PROJECT" \
@@ -153,11 +163,51 @@ jobs:
           docker push $IMAGE:$IMAGE_TAG
           docker push $IMAGE:latest
 
+  finalize-infra:
+    name: Finalize Infrastructure
+    runs-on: ubuntu-latest
+    needs: [provision-infra, build-backend, build-frontend]
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      backend_url: ${{ steps.outputs.outputs.backend_url }}
+      frontend_url: ${{ steps.outputs.outputs.frontend_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init -backend-config=envs/dev/backend.config
+
+      - name: Terraform Apply Full Stack
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve -var-file=envs/dev/terraform.tfvars
+
+      - name: Get Terraform outputs
+        id: outputs
+        working-directory: infra/terraform
+        run: |
+          echo "backend_url=$(terraform output -raw backend_url)" >> "$GITHUB_OUTPUT"
+          echo "frontend_url=$(terraform output -raw frontend_url)" >> "$GITHUB_OUTPUT"
+
   # ── Step 3: Deploy to App Runner ───────────────────────────────────────────
   deploy:
     name: Deploy to App Runner
     runs-on: ubuntu-latest
-    needs: [build-backend, build-frontend, provision-infra]
+    needs: [finalize-infra]
     permissions:
       id-token: write
       contents: read
@@ -228,7 +278,7 @@ jobs:
   health-check:
     name: Health Check
     runs-on: ubuntu-latest
-    needs: [deploy, provision-infra]
+    needs: [deploy, finalize-infra]
     if: always() && needs.deploy.result == 'success'
 
     steps:
