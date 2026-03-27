@@ -1,6 +1,6 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: March 26, 2026 (America/Chicago)
+Last updated: March 26, 2026 10:19 PM (America/Chicago)
 
 This is the first file a future Codex run should read for staging, deployment, ops, and recovery work.
 It captures the current live state, the last known deployment progress, where to look in AWS, and the fastest safe troubleshooting paths.
@@ -54,15 +54,15 @@ For any future deployment or incident task:
 - Backend public URL: `https://ed4nsj3sgv.us-east-1.awsapprunner.com`
 - Backend status at handoff: healthy and returning `200` on `/health` and `/api/health`
 
-- Frontend managed service name: `afritalent-staging-appr-frontend-managed`
-- Frontend managed service ARN: `arn:aws:apprunner:us-east-1:260820061731:service/afritalent-staging-appr-frontend-managed/d4d78ed015ee4faa88d9c647d0fdb422`
-- Frontend managed URL: `https://zkpptays2x.us-east-1.awsapprunner.com`
-- Frontend managed status at handoff: stuck in `OPERATION_IN_PROGRESS`
+- Frontend live service name: `afritalent-stg-fe-livefix`
+- Frontend live service ARN: `arn:aws:apprunner:us-east-1:260820061731:service/afritalent-stg-fe-livefix/3cfcc7543c0746c582000ae3d4a529b4`
+- Frontend live URL: `https://3mwn2b4e5t.us-east-1.awsapprunner.com`
+- Frontend live status at handoff: `RUNNING`
 
-- Frontend recovery service name: `afritalent-stg-fe-recov`
-- Frontend recovery service ARN: `arn:aws:apprunner:us-east-1:260820061731:service/afritalent-stg-fe-recov/def7b662c4a34c48ac33b171b2a7c02d`
-- Frontend recovery URL: `https://fnpbwtphjp.us-east-1.awsapprunner.com`
-- Frontend recovery status at handoff: also stuck in `OPERATION_IN_PROGRESS`
+- Frontend managed service name: `afritalent-staging-appr-frontend-managed`
+- Frontend managed service ARN: `arn:aws:apprunner:us-east-1:260820061731:service/afritalent-staging-appr-frontend-managed/188b078ce30a4439954995135ddfa299`
+- Frontend managed URL: `https://rrmkvb99ca.us-east-1.awsapprunner.com`
+- Frontend managed status at handoff: still stuck in `OPERATION_IN_PROGRESS` from an older partial fix attempt
 
 ## Last Known Deployment State
 
@@ -76,21 +76,22 @@ Completed:
 - Prisma migrations now run at container startup through `backend/docker/entrypoint.sh`
 - Staging `DATABASE_URL` in Secrets Manager was repaired so the password is URL-encoded
 - Backend startup logs confirmed migrations applied and health checks succeeded
+- Frontend Docker runtime was repaired so App Runner cannot override the bind target
+- Frontend image healthcheck was repaired to probe IPv4 loopback instead of `localhost`
+- Frontend live recovery service reached `RUNNING` and serves the site successfully
 
 Open:
 
-- Frontend image was built and pushed successfully
-- Frontend container logs show Next.js starts successfully
-- App Runner does not finish either frontend service create operation
-- Public frontend hostnames still do not serve the app at handoff time
+- The original managed frontend service is still stuck in `OPERATION_IN_PROGRESS` from a pre-fix create attempt and should be cleaned up later
+- Terraform and workflows still need to be reconciled to the now-working frontend service path
 
 ## Last Known Image Digests
 
 - Backend tag: `1910dfc-live`
 - Backend digest: `sha256:323ab65dc4acc9279a05bbdcb1ad1a2f6727c4458ee12e5554d6643b3c02b7da`
 
-- Frontend tag: `fe70c56-live`
-- Frontend digest: `sha256:9101760d5a964411c93b51bdf0b7ea672007969457c6fd22d4a377d92a3f7866`
+- Frontend tag: `apprunnerfix-20260326-221310`
+- Frontend digest: `sha256:7a4f71f6b3fd218f01c9a581b531a6c77b7e322f71e30e33c3b2e531dcb34987`
 
 ## Current Repo State
 
@@ -120,14 +121,18 @@ Do not reset or discard those unless the user explicitly asks.
 1. Backend `FRONTEND_URL` still points at `https://staging.afri-talent.com`
    The backend is working, but password reset links and any frontend redirect behavior should be updated after a stable frontend URL is chosen.
 
-2. Frontend App Runner service creation is hanging in AWS
-   Both the normal HTTP-health-check service and a TCP-health-check recovery service start the Next.js app successfully, but App Runner does not complete the create operation.
+2. Frontend App Runner service creation is failing in AWS
+   Root cause was in the frontend container itself:
+   - the image healthcheck was probing `localhost`, which hit IPv6 loopback and failed
+   - Next.js standalone reads `process.env.HOSTNAME`, and App Runner can override that value
+   - fix was to force `HOSTNAME=0.0.0.0` in the runtime `CMD` and use an IPv4 loopback health probe
+   The latest recovery service is running with that fix.
 
 3. Uploads bucket CORS was manually widened for App Runner testing
    Current allowed origins include:
    - `https://staging.afri-talent.com`
-   - `https://zkpptays2x.us-east-1.awsapprunner.com`
-   - `https://fnpbwtphjp.us-east-1.awsapprunner.com`
+   - `https://rrmkvb99ca.us-east-1.awsapprunner.com`
+   - `https://3mwn2b4e5t.us-east-1.awsapprunner.com`
 
 ## Where To Look First
 
@@ -224,15 +229,32 @@ docker run --rm -p 3001:3000 \
   260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-staging-frontend:latest
 ```
 
-2. Check App Runner application logs for `Ready`
+2. Check App Runner application logs for:
+
+- `Local: http://localhost:3000`
+- `Network: http://0.0.0.0:3000`
+- `Ready`
 
 3. Check App Runner service `events`
 
-4. If App Runner is stuck in `OPERATION_IN_PROGRESS` for a long time:
+4. Inspect the generated standalone server:
+
+- `frontend/.next/standalone/server.js`
+- it reads `process.env.HOSTNAME`
+- if App Runner overrides `HOSTNAME`, the server may bind to the instance hostname instead of `0.0.0.0`
+
+5. If App Runner is stuck in `OPERATION_IN_PROGRESS` for a long time:
 
 - wait for the control plane to release the service state
 - if deletion becomes allowed, delete the stuck service and recreate it
 - if deletion is blocked, create a temporary recovery service with a short name
+
+6. If App Runner moves from `OPERATION_IN_PROGRESS` to `CREATE_FAILED`:
+
+- verify whether the generated `*.awsapprunner.com` hostname resolves in DNS
+- pull the service deployment log stream and capture the final failure line
+- pull the application log stream with `LANG=en_US.UTF-8` so Next.js unicode output renders correctly
+- if the app reaches `Ready` but service creation still fails, treat it as an App Runner service-side deployment failure and recreate the service rather than assuming the container itself is broken
 
 ### If Uploads Fail From Frontend
 
