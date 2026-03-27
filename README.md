@@ -2,6 +2,16 @@
 
 A full-stack MVP application connecting African tech talent with global opportunities.
 
+## Deployment State Start Here
+
+For the current live deployment state, staging URLs, AWS resource names, recovery steps, and troubleshooting workflow, read [STAGING_RUNBOOK.md](./STAGING_RUNBOOK.md) first.
+
+Agent-specific pointers:
+
+- Codex: reads [AGENTS.md](./AGENTS.md)
+- Claude: reads [CLAUDE.md](./CLAUDE.md)
+- Droid or other agents: start with [STAGING_RUNBOOK.md](./STAGING_RUNBOOK.md)
+
 ---
 
 ## MVP Scope (LOCKED)
