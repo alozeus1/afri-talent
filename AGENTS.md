@@ -4,7 +4,7 @@
 
 - `backend/`: Express + Prisma API (TypeScript). Entry: `src/server.ts`. Prisma schema/seed in `prisma/`.
 - `frontend/`: Next.js App Router UI (TypeScript). Pages in `src/app`, shared UI in `src/components`.
-- `infra/terraform/`: AWS ECS + RDS + CloudFront infrastructure, CI/CD workflows.
+- `infra/terraform/`: AWS App Runner + RDS infrastructure, CI/CD workflows.
 - `infra/terraform/modules/`: Terraform submodules (`network`, `security`, `alb`, `cloudfront`, `ecr`, `rds`, `secrets`, `iam-ecs`, `ecs`, `route53`, `github-oidc`).
 - `docs`: Root markdown files describe deployment, security, and ops.
 
@@ -36,16 +36,23 @@ Frontend:
 
 ## Architecture Overview
 
-- High-level layout is documented in `DEPLOYMENT.md` (ASCII diagram) and `infra/terraform/README.md` (AWS stack details).
-- Data flow: CloudFront → ALB → ECS (frontend + backend) → RDS PostgreSQL.
+- High-level layout is documented in `DEPLOYMENT.md` and `infra/terraform/README.md`.
+- Current shared non-prod deployment path is App Runner frontend/backend + RDS PostgreSQL.
 - If you add diagrams, place them in `docs/architecture/` and link them from `DEPLOYMENT.md`.
 
 ## Release Process
 
 - Provision or update infra with Terraform (`infra/terraform`), then capture outputs.
-- Build/push images to ECR (or use the manual `Deploy ECS` workflow).
-- Run `npx prisma migrate deploy` against the production DB on first release.
-- Validate `/api/health` and UI routes; use the rollback steps in `infra/terraform/README.md` if needed.
+- Build/push images to ECR and deploy App Runner.
+- Shared staging is the only active shared test environment; `dev` was intentionally removed.
+- Backend runtime currently applies `npx prisma migrate deploy` at container startup for staging.
+- Validate `/api/health`, `/health`, and the frontend root route after deploys.
+
+## Deployment Handoff
+
+- For any deployment, staging, infrastructure, or incident task, read `STAGING_RUNBOOK.md` first.
+- Treat `STAGING_RUNBOOK.md` as the current source of truth for live environment state, URLs, AWS resource names, last known blockers, and recovery steps.
+- After any material live change, update `STAGING_RUNBOOK.md` in the same session so future agents inherit the latest state immediately.
 
 ## Commit & Pull Request Guidelines
 
