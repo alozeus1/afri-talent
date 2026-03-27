@@ -7,14 +7,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 resource "random_password" "db" {
-  length  = 32
-  special = false
-
-  # Rotate away from any previously generated values that included characters
-  # RDS rejects for the master password.
-  keepers = {
-    password_policy = "rds-safe-ascii-v2"
-  }
+  length           = 24
+  special          = true
+  override_special = "!@#%^*()-_=+[]{}"
 }
 
 resource "random_password" "jwt" {
@@ -54,7 +49,7 @@ module "ecr" {
   create      = var.create_ecr
 }
 
-# ── RDS PostgreSQL (smallest instance for dev) ───────────────────────────────
+# ── RDS PostgreSQL (shared non-production baseline) ─────────────────────────
 
 module "rds" {
   source                   = "./modules/rds"
@@ -126,6 +121,7 @@ module "apprunner" {
 
   # Backend configuration
   backend_image           = var.backend_image
+  backend_service_name    = var.apprunner_backend_service_name
   backend_port            = var.backend_container_port
   backend_cpu             = tostring(var.backend_container_cpu)
   backend_memory          = tostring(var.backend_container_memory)
@@ -135,21 +131,23 @@ module "apprunner" {
   backend_health_path     = var.backend_health_check_path
   backend_url             = local.backend_public_url
   backend_environment_variables = {
-    AWS_REGION                        = var.aws_region
-    SES_REGION                        = var.ses_region
-    SES_FROM_EMAIL                    = var.ses_from_email
-    FRONTEND_URL                      = local.frontend_url
-    ALLOWED_ORIGIN_REGEX              = var.use_custom_domain_urls ? "" : "^https://[a-z0-9-]+\\.us-east-1\\.awsapprunner\\.com$"
-    S3_UPLOADS_BUCKET                 = module.s3.bucket_name
-    AI_FAST_MODEL                     = var.ai_fast_model
-    AI_QUALITY_MODEL                  = var.ai_quality_model
-    ORCHESTRATOR_TOKEN_BUDGET_MAX     = tostring(var.orchestrator_token_budget_max)
-    AI_DISABLED                       = var.ai_disabled ? "1" : "0"
-    DAILY_APPLY_PACK_LIMIT            = tostring(var.daily_apply_pack_limit)
-    DAILY_JOB_MATCH_LIMIT             = tostring(var.daily_job_match_limit)
-    DAILY_RESUME_REVIEW_LIMIT         = tostring(var.daily_resume_review_limit)
-    STRIPE_PRICE_BASIC_MONTHLY        = var.stripe_price_basic_monthly
-    STRIPE_PRICE_PROFESSIONAL_MONTHLY = var.stripe_price_professional_monthly
+    for key, value in {
+      AWS_REGION                        = var.aws_region
+      SES_REGION                        = var.ses_region
+      SES_FROM_EMAIL                    = var.ses_from_email
+      FRONTEND_URL                      = local.frontend_url
+      ALLOWED_ORIGIN_REGEX              = var.use_custom_domain_urls ? "" : "^https://[a-z0-9-]+\\.us-east-1\\.awsapprunner\\.com$"
+      S3_UPLOADS_BUCKET                 = module.s3.bucket_name
+      AI_FAST_MODEL                     = var.ai_fast_model
+      AI_QUALITY_MODEL                  = var.ai_quality_model
+      ORCHESTRATOR_TOKEN_BUDGET_MAX     = tostring(var.orchestrator_token_budget_max)
+      AI_DISABLED                       = var.ai_disabled ? "1" : "0"
+      DAILY_APPLY_PACK_LIMIT            = tostring(var.daily_apply_pack_limit)
+      DAILY_JOB_MATCH_LIMIT             = tostring(var.daily_job_match_limit)
+      DAILY_RESUME_REVIEW_LIMIT         = tostring(var.daily_resume_review_limit)
+      STRIPE_PRICE_BASIC_MONTHLY        = var.stripe_price_basic_monthly
+      STRIPE_PRICE_PROFESSIONAL_MONTHLY = var.stripe_price_professional_monthly
+    } : key => value if value != null
   }
   backend_secret_names = [
     "DATABASE_URL",
@@ -165,6 +163,7 @@ module "apprunner" {
 
   # Frontend configuration
   frontend_image           = var.frontend_image
+  frontend_service_name    = var.apprunner_frontend_service_name
   frontend_port            = var.frontend_container_port
   frontend_cpu             = tostring(var.frontend_container_cpu)
   frontend_memory          = tostring(var.frontend_container_memory)
@@ -242,11 +241,20 @@ output "backend_url" {
   value       = module.apprunner.backend_service_url
 }
 
+output "backend_service_arn" {
+  description = "Backend App Runner service ARN"
+  value       = module.apprunner.backend_service_arn
+}
+
 output "frontend_url" {
   description = "Frontend App Runner service URL"
   value       = module.apprunner.frontend_service_url
 }
 
+output "frontend_service_arn" {
+  description = "Frontend App Runner service ARN"
+  value       = module.apprunner.frontend_service_arn
+}
 output "rds_endpoint" {
   description = "RDS database endpoint"
   value       = module.rds.db_endpoint

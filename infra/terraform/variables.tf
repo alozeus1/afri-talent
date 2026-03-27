@@ -12,7 +12,7 @@ variable "project_name" {
 
 variable "environment" {
   type        = string
-  description = "Environment name (e.g., dev, staging, prod)"
+  description = "Environment name (e.g., staging, prod)"
   default     = "prod"
 }
 
@@ -72,13 +72,19 @@ variable "acm_certificate_arn" {
 variable "frontend_image" {
   type        = string
   description = "Container image URI for the frontend service"
-  default     = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend:latest"
+  default     = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-staging-frontend:latest"
 }
 
 variable "backend_image" {
   type        = string
   description = "Container image URI for the backend service"
-  default     = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend:latest"
+  default     = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-staging-backend:latest"
+}
+
+variable "apprunner_backend_service_name" {
+  type        = string
+  description = "Optional explicit App Runner backend service name"
+  default     = ""
 }
 
 variable "create_ecr" {
@@ -91,6 +97,12 @@ variable "frontend_container_port" {
   type        = number
   description = "Frontend container port"
   default     = 3000
+}
+
+variable "apprunner_frontend_service_name" {
+  type        = string
+  description = "Optional explicit App Runner frontend service name"
+  default     = ""
 }
 
 variable "backend_container_port" {

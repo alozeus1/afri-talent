@@ -1,12 +1,12 @@
 variable "bucket_name" {
-  description = "S3 bucket name (e.g. afritalent-dev-uploads)"
+  description = "S3 bucket name (e.g. afritalent-staging-uploads)"
   type        = string
 }
 
 variable "environment" {
-  description = "Environment tag (dev, staging, prod)"
+  description = "Environment tag (staging, prod)"
   type        = string
-  default     = "dev"
+  default     = "staging"
 }
 
 variable "allowed_origins" {

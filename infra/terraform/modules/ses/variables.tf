@@ -17,7 +17,7 @@ variable "ses_region" {
 variable "environment" {
   description = "Environment tag"
   type        = string
-  default     = "dev"
+  default     = "staging"
 }
 
 variable "add_mx_record" {
