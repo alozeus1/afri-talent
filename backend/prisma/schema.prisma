@@ -204,6 +204,106 @@ enum BotSubscriptionStatus {
   REVOKED
 }
 
+enum EmployerVerificationLevel {
+  UNVERIFIED
+  EMAIL_DOMAIN_VERIFIED
+  BUSINESS_DOC_VERIFIED
+  MANUAL_REVIEW_APPROVED
+  PREMIUM_TRUSTED
+}
+
+enum CandidateVerificationLevel {
+  UNVERIFIED
+  EMAIL_VERIFIED
+  PHONE_VERIFIED
+  IDENTITY_DOCUMENT_VERIFIED
+  SKILLS_VERIFIED
+  EMPLOYMENT_HISTORY_PARTIALLY_VERIFIED
+}
+
+enum VerificationArtifactType {
+  BUSINESS_REGISTRATION
+  DOMAIN_OWNERSHIP
+  LINKEDIN_COMPANY
+  IDENTITY_DOCUMENT
+  CERTIFICATION
+  EMPLOYMENT_PROOF
+}
+
+enum VerificationArtifactStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NEEDS_MORE_INFO
+}
+
+enum TrustEntityType {
+  USER
+  EMPLOYER
+  CANDIDATE
+  JOB
+  APPLICATION
+  MESSAGE
+  REPORT
+}
+
+enum TrustRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TrustCaseStatus {
+  OPEN
+  IN_REVIEW
+  ACTIONED
+  DISMISSED
+}
+
+enum ModerationActionType {
+  NOTE
+  APPROVE
+  REJECT
+  HOLD
+  LIMIT
+  SUSPEND
+  REINSTATE
+  ESCALATE
+}
+
+enum AbuseReportReason {
+  SCAM
+  FAKE_JOB
+  IMPERSONATION
+  SPAM
+  OFF_PLATFORM_CONTACT
+  ADVANCE_FEE_REQUEST
+  HARASSMENT
+  FAKE_PROFILE
+  MISLEADING_SALARY
+  OTHER
+}
+
+enum AbuseReportStatus {
+  OPEN
+  TRIAGED
+  RESOLVED
+  DISMISSED
+}
+
+enum AccountRestrictionStatus {
+  ACTIVE
+  LIMITED
+  SUSPENDED
+}
+
+enum PhoneVerificationStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+}
+
 // ──────────────── OAuth & Email Verification ────────────────
 
 enum OAuthProvider {
@@ -373,6 +473,9 @@ model User {
   emailVerified   Boolean         @default(false)
   emailVerifiedAt DateTime?
   avatarUrl       String?         @db.VarChar(500)
+  accountRestrictionStatus AccountRestrictionStatus @default(ACTIVE)
+  accountRestrictionReason String?        @db.VarChar(160)
+  accountRestrictedAt      DateTime?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
@@ -413,9 +516,19 @@ model User {
   botSubscriptions        BotSubscription[]
   employerAiTasksCreated  EmployerAiTask[]           @relation("EmployerAiTaskCreator")
   employerAiTasksReviewed EmployerAiTask[]           @relation("EmployerAiTaskReviewer")
+  candidateTrustProfile   CandidateTrustProfile?
+  verificationArtifacts   VerificationArtifact[]     @relation("UserVerificationArtifacts")
+  reviewedVerificationArtifacts VerificationArtifact[] @relation("VerificationArtifactReviewer")
+  trustRiskEvents         TrustRiskEvent[]
+  abuseReportsFiled       AbuseReport[]              @relation("AbuseReportReporter")
+  abuseReportsAgainst     AbuseReport[]              @relation("AbuseReportTargetUser")
+  abuseReportsAssigned    AbuseReport[]              @relation("AbuseReportAssignee")
+  trustCasesAssigned      TrustCase[]                @relation("TrustCaseAssignee")
+  trustCaseActions        TrustCaseAction[]          @relation("TrustCaseActionActor")
 
   @@index([role])
   @@index([createdAt])
+  @@index([accountRestrictionStatus])
 }
 
 model Employer {
@@ -433,6 +546,10 @@ model Employer {
   jobs           Job[]
   atsConnections ATSConnection[]
   aiTasks        EmployerAiTask[]
+  trustProfile   EmployerTrustProfile?
+  verificationArtifacts VerificationArtifact[] @relation("EmployerVerificationArtifacts")
+  trustRiskEvents TrustRiskEvent[]
+  abuseReports   AbuseReport[]
 }
 
 model Job {
@@ -465,6 +582,10 @@ model Job {
   expiresAt     DateTime? // when the listing expires (from source or heuristic)
   lastCheckedAt DateTime? // last time we verified the listing is still live
   isExpired     Boolean   @default(false)
+  riskScore     Int       @default(0)
+  riskLevel     TrustRiskLevel @default(LOW)
+  trustFlags    Json?
+  qualityCheckedAt DateTime?
 
   // Nullable for aggregated jobs (no Employer profile in DB)
   employerId String?
@@ -476,6 +597,9 @@ model Job {
   jobAlerts                 JobAlert[]
   assessmentInvites         AssessmentInvite[]
   salaryNegotiationSessions SalaryNegotiationSession[]
+  trustRiskEvents           TrustRiskEvent[]
+  abuseReports              AbuseReport[]
+  trustCases                TrustCase[]
 
   @@index([status])
   @@index([status, publishedAt(sort: Desc)])
@@ -488,6 +612,7 @@ model Job {
   @@index([sourceId])
   @@index([isExpired, status])
   @@index([expiresAt])
+  @@index([riskLevel, riskScore])
 }
 
 model Application {
@@ -496,6 +621,9 @@ model Application {
   cvUrl       String?
   coverLetter String?
   notes       String?
+  riskScore   Int               @default(0)
+  riskLevel   TrustRiskLevel    @default(LOW)
+  trustFlags  Json?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -507,12 +635,16 @@ model Application {
 
   adminReviews AdminReview[]  @relation("ApplicationReviews")
   thread       MessageThread?
+  trustRiskEvents TrustRiskEvent[]
+  abuseReports AbuseReport[]
+  trustCases TrustCase[]
 
   @@unique([jobId, candidateId])
   @@index([jobId])
   @@index([candidateId])
   @@index([status])
   @@index([createdAt(sort: Desc)])
+  @@index([riskLevel, riskScore])
 }
 
 model Resource {
@@ -588,6 +720,216 @@ model CandidateProfile {
   @@index([skills])
 }
 
+model EmployerTrustProfile {
+  id                         String                    @id @default(uuid())
+  employerId                 String                    @unique
+  employer                   Employer                  @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  verificationLevel          EmployerVerificationLevel @default(UNVERIFIED)
+  authenticityScore          Int                       @default(0)
+  riskScore                  Int                       @default(0)
+  riskLevel                  TrustRiskLevel            @default(LOW)
+  postingEligibility         Boolean                   @default(false)
+  requiresEnhancedVerification Boolean                 @default(false)
+  verifiedDomain             String?                   @db.VarChar(255)
+  websiteMatchesEmail        Boolean                   @default(false)
+  throwawayDomainDetected    Boolean                   @default(false)
+  linkedInCompanyUrl         String?                   @db.VarChar(500)
+  domainVerifiedAt           DateTime?
+  businessDocVerifiedAt      DateTime?
+  manualApprovedAt           DateTime?
+  premiumTrustedAt           DateTime?
+  suspiciousSignals          Json?
+  internalNotes              String?                   @db.Text
+  createdAt                  DateTime                  @default(now())
+  updatedAt                  DateTime                  @updatedAt
+
+  verificationArtifacts VerificationArtifact[] @relation("EmployerVerificationArtifacts")
+  trustCases            TrustCase[]
+
+  @@index([verificationLevel])
+  @@index([riskLevel, riskScore])
+  @@index([postingEligibility])
+}
+
+model CandidateTrustProfile {
+  id                     String                     @id @default(uuid())
+  userId                 String                     @unique
+  user                   User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verificationLevel      CandidateVerificationLevel @default(UNVERIFIED)
+  authenticityScore      Int                        @default(0)
+  riskScore              Int                        @default(0)
+  riskLevel              TrustRiskLevel             @default(LOW)
+  phoneNumber            String?                    @db.VarChar(30)
+  phoneVerifiedAt        DateTime?
+  identityVerifiedAt     DateTime?
+  skillsVerifiedAt       DateTime?
+  employmentVerifiedAt   DateTime?
+  linkedinVerified       Boolean                    @default(false)
+  githubVerified         Boolean                    @default(false)
+  portfolioVerified      Boolean                    @default(false)
+  premiumFilterEligible  Boolean                    @default(false)
+  suspiciousSignals      Json?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+
+  phoneChallenges PhoneVerificationChallenge[]
+  trustCases      TrustCase[]
+
+  @@index([verificationLevel])
+  @@index([riskLevel, riskScore])
+  @@index([premiumFilterEligible])
+}
+
+model PhoneVerificationChallenge {
+  id                      String                  @id @default(uuid())
+  candidateTrustProfileId String
+  candidateTrustProfile   CandidateTrustProfile   @relation(fields: [candidateTrustProfileId], references: [id], onDelete: Cascade)
+  phoneNumber             String                  @db.VarChar(30)
+  otpHash                 String                  @db.VarChar(128)
+  expiresAt               DateTime
+  attempts                Int                     @default(0)
+  verifiedAt              DateTime?
+  status                  PhoneVerificationStatus @default(PENDING)
+  createdAt               DateTime                @default(now())
+
+  @@index([candidateTrustProfileId, createdAt(sort: Desc)])
+  @@index([phoneNumber, status])
+}
+
+model VerificationArtifact {
+  id            String                     @id @default(uuid())
+  type          VerificationArtifactType
+  status        VerificationArtifactStatus @default(PENDING)
+  userId        String?
+  user          User?                      @relation("UserVerificationArtifacts", fields: [userId], references: [id], onDelete: SetNull)
+  employerId    String?
+  employer      Employer?                  @relation("EmployerVerificationArtifacts", fields: [employerId], references: [id], onDelete: SetNull)
+  reviewerId    String?
+  reviewer      User?                      @relation("VerificationArtifactReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  fileKey       String?                    @db.VarChar(500)
+  fileName      String?                    @db.VarChar(255)
+  externalUrl   String?                    @db.VarChar(500)
+  metadata      Json?
+  submittedAt   DateTime                   @default(now())
+  reviewedAt    DateTime?
+  reviewerNotes String?                    @db.Text
+  trustCase     TrustCase?
+
+  @@index([type, status])
+  @@index([userId, submittedAt(sort: Desc)])
+  @@index([employerId, submittedAt(sort: Desc)])
+}
+
+model TrustRiskEvent {
+  id                      String         @id @default(uuid())
+  entityType              TrustEntityType
+  reasonCode              String         @db.VarChar(100)
+  summary                 String         @db.VarChar(255)
+  evidence                Json?
+  scoreDelta              Int
+  resultingScore          Int
+  riskLevel               TrustRiskLevel
+  autoHeld                Boolean        @default(false)
+  userId                  String?
+  user                    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  employerId              String?
+  employer                Employer?      @relation(fields: [employerId], references: [id], onDelete: SetNull)
+  jobId                   String?
+  job                     Job?           @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  applicationId           String?
+  application             Application?   @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  threadId                String?
+  thread                  MessageThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  createdAt               DateTime       @default(now())
+
+  @@index([entityType, createdAt(sort: Desc)])
+  @@index([riskLevel, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([employerId, createdAt(sort: Desc)])
+}
+
+model AbuseReport {
+  id                  String            @id @default(uuid())
+  reporterUserId      String
+  reporter            User              @relation("AbuseReportReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  reportedUserId      String?
+  reportedUser        User?             @relation("AbuseReportTargetUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+  employerId          String?
+  employer            Employer?         @relation(fields: [employerId], references: [id], onDelete: SetNull)
+  targetJobId         String?
+  targetJob           Job?              @relation(fields: [targetJobId], references: [id], onDelete: SetNull)
+  targetApplicationId String?
+  targetApplication   Application?      @relation(fields: [targetApplicationId], references: [id], onDelete: SetNull)
+  targetThreadId      String?
+  targetThread        MessageThread?    @relation(fields: [targetThreadId], references: [id], onDelete: SetNull)
+  assignedAdminId     String?
+  assignedAdmin       User?             @relation("AbuseReportAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  reason              AbuseReportReason
+  details             String?           @db.Text
+  status              AbuseReportStatus @default(OPEN)
+  resolutionNotes     String?           @db.Text
+  triagedAt           DateTime?
+  resolvedAt          DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  trustCase           TrustCase?
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([reason, createdAt(sort: Desc)])
+  @@index([reporterUserId, createdAt(sort: Desc)])
+}
+
+model TrustCase {
+  id                      String            @id @default(uuid())
+  entityType              TrustEntityType
+  status                  TrustCaseStatus   @default(OPEN)
+  priority                TrustRiskLevel    @default(MEDIUM)
+  title                   String            @db.VarChar(200)
+  reasonCode              String?           @db.VarChar(100)
+  summary                 String?           @db.Text
+  employerTrustProfileId  String?
+  employerTrustProfile    EmployerTrustProfile? @relation(fields: [employerTrustProfileId], references: [id], onDelete: SetNull)
+  candidateTrustProfileId String?
+  candidateTrustProfile   CandidateTrustProfile? @relation(fields: [candidateTrustProfileId], references: [id], onDelete: SetNull)
+  jobId                   String?
+  job                     Job?              @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  applicationId           String?
+  application             Application?      @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  threadId                String?
+  thread                  MessageThread?    @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  reportId                String?           @unique
+  report                  AbuseReport?      @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  artifactId              String?           @unique
+  artifact                VerificationArtifact? @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  assignedAdminId         String?
+  assignedAdmin           User?             @relation("TrustCaseAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  openedAt                DateTime          @default(now())
+  closedAt                DateTime?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  actions TrustCaseAction[]
+
+  @@index([status, priority, createdAt(sort: Desc)])
+  @@index([assignedAdminId, status])
+}
+
+model TrustCaseAction {
+  id         String               @id @default(uuid())
+  caseId      String
+  trustCase   TrustCase           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actorId     String?
+  actor       User?               @relation("TrustCaseActionActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actionType  ModerationActionType
+  reasonCode  String?             @db.VarChar(100)
+  notes       String?             @db.Text
+  metadata    Json?
+  createdAt   DateTime            @default(now())
+
+  @@index([caseId, createdAt(sort: Desc)])
+  @@index([actionType, createdAt(sort: Desc)])
+}
+
 model Resume {
   id         String           @id @default(uuid())
   profileId  String
@@ -642,6 +984,9 @@ model MessageThread {
 
   participants ThreadParticipant[]
   messages     Message[]
+  trustRiskEvents TrustRiskEvent[]
+  abuseReports AbuseReport[]
+  trustCases TrustCase[]
 
   @@index([jobId])
 }
