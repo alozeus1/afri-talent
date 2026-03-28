@@ -41,6 +41,21 @@ import referralsRoutes from "./routes/referrals.js";
 import learningRoutes from "./routes/learning.js";
 import calendarRoutes from "./routes/calendar.js";
 import candidateAnalyticsRoutes from "./routes/candidate-analytics.js";
+import jobExtractRoutes from "./routes/job-extract.js";
+import autopilotRoutes from "./routes/autopilot.js";
+import chatRoutes from "./routes/chat.js";
+import chatConsentRoutes from "./routes/chat-consent.js";
+import pricingRoutes from "./routes/pricing.js";
+import oauthRoutes from "./routes/oauth.js";
+import emailVerificationRoutes from "./routes/email-verification.js";
+import publicRoutes from "./routes/public.js";
+import resumeParserRoutes from "./routes/resume-parser.js";
+import pushRoutes from "./routes/push.js";
+import preferencesRoutes from "./routes/preferences.js";
+import atsRoutes from "./routes/ats.js";
+import mockInterviewsRoutes from "./routes/mock-interviews.js";
+import analyticsEventsRoutes from "./routes/analytics-events.js";
+import { swaggerSpec } from "./lib/swagger.js";
 
 dotenv.config({ quiet: true });
 initSentry();
@@ -48,6 +63,7 @@ initSentry();
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 const isTest = process.env.NODE_ENV === "test";
+const docsEnabled = process.env.ENABLE_API_DOCS === "true" || !isProduction;
 
 // Request ID middleware (must be first)
 app.use(requestIdMiddleware);
@@ -219,6 +235,57 @@ app.use("/api/referrals", referralsRoutes);
 app.use("/api/learning", learningRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/candidate-analytics", candidateAnalyticsRoutes);
+app.use("/api/job-extract", jobExtractRoutes);
+app.use("/api/autopilot", autopilotRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/chat/consent", chatConsentRoutes);
+app.use("/api/pricing", pricingRoutes);
+app.use("/api/auth/oauth", oauthRoutes);
+app.use("/api/auth/email", emailVerificationRoutes);
+app.use("/api/public", publicRoutes);
+app.use("/api/profile/resume-parser", resumeParserRoutes);
+app.use("/api/push", pushRoutes);
+app.use("/api/preferences", preferencesRoutes);
+app.use("/api/ats", atsRoutes);
+app.use("/api/mock-interviews", mockInterviewsRoutes);
+app.use("/api/analytics", analyticsEventsRoutes);
+
+// OpenAPI/Swagger docs
+app.get("/api/docs/spec.json", (_req, res) => {
+  if (!docsEnabled) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json(swaggerSpec);
+});
+
+// Serve Swagger UI dynamically (avoid bundling UI assets)
+app.get("/api/docs", async (_req, res) => {
+  if (!docsEnabled) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const html = `<!DOCTYPE html>
+<html><head>
+  <title>AfriTalent API Docs</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"/>
+</head><body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: '/api/docs/spec.json',
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: "BaseLayout",
+    });
+  </script>
+</body></html>`;
+  res.type("html").send(html);
+});
 
 // Orchestrator route needs a larger body limit (resume + raw job texts can be ~200 KB combined)
 app.use(

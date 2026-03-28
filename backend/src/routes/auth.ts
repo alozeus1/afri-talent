@@ -7,6 +7,7 @@ import { authenticate } from "../middleware/auth.js";
 import { authLimiter, registerLimiter } from "../middleware/security.js";
 import { blockToken } from "../lib/redis.js";
 import { Role } from "@prisma/client";
+import { issueEmailVerification } from "./email-verification.js";
 
 const router = Router();
 
@@ -66,9 +67,23 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
 
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
+      include: {
+        oauthAccounts: {
+          select: { provider: true },
+        },
+      },
     });
 
     if (existingUser) {
+      const providerNames = (existingUser.oauthAccounts || []).map((acc) => acc.provider);
+      if (existingUser.password === "" && providerNames.length > 0) {
+        res.status(409).json({
+          error: `This email is already registered via ${providerNames.join(", ")}. Please continue with social sign in.`,
+          code: "PROVIDER_MISMATCH",
+          providers: providerNames,
+        });
+        return;
+      }
       res.status(400).json({ error: "Email already registered" });
       return;
     }
@@ -92,6 +107,17 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
           companyName: data.companyName!,
           location: data.location || "Remote",
         },
+      });
+    }
+
+    if (process.env.NODE_ENV !== "test") {
+      void issueEmailVerification({
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        invalidateExisting: true,
+      }).catch((verificationError) => {
+        console.error("Failed to send verification email:", verificationError);
       });
     }
 
@@ -129,7 +155,12 @@ router.post("/login", authLimiter, async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({
       where: { email: data.email },
-      include: { employer: true },
+      include: {
+        employer: true,
+        oauthAccounts: {
+          select: { provider: true },
+        },
+      },
     });
 
     if (!user) {
@@ -137,7 +168,17 @@ router.post("/login", authLimiter, async (req: Request, res: Response) => {
       return;
     }
 
-    const validPassword = await bcrypt.compare(data.password, user.password);
+    if (!user.password && (user.oauthAccounts?.length ?? 0) > 0) {
+      const providers = (user.oauthAccounts || []).map((acc) => acc.provider);
+      res.status(409).json({
+        error: "This account uses social sign-in. Please continue with your OAuth provider.",
+        code: "PROVIDER_MISMATCH",
+        providers,
+      });
+      return;
+    }
+
+    const validPassword = await bcrypt.compare(data.password, user.password || "");
 
     if (!validPassword) {
       res.status(401).json({ error: "Invalid email or password" });
@@ -158,6 +199,8 @@ router.post("/login", authLimiter, async (req: Request, res: Response) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        emailVerified: user.emailVerified,
+        avatarUrl: user.avatarUrl,
         employer: user.employer,
       },
       expiresIn: getTokenExpiresIn(),
@@ -211,6 +254,8 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
       email: user.email,
       name: user.name,
       role: user.role,
+      emailVerified: user.emailVerified,
+      avatarUrl: user.avatarUrl,
       employer: user.employer,
     });
   } catch (error) {

@@ -1,18 +1,20 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, requireVerifiedEmail } from "../middleware/auth.js";
 import { getStripe, isStripeConfigured, STRIPE_PRICES } from "../lib/stripe.js";
-import { SubscriptionPlan } from "@prisma/client";
+import { SubscriptionPlan, BillingInterval } from "@prisma/client";
+import { resolveStripePriceId, resolveUserRegion } from "../lib/billing/index.js";
 
 const router = Router();
 
 const checkoutSchema = z.object({
-  plan: z.enum(["BASIC", "PROFESSIONAL"]),
+  plan: z.enum(["BASIC", "PROFESSIONAL", "EMPLOYER_BASIC", "EMPLOYER_PREMIUM"]),
+  interval: z.enum(["MONTHLY", "YEARLY"]).optional().default("MONTHLY"),
 });
 
 // POST /api/billing/checkout — create Stripe checkout session
-router.post("/checkout", authenticate, async (req: Request, res: Response) => {
+router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Request, res: Response) => {
   try {
     if (!isStripeConfigured()) {
       res.status(503).json({ error: "Billing is not configured for this environment" });
@@ -20,8 +22,17 @@ router.post("/checkout", authenticate, async (req: Request, res: Response) => {
     }
 
     const stripe = getStripe();
-    const { plan } = checkoutSchema.parse(req.body);
-    const priceId = STRIPE_PRICES[plan as SubscriptionPlan];
+    const { plan, interval } = checkoutSchema.parse(req.body);
+
+    // Resolve regional price
+    const regionalPrice = await resolveStripePriceId(
+      req.user!.userId,
+      plan as SubscriptionPlan,
+      interval as BillingInterval,
+    );
+
+    // Fallback to legacy env-var prices if no regional price configured
+    const priceId = regionalPrice?.stripePriceId ?? STRIPE_PRICES[plan as SubscriptionPlan];
 
     if (!priceId) {
       res.status(400).json({ error: `Price not configured for plan: ${plan}` });
@@ -41,15 +52,19 @@ router.post("/checkout", authenticate, async (req: Request, res: Response) => {
         select: { email: true, name: true },
       });
 
+      const region = await resolveUserRegion(req.user!.userId);
+
       const customer = await stripe.customers.create({
         email: user!.email,
         name: user!.name,
-        metadata: { userId: req.user!.userId },
+        metadata: {
+          userId: req.user!.userId,
+          billingRegion: region.region,
+        },
       });
 
       customerId = customer.id;
 
-      // Upsert subscription record with customer ID
       await prisma.subscription.upsert({
         where: { userId: req.user!.userId },
         create: {
@@ -63,17 +78,34 @@ router.post("/checkout", authenticate, async (req: Request, res: Response) => {
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams: Record<string, unknown> = {
       customer: customerId,
       mode: "subscription",
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${frontendUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontendUrl}/billing`,
-      metadata: { userId: req.user!.userId, plan },
+      metadata: { userId: req.user!.userId, plan, interval },
+    };
+
+    // For European customers, collect tax ID
+    const billingProfile = await prisma.userBillingProfile.findUnique({
+      where: { userId: req.user!.userId },
+      select: { region: true },
     });
 
-    res.json({ url: session.url, sessionId: session.id });
+    if (billingProfile?.region === "EUROPE") {
+      sessionParams.tax_id_collection = { enabled: true };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams as Parameters<typeof stripe.checkout.sessions.create>[0]);
+
+    res.json({
+      url: session.url,
+      sessionId: session.id,
+      currency: regionalPrice?.currency ?? "usd",
+      amount: regionalPrice?.amount ?? null,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: "Validation failed", details: error.issues });
@@ -85,7 +117,7 @@ router.post("/checkout", authenticate, async (req: Request, res: Response) => {
 });
 
 // POST /api/billing/portal — create Stripe customer portal session
-router.post("/portal", authenticate, async (req: Request, res: Response) => {
+router.post("/portal", authenticate, requireVerifiedEmail(), async (req: Request, res: Response) => {
   try {
     if (!isStripeConfigured()) {
       res.status(503).json({ error: "Billing is not configured for this environment" });

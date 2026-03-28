@@ -1,43 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { billing, BillingStatus } from "@/lib/api";
+import { billing, pricing, BillingStatus, PricingData, RegionalPriceInfo } from "@/lib/api";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-const plans = [
-  {
-    key: "FREE" as const,
+type Interval = "MONTHLY" | "YEARLY";
+
+const PLAN_ORDER = ["FREE", "BASIC", "PROFESSIONAL"] as const;
+const EMPLOYER_PLAN_ORDER = ["EMPLOYER_FREE", "EMPLOYER_BASIC", "EMPLOYER_PREMIUM"] as const;
+
+const PLAN_META: Record<string, { name: string; features: string[]; popular?: boolean }> = {
+  FREE: {
     name: "Free",
-    price: "$0",
-    period: "forever",
-    features: [
-      "Browse all jobs",
-      "Apply to 5 jobs/month",
-      "Basic profile",
-    ],
+    features: ["Browse all jobs", "Apply to 5 jobs/month", "Basic profile"],
   },
-  {
-    key: "BASIC" as const,
+  BASIC: {
     name: "Basic",
-    price: "$9.99",
-    period: "/month",
     features: [
       "Everything in Free",
       "Unlimited applications",
       "AI resume review (10/month)",
       "Saved searches",
       "Job alerts",
+      "AI Chat assistant",
     ],
   },
-  {
-    key: "PROFESSIONAL" as const,
+  PROFESSIONAL: {
     name: "Professional",
-    price: "$24.99",
-    period: "/month",
     popular: true,
     features: [
       "Everything in Basic",
@@ -45,32 +38,68 @@ const plans = [
       "AI apply packs (5/month)",
       "Priority support",
       "Skills assessments",
+      "Autopilot mode",
     ],
   },
-];
+  EMPLOYER_FREE: {
+    name: "Employer Free",
+    features: ["Post up to 3 jobs/month", "Basic applicant management"],
+  },
+  EMPLOYER_BASIC: {
+    name: "Employer Basic",
+    features: ["Post up to 20 jobs/month", "Talent search", "Analytics dashboard"],
+  },
+  EMPLOYER_PREMIUM: {
+    name: "Employer Premium",
+    popular: true,
+    features: [
+      "Unlimited job posts",
+      "Talent search",
+      "Advanced analytics",
+      "API access",
+      "Priority support",
+    ],
+  },
+};
+
+function getPrice(prices: RegionalPriceInfo[], plan: string, interval: Interval): RegionalPriceInfo | undefined {
+  return prices.find((p) => p.plan === plan && p.interval === interval);
+}
 
 export default function BillingPage() {
   const { user, isLoading } = useAuth();
   const [status, setStatus] = useState<BillingStatus | null>(null);
-  const [loading, setLoading] = useState(!!user);
+  const [pricingData, setPricingData] = useState<PricingData | null>(null);
+  const [interval, setInterval] = useState<Interval>("MONTHLY");
+  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      let cancelled = false;
-      billing
-        .status()
-        .then((s) => { if (!cancelled) setStatus(s); })
-        .catch(console.error)
-        .finally(() => { if (!cancelled) setLoading(false); });
-      return () => { cancelled = true; };
+  const fetchData = useCallback(async () => {
+    try {
+      const pData = user
+        ? await pricing.me()
+        : await pricing.get();
+      setPricingData(pData);
+
+      if (user) {
+        const s = await billing.status();
+        setStatus(s);
+      }
+    } catch (err) {
+      console.error("Failed to load pricing:", err);
+    } finally {
+      setLoading(false);
     }
   }, [user]);
 
-  const handleCheckout = async (plan: "BASIC" | "PROFESSIONAL") => {
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleCheckout = async (plan: string) => {
     setActionLoading(plan);
     try {
-      const { url } = await billing.checkout(plan);
+      const { url } = await billing.checkout(plan, interval);
       globalThis.location.assign(url);
     } catch {
       setActionLoading(null);
@@ -87,39 +116,74 @@ export default function BillingPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || loading) {
     return (
       <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
       </div>
     );
   }
 
   const currentPlan = status?.plan ?? "FREE";
+  const prices = pricingData?.prices ?? [];
+  const region = pricingData?.region ?? "ROW";
+  const currency = pricingData?.currency ?? "USD";
+
+  const isEmployer = user && (currentPlan.startsWith("EMPLOYER_") || user.role === "EMPLOYER");
+  const planOrder = isEmployer ? EMPLOYER_PLAN_ORDER : PLAN_ORDER;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="text-center mb-12">
+      <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Plans &amp; Pricing</h1>
         <p className="text-gray-600 max-w-2xl mx-auto">
-          Choose the plan that fits your job search. Upgrade anytime to unlock AI-powered tools and unlimited applications.
+          Choose the plan that fits your needs. Upgrade anytime to unlock powerful features.
         </p>
+
+        {/* Region badge */}
+        <div className="mt-3 flex items-center justify-center gap-2 text-sm text-gray-500">
+          <span>Showing prices for</span>
+          <Badge variant="info">{region}</Badge>
+          <span>in {currency}</span>
+        </div>
       </div>
 
-      {user && loading && (
-        <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
+      {/* Interval toggle */}
+      <div className="flex justify-center mb-10">
+        <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+          <button
+            className={`px-4 py-2 text-sm font-medium rounded-md transition ${
+              interval === "MONTHLY"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => setInterval("MONTHLY")}
+          >
+            Monthly
+          </button>
+          <button
+            className={`px-4 py-2 text-sm font-medium rounded-md transition ${
+              interval === "YEARLY"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => setInterval("YEARLY")}
+          >
+            Yearly
+            <span className="ml-1 text-xs text-emerald-600 font-semibold">Save ~17%</span>
+          </button>
         </div>
-      )}
+      </div>
 
+      {/* Current plan card */}
       {user && status && (
         <Card className="mb-10 max-w-2xl mx-auto">
           <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-semibold text-gray-900">Current Plan:</span>
-                <Badge variant="success">{currentPlan}</Badge>
-                {status.status === "ACTIVE" && currentPlan !== "FREE" && (
+                <Badge variant="success">{PLAN_META[currentPlan]?.name ?? currentPlan}</Badge>
+                {status.status === "ACTIVE" && currentPlan !== "FREE" && currentPlan !== "EMPLOYER_FREE" && (
                   <Badge variant="info">Active</Badge>
                 )}
               </div>
@@ -136,28 +200,39 @@ export default function BillingPage() {
                 onClick={handlePortal}
                 disabled={actionLoading === "portal"}
               >
-                {actionLoading === "portal" ? "Redirecting…" : "Manage Billing"}
+                {actionLoading === "portal" ? "Redirecting..." : "Manage Billing"}
               </Button>
             )}
           </CardContent>
         </Card>
       )}
 
+      {/* Plan cards */}
       <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-        {plans.map((plan) => {
-          const isCurrent = user && currentPlan === plan.key;
-          const isPaid = plan.key !== "FREE";
+        {planOrder.map((planKey) => {
+          const meta = PLAN_META[planKey];
+          if (!meta) return null;
+          const isCurrent = user && currentPlan === planKey;
+          const isFree = planKey === "FREE" || planKey === "EMPLOYER_FREE";
+          const priceInfo = getPrice(prices, planKey, interval);
+
+          const displayPrice = isFree
+            ? "$0"
+            : priceInfo?.displayAmount ?? "—";
+          const period = isFree
+            ? "forever"
+            : interval === "MONTHLY"
+              ? "/month"
+              : "/year";
 
           return (
             <Card
-              key={plan.key}
+              key={planKey}
               className={`relative flex flex-col ${
-                plan.popular
-                  ? "border-2 border-emerald-600 shadow-lg"
-                  : ""
+                meta.popular ? "border-2 border-emerald-600 shadow-lg" : ""
               } ${isCurrent ? "ring-2 ring-emerald-500" : ""}`}
             >
-              {plan.popular && (
+              {meta.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <Badge variant="success" className="bg-emerald-600 text-white px-3 py-1">
                     Most Popular
@@ -166,21 +241,22 @@ export default function BillingPage() {
               )}
 
               <CardHeader className="text-center pt-8">
-                <h2 className="text-xl font-bold text-gray-900">{plan.name}</h2>
+                <h2 className="text-xl font-bold text-gray-900">{meta.name}</h2>
                 <div className="mt-2">
-                  <span className="text-4xl font-extrabold text-gray-900">{plan.price}</span>
-                  <span className="text-gray-500 ml-1">{plan.period}</span>
+                  <span className="text-4xl font-extrabold text-gray-900">{displayPrice}</span>
+                  <span className="text-gray-500 ml-1">{period}</span>
                 </div>
+                {pricingData?.taxLabel && !isFree && (
+                  <p className="text-xs text-gray-400 mt-1">excl. {pricingData.taxLabel}</p>
+                )}
                 {isCurrent && (
-                  <Badge variant="success" className="mt-3">
-                    Current Plan
-                  </Badge>
+                  <Badge variant="success" className="mt-3">Current Plan</Badge>
                 )}
               </CardHeader>
 
               <CardContent className="flex-1">
                 <ul className="space-y-3">
-                  {plan.features.map((feature) => (
+                  {meta.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm text-gray-700">
                       <svg
                         className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5"
@@ -201,26 +277,26 @@ export default function BillingPage() {
                 {!user ? (
                   <Link href="/register" className="w-full">
                     <Button
-                      variant={plan.popular ? "primary" : "outline"}
+                      variant={meta.popular ? "primary" : "outline"}
                       size="lg"
                       className="w-full"
                     >
-                      {isPaid ? "Get Started" : "Sign Up Free"}
+                      {isFree ? "Sign Up Free" : "Get Started"}
                     </Button>
                   </Link>
                 ) : isCurrent ? (
                   <Button variant="secondary" size="lg" className="w-full" disabled>
                     Current Plan
                   </Button>
-                ) : isPaid ? (
+                ) : !isFree ? (
                   <Button
-                    variant={plan.popular ? "primary" : "outline"}
+                    variant={meta.popular ? "primary" : "outline"}
                     size="lg"
                     className="w-full"
-                    onClick={() => handleCheckout(plan.key as "BASIC" | "PROFESSIONAL")}
-                    disabled={actionLoading === plan.key}
+                    onClick={() => handleCheckout(planKey)}
+                    disabled={actionLoading === planKey}
                   >
-                    {actionLoading === plan.key ? "Redirecting…" : "Upgrade"}
+                    {actionLoading === planKey ? "Redirecting..." : "Upgrade"}
                   </Button>
                 ) : (
                   <Button variant="secondary" size="lg" className="w-full" disabled>
@@ -231,6 +307,16 @@ export default function BillingPage() {
             </Card>
           );
         })}
+      </div>
+
+      {/* Switch between candidate and employer plans */}
+      <div className="text-center mt-8">
+        <Link
+          href={isEmployer ? "/billing?view=candidate" : "/billing?view=employer"}
+          className="text-sm text-emerald-600 hover:underline"
+        >
+          {isEmployer ? "View candidate plans" : "Looking to hire? View employer plans"}
+        </Link>
       </div>
     </div>
   );

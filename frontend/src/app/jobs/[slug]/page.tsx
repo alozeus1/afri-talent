@@ -9,8 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { QuickApplyModal } from "@/components/jobs/quick-apply-modal";
+import { JobJsonLd } from "@/components/jobs/job-jsonld";
+import { JobDetailSkeleton } from "@/components/ui/skeleton";
+import { formatSalaryRange } from "@/lib/salary";
+import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 
 export default function JobDetailPage() {
+  const locale = useLocale();
+  const t = useT();
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
@@ -38,7 +44,7 @@ export default function JobDetailPage() {
 
   const handleApply = async () => {
     if (!user) {
-      router.push(`/login?redirect=/jobs/${params.slug}`);
+      router.push(localizePath(`/login?redirect=/jobs/${params.slug}`, locale));
       return;
     }
 
@@ -60,21 +66,8 @@ export default function JobDetailPage() {
     }
   };
 
-  const formatSalary = () => {
-    if (!job?.salaryMin && !job?.salaryMax) return null;
-    const currency = job.currency || "USD";
-    const min = job.salaryMin ? `${currency} ${job.salaryMin.toLocaleString()}` : "";
-    const max = job.salaryMax ? `${currency} ${job.salaryMax.toLocaleString()}` : "";
-    if (min && max) return `${min} - ${max}`;
-    return min || max;
-  };
-
   if (loading) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+    return <JobDetailSkeleton />;
   }
 
   if (error || !job) {
@@ -83,22 +76,29 @@ export default function JobDetailPage() {
         <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
           {error || "Job not found"}
         </div>
-        <Link href="/jobs">
-          <Button variant="outline">Back to Jobs</Button>
+        <Link href={localizePath("/jobs", locale)}>
+          <Button variant="outline">{t("common.backToJobs")}</Button>
         </Link>
       </div>
     );
   }
 
-  const salary = formatSalary();
+  const salary = formatSalaryRange({
+    salaryMin: job.salaryMin,
+    salaryMax: job.salaryMax,
+    currency: job.currency,
+    salaryPeriod: job.salaryPeriod,
+  });
 
   return (
+    <>
+    <JobJsonLd job={job} />
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <Link href="/jobs" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
+      <Link href={localizePath("/jobs", locale)} className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
         <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
-        Back to Jobs
+        {t("common.backToJobs")}
       </Link>
 
       <div className="grid lg:grid-cols-3 gap-8">
@@ -131,7 +131,7 @@ export default function JobDetailPage() {
                   <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  {salary}/year
+                  {salary}
                 </span>
               )}
             </div>
@@ -227,7 +227,7 @@ export default function JobDetailPage() {
                     onClick={handleApply}
                     disabled={applying}
                   >
-                    {applying ? "Applying..." : user ? "Apply Now" : "Sign in to Apply"}
+                    {applying ? "Applying..." : user ? t("common.applyNow") : t("common.signInToApply")}
                   </Button>
                   {user && user.role === "CANDIDATE" && (
                     <Button
@@ -239,7 +239,7 @@ export default function JobDetailPage() {
                       <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      Quick Apply
+                      {t("common.quickApply")}
                     </Button>
                   )}
                   {!user && (
@@ -331,5 +331,6 @@ export default function JobDetailPage() {
         />
       )}
     </div>
+    </>
   );
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { JobStatus, Role } from "@prisma/client";
+import { buildCacheKey, getCachedJson, setCachedJson } from "../lib/cache.js";
 
 const router = Router();
 
@@ -64,6 +65,7 @@ router.get("/ai-search", authenticate, authorize(Role.CANDIDATE), async (req: Re
     const jobs = await prisma.job.findMany({
       where: {
         status: JobStatus.PUBLISHED,
+        isExpired: false,
         ...(query ? {
           OR: [
             { title: { contains: query as string, mode: "insensitive" } },
@@ -108,6 +110,14 @@ router.get("/ai-search", authenticate, authorize(Role.CANDIDATE), async (req: Re
 // GET /api/jobs - Public: list published jobs
 router.get("/", async (req: Request, res: Response) => {
   try {
+    const cacheKey = buildCacheKey("jobs:list", req.query);
+    const cachedResponse = await getCachedJson<Record<string, unknown>>(cacheKey);
+    if (cachedResponse) {
+      res.setHeader("X-Cache", "HIT");
+      res.json(cachedResponse);
+      return;
+    }
+
     const {
       search, query: queryAlias, location, type, seniority,
       visaSponsorship, relocationAssistance, remote,
@@ -116,7 +126,7 @@ router.get("/", async (req: Request, res: Response) => {
     } = req.query;
     const searchTerm = (search || queryAlias) as string | undefined;
 
-    const where: any = { status: JobStatus.PUBLISHED };
+    const where: any = { status: JobStatus.PUBLISHED, isExpired: false };
 
     if (searchTerm) {
       where.OR = [
@@ -190,11 +200,14 @@ router.get("/", async (req: Request, res: Response) => {
         seniority: job.seniority,
         description: job.description,
       }));
-      res.json({ jobs: aiJobs, total });
+      const payload = { jobs: aiJobs, total };
+      await setCachedJson(cacheKey, payload, 60);
+      res.setHeader("X-Cache", "MISS");
+      res.json(payload);
       return;
     }
 
-    res.json({
+    const payload = {
       jobs,
       pagination: {
         page: parseInt(page as string),
@@ -202,7 +215,10 @@ router.get("/", async (req: Request, res: Response) => {
         total,
         totalPages: Math.ceil(total / take),
       },
-    });
+    };
+    await setCachedJson(cacheKey, payload, 60);
+    res.setHeader("X-Cache", "MISS");
+    res.json(payload);
   } catch (error) {
     console.error("List jobs error:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -212,6 +228,14 @@ router.get("/", async (req: Request, res: Response) => {
 // GET /api/jobs/:slug - Public: get single job by slug
 router.get("/:slug", async (req: Request, res: Response) => {
   try {
+    const cacheKey = buildCacheKey("jobs:detail", { slug: req.params.slug });
+    const cachedJob = await getCachedJson<Record<string, unknown>>(cacheKey);
+    if (cachedJob) {
+      res.setHeader("X-Cache", "HIT");
+      res.json(cachedJob);
+      return;
+    }
+
     const job = await prisma.job.findUnique({
       where: { slug: req.params.slug },
       include: {
@@ -227,12 +251,14 @@ router.get("/:slug", async (req: Request, res: Response) => {
       return;
     }
 
-    // Only show published jobs to public
-    if (job.status !== JobStatus.PUBLISHED) {
+    // Only show published, non-expired jobs to public
+    if (job.status !== JobStatus.PUBLISHED || job.isExpired) {
       res.status(404).json({ error: "Job not found" });
       return;
     }
 
+    await setCachedJson(cacheKey, job, 120);
+    res.setHeader("X-Cache", "MISS");
     res.json(job);
   } catch (error) {
     console.error("Get job error:", error);

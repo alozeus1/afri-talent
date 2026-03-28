@@ -8,13 +8,16 @@ import { jobs } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 
 const jobTypes = ["Full-time", "Part-time", "Contract", "Freelance", "Internship"];
 const seniorityLevels = ["Junior", "Mid-level", "Senior", "Lead", "Executive"];
 
 export default function NewJobPage() {
+  const locale = useLocale();
   const router = useRouter();
   const { user } = useAuth();
+  const [step, setStep] = useState<1 | 2 | 3>(1);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -49,7 +52,7 @@ export default function NewJobPage() {
           tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()) : undefined,
         }
       );
-      router.push("/employer");
+      router.push(localizePath("/employer", locale));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create job");
     } finally {
@@ -61,11 +64,29 @@ export default function NewJobPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const nextStep = () => {
+    if (step === 1 && (!formData.title || !formData.description || !formData.location)) {
+      setError("Please complete title, description, and location before continuing.");
+      return;
+    }
+    if (step === 2 && (!formData.type || !formData.seniority)) {
+      setError("Please complete role details before continuing.");
+      return;
+    }
+    setError(null);
+    setStep((prev) => (prev < 3 ? ((prev + 1) as 1 | 2 | 3) : prev));
+  };
+
+  const prevStep = () => {
+    setError(null);
+    setStep((prev) => (prev > 1 ? ((prev - 1) as 1 | 2 | 3) : prev));
+  };
+
   if (!user || user.role !== "EMPLOYER") {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 text-center">
         <p className="text-gray-600 mb-4">You must be logged in as an employer to post jobs.</p>
-        <Link href="/login">
+        <Link href={localizePath("/login", locale)}>
           <Button>Login</Button>
         </Link>
       </div>
@@ -74,7 +95,7 @@ export default function NewJobPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <Link href="/employer" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
+      <Link href={localizePath("/employer", locale)} className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
         <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
@@ -85,6 +106,22 @@ export default function NewJobPage() {
         <CardHeader>
           <h1 className="text-2xl font-bold text-gray-900">Post a New Job</h1>
           <p className="text-gray-600">Your job will be reviewed before being published</p>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {[
+              { n: 1, label: "Basics" },
+              { n: 2, label: "Role Details" },
+              { n: 3, label: "Publish" },
+            ].map((item) => (
+              <div
+                key={item.n}
+                className={`rounded-md px-3 py-2 text-xs font-medium text-center ${
+                  step >= item.n ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-500"
+                }`}
+              >
+                {item.n}. {item.label}
+              </div>
+            ))}
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -92,121 +129,152 @@ export default function NewJobPage() {
               <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{error}</div>
             )}
 
-            <Input
-              id="title"
-              label="Job Title"
-              placeholder="e.g., Senior Full-Stack Engineer"
-              value={formData.title}
-              onChange={(e) => updateField("title", e.target.value)}
-              required
-            />
+            {step === 1 && (
+              <>
+                <Input
+                  id="title"
+                  label="Job Title"
+                  placeholder="e.g., Senior Full-Stack Engineer"
+                  value={formData.title}
+                  onChange={(e) => updateField("title", e.target.value)}
+                  required
+                />
 
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                Job Description
-              </label>
-              <textarea
-                id="description"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[200px]"
-                placeholder="Describe the role, responsibilities, requirements, and benefits..."
-                value={formData.description}
-                onChange={(e) => updateField("description", e.target.value)}
-                required
-              />
-            </div>
+                <div>
+                  <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                    Job Description
+                  </label>
+                  <textarea
+                    id="description"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[200px]"
+                    placeholder="Describe the role, responsibilities, requirements, and benefits..."
+                    value={formData.description}
+                    onChange={(e) => updateField("description", e.target.value)}
+                    required
+                  />
+                </div>
 
-            <Input
-              id="location"
-              label="Location"
-              placeholder="e.g., Remote, Lagos, Nigeria"
-              value={formData.location}
-              onChange={(e) => updateField("location", e.target.value)}
-              required
-            />
+                <Input
+                  id="location"
+                  label="Location"
+                  placeholder="e.g., Remote, Lagos, Nigeria"
+                  value={formData.location}
+                  onChange={(e) => updateField("location", e.target.value)}
+                  required
+                />
+              </>
+            )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
-                  Job Type
-                </label>
-                <select
-                  id="type"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  value={formData.type}
-                  onChange={(e) => updateField("type", e.target.value)}
-                >
-                  {jobTypes.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="seniority" className="block text-sm font-medium text-gray-700 mb-1">
-                  Seniority Level
-                </label>
-                <select
-                  id="seniority"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  value={formData.seniority}
-                  onChange={(e) => updateField("seniority", e.target.value)}
-                >
-                  {seniorityLevels.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            {step === 2 && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
+                      Job Type
+                    </label>
+                    <select
+                      id="type"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      value={formData.type}
+                      onChange={(e) => updateField("type", e.target.value)}
+                    >
+                      {jobTypes.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="seniority" className="block text-sm font-medium text-gray-700 mb-1">
+                      Seniority Level
+                    </label>
+                    <select
+                      id="seniority"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      value={formData.seniority}
+                      onChange={(e) => updateField("seniority", e.target.value)}
+                    >
+                      {seniorityLevels.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <Input
-                id="salaryMin"
-                type="number"
-                label="Min Salary (optional)"
-                placeholder="60000"
-                value={formData.salaryMin}
-                onChange={(e) => updateField("salaryMin", e.target.value)}
-              />
-              <Input
-                id="salaryMax"
-                type="number"
-                label="Max Salary (optional)"
-                placeholder="90000"
-                value={formData.salaryMax}
-                onChange={(e) => updateField("salaryMax", e.target.value)}
-              />
-              <div>
-                <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
-                  Currency
-                </label>
-                <select
-                  id="currency"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  value={formData.currency}
-                  onChange={(e) => updateField("currency", e.target.value)}
-                >
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="GBP">GBP</option>
-                  <option value="NGN">NGN</option>
-                  <option value="KES">KES</option>
-                  <option value="ZAR">ZAR</option>
-                </select>
-              </div>
-            </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <Input
+                    id="salaryMin"
+                    type="number"
+                    label="Min Salary (optional)"
+                    placeholder="60000"
+                    value={formData.salaryMin}
+                    onChange={(e) => updateField("salaryMin", e.target.value)}
+                  />
+                  <Input
+                    id="salaryMax"
+                    type="number"
+                    label="Max Salary (optional)"
+                    placeholder="90000"
+                    value={formData.salaryMax}
+                    onChange={(e) => updateField("salaryMax", e.target.value)}
+                  />
+                  <div>
+                    <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
+                      Currency
+                    </label>
+                    <select
+                      id="currency"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      value={formData.currency}
+                      onChange={(e) => updateField("currency", e.target.value)}
+                    >
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                      <option value="NGN">NGN</option>
+                      <option value="KES">KES</option>
+                      <option value="ZAR">ZAR</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
 
-            <Input
-              id="tags"
-              label="Skills / Tags (comma-separated)"
-              placeholder="e.g., React, Node.js, PostgreSQL"
-              value={formData.tags}
-              onChange={(e) => updateField("tags", e.target.value)}
-            />
+            {step === 3 && (
+              <>
+                <Input
+                  id="tags"
+                  label="Skills / Tags (comma-separated)"
+                  placeholder="e.g., React, Node.js, PostgreSQL"
+                  value={formData.tags}
+                  onChange={(e) => updateField("tags", e.target.value)}
+                />
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                  <p className="font-semibold mb-2">Review</p>
+                  <p><strong>Title:</strong> {formData.title}</p>
+                  <p><strong>Location:</strong> {formData.location}</p>
+                  <p><strong>Type:</strong> {formData.type}</p>
+                  <p><strong>Seniority:</strong> {formData.seniority}</p>
+                  <p><strong>Salary:</strong> {formData.salaryMin || "-"} - {formData.salaryMax || "-"} {formData.currency}</p>
+                </div>
+              </>
+            )}
 
             <div className="flex gap-4">
-              <Button type="submit" className="flex-1" disabled={loading}>
-                {loading ? "Creating..." : "Post Job"}
-              </Button>
-              <Link href="/employer">
+              {step > 1 && (
+                <Button type="button" variant="outline" onClick={prevStep}>
+                  Back
+                </Button>
+              )}
+              {step < 3 ? (
+                <Button type="button" className="flex-1" onClick={nextStep}>
+                  Continue
+                </Button>
+              ) : (
+                <Button type="submit" className="flex-1" disabled={loading}>
+                  {loading ? "Creating..." : "Post Job"}
+                </Button>
+              )}
+              <Link href={localizePath("/employer", locale)}>
                 <Button type="button" variant="outline">Cancel</Button>
               </Link>
             </div>

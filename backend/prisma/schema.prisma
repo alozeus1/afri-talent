@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
@@ -17,6 +17,13 @@ enum Role {
   ADMIN
   CANDIDATE
   EMPLOYER
+}
+
+enum SupportedLocale {
+  EN
+  FR
+  PT
+  AR
 }
 
 enum JobStatus {
@@ -89,40 +96,263 @@ enum SubscriptionPlan {
   FREE
   BASIC
   PROFESSIONAL
+  EMPLOYER_FREE
+  EMPLOYER_BASIC
+  EMPLOYER_PREMIUM
+}
+
+enum ATSProvider {
+  GREENHOUSE
+  LEVER
+  WORKABLE
+}
+
+enum ATSConnectionStatus {
+  ACTIVE
+  ERROR
+  DISCONNECTED
+}
+
+enum ATSSyncStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum MockInterviewStatus {
+  DRAFT
+  PROCESSING
+  READY
+  ARCHIVED
+}
+
+enum MockInterviewVisibility {
+  PRIVATE
+  TEAM_SHARED
+}
+
+enum MockInterviewArtifactType {
+  VIDEO
+  AUDIO
+  TRANSCRIPT
+  FEEDBACK_JSON
+}
+
+enum AnalyticsEventCategory {
+  ACQUISITION
+  ACTIVATION
+  ENGAGEMENT
+  CONVERSION
+  RETENTION
+  MONETIZATION
+  EMPLOYER_PIPELINE
+  SYSTEM
+}
+
+// ──────────────── OAuth & Email Verification ────────────────
+
+enum OAuthProvider {
+  GOOGLE
+  APPLE
+}
+
+model OAuthAccount {
+  id             String        @id @default(uuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider       OAuthProvider
+  providerUserId String
+  email          String?       @db.VarChar(255)
+  displayName    String?       @db.VarChar(200)
+  avatarUrl      String?       @db.VarChar(500)
+  accessToken    String?       @db.Text
+  refreshToken   String?       @db.Text
+  tokenExpiresAt DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@index([provider, email])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+// ──────────────── Regional Pricing ────────────────
+
+enum BillingRegion {
+  AFRICA
+  EUROPE
+  ROW // Rest of World
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum RegionChangeSource {
+  USER_SELECTED
+  STRIPE_PAYMENT
+  IP_GEOLOCATION
+  ADMIN_OVERRIDE
+}
+
+model RegionalPrice {
+  id            String           @id @default(uuid())
+  plan          SubscriptionPlan
+  region        BillingRegion
+  interval      BillingInterval
+  currency      String           @db.VarChar(3) // ISO 4217
+  amount        Int // minor units (cents, kobo, etc.)
+  stripePriceId String?          @db.VarChar(255) // Stripe Price object ID
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([plan, region, interval, currency])
+  @@index([plan, region, isActive])
+  @@index([stripePriceId])
+}
+
+model PlanEntitlement {
+  id                    String           @id @default(uuid())
+  plan                  SubscriptionPlan @unique
+  applicationsPerMonth  Int? // null = unlimited
+  aiResumeReviews       Int?
+  aiJobMatches          Int?
+  aiApplyPacks          Int?
+  savedSearches         Int?
+  jobAlerts             Boolean          @default(true)
+  prioritySupport       Boolean          @default(false)
+  skillsAssessments     Boolean          @default(false)
+  chatAccess            Boolean          @default(false)
+  autopilot             Boolean          @default(false)
+  jobPostsPerMonth      Int? // employer plans
+  talentSearch          Boolean          @default(false) // employer
+  analytics             Boolean          @default(false) // employer
+  apiAccess             Boolean          @default(false) // employer premium
+  atsIntegrations       Int? // employer integrations quota
+  videoMockInterviews   Int? // monthly seat quota
+  pipelineExports       Boolean          @default(false)
+  brandedCareerPage     Boolean          @default(false)
+  advancedFunnelMetrics Boolean          @default(false)
+  customFeatures        Json? // extensible
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+}
+
+model UserBillingProfile {
+  id              String             @id @default(uuid())
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  country         String?            @db.VarChar(2) // ISO 3166-1 alpha-2
+  region          BillingRegion      @default(ROW)
+  currency        String             @default("USD") @db.VarChar(3)
+  pricingVersion  Int                @default(1)
+  isGrandfathered Boolean            @default(false)
+  grandfatheredAt DateTime?
+  regionSource    RegionChangeSource @default(USER_SELECTED)
+  taxIdType       String?            @db.VarChar(50) // e.g. eu_vat
+  taxIdValue      String?            @db.VarChar(100)
+  stripeCountry   String?            @db.VarChar(2) // from payment method
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  regionChanges BillingRegionAudit[]
+
+  @@index([userId])
+  @@index([region])
+}
+
+model BillingRegionAudit {
+  id              String             @id @default(uuid())
+  profileId       String
+  profile         UserBillingProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  previousRegion  BillingRegion?
+  newRegion       BillingRegion
+  previousCountry String?            @db.VarChar(2)
+  newCountry      String?            @db.VarChar(2)
+  source          RegionChangeSource
+  ipAddress       String?            @db.VarChar(45)
+  metadata        Json?
+  createdAt       DateTime           @default(now())
+
+  @@index([profileId, createdAt(sort: Desc)])
+}
+
+model RegionConfig {
+  id              String        @id @default(uuid())
+  region          BillingRegion @unique
+  defaultCurrency String        @db.VarChar(3)
+  currencies      String[] // supported currencies for this region
+  countries       String[] // ISO 3166-1 alpha-2 codes
+  taxBehavior     String        @default("unspecified") @db.VarChar(20) // inclusive, exclusive, unspecified
+  taxLabel        String?       @db.VarChar(50) // e.g. "VAT", "GST"
+  isActive        Boolean       @default(true)
+  metadata        Json? // e.g. { vatRates: { standard: 20 } }
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 // ──────────────── Existing Models ────────────────
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String          @id @default(uuid())
+  email           String          @unique
+  password        String          @default("")
+  name            String
+  role            Role
+  preferredLocale SupportedLocale @default(EN)
+  emailVerified   Boolean         @default(false)
+  emailVerifiedAt DateTime?
+  avatarUrl       String?         @db.VarChar(500)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
-  employer           Employer?
-  applications       Application[]
-  adminReviews       AdminReview[]       @relation("AdminReviewer")
-  candidateProfile   CandidateProfile?
-  subscription       Subscription?
-  notifications      Notification[]
-  threadParticipants ThreadParticipant[]
-  sentMessages       Message[]           @relation("MessageSender")
-  aiRuns             AiRun[]
-  savedSearches      SavedSearch[]
-  jobAlerts          JobAlert[]
-  companyReviews     CompanyReview[]
-  skillAssessments   SkillAssessment[]
-  assessmentInvites  AssessmentInvite[]
+  employer                Employer?
+  applications            Application[]
+  adminReviews            AdminReview[]            @relation("AdminReviewer")
+  candidateProfile        CandidateProfile?
+  subscription            Subscription?
+  notifications           Notification[]
+  threadParticipants      ThreadParticipant[]
+  sentMessages            Message[]                @relation("MessageSender")
+  aiRuns                  AiRun[]
+  savedSearches           SavedSearch[]
+  jobAlerts               JobAlert[]
+  companyReviews          CompanyReview[]
+  skillAssessments        SkillAssessment[]
+  assessmentInvites       AssessmentInvite[]
   passwordResets          PasswordResetToken[]
-  interviewExperiences   InterviewExperience[]
-  salaryReports          SalaryReport[]
-  immigrationProcesses   ImmigrationProcess[]
-  referralsMade          Referral[]         @relation("ReferralsMade")
-  referralsReceived      Referral[]         @relation("ReferralsReceived")
-  calendarEvents         CalendarEvent[]
+  interviewExperiences    InterviewExperience[]
+  salaryReports           SalaryReport[]
+  immigrationProcesses    ImmigrationProcess[]
+  referralsMade           Referral[]               @relation("ReferralsMade")
+  referralsReceived       Referral[]               @relation("ReferralsReceived")
+  calendarEvents          CalendarEvent[]
+  chatConsent             ChatConsent?
+  chatConversations       ChatConversation[]
+  billingProfile          UserBillingProfile?
+  oauthAccounts           OAuthAccount[]
+  emailVerificationTokens EmailVerificationToken[]
+  notificationPreferences NotificationPreference?
+  pushSubscriptions       PushSubscription[]
+  analyticsEvents         AnalyticsEvent[]
+  mockInterviewSessions   MockInterviewSession[]
 
   @@index([role])
   @@index([createdAt])
@@ -140,7 +370,8 @@ model Employer {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id])
 
-  jobs Job[]
+  jobs           Job[]
+  atsConnections ATSConnection[]
 }
 
 model Job {
@@ -166,15 +397,20 @@ model Job {
   eligibleCountries    String[]
   jobSource            JobSource             @default(EMPLOYER_POSTED)
   sourceUrl            String?
-  sourceId             String?               // external ATS/job board ID (for dedup)
-  sourceName           String?               // company name for aggregated jobs
+  sourceId             String? // external ATS/job board ID (for dedup)
+  sourceName           String? // company name for aggregated jobs
+
+  // Job expiry tracking
+  expiresAt     DateTime? // when the listing expires (from source or heuristic)
+  lastCheckedAt DateTime? // last time we verified the listing is still live
+  isExpired     Boolean   @default(false)
 
   // Nullable for aggregated jobs (no Employer profile in DB)
   employerId String?
   employer   Employer? @relation(fields: [employerId], references: [id])
 
   applications      Application[]
-  adminReviews      AdminReview[]       @relation("JobReviews")
+  adminReviews      AdminReview[]      @relation("JobReviews")
   threads           MessageThread[]
   jobAlerts         JobAlert[]
   assessmentInvites AssessmentInvite[]
@@ -188,6 +424,8 @@ model Job {
   @@index([visaSponsorship])
   @@index([jobSource])
   @@index([sourceId])
+  @@index([isExpired, status])
+  @@index([expiresAt])
 }
 
 model Application {
@@ -199,11 +437,11 @@ model Application {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  jobId       String
-  job         Job               @relation(fields: [jobId], references: [id])
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id])
 
   candidateId String
-  candidate   User              @relation(fields: [candidateId], references: [id])
+  candidate   User   @relation(fields: [candidateId], references: [id])
 
   adminReviews AdminReview[]  @relation("ApplicationReviews")
   thread       MessageThread?
@@ -236,24 +474,24 @@ model Resource {
 }
 
 model AdminReview {
-  id        String           @id @default(uuid())
+  id        String       @id @default(uuid())
   status    ReviewStatus
   notes     String?
-  createdAt DateTime         @default(now())
+  createdAt DateTime     @default(now())
 
   reviewerId String
-  reviewer   User @relation("AdminReviewer", fields: [reviewerId], references: [id])
+  reviewer   User   @relation("AdminReviewer", fields: [reviewerId], references: [id])
 
   targetType ReviewTargetType
 
-  targetJobId         String?
-  targetJob           Job?         @relation("JobReviews", fields: [targetJobId], references: [id])
+  targetJobId String?
+  targetJob   Job?    @relation("JobReviews", fields: [targetJobId], references: [id])
 
   targetApplicationId String?
   targetApplication   Application? @relation("ApplicationReviews", fields: [targetApplicationId], references: [id])
 
-  targetResourceId    String?
-  targetResource      Resource?    @relation("ResourceReviews", fields: [targetResourceId], references: [id])
+  targetResourceId String?
+  targetResource   Resource? @relation("ResourceReviews", fields: [targetResourceId], references: [id])
 
   @@index([reviewerId])
   @@index([targetType])
@@ -386,6 +624,145 @@ model Notification {
   @@index([userId, createdAt(sort: Desc)])
 }
 
+model NotificationPreference {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  savedSearchAlerts   Boolean  @default(true)
+  interviewReminders  Boolean  @default(true)
+  applicationUpdates  Boolean  @default(true)
+  subscriptionNotices Boolean  @default(true)
+  marketing           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model PushSubscription {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint   String
+  p256dh     String
+  auth       String
+  userAgent  String?  @db.VarChar(500)
+  isActive   Boolean  @default(true)
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, endpoint])
+  @@index([userId, isActive])
+}
+
+model ATSConnection {
+  id                    String              @id @default(uuid())
+  employerId            String
+  employer              Employer            @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  provider              ATSProvider
+  externalOrgId         String              @db.VarChar(255)
+  encryptedAccessToken  String?             @db.Text
+  encryptedRefreshToken String?             @db.Text
+  metadata              Json?
+  status                ATSConnectionStatus @default(ACTIVE)
+  lastSyncedAt          DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  syncRuns ATSSyncRun[]
+
+  @@unique([employerId, provider, externalOrgId])
+  @@index([employerId])
+  @@index([provider])
+}
+
+model ATSSyncRun {
+  id           String        @id @default(uuid())
+  connectionId String
+  connection   ATSConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  status       ATSSyncStatus @default(QUEUED)
+  startedAt    DateTime      @default(now())
+  finishedAt   DateTime?
+  pulledJobs   Int           @default(0)
+  createdJobs  Int           @default(0)
+  updatedJobs  Int           @default(0)
+  dedupedJobs  Int           @default(0)
+  errorCount   Int           @default(0)
+  cursor       String?       @db.VarChar(255)
+  errors       Json?
+  metadata     Json?
+
+  @@index([connectionId, startedAt(sort: Desc)])
+  @@index([status, startedAt(sort: Desc)])
+}
+
+model MockInterviewSession {
+  id                  String                  @id @default(uuid())
+  userId              String
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title               String                  @db.VarChar(200)
+  targetRole          String                  @db.VarChar(120)
+  promptLanguage      SupportedLocale         @default(EN)
+  questionSet         Json?
+  transcript          Json?
+  feedbackSummary     String?                 @db.Text
+  scoreOverall        Int?
+  scoreCommunication  Int?
+  scoreTechnical      Int?
+  scoreProblemSolving Int?
+  status              MockInterviewStatus     @default(DRAFT)
+  visibility          MockInterviewVisibility @default(PRIVATE)
+  retentionDays       Int                     @default(30)
+  piiRedacted         Boolean                 @default(true)
+  startedAt           DateTime?
+  completedAt         DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  artifacts MockInterviewArtifact[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([expiresAt])
+}
+
+model MockInterviewArtifact {
+  id          String                    @id @default(uuid())
+  sessionId   String
+  session     MockInterviewSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  type        MockInterviewArtifactType
+  storageKey  String                    @db.VarChar(500)
+  contentType String?                   @db.VarChar(120)
+  sizeBytes   Int?
+  metadata    Json?
+  createdAt   DateTime                  @default(now())
+
+  @@index([sessionId, createdAt(sort: Desc)])
+  @@index([type])
+}
+
+model AnalyticsEvent {
+  id         String                 @id @default(uuid())
+  userId     String?
+  user       User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  category   AnalyticsEventCategory
+  eventName  String                 @db.VarChar(120)
+  sessionId  String?                @db.VarChar(120)
+  path       String?                @db.VarChar(500)
+  referrer   String?                @db.VarChar(500)
+  properties Json?
+  ipHash     String?                @db.VarChar(128)
+  userAgent  String?                @db.VarChar(500)
+  occurredAt DateTime               @default(now())
+  receivedAt DateTime               @default(now())
+
+  @@index([category, occurredAt(sort: Desc)])
+  @@index([eventName, occurredAt(sort: Desc)])
+  @@index([userId, occurredAt(sort: Desc)])
+}
+
 model Subscription {
   id               String             @id @default(uuid())
   userId           String             @unique
@@ -491,16 +868,16 @@ model SavedSearch {
 }
 
 model JobAlert {
-  id           String   @id @default(uuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobId        String
-  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  searchId     String?
-  matchScore   Int?
-  sentAt       DateTime?
-  clickedAt    DateTime?
-  createdAt    DateTime @default(now())
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId      String
+  job        Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  searchId   String?
+  matchScore Int?
+  sentAt     DateTime?
+  clickedAt  DateTime?
+  createdAt  DateTime  @default(now())
 
   @@unique([userId, jobId])
   @@index([userId, sentAt])
@@ -515,12 +892,12 @@ model CompanyReview {
   company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   userId            String
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  overallRating     Int      // 1-5
-  cultureRating     Int?     // 1-5
-  salaryRating      Int?     // 1-5
-  workLifeRating    Int?     // 1-5
-  managementRating  Int?     // 1-5
-  growthRating      Int?     // 1-5
+  overallRating     Int // 1-5
+  cultureRating     Int? // 1-5
+  salaryRating      Int? // 1-5
+  workLifeRating    Int? // 1-5
+  managementRating  Int? // 1-5
+  growthRating      Int? // 1-5
   title             String   @db.VarChar(200)
   pros              String   @db.Text
   cons              String   @db.Text
@@ -541,18 +918,18 @@ model CompanyReview {
 }
 
 model CompanyRatingAggregate {
-  id                    String   @id @default(uuid())
-  companyId             String   @unique
-  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  totalReviews          Int      @default(0)
-  averageOverall        Float?
-  averageCulture        Float?
-  averageSalary         Float?
-  averageWorkLife       Float?
-  averageManagement     Float?
-  averageGrowth         Float?
-  recommendationPct     Float?   // % who would recommend
-  updatedAt             DateTime @updatedAt
+  id                String   @id @default(uuid())
+  companyId         String   @unique
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  totalReviews      Int      @default(0)
+  averageOverall    Float?
+  averageCulture    Float?
+  averageSalary     Float?
+  averageWorkLife   Float?
+  averageManagement Float?
+  averageGrowth     Float?
+  recommendationPct Float? // % who would recommend
+  updatedAt         DateTime @updatedAt
 }
 
 // ──────────────── Skills Assessment Integration ────────────────
@@ -574,21 +951,21 @@ enum AssessmentStatus {
 }
 
 model SkillAssessment {
-  id              String             @id @default(uuid())
-  userId          String
-  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  skillName       String             @db.VarChar(100)
-  provider        AssessmentProvider
-  externalId      String?            @db.VarChar(255)
-  status          AssessmentStatus   @default(PENDING)
-  score           Int?               // 0-100
-  percentile      Int?               // 0-100
-  level           String?            @db.VarChar(50) // beginner, intermediate, advanced, expert
-  resultUrl       String?            @db.VarChar(500)
-  metadata        Json?
-  completedAt     DateTime?
-  expiresAt       DateTime?
-  createdAt       DateTime           @default(now())
+  id          String             @id @default(uuid())
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skillName   String             @db.VarChar(100)
+  provider    AssessmentProvider
+  externalId  String?            @db.VarChar(255)
+  status      AssessmentStatus   @default(PENDING)
+  score       Int? // 0-100
+  percentile  Int? // 0-100
+  level       String?            @db.VarChar(50) // beginner, intermediate, advanced, expert
+  resultUrl   String?            @db.VarChar(500)
+  metadata    Json?
+  completedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime           @default(now())
 
   @@index([userId, skillName])
   @@index([status])
@@ -614,22 +991,22 @@ model AssessmentInvite {
 // ──────────────── Interview Experiences ────────────────
 
 model InterviewExperience {
-  id              String   @id @default(uuid())
-  companyId       String
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobTitle        String   @db.VarChar(200)
-  difficulty      String   @db.VarChar(20) // easy, medium, hard
-  outcome         String   @db.VarChar(20) // offered, rejected, no_response, withdrew
-  interviewType   String   @db.VarChar(50) // phone, video, onsite, take_home, panel
-  process         String   @db.Text
-  questions       String[] // array of interview questions
-  tips            String?  @db.Text
-  duration        String?  @db.VarChar(50) // e.g., "2 weeks", "1 month"
-  isApproved      Boolean  @default(false)
-  helpfulCount    Int      @default(0)
-  createdAt       DateTime @default(now())
+  id            String   @id @default(uuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobTitle      String   @db.VarChar(200)
+  difficulty    String   @db.VarChar(20) // easy, medium, hard
+  outcome       String   @db.VarChar(20) // offered, rejected, no_response, withdrew
+  interviewType String   @db.VarChar(50) // phone, video, onsite, take_home, panel
+  process       String   @db.Text
+  questions     String[] // array of interview questions
+  tips          String?  @db.Text
+  duration      String?  @db.VarChar(50) // e.g., "2 weeks", "1 month"
+  isApproved    Boolean  @default(false)
+  helpfulCount  Int      @default(0)
+  createdAt     DateTime @default(now())
 
   @@index([companyId, isApproved])
   @@index([userId])
@@ -647,9 +1024,9 @@ model SalaryReport {
   jobTitle        String   @db.VarChar(200)
   location        String   @db.VarChar(200)
   country         String   @db.VarChar(100)
-  salaryCurrency  String   @db.VarChar(10) @default("USD")
+  salaryCurrency  String   @default("USD") @db.VarChar(10)
   salaryAmount    Int
-  salaryPeriod    String   @db.VarChar(20) @default("yearly") // yearly, monthly
+  salaryPeriod    String   @default("yearly") @db.VarChar(20) // yearly, monthly
   yearsExperience Int?
   employmentType  String?  @db.VarChar(50) // full-time, contract, part-time
   isVerified      Boolean  @default(false)
@@ -692,17 +1069,17 @@ model ImmigrationProcess {
 }
 
 model ImmigrationStep {
-  id                  String              @id @default(uuid())
-  processId           String
-  process             ImmigrationProcess  @relation(fields: [processId], references: [id], onDelete: Cascade)
-  name                String              @db.VarChar(200)
-  description         String?             @db.Text
-  status              ImmigrationStatus   @default(NOT_STARTED)
-  dueDate             DateTime?
-  completedAt         DateTime?
-  documents           String[]
-  sortOrder           Int                 @default(0)
-  createdAt           DateTime            @default(now())
+  id          String             @id @default(uuid())
+  processId   String
+  process     ImmigrationProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+  name        String             @db.VarChar(200)
+  description String?            @db.Text
+  status      ImmigrationStatus  @default(NOT_STARTED)
+  dueDate     DateTime?
+  completedAt DateTime?
+  documents   String[]
+  sortOrder   Int                @default(0)
+  createdAt   DateTime           @default(now())
 
   @@index([processId])
 }
@@ -717,18 +1094,18 @@ enum ReferralStatus {
 }
 
 model Referral {
-  id              String         @id @default(uuid())
-  referrerId      String
-  referrer        User           @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
-  refereeEmail    String         @db.VarChar(255)
-  refereeId       String?
-  referee         User?          @relation("ReferralsReceived", fields: [refereeId], references: [id], onDelete: SetNull)
-  jobId           String?
-  companyName     String?        @db.VarChar(200)
-  message         String?        @db.Text
-  status          ReferralStatus @default(PENDING)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id           String         @id @default(uuid())
+  referrerId   String
+  referrer     User           @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
+  refereeEmail String         @db.VarChar(255)
+  refereeId    String?
+  referee      User?          @relation("ReferralsReceived", fields: [refereeId], references: [id], onDelete: SetNull)
+  jobId        String?
+  companyName  String?        @db.VarChar(200)
+  message      String?        @db.Text
+  status       ReferralStatus @default(PENDING)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@index([referrerId])
   @@index([refereeEmail])
@@ -738,19 +1115,19 @@ model Referral {
 // ──────────────── Learning Resources ────────────────
 
 model LearningResource {
-  id              String   @id @default(uuid())
-  title           String   @db.VarChar(300)
-  description     String?  @db.Text
-  url             String   @db.VarChar(500)
-  provider        String   @db.VarChar(100) // Coursera, Udemy, YouTube, etc.
-  category        String   @db.VarChar(100) // programming, design, data-science, etc.
-  skills          String[]
-  difficulty      String   @db.VarChar(20) // beginner, intermediate, advanced
-  durationHours   Float?
-  isFree          Boolean  @default(false)
-  imageUrl        String?  @db.VarChar(500)
-  featured        Boolean  @default(false)
-  createdAt       DateTime @default(now())
+  id            String   @id @default(uuid())
+  title         String   @db.VarChar(300)
+  description   String?  @db.Text
+  url           String   @db.VarChar(500)
+  provider      String   @db.VarChar(100) // Coursera, Udemy, YouTube, etc.
+  category      String   @db.VarChar(100) // programming, design, data-science, etc.
+  skills        String[]
+  difficulty    String   @db.VarChar(20) // beginner, intermediate, advanced
+  durationHours Float?
+  isFree        Boolean  @default(false)
+  imageUrl      String?  @db.VarChar(500)
+  featured      Boolean  @default(false)
+  createdAt     DateTime @default(now())
 
   @@index([category])
   @@index([skills])
@@ -790,11 +1167,11 @@ model CalendarEvent {
 // ──────────────── Job Views / Profile Analytics ────────────────
 
 model ProfileView {
-  id          String   @id @default(uuid())
-  profileId   String
-  viewerId    String?
-  viewerRole  String?  @db.VarChar(20)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  profileId  String
+  viewerId   String?
+  viewerRole String?  @db.VarChar(20)
+  createdAt  DateTime @default(now())
 
   @@index([profileId, createdAt(sort: Desc)])
   @@index([viewerId])
@@ -803,14 +1180,74 @@ model ProfileView {
 // ──────────────── Password Reset ────────────────
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([token])
   @@index([userId])
+}
+
+// ──────────────── AI Chat Assistant ────────────────
+
+enum ChatConsentType {
+  PRIVACY_NOTICE
+  TERMS_OF_USE
+  DATA_STORAGE
+}
+
+model ChatConsent {
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  privacyNotice Boolean   @default(false)
+  termsOfUse    Boolean   @default(false)
+  dataStorage   Boolean   @default(false)
+  consentedAt   DateTime?
+  revokedAt     DateTime?
+  ipAddress     String?   @db.VarChar(45)
+  userAgent     String?   @db.VarChar(500)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model ChatConversation {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?  @db.VarChar(200)
+  summary   String?  @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages ChatMessage[]
+
+  @@index([userId, isActive])
+  @@index([userId, updatedAt(sort: Desc)])
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model ChatMessage {
+  id             String           @id @default(uuid())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           ChatMessageRole
+  content        String           @db.Text
+  metadata       Json?
+  tokenCount     Int?
+  createdAt      DateTime         @default(now())
+
+  @@index([conversationId, createdAt])
 }

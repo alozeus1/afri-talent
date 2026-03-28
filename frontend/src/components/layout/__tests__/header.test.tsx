@@ -12,6 +12,9 @@ jest.mock('@/lib/auth-context', () => ({
     logout: jest.fn(),
   })),
 }));
+jest.mock('@/components/layout/theme-toggle', () => ({
+  ThemeToggle: () => <button type="button">Theme</button>,
+}));
 
 import { useAuth } from "@/lib/auth-context";
 

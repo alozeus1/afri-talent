@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { employerAnalytics, EmployerAnalytics, EmployerBranding } from "@/lib/api";
+import {
+  employerAnalytics,
+  EmployerAnalytics,
+  EmployerBranding,
+  EmployerAdvancedAnalytics,
+} from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +30,7 @@ export default function EmployerAnalyticsPage() {
   const { user, isLoading } = useAuth();
 
   const [analytics, setAnalytics] = useState<EmployerAnalytics | null>(null);
+  const [advancedAnalytics, setAdvancedAnalytics] = useState<EmployerAdvancedAnalytics | null>(null);
   const [, setBranding] = useState<EmployerBranding | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,9 +53,14 @@ export default function EmployerAnalyticsPage() {
 
   useEffect(() => {
     if (user?.role === "EMPLOYER") {
-      Promise.all([employerAnalytics.stats(), employerAnalytics.getBranding()])
-        .then(([statsData, brandingData]) => {
+      Promise.all([
+        employerAnalytics.stats(),
+        employerAnalytics.advanced(),
+        employerAnalytics.getBranding(),
+      ])
+        .then(([statsData, advancedData, brandingData]) => {
           setAnalytics(statsData);
+          setAdvancedAnalytics(advancedData);
           setBranding(brandingData);
           setBrandingForm({
             companyName: brandingData.companyName || "",
@@ -155,6 +166,105 @@ export default function EmployerAnalyticsPage() {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {advancedAnalytics && (
+            <>
+              <Card className="mb-8">
+                <CardHeader>
+                  <h2 className="text-xl font-semibold text-gray-900">Hiring Funnel</h2>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {advancedAnalytics.funnel.map((step) => (
+                      <div
+                        key={step.step}
+                        className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          {step.step.replace(/_/g, " ")}
+                        </p>
+                        <p className="mt-2 text-2xl font-bold text-gray-900">{step.count}</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          {step.conversionFromPrevious === null
+                            ? "Baseline"
+                            : `${step.conversionFromPrevious}% from previous step`}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="mb-8">
+                <CardHeader>
+                  <h2 className="text-xl font-semibold text-gray-900">Posting Performance</h2>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="pb-3 text-sm font-medium text-gray-500">Job</th>
+                          <th className="pb-3 text-sm font-medium text-gray-500">Applications</th>
+                          <th className="pb-3 text-sm font-medium text-gray-500">Shortlist Rate</th>
+                          <th className="pb-3 text-sm font-medium text-gray-500">Acceptance Rate</th>
+                          <th className="pb-3 text-sm font-medium text-gray-500">Time to First App</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {advancedAnalytics.postingPerformance.slice(0, 10).map((row) => (
+                          <tr key={row.jobId}>
+                            <td className="py-3 text-sm text-gray-900">{row.title}</td>
+                            <td className="py-3 text-sm text-gray-600">{row.applicationCount}</td>
+                            <td className="py-3 text-sm text-gray-600">{row.shortlistRate}%</td>
+                            <td className="py-3 text-sm text-gray-600">{row.acceptanceRate}%</td>
+                            <td className="py-3 text-sm text-gray-600">
+                              {row.timeToFirstApplicationHours === null
+                                ? "N/A"
+                                : `${row.timeToFirstApplicationHours}h`}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="mb-8">
+                <CardHeader>
+                  <h2 className="text-xl font-semibold text-gray-900">Candidate Pipeline Metrics</h2>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {[
+                      ["Total", advancedAnalytics.candidatePipeline.total],
+                      ["Pending", advancedAnalytics.candidatePipeline.pending],
+                      ["Reviewing", advancedAnalytics.candidatePipeline.reviewing],
+                      ["Shortlisted", advancedAnalytics.candidatePipeline.shortlisted],
+                      ["Accepted", advancedAnalytics.candidatePipeline.accepted],
+                      ["Rejected", advancedAnalytics.candidatePipeline.rejected],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-lg border border-gray-200 bg-white p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+                        <p className="mt-1 text-xl font-bold text-gray-900">{value as number}</p>
+                      </div>
+                    ))}
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 lg:col-span-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                        Average Review Time
+                      </p>
+                      <p className="mt-1 text-xl font-bold text-emerald-900">
+                        {advancedAnalytics.candidatePipeline.avgReviewTimeHours === null
+                          ? "N/A"
+                          : `${advancedAnalytics.candidatePipeline.avgReviewTimeHours}h`}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           )}
 
           {/* Recent Applications */}

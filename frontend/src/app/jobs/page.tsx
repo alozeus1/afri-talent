@@ -5,6 +5,7 @@ import { jobs, JobListResponse } from "@/lib/api";
 import { JobCard } from "@/components/jobs/job-card";
 import { JobFilters } from "@/components/jobs/job-filters";
 import { Button } from "@/components/ui/button";
+import { JobListSkeleton } from "@/components/ui/skeleton";
 
 export default function JobsPage() {
   const [data, setData] = useState<JobListResponse | null>(null);
@@ -64,8 +65,8 @@ export default function JobsPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Find Your Next Role</h1>
-        <p className="text-gray-600">Browse remote and international opportunities from top companies</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Find Your Next Role</h1>
+        <p className="text-gray-600 dark:text-gray-300">Browse remote and international opportunities from top companies</p>
       </div>
 
       <JobFilters
@@ -86,27 +87,23 @@ export default function JobsPage() {
         onClear={clearFilters}
       />
 
-      {loading && (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-        </div>
-      )}
+      {loading && <JobListSkeleton count={6} />}
 
       {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-8">
+        <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 p-4 rounded-lg mb-8">
           {error}
         </div>
       )}
 
       {!loading && data && (
         <>
-          <div className="mb-4 text-gray-600">
+          <div className="mb-4 text-gray-600 dark:text-gray-300">
             {data.pagination.total} job{data.pagination.total !== 1 ? "s" : ""} found
           </div>
 
           {data.jobs.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-600 mb-4">No jobs found matching your criteria</p>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">No jobs found matching your criteria</p>
               <Button variant="outline" onClick={clearFilters}>
                 Clear filters
               </Button>
@@ -128,7 +125,7 @@ export default function JobsPage() {
               >
                 Previous
               </Button>
-              <span className="flex items-center px-4 text-gray-600">
+              <span className="flex items-center px-4 text-gray-600 dark:text-gray-300">
                 Page {page} of {data.pagination.totalPages}
               </span>
               <Button

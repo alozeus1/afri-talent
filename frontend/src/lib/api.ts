@@ -32,6 +32,31 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
   return response.json();
 }
 
+async function fetchMultipartAPI<T>(endpoint: string, options: Omit<FetchOptions, "body"> & { body: FormData }): Promise<T> {
+  const { token, ...fetchOptions } = options;
+  const headers: HeadersInit = {
+    ...(options.headers || {}),
+  };
+
+  if (token) {
+    (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...fetchOptions,
+    headers,
+    body: options.body,
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Request failed" }));
+    throw new Error(error.error || "Request failed");
+  }
+
+  return response.json();
+}
+
 // Auth
 export const auth = {
   login: (email: string, password: string) =>
@@ -51,6 +76,24 @@ export const auth = {
 
   logout: () =>
     fetchAPI<{ message: string }>("/api/auth/logout", { method: "POST" }),
+};
+
+// Email verification
+export const emailVerification = {
+  status: () =>
+    fetchAPI<{ email: string; verified: boolean; verifiedAt: string | null }>("/api/auth/email/status"),
+  send: () =>
+    fetchAPI<{ message: string }>("/api/auth/email/send-verification", { method: "POST" }),
+  verify: (token: string) =>
+    fetchAPI<{ message: string }>("/api/auth/email/verify", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+};
+
+// Public marketing stats
+export const publicStats = {
+  get: () => fetchAPI<PublicStats>("/api/public/stats"),
 };
 
 // Jobs
@@ -158,10 +201,10 @@ export const admin = {
 
 // Billing
 export const billing = {
-  checkout: (plan: "BASIC" | "PROFESSIONAL") =>
-    fetchAPI<{ url: string; sessionId: string }>("/api/billing/checkout", {
+  checkout: (plan: string, interval: "MONTHLY" | "YEARLY" = "MONTHLY") =>
+    fetchAPI<{ url: string; sessionId: string; currency: string; amount: number | null }>("/api/billing/checkout", {
       method: "POST",
-      body: JSON.stringify({ plan }),
+      body: JSON.stringify({ plan, interval }),
     }),
 
   portal: () =>
@@ -169,6 +212,30 @@ export const billing = {
 
   status: () =>
     fetchAPI<BillingStatus>("/api/billing/status"),
+};
+
+// Pricing (public + authenticated)
+export const pricing = {
+  get: (region?: string, currency?: string) => {
+    const params = new URLSearchParams();
+    if (region) params.set("region", region);
+    if (currency) params.set("currency", currency);
+    const query = params.toString();
+    return fetchAPI<PricingData>(`/api/pricing${query ? `?${query}` : ""}`);
+  },
+
+  me: () => fetchAPI<UserPricingData>("/api/pricing/me"),
+
+  setBillingCountry: (country: string, currency?: string, taxIdType?: string, taxIdValue?: string) =>
+    fetchAPI<{ region: string; country: string; currency: string }>("/api/pricing/billing-country", {
+      method: "POST",
+      body: JSON.stringify({ country, currency, taxIdType, taxIdValue }),
+    }),
+
+  regions: () => fetchAPI<RegionConfig[]>("/api/pricing/regions"),
+  paymentLocalization: () => fetchAPI<PaymentLocalizationResponse>("/api/pricing/payment-localization"),
+
+  entitlements: (plan: string) => fetchAPI<PlanEntitlements>(`/api/pricing/entitlements/${plan}`),
 };
 
 // Talent
@@ -188,12 +255,116 @@ export const talent = {
 // Employer Analytics
 export const employerAnalytics = {
   stats: () => fetchAPI<EmployerAnalytics>("/api/employer/analytics"),
+  advanced: () => fetchAPI<EmployerAdvancedAnalytics>("/api/employer/analytics/advanced"),
+  onboarding: () => fetchAPI<EmployerOnboarding>("/api/employer/onboarding"),
   getBranding: () => fetchAPI<EmployerBranding>("/api/employer/branding"),
   updateBranding: (data: { companyName?: string; website?: string; location?: string; bio?: string }) =>
     fetchAPI<EmployerBranding>("/api/employer/branding", {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+};
+
+export const ats = {
+  listConnections: () => fetchAPI<ATSConnection[]>("/api/ats/connections"),
+  createConnection: (data: {
+    provider: "GREENHOUSE" | "LEVER" | "WORKABLE";
+    externalOrgId: string;
+    accessToken?: string;
+    refreshToken?: string;
+    metadata?: Record<string, unknown>;
+  }) => fetchAPI<ATSConnection>("/api/ats/connections", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
+  disconnectConnection: (id: string) =>
+    fetchAPI<{ message: string }>(`/api/ats/connections/${id}`, {
+      method: "DELETE",
+    }),
+  syncConnection: (id: string) =>
+    fetchAPI<{
+      syncRunId: string;
+      pulledJobs: number;
+      createdJobs: number;
+      updatedJobs: number;
+      dedupedJobs: number;
+    }>(`/api/ats/connections/${id}/sync`, {
+      method: "POST",
+    }),
+};
+
+export const mockInterviews = {
+  list: () => fetchAPI<MockInterviewSession[]>("/api/mock-interviews"),
+  create: (data: {
+    title: string;
+    targetRole: string;
+    promptLanguage?: "EN" | "FR" | "PT" | "AR";
+    questionSet?: string[];
+    visibility?: "PRIVATE" | "TEAM_SHARED";
+    retentionDays?: number;
+  }) => fetchAPI<MockInterviewSession>("/api/mock-interviews", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
+  get: (id: string) => fetchAPI<MockInterviewSession>(`/api/mock-interviews/${id}`),
+  submitFeedback: (
+    id: string,
+    data: {
+      transcript: Array<{ speaker: "interviewer" | "candidate"; text: string; timestampMs?: number }>;
+      scoreCommunication?: number;
+      scoreTechnical?: number;
+      scoreProblemSolving?: number;
+      notes?: string[];
+    },
+  ) =>
+    fetchAPI<MockInterviewSession>(`/api/mock-interviews/${id}/feedback`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updatePrivacy: (
+    id: string,
+    data: {
+      visibility?: "PRIVATE" | "TEAM_SHARED";
+      retentionDays?: number;
+      piiRedacted?: boolean;
+      status?: "DRAFT" | "PROCESSING" | "READY" | "ARCHIVED";
+    },
+  ) =>
+    fetchAPI<MockInterviewSession>(`/api/mock-interviews/${id}/privacy`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  addArtifact: (
+    id: string,
+    data: {
+      type: "VIDEO" | "AUDIO" | "TRANSCRIPT" | "FEEDBACK_JSON";
+      storageKey: string;
+      contentType?: string;
+      sizeBytes?: number;
+      metadata?: Record<string, unknown>;
+    },
+  ) =>
+    fetchAPI<MockInterviewArtifact>(`/api/mock-interviews/${id}/artifacts`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
+export const analyticsEventsApi = {
+  ingest: (events: Array<{
+    category: "ACQUISITION" | "ACTIVATION" | "ENGAGEMENT" | "CONVERSION" | "RETENTION" | "MONETIZATION" | "EMPLOYER_PIPELINE" | "SYSTEM";
+    eventName: string;
+    sessionId?: string;
+    path?: string;
+    referrer?: string;
+    properties?: Record<string, unknown>;
+    occurredAt?: string;
+  }>) =>
+    fetchAPI<{ accepted: number }>("/api/analytics/events", {
+      method: "POST",
+      body: JSON.stringify({ events }),
+    }),
+  model: () => fetchAPI<Record<string, unknown>>("/api/analytics/model"),
 };
 
 // Messages
@@ -250,6 +421,8 @@ export interface User {
   email: string;
   name: string;
   role: "ADMIN" | "CANDIDATE" | "EMPLOYER";
+  emailVerified?: boolean;
+  avatarUrl?: string | null;
   employer?: {
     id: string;
     companyName: string;
@@ -277,6 +450,7 @@ export interface Job {
   salaryMin?: number;
   salaryMax?: number;
   currency?: string;
+  salaryPeriod?: string | null;
   tags: string[];
   visaSponsorship?: "YES" | "NO" | "UNKNOWN";
   relocationAssistance?: boolean;
@@ -284,6 +458,8 @@ export interface Job {
   jobSource?: "EMPLOYER_POSTED" | "AGGREGATED";
   sourceName?: string;
   sourceUrl?: string;
+  isExpired?: boolean;
+  expiresAt?: string | null;
   status: string;
   publishedAt?: string;
   createdAt: string;
@@ -332,6 +508,7 @@ export interface CreateJobData {
   salaryMin?: number;
   salaryMax?: number;
   currency?: string;
+  salaryPeriod?: string;
   tags?: string[];
 }
 
@@ -388,6 +565,14 @@ export interface AdminStats {
   totalResources: number;
 }
 
+export interface PublicStats {
+  activeCandidates: number;
+  partnerCompanies: number;
+  jobsPosted: number;
+  africanCountries: number;
+  lastUpdated: string;
+}
+
 export interface UserListResponse {
   users: Array<User & { createdAt: string; _count: { applications: number } }>;
   pagination: {
@@ -399,10 +584,94 @@ export interface UserListResponse {
 }
 
 export interface BillingStatus {
-  plan: "FREE" | "BASIC" | "PROFESSIONAL";
+  plan: "FREE" | "BASIC" | "PROFESSIONAL" | "EMPLOYER_FREE" | "EMPLOYER_BASIC" | "EMPLOYER_PREMIUM";
   status: "ACTIVE" | "INACTIVE" | "PAST_DUE" | "CANCELLED";
   currentPeriodEnd: string | null;
   hasCustomer: boolean;
+}
+
+export interface RegionalPriceInfo {
+  plan: string;
+  region: string;
+  interval: "MONTHLY" | "YEARLY";
+  currency: string;
+  amount: number;
+  stripePriceId: string | null;
+  displayAmount: string;
+}
+
+export interface PlanEntitlements {
+  plan: string;
+  applicationsPerMonth: number | null;
+  aiResumeReviews: number | null;
+  aiJobMatches: number | null;
+  aiApplyPacks: number | null;
+  savedSearches: number | null;
+  jobAlerts: boolean;
+  prioritySupport: boolean;
+  skillsAssessments: boolean;
+  chatAccess: boolean;
+  autopilot: boolean;
+  jobPostsPerMonth: number | null;
+  talentSearch: boolean;
+  analytics: boolean;
+  apiAccess: boolean;
+  atsIntegrations: number | null;
+  videoMockInterviews: number | null;
+  pipelineExports: boolean;
+  brandedCareerPage: boolean;
+  advancedFunnelMetrics: boolean;
+}
+
+export interface PricingData {
+  region: string;
+  currency: string;
+  availableCurrencies: string[];
+  taxBehavior: string;
+  taxLabel: string | null;
+  prices: RegionalPriceInfo[];
+  entitlements: Record<string, PlanEntitlements>;
+}
+
+export interface UserPricingData extends PricingData {
+  country: string | null;
+  confidence: "high" | "medium" | "low";
+  source: string;
+  isGrandfathered: boolean;
+  pricingVersion: number;
+  taxId: { type: string; value: string | null } | null;
+}
+
+export interface RegionConfig {
+  id: string;
+  region: string;
+  defaultCurrency: string;
+  currencies: string[];
+  countries: string[];
+  taxBehavior: string;
+  taxLabel: string | null;
+}
+
+export interface PaymentLocalizationResponse {
+  regions: Array<{
+    region: string;
+    defaultCurrency: string;
+    currencies: string[];
+    taxBehavior: string;
+    taxLabel: string | null;
+    paymentMethodsLive: string[];
+    paymentMethodsRoadmap: string[];
+    compliance: unknown;
+    taxMetadata: unknown;
+  }>;
+  europeSpecific: {
+    supportedTaxIds: string[];
+    invoiceRules: string[];
+  };
+  africaRoadmap: {
+    plannedMethods: string[];
+    status: string;
+  };
 }
 
 export interface MessageThread {
@@ -477,6 +746,99 @@ export interface EmployerAnalytics {
   recentApplications: Array<{ id: string; status: string; createdAt: string; candidate: { name: string }; job: { title: string } }>;
 }
 
+export interface EmployerAdvancedAnalytics {
+  funnel: Array<{
+    step: string;
+    count: number;
+    conversionFromPrevious: number | null;
+  }>;
+  postingPerformance: Array<{
+    jobId: string;
+    title: string;
+    status: string;
+    applicationCount: number;
+    shortlistRate: number;
+    acceptanceRate: number;
+    timeToFirstApplicationHours: number | null;
+  }>;
+  candidatePipeline: {
+    total: number;
+    pending: number;
+    reviewing: number;
+    shortlisted: number;
+    accepted: number;
+    rejected: number;
+    avgReviewTimeHours: number | null;
+  };
+}
+
+export interface ATSConnection {
+  id: string;
+  provider: "GREENHOUSE" | "LEVER" | "WORKABLE";
+  externalOrgId: string;
+  status: "ACTIVE" | "ERROR" | "DISCONNECTED";
+  metadata: Record<string, unknown> | null;
+  lastSyncedAt: string | null;
+  lastSyncRun: {
+    id: string;
+    status: "QUEUED" | "RUNNING" | "SUCCESS" | "PARTIAL" | "FAILED";
+    startedAt: string;
+    finishedAt: string | null;
+    pulledJobs: number;
+    createdJobs: number;
+    updatedJobs: number;
+    dedupedJobs: number;
+    errorCount: number;
+  } | null;
+  createdAt: string;
+}
+
+export interface MockInterviewArtifact {
+  id: string;
+  sessionId: string;
+  type: "VIDEO" | "AUDIO" | "TRANSCRIPT" | "FEEDBACK_JSON";
+  storageKey: string;
+  contentType: string | null;
+  sizeBytes: number | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface MockInterviewSession {
+  id: string;
+  userId: string;
+  title: string;
+  targetRole: string;
+  promptLanguage: "EN" | "FR" | "PT" | "AR";
+  questionSet: unknown;
+  transcript: unknown;
+  feedbackSummary: string | null;
+  scoreOverall: number | null;
+  scoreCommunication: number | null;
+  scoreTechnical: number | null;
+  scoreProblemSolving: number | null;
+  status: "DRAFT" | "PROCESSING" | "READY" | "ARCHIVED";
+  visibility: "PRIVATE" | "TEAM_SHARED";
+  retentionDays: number;
+  piiRedacted: boolean;
+  startedAt: string | null;
+  completedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  artifacts?: MockInterviewArtifact[];
+}
+
+export interface EmployerOnboarding {
+  checklist: Array<{ key: string; label: string; done: boolean }>;
+  completionPct: number;
+  stats: {
+    jobCount: number;
+    publishedJobs: number;
+  };
+  recommendation: string;
+}
+
 export interface EmployerBranding {
   id: string;
   companyName: string;
@@ -493,6 +855,26 @@ export const profile = {
   resumes: () => fetchAPI<ResumeFile[]>("/api/profile/resumes"),
   uploadResume: (data: { s3Key: string; fileName: string; setActive?: boolean }) =>
     fetchAPI<ResumeFile>("/api/profile/resumes", { method: "POST", body: JSON.stringify(data) }),
+  parseResume: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return fetchMultipartAPI<ResumeParseResponse>("/api/profile/resume-parser/parse", {
+      method: "POST",
+      body: formData,
+    });
+  },
+  applyResumeDraft: (data: {
+    confirm: boolean;
+    overwriteExisting?: boolean;
+    draft: Partial<ResumeProfileDraft>;
+  }) =>
+    fetchAPI<{ profile: CandidateProfile; overwriteExisting: boolean; message: string }>(
+      "/api/profile/resume-parser/apply-draft",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+    ),
   analytics: () => fetchAPI<ProfileAnalytics>("/api/profile/analytics"),
 };
 
@@ -509,6 +891,40 @@ export const notifications = {
   unreadCount: () => fetchAPI<{ count: number }>("/api/notifications/unread-count"),
   markRead: (id: string) => fetchAPI<{ notification: NotificationItem }>(`/api/notifications/${id}/read`, { method: "PUT" }),
   markAllRead: () => fetchAPI<{ updated: number }>("/api/notifications/read-all", { method: "PUT" }),
+};
+
+export const preferences = {
+  getLocale: () => fetchAPI<{ preferredLocale: "EN" | "FR" | "PT" | "AR" }>("/api/preferences/locale"),
+  setLocale: (preferredLocale: "EN" | "FR" | "PT" | "AR") =>
+    fetchAPI<{ preferredLocale: "EN" | "FR" | "PT" | "AR" }>("/api/preferences/locale", {
+      method: "PUT",
+      body: JSON.stringify({ preferredLocale }),
+    }),
+};
+
+export const pushNotifications = {
+  getVapidPublicKey: () => fetchAPI<{ publicKey: string }>("/api/push/vapid-public-key"),
+  getPreferences: () => fetchAPI<NotificationPreference>("/api/push/preferences"),
+  updatePreferences: (data: Partial<NotificationPreference>) =>
+    fetchAPI<NotificationPreference>("/api/push/preferences", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  subscribe: (subscription: PushSubscriptionRequest) =>
+    fetchAPI<{ id: string }>("/api/push/subscribe", {
+      method: "POST",
+      body: JSON.stringify(subscription),
+    }),
+  unsubscribe: (endpoint: string) =>
+    fetchAPI<{ message: string }>("/api/push/subscribe", {
+      method: "DELETE",
+      body: JSON.stringify({ endpoint }),
+    }),
+  sendTest: (type: "savedSearchAlerts" | "interviewReminders" | "applicationUpdates" | "subscriptionNotices") =>
+    fetchAPI<{ message: string; notificationId: string }>("/api/push/test", {
+      method: "POST",
+      body: JSON.stringify({ type }),
+    }),
 };
 
 // Saved Searches
@@ -676,6 +1092,73 @@ export interface ResumeFile {
   fileName: string;
   isActive: boolean;
   uploadedAt: string;
+}
+
+export interface ResumeParsedWorkItem {
+  company?: string;
+  title?: string;
+  period?: string;
+  description?: string;
+}
+
+export interface ResumeParsedEducationItem {
+  institution?: string;
+  degree?: string;
+  period?: string;
+}
+
+export interface ResumeParsedData {
+  name?: string;
+  email?: string;
+  phone?: string;
+  linkedinUrl?: string;
+  githubUrl?: string;
+  portfolioUrl?: string;
+  summary?: string;
+  skills: string[];
+  workHistory: ResumeParsedWorkItem[];
+  education: ResumeParsedEducationItem[];
+  certifications: string[];
+  rawText: string;
+}
+
+export interface ResumeProfileDraft {
+  headline?: string;
+  bio?: string;
+  skills?: string[];
+  targetRoles?: string[];
+  yearsExperience?: number;
+  linkedinUrl?: string;
+  githubUrl?: string;
+  portfolioUrl?: string;
+}
+
+export interface ResumeParseResponse {
+  file: { name: string; size: number; mimetype: string };
+  parsed: ResumeParsedData;
+  profileDraft: ResumeProfileDraft;
+  existingProfile: Partial<CandidateProfile> | null;
+  requiresConfirmation: boolean;
+}
+
+export interface NotificationPreference {
+  id: string;
+  userId: string;
+  savedSearchAlerts: boolean;
+  interviewReminders: boolean;
+  applicationUpdates: boolean;
+  subscriptionNotices: boolean;
+  marketing: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PushSubscriptionRequest {
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
 }
 
 export interface ProfileAnalytics {
@@ -911,3 +1394,85 @@ export interface ApplicationFunnel {
   accepted: number;
   rejected: number;
 }
+
+// ── Chat Assistant ───────────────────────────────────────────────────────────
+
+export interface ChatConsentPolicy {
+  title: string;
+  summary: string;
+  version: string;
+}
+
+export interface ChatConsentStatus {
+  consent: {
+    privacyNotice: boolean;
+    termsOfUse: boolean;
+    dataStorage: boolean;
+    consentedAt: string | null;
+    revokedAt: string | null;
+  } | null;
+  hasFullConsent: boolean;
+  policies: {
+    privacyNotice: ChatConsentPolicy;
+    termsOfUse: ChatConsentPolicy;
+    dataStorage: ChatConsentPolicy;
+  };
+}
+
+export interface ChatMessageData {
+  id: string;
+  role: "USER" | "ASSISTANT";
+  content: string;
+  createdAt: string;
+}
+
+export interface ChatConversation {
+  id: string;
+  title: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { messages: number };
+}
+
+export interface ChatSendResponse {
+  message: ChatMessageData;
+  conversationId: string;
+  remaining: number;
+}
+
+export const chat = {
+  getConsent: () =>
+    fetchAPI<ChatConsentStatus>("/api/chat/consent"),
+
+  acceptConsent: () =>
+    fetchAPI<{ message: string }>("/api/chat/consent", {
+      method: "POST",
+      body: JSON.stringify({ privacyNotice: true, termsOfUse: true, dataStorage: true }),
+    }),
+
+  revokeConsent: () =>
+    fetchAPI<{ message: string; deletedConversations: number }>("/api/chat/consent", {
+      method: "DELETE",
+    }),
+
+  sendMessage: (message: string, conversationId?: string) =>
+    fetchAPI<ChatSendResponse>("/api/chat/message", {
+      method: "POST",
+      body: JSON.stringify({ message, conversationId }),
+    }),
+
+  getHistory: (conversationId?: string, page = 1) =>
+    fetchAPI<{
+      messages?: ChatMessageData[];
+      conversations?: ChatConversation[];
+      conversation?: ChatConversation;
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/api/chat/history?${conversationId ? `conversationId=${conversationId}&` : ""}page=${page}`),
+
+  newConversation: () =>
+    fetchAPI<{ conversation: ChatConversation }>("/api/chat/conversations", { method: "POST" }),
+
+  deleteConversation: (id: string) =>
+    fetchAPI<{ message: string }>(`/api/chat/conversations/${id}`, { method: "DELETE" }),
+};

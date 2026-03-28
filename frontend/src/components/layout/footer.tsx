@@ -115,6 +115,14 @@ export function Footer() {
             &copy; {new Date().getFullYear()} AfriTalent. All rights reserved.
           </p>
         </div>
+
+        {/* Powered by Maralito Labs */}
+        <div className="border-t border-gray-800 mt-6 pt-4 text-center">
+          <p className="text-gray-500 text-xs">
+            Powered by <span className="font-semibold text-gray-400">Maralito Labs</span>
+            <sup className="text-gray-600 ml-0.5">TM</sup>
+          </p>
+        </div>
       </div>
     </footer>
   );

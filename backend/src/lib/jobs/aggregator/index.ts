@@ -10,6 +10,12 @@ import { RemoteOKSource } from "./sources/remoteok.js";
 import { WeWorkRemotelySource } from "./sources/weworkremotely.js";
 import { AdzunaSource } from "./sources/adzuna.js";
 import { JobbermanSource } from "./sources/jobberman.js";
+import { HimalayasSource } from "./sources/himalayas.js";
+import { ArbeitnowSource } from "./sources/arbeitnow.js";
+import { RemotiveSource } from "./sources/jobsincyprus.js";
+import { GreenhouseSource } from "./sources/greenhouse.js";
+import { LeverSource } from "./sources/lever.js";
+import { WorkableSource } from "./sources/workable.js";
 import type { BaseJobSource, JobQuery } from "./sources/base.js";
 
 export class JobAggregator {
@@ -22,16 +28,52 @@ export class JobAggregator {
   }
 
   private initializeSources(): void {
-    // Always-on free sources
+    // Always-on free sources (no API key required)
     this.sources.push(new RemoteOKSource());
     this.sources.push(new WeWorkRemotelySource());
     this.sources.push(new JobbermanSource());
+    this.sources.push(new HimalayasSource());
+    this.sources.push(new ArbeitnowSource());
+    this.sources.push(new RemotiveSource());
 
     // API-based sources (require keys)
     const adzunaAppId = process.env.ADZUNA_APP_ID;
     const adzunaApiKey = process.env.ADZUNA_API_KEY;
     if (adzunaAppId && adzunaApiKey) {
       this.sources.push(new AdzunaSource(adzunaAppId, adzunaApiKey));
+    }
+
+    const greenhouseBoards = (process.env.GREENHOUSE_BOARD_TOKENS || "")
+      .split(",")
+      .map((token) => token.trim())
+      .filter(Boolean);
+    if (greenhouseBoards.length > 0) {
+      this.sources.push(new GreenhouseSource(greenhouseBoards));
+    }
+
+    const leverSites = (process.env.LEVER_SITE_TOKENS || "")
+      .split(",")
+      .map((token) => token.trim())
+      .filter(Boolean);
+    if (leverSites.length > 0) {
+      this.sources.push(new LeverSource(leverSites));
+    }
+
+    const workableAccounts = (process.env.WORKABLE_COMPANY_TOKENS || "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map((entry) => {
+        const [account, token] = entry.split(":");
+        return {
+          account: account?.trim() || "",
+          token: token?.trim() || undefined,
+        };
+      })
+      .filter((item) => item.account.length > 0);
+
+    if (workableAccounts.length > 0) {
+      this.sources.push(new WorkableSource(workableAccounts));
     }
 
     logger.info({ sourceCount: this.sources.length }, "[aggregator] Initialized job sources");
@@ -125,8 +167,22 @@ export class JobAggregator {
     const seen = new Map<string, AggregatedJob>();
 
     for (const job of jobs) {
-      // Create composite key from title + company + location
-      const key = `${job.title.toLowerCase()}|${job.company.toLowerCase()}|${job.location.toLowerCase()}`;
+      const normalizedTitle = job.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const normalizedCompany = job.company.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const normalizedLocation = job.location.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const canonicalUrl = (() => {
+        try {
+          const parsed = new URL(job.sourceUrl);
+          return `${parsed.hostname}${parsed.pathname}`.toLowerCase();
+        } catch {
+          return "";
+        }
+      })();
+
+      // Prefer source URL + semantic title/company, fallback to title/company/location.
+      const key = canonicalUrl
+        ? `${canonicalUrl}|${normalizedTitle}|${normalizedCompany}`
+        : `${normalizedTitle}|${normalizedCompany}|${normalizedLocation}`;
       
       if (!seen.has(key)) {
         seen.set(key, job);
@@ -186,6 +242,9 @@ export class JobAggregator {
       sourceUrl: job.sourceUrl,
       sourceId: job.externalId,
       sourceName: job.company,
+      expiresAt: job.expiresAt || null,
+      lastCheckedAt: new Date(),
+      isExpired: false,
     };
 
     if (existing) {

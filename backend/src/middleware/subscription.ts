@@ -6,6 +6,9 @@ const PLAN_RANK: Record<SubscriptionPlan, number> = {
   FREE: 0,
   BASIC: 1,
   PROFESSIONAL: 2,
+  EMPLOYER_FREE: 0,
+  EMPLOYER_BASIC: 1,
+  EMPLOYER_PREMIUM: 2,
 };
 
 /**

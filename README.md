@@ -262,11 +262,25 @@ afri-tech/
 | `JWT_SECRET` | Secret for signing JWTs |
 | `FRONTEND_URL` | Frontend origin for CORS |
 | `PORT` | Server port (default: 4000) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Enable Google OAuth |
+| `APPLE_CLIENT_ID` / `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` | Enable Apple OAuth |
+| `SES_FROM_EMAIL` | Sender used for email verification/reset emails |
+| `ENABLE_API_DOCS` | Set `true` to expose `/api/docs` in production |
 
 **Frontend (required):**
 | Variable | Description |
 |----------|-------------|
 | `NEXT_PUBLIC_API_URL` | Backend API URL |
+| `NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS` | Show seeded demo credentials in local/non-prod UI |
+
+## Additional Docs
+
+- OpenAPI/Swagger: `GET /api/docs` and raw spec at `GET /api/docs/spec.json`
+- Google for Jobs validation playbook: [docs/GOOGLE_FOR_JOBS_VALIDATION.md](./docs/GOOGLE_FOR_JOBS_VALIDATION.md)
+- Phase 3 technical design: [docs/PHASE3_TECHNICAL_DESIGN.md](./docs/PHASE3_TECHNICAL_DESIGN.md)
+- Phase 3 analytics event model: [docs/PHASE3_ANALYTICS_EVENT_MODEL.md](./docs/PHASE3_ANALYTICS_EVENT_MODEL.md)
+- Phase 3 billing localization plan: [docs/PHASE3_BILLING_LOCALIZATION_PLAN.md](./docs/PHASE3_BILLING_LOCALIZATION_PLAN.md)
+- Phase 3 phased rollout plan: [docs/PHASE3_ROLLOUT_PLAN.md](./docs/PHASE3_ROLLOUT_PLAN.md)
 
 
    •  Frontend: http://localhost:3000

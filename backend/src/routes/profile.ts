@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { Role } from "@prisma/client";
+import { computeProfileCompleteness } from "../lib/profile-completeness.js";
 
 const router = Router();
 
@@ -19,34 +20,6 @@ const upsertProfileSchema = z.object({
   portfolioUrl: z.string().url().max(500).optional().or(z.literal("")),
   openToWork: z.boolean().optional(),
 });
-
-interface ProfileForCompleteness {
-  headline?: string | null;
-  bio?: string | null;
-  skills: string[];
-  targetRoles: string[];
-  targetCountries: string[];
-  yearsExperience?: number | null;
-  visaStatus?: string | null;
-  linkedinUrl?: string | null;
-  githubUrl?: string | null;
-  portfolioUrl?: string | null;
-  resumes?: { id: string }[];
-}
-
-function computeCompleteness(profile: ProfileForCompleteness): number {
-  let score = 0;
-  if (profile.headline) score += 15;
-  if (profile.bio) score += 15;
-  if (profile.skills.length > 0) score += 15;
-  if (profile.targetRoles.length > 0) score += 10;
-  if (profile.targetCountries.length > 0) score += 10;
-  if (profile.yearsExperience != null) score += 10;
-  if (profile.visaStatus) score += 10;
-  if (profile.linkedinUrl || profile.githubUrl || profile.portfolioUrl) score += 10;
-  if (profile.resumes && profile.resumes.length > 0) score += 5;
-  return score;
-}
 
 const resumeMetadataSchema = z.object({
   s3Key: z.string().min(1).max(500),
@@ -117,7 +90,7 @@ router.put("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, re
       },
     });
 
-    const completeness = computeCompleteness(profile);
+    const completeness = computeProfileCompleteness(profile);
     const updated = await prisma.candidateProfile.update({
       where: { id: profile.id },
       data: { profileCompleteness: completeness },

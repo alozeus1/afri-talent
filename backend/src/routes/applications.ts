@@ -1,8 +1,9 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
-import { authenticate, authorize } from "../middleware/auth.js";
+import { authenticate, authorize, requireVerifiedEmail } from "../middleware/auth.js";
 import { ApplicationStatus, JobStatus, Role } from "@prisma/client";
+import { createUserNotification } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -44,7 +45,12 @@ const updateStatusSchema = z.object({
 });
 
 // POST /api/applications - Candidate: apply to job
-router.post("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response) => {
+router.post(
+  "/",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  requireVerifiedEmail({ roles: [Role.CANDIDATE] }),
+  async (req: Request, res: Response) => {
   try {
     const data = applySchema.parse(req.body);
 
@@ -53,7 +59,7 @@ router.post("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, r
       where: { id: data.jobId },
     });
 
-    if (!job || job.status !== JobStatus.PUBLISHED) {
+    if (!job || job.status !== JobStatus.PUBLISHED || job.isExpired) {
       res.status(404).json({ error: "Job not found or not available" });
       return;
     }
@@ -85,6 +91,24 @@ router.post("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, r
         },
       },
     });
+
+    if (job.employerId) {
+      const employer = await prisma.employer.findUnique({
+        where: { id: job.employerId },
+        select: { userId: true },
+      });
+
+      if (employer?.userId) {
+        await createUserNotification({
+          userId: employer.userId,
+          type: "APPLICATION_STATUS",
+          title: "New job application received",
+          body: `A candidate applied for ${job.title}.`,
+          channel: "applicationUpdates",
+          metadata: { applicationId: application.id, jobId: job.id },
+        });
+      }
+    }
 
     res.status(201).json(application);
   } catch (error) {
@@ -195,6 +219,19 @@ router.put("/:id/status", authenticate, authorize(Role.EMPLOYER), async (req: Re
       data: {
         status: data.status as ApplicationStatus,
         notes: data.notes,
+      },
+    });
+
+    await createUserNotification({
+      userId: application.candidateId,
+      type: "APPLICATION_STATUS",
+      title: "Application status updated",
+      body: `Your application for ${application.job.title} is now ${data.status.toLowerCase()}.`,
+      channel: "applicationUpdates",
+      metadata: {
+        applicationId: updatedApplication.id,
+        jobId: application.jobId,
+        status: data.status,
       },
     });
 

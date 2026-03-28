@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { jobs, Job } from "@/lib/api";
+import { jobs, Job, employerAnalytics, EmployerOnboarding } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 
 const statusVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
   DRAFT: "default",
@@ -17,16 +18,18 @@ const statusVariants: Record<string, "default" | "success" | "warning" | "danger
 };
 
 export default function EmployerDashboard() {
+  const locale = useLocale();
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [myJobs, setMyJobs] = useState<Job[]>([]);
+  const [onboarding, setOnboarding] = useState<EmployerOnboarding | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "EMPLOYER")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
 
   useEffect(() => {
     if (user?.role === "EMPLOYER") {
@@ -35,6 +38,7 @@ export default function EmployerDashboard() {
         .then(setMyJobs)
         .catch(console.error)
         .finally(() => setLoading(false));
+      employerAnalytics.onboarding().then(setOnboarding).catch(() => {});
     }
   }, [user]);
 
@@ -56,14 +60,52 @@ export default function EmployerDashboard() {
         </h1>
         <p className="text-gray-600">Manage your job postings and review applications</p>
         <div className="flex flex-wrap gap-3 mt-4">
-          <Link href="/employer/talent">
+          <Link href={localizePath("/employer/talent", locale)}>
             <Button variant="outline" size="sm">Browse Talent</Button>
           </Link>
-          <Link href="/employer/analytics">
+          <Link href={localizePath("/employer/integrations", locale)}>
+            <Button variant="outline" size="sm">ATS Integrations</Button>
+          </Link>
+          <Link href={localizePath("/employer/analytics", locale)}>
             <Button variant="outline" size="sm">Analytics</Button>
+          </Link>
+          <Link href={localizePath("/billing", locale)}>
+            <Button variant="outline" size="sm">Billing & Upgrades</Button>
           </Link>
         </div>
       </div>
+
+      {onboarding && (
+        <Card className="mb-8 border-emerald-200 bg-emerald-50/40 dark:bg-emerald-900/10">
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Employer onboarding {onboarding.completionPct}%
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-300">{onboarding.recommendation}</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-2 gap-3 mb-4">
+              {onboarding.checklist.map((item) => (
+                <div key={item.key} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                  <span className={item.done ? "text-emerald-600" : "text-amber-600"}>{item.done ? "✓" : "○"}</span>
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link href={localizePath("/employer/jobs/new", locale)}>
+                <Button size="sm">Launch First Job Wizard</Button>
+              </Link>
+              <Link href={localizePath("/employer/integrations", locale)}>
+                <Button size="sm" variant="outline">Connect ATS</Button>
+              </Link>
+              <Link href={localizePath("/employer/analytics", locale)}>
+                <Button size="sm" variant="outline">View Funnel Analytics</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid md:grid-cols-4 gap-6 mb-8">
         <Card>
@@ -100,7 +142,7 @@ export default function EmployerDashboard() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">My Job Postings</h2>
-            <Link href="/employer/jobs/new">
+            <Link href={localizePath("/employer/jobs/new", locale)}>
               <Button>Post New Job</Button>
             </Link>
           </div>
@@ -113,7 +155,7 @@ export default function EmployerDashboard() {
           ) : myJobs.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-600 mb-4">You haven&apos;t posted any jobs yet</p>
-              <Link href="/employer/jobs/new">
+              <Link href={localizePath("/employer/jobs/new", locale)}>
                 <Button>Post Your First Job</Button>
               </Link>
             </div>
@@ -138,13 +180,13 @@ export default function EmployerDashboard() {
                   </div>
                   <div className="flex gap-2">
                     {job.status === "PUBLISHED" && (
-                      <Link href={`/employer/jobs/${job.id}/applications`}>
+                      <Link href={localizePath(`/employer/jobs/${job.id}/applications`, locale)}>
                         <Button variant="outline" size="sm">
                           View Applications
                         </Button>
                       </Link>
                     )}
-                    <Link href={`/jobs/${job.slug}`}>
+                    <Link href={localizePath(`/jobs/${job.slug}`, locale)}>
                       <Button variant="ghost" size="sm">
                         View
                       </Button>

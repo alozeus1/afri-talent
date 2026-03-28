@@ -1,8 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
+import logger from "../lib/logger.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { ApplicationStatus, JobStatus, Role } from "@prisma/client";
+import { generateQuickCoverLetter } from "../lib/ai/cover-letter.js";
 const router = Router();
 const quickApplySchema = z.object({
     jobId: z.string().uuid(),
@@ -47,10 +49,31 @@ router.post("/", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
         // Use active resume's s3Key as cvUrl
         const activeResume = profile.resumes[0];
         const cvUrl = activeResume?.s3Key ?? null;
-        // Build cover letter summary from profile
-        const coverLetter = profile.headline
-            ? `${profile.headline} | Skills: ${profile.skills.join(", ")}`
-            : undefined;
+        // Generate AI-powered cover letter specific to this job
+        const companyName = job.employerId
+            ? (await prisma.employer.findUnique({ where: { id: job.employerId }, select: { companyName: true } }))?.companyName ?? job.sourceName ?? "the company"
+            : job.sourceName ?? "the company";
+        let coverLetter;
+        try {
+            const clResult = await generateQuickCoverLetter({
+                candidateName: (await prisma.user.findUnique({ where: { id: req.user.userId }, select: { name: true } }))?.name ?? "Candidate",
+                headline: profile.headline,
+                skills: profile.skills,
+                bio: profile.bio,
+                yearsExperience: profile.yearsExperience,
+                jobTitle: job.title,
+                companyName,
+                jobDescription: job.description,
+            });
+            coverLetter = clResult.coverLetter;
+            logger.info({ jobId: data.jobId, source: clResult.source }, "[quick-apply] cover letter generated");
+        }
+        catch (err) {
+            logger.warn({ err }, "[quick-apply] cover letter generation failed, applying without");
+            coverLetter = profile.headline
+                ? `${profile.headline} | Skills: ${profile.skills.join(", ")}`
+                : undefined;
+        }
         const application = await prisma.application.create({
             data: {
                 jobId: data.jobId,

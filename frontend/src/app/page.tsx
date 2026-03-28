@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { HeroStats } from "@/components/home/hero-stats";
 
 export default function Home() {
   return (
@@ -62,95 +63,73 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-16 bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-emerald-600 mb-2">10K+</div>
-              <div className="text-gray-600">Active Candidates</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-emerald-600 mb-2">500+</div>
-              <div className="text-gray-600">Partner Companies</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-emerald-600 mb-2">2K+</div>
-              <div className="text-gray-600">Jobs Posted</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-emerald-600 mb-2">54</div>
-              <div className="text-gray-600">African Countries</div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <HeroStats />
 
       {/* Features Section */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-20 bg-gray-50 dark:bg-gray-900/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
               Why Professionals Choose AfriTalent
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
               Empowering your career journey across borders with specialized tools and insights
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow">
               <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-4">
                 <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
                 Remote-First Jobs
               </h3>
-              <p className="text-gray-600 text-sm">
+              <p className="text-gray-600 dark:text-gray-300 text-sm">
                 Work from anywhere with top global companies hiring from Africa.
               </p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
                 <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
                 Visa Sponsorship Clarity
               </h3>
-              <p className="text-gray-600 text-sm">
+              <p className="text-gray-600 dark:text-gray-300 text-sm">
                 Clear info on visa support and legal requirements for every role.
               </p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow">
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
                 <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
                 Relocation Support
               </h3>
-              <p className="text-gray-600 text-sm">
+              <p className="text-gray-600 dark:text-gray-300 text-sm">
                 Guidance and assistance for moving abroad for your dream job.
               </p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow">
               <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
                 <svg className="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
                 AI-Powered Matching
               </h3>
-              <p className="text-gray-600 text-sm">
+              <p className="text-gray-600 dark:text-gray-300 text-sm">
                 Smart job matching and tailored resumes powered by Claude AI.
               </p>
             </div>
@@ -159,36 +138,40 @@ export default function Home() {
       </section>
 
       {/* Job Sources Section */}
-      <section className="py-16 bg-white">
+      <section className="py-16 bg-white dark:bg-gray-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Jobs From Global Platforms</h2>
-            <p className="text-gray-600">We aggregate opportunities from leading job boards worldwide</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Jobs From Global Platforms</h2>
+            <p className="text-gray-600 dark:text-gray-300">We aggregate opportunities from leading job boards worldwide</p>
           </div>
           <div className="flex flex-wrap justify-center items-center gap-8 opacity-60">
             <div className="text-center">
-              <div className="font-semibold text-gray-700">RemoteOK</div>
-              <div className="text-xs text-gray-500">Remote Global</div>
+              <div className="font-semibold text-gray-700 dark:text-gray-200">RemoteOK</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Remote Global</div>
             </div>
             <div className="text-center">
-              <div className="font-semibold text-gray-700">We Work Remotely</div>
-              <div className="text-xs text-gray-500">Remote Global</div>
+              <div className="font-semibold text-gray-700 dark:text-gray-200">We Work Remotely</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Remote Global</div>
             </div>
             <div className="text-center">
-              <div className="font-semibold text-gray-700">Jobberman</div>
-              <div className="text-xs text-gray-500">Africa</div>
+              <div className="font-semibold text-gray-700 dark:text-gray-200">Jobberman</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Africa</div>
             </div>
             <div className="text-center">
-              <div className="font-semibold text-gray-700">BrighterMonday</div>
-              <div className="text-xs text-gray-500">East Africa</div>
+              <div className="font-semibold text-gray-700 dark:text-gray-200">Himalayas</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Remote Global</div>
             </div>
             <div className="text-center">
-              <div className="font-semibold text-gray-700">Adzuna</div>
-              <div className="text-xs text-gray-500">US, UK, EU, CA</div>
+              <div className="font-semibold text-gray-700 dark:text-gray-200">Arbeitnow</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Europe + Visa</div>
             </div>
             <div className="text-center">
-              <div className="font-semibold text-gray-700">+ More</div>
-              <div className="text-xs text-gray-500">Coming Soon</div>
+              <div className="font-semibold text-gray-700 dark:text-gray-200">Remotive</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Remote Global</div>
+            </div>
+            <div className="text-center">
+              <div className="font-semibold text-gray-700 dark:text-gray-200">Adzuna</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">US, UK, EU, CA</div>
             </div>
           </div>
         </div>

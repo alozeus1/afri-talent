@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import { getStripe, getPlanFromPriceId, isStripeConfigured } from "../lib/stripe.js";
 import prisma from "../lib/prisma.js";
 import { SubscriptionStatus, SubscriptionPlan } from "@prisma/client";
+import { updateStripeCountry } from "../lib/billing/region-resolver.js";
+import { createUserNotification } from "../lib/notifications.js";
 
 const router = Router();
 
@@ -76,6 +78,35 @@ router.post("/stripe", async (req: Request, res: Response) => {
               status: SubscriptionStatus.ACTIVE,
             },
           });
+
+          await createUserNotification({
+            userId,
+            type: "VERIFICATION",
+            title: "Subscription activated",
+            body: `Your ${plan} plan is now active.`,
+            channel: "subscriptionNotices",
+            metadata: { event: event.type, plan },
+          });
+        }
+        break;
+      }
+
+      case "payment_method.attached": {
+        // Capture payment country from payment method
+        const pm = event.data.object as unknown as {
+          customer: string;
+          card?: { country: string };
+        };
+        if (pm.customer && pm.card?.country) {
+          const sub = await prisma.subscription.findFirst({
+            where: { stripeCustomerId: pm.customer as string },
+            select: { userId: true },
+          });
+          if (sub) {
+            await updateStripeCountry(sub.userId, pm.card.country).catch((err) =>
+              console.error("[webhook] Failed to update Stripe country:", err),
+            );
+          }
         }
         break;
       }
@@ -90,6 +121,10 @@ router.post("/stripe", async (req: Request, res: Response) => {
         const priceId = sub.items.data[0]?.price.id;
         const plan = priceId ? getPlanFromPriceId(priceId) : undefined;
         const status = mapStripeStatus(sub.status);
+        const existing = await prisma.subscription.findFirst({
+          where: { stripeSubId: sub.id },
+          select: { userId: true },
+        });
 
         await prisma.subscription.updateMany({
           where: { stripeSubId: sub.id },
@@ -99,11 +134,26 @@ router.post("/stripe", async (req: Request, res: Response) => {
             currentPeriodEnd: new Date(sub.current_period_end * 1000),
           },
         });
+
+        if (existing?.userId) {
+          await createUserNotification({
+            userId: existing.userId,
+            type: "VERIFICATION",
+            title: "Subscription updated",
+            body: `Your subscription status is now ${status.toLowerCase()}.`,
+            channel: "subscriptionNotices",
+            metadata: { event: event.type, status, plan },
+          });
+        }
         break;
       }
 
       case "customer.subscription.deleted": {
         const sub = event.data.object as { id: string };
+        const existing = await prisma.subscription.findFirst({
+          where: { stripeSubId: sub.id },
+          select: { userId: true },
+        });
         await prisma.subscription.updateMany({
           where: { stripeSubId: sub.id },
           data: {
@@ -111,15 +161,41 @@ router.post("/stripe", async (req: Request, res: Response) => {
             plan: SubscriptionPlan.FREE,
           },
         });
+
+        if (existing?.userId) {
+          await createUserNotification({
+            userId: existing.userId,
+            type: "VERIFICATION",
+            title: "Subscription cancelled",
+            body: "Your paid subscription was cancelled and moved to Free.",
+            channel: "subscriptionNotices",
+            metadata: { event: event.type },
+          });
+        }
         break;
       }
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as unknown as { subscription: string };
+        const existing = await prisma.subscription.findFirst({
+          where: { stripeSubId: invoice.subscription },
+          select: { userId: true },
+        });
         await prisma.subscription.updateMany({
           where: { stripeSubId: invoice.subscription },
           data: { status: SubscriptionStatus.PAST_DUE },
         });
+
+        if (existing?.userId) {
+          await createUserNotification({
+            userId: existing.userId,
+            type: "VERIFICATION",
+            title: "Payment issue detected",
+            body: "We could not process your payment. Please update your billing details.",
+            channel: "subscriptionNotices",
+            metadata: { event: event.type },
+          });
+        }
         break;
       }
 

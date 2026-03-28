@@ -7,8 +7,17 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
+import { Skeleton } from "@/components/ui/skeleton";
+import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+
+const SHOW_DEMO_CREDENTIALS =
+  process.env.NODE_ENV !== "production" &&
+  process.env.NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS === "true";
 
 function LoginForm() {
+  const locale = useLocale();
+  const t = useT();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
@@ -46,7 +55,7 @@ function LoginForm() {
 
     try {
       await login(email, password);
-      const redirect = searchParams.get("redirect") || "/";
+      const redirect = searchParams.get("redirect") || localizePath("/", locale);
       router.push(redirect);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -58,13 +67,13 @@ function LoginForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Welcome Back</h1>
-        <p className="text-gray-600">Sign in to your account</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t("auth.welcomeBack")}</h1>
+        <p className="text-gray-600 dark:text-gray-300">{t("auth.signInToAccount")}</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+            <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 p-3 rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -90,30 +99,34 @@ function LoginForm() {
           />
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Signing in..." : t("auth.signIn")}
           </Button>
 
           <div className="text-right">
-            <Link href="/forgot-password" className="text-sm text-emerald-600 hover:text-emerald-700">
+            <Link href={localizePath("/forgot-password", locale)} className="text-sm text-emerald-600 hover:text-emerald-700">
               Forgot your password?
             </Link>
           </div>
         </form>
 
-        <div className="mt-6 text-center text-sm text-gray-600">
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="text-emerald-600 hover:text-emerald-700 font-medium">
-            Create one
+        <OAuthButtons mode="login" onError={(oauthError) => setError(oauthError)} />
+
+        <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
+          {t("auth.dontHaveAccount")}{" "}
+          <Link href={localizePath("/register", locale)} className="text-emerald-600 hover:text-emerald-700 font-medium">
+            {t("auth.createAccount")}
           </Link>
         </div>
 
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
-          <p className="font-medium mb-2">Demo Credentials:</p>
-          <p>Candidate: candidate@example.com</p>
-          <p>Employer: employer@example.com</p>
-          <p>Admin: admin@example.com</p>
-          <p className="mt-1">Password: Password123!</p>
-        </div>
+        {SHOW_DEMO_CREDENTIALS && (
+          <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg text-sm text-gray-600 dark:text-gray-300">
+            <p className="font-medium mb-2">Demo Credentials:</p>
+            <p>Candidate: candidate@example.com</p>
+            <p>Employer: employer@example.com</p>
+            <p>Admin: admin@example.com</p>
+            <p className="mt-1">Password: Password123!</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -122,7 +135,11 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
-      <Suspense fallback={<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>}>
+      <Suspense fallback={
+        <div className="w-full max-w-md space-y-3">
+          <Skeleton className="h-56 w-full rounded-xl" />
+        </div>
+      }>
         <LoginForm />
       </Suspense>
     </div>

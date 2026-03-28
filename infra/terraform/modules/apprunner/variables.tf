@@ -40,6 +40,12 @@ variable "backend_image" {
   description = "Backend ECR image URI"
 }
 
+variable "backend_service_name" {
+  type        = string
+  description = "Optional explicit App Runner backend service name"
+  default     = ""
+}
+
 variable "backend_port" {
   type        = number
   description = "Backend container port"
@@ -103,6 +109,12 @@ variable "backend_secret_names" {
 variable "frontend_image" {
   type        = string
   description = "Frontend ECR image URI"
+}
+
+variable "frontend_service_name" {
+  type        = string
+  description = "Optional explicit App Runner frontend service name"
+  default     = ""
 }
 
 variable "frontend_port" {
