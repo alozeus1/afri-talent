@@ -1,4 +1,12 @@
-import { AbuseReportStatus, JobStatus, TrustCaseStatus, VerificationArtifactStatus } from "@prisma/client";
+import {
+  AbuseReportStatus,
+  BillingDiscrepancyStatus,
+  BillingDiscrepancyType,
+  BillingEventOutcome,
+  JobStatus,
+  TrustCaseStatus,
+  VerificationArtifactStatus,
+} from "@prisma/client";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { getLastSyncTime } from "./aggregator-cron.js";
@@ -16,6 +24,10 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
     abuseReportsOpen,
     fraudDetectionsLast24h,
     deadLettersBySource,
+    billingFailedPaymentsOpen,
+    billingPendingRefundsOpen,
+    billingWebhookFailuresOpen,
+    billingSuccessfulPayments24h,
   ] = await Promise.all([
     getLastSyncTime(),
     prisma.job.count({ where: { status: JobStatus.PENDING_REVIEW } }),
@@ -48,6 +60,41 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
       },
     }),
     summarizeDeadLetters(),
+    prisma.billingDiscrepancy.count({
+      where: {
+        type: BillingDiscrepancyType.PAYMENT_FAILURE,
+        status: {
+          in: [BillingDiscrepancyStatus.OPEN, BillingDiscrepancyStatus.ACKNOWLEDGED],
+        },
+      },
+    }),
+    prisma.billingDiscrepancy.count({
+      where: {
+        type: BillingDiscrepancyType.PENDING_REFUND,
+        status: {
+          in: [BillingDiscrepancyStatus.OPEN, BillingDiscrepancyStatus.ACKNOWLEDGED],
+        },
+      },
+    }),
+    prisma.billingDiscrepancy.count({
+      where: {
+        type: BillingDiscrepancyType.WEBHOOK_FAILURE,
+        status: {
+          in: [BillingDiscrepancyStatus.OPEN, BillingDiscrepancyStatus.ACKNOWLEDGED],
+        },
+      },
+    }),
+    prisma.billingEventAudit.count({
+      where: {
+        eventType: {
+          in: ["invoice.paid", "invoice.payment_succeeded"],
+        },
+        outcome: BillingEventOutcome.PROCESSED,
+        createdAt: {
+          gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        },
+      },
+    }),
   ]);
 
   const minutesSinceLastSync = lastSyncAt
@@ -89,6 +136,26 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
   });
 
   recordOpsSnapshotMetric({
+    metricName: "billing_failed_payments_open",
+    value: billingFailedPaymentsOpen,
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "billing_pending_refunds_open",
+    value: billingPendingRefundsOpen,
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "billing_webhook_failures_open",
+    value: billingWebhookFailuresOpen,
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "billing_successful_payments_24h",
+    value: billingSuccessfulPayments24h,
+  });
+
+  recordOpsSnapshotMetric({
     metricName: "dead_letter_backlog",
     value: totalDeadLetters,
   });
@@ -102,6 +169,10 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
       moderationQueueBacklog,
       abuseReportsOpen,
       fraudDetectionsLast24h,
+      billingFailedPaymentsOpen,
+      billingPendingRefundsOpen,
+      billingWebhookFailuresOpen,
+      billingSuccessfulPayments24h,
       totalDeadLetters,
     },
     "[ops] operational snapshot emitted",

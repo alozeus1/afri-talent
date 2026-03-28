@@ -3,3 +3,14 @@ export { resolveUserRegion, setUserBillingCountry, updateStripeCountry } from ".
 export { getRegionalPrice, getRegionalPrices, resolveStripePriceId } from "./pricing.js";
 export { getEntitlements, getUserEntitlements } from "./entitlements.js";
 export { grandfatherActiveSubscribers, isGrandfathered, removeGrandfathering } from "./grandfathering.js";
+export {
+  mapStripeSubscriptionStatus,
+  validateBillingEntitlementState,
+  syncBillingEntitlementState,
+  recordBillingEvent,
+  upsertBillingDiscrepancy,
+  resolveBillingDiscrepancy,
+  createBillingSupportAction,
+  validateCheckoutSafety,
+  runBillingReconciliationCycle,
+} from "./operations.js";

@@ -364,6 +364,48 @@ enum RegionChangeSource {
   ADMIN_OVERRIDE
 }
 
+enum BillingEventOutcome {
+  RECEIVED
+  PROCESSED
+  FAILED
+  DUPLICATE
+  RECONCILED
+}
+
+enum BillingDiscrepancyType {
+  WEBHOOK_FAILURE
+  SUBSCRIPTION_STATE_MISMATCH
+  PLAN_MISMATCH
+  UNPAID_BUT_ENTITLED
+  PAID_BUT_NOT_ENTITLED
+  PENDING_REFUND
+  REGION_MISMATCH
+  STALE_ENTITLEMENT
+  PAYMENT_FAILURE
+}
+
+enum BillingDiscrepancyStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum BillingSupportActionType {
+  NOTE
+  RESYNC_ENTITLEMENTS
+  RESEND_RECEIPT
+  REFUND_REVIEW
+  CANCEL_SUBSCRIPTION
+  UPGRADE_DOWNGRADE_CORRECTION
+  GRANDFATHER_OVERRIDE
+}
+
+enum BillingReconciliationStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
 model RegionalPrice {
   id            String           @id @default(uuid())
   plan          SubscriptionPlan
@@ -464,67 +506,72 @@ model RegionConfig {
 // ──────────────── Existing Models ────────────────
 
 model User {
-  id              String          @id @default(uuid())
-  email           String          @unique
-  password        String          @default("")
-  name            String
-  role            Role
-  preferredLocale SupportedLocale @default(EN)
-  emailVerified   Boolean         @default(false)
-  emailVerifiedAt DateTime?
-  avatarUrl       String?         @db.VarChar(500)
+  id                       String                   @id @default(uuid())
+  email                    String                   @unique
+  password                 String                   @default("")
+  name                     String
+  role                     Role
+  preferredLocale          SupportedLocale          @default(EN)
+  emailVerified            Boolean                  @default(false)
+  emailVerifiedAt          DateTime?
+  avatarUrl                String?                  @db.VarChar(500)
   accountRestrictionStatus AccountRestrictionStatus @default(ACTIVE)
-  accountRestrictionReason String?        @db.VarChar(160)
+  accountRestrictionReason String?                  @db.VarChar(160)
   accountRestrictedAt      DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
 
-  employer                Employer?
-  applications            Application[]
-  adminReviews            AdminReview[]              @relation("AdminReviewer")
-  candidateProfile        CandidateProfile?
-  subscription            Subscription?
-  notifications           Notification[]
-  threadParticipants      ThreadParticipant[]
-  sentMessages            Message[]                  @relation("MessageSender")
-  aiRuns                  AiRun[]
-  savedSearches           SavedSearch[]
-  jobAlerts               JobAlert[]
-  companyReviews          CompanyReview[]
-  skillAssessments        SkillAssessment[]
-  assessmentInvites       AssessmentInvite[]
-  passwordResets          PasswordResetToken[]
-  interviewExperiences    InterviewExperience[]
-  salaryReports           SalaryReport[]
-  immigrationProcesses    ImmigrationProcess[]
-  referralsMade           Referral[]                 @relation("ReferralsMade")
-  referralsReceived       Referral[]                 @relation("ReferralsReceived")
-  calendarEvents          CalendarEvent[]
-  chatConsent             ChatConsent?
-  chatConversations       ChatConversation[]
-  billingProfile          UserBillingProfile?
-  oauthAccounts           OAuthAccount[]
-  emailVerificationTokens EmailVerificationToken[]
-  notificationPreferences NotificationPreference?
-  pushSubscriptions       PushSubscription[]
-  analyticsEvents         AnalyticsEvent[]
-  mockInterviewSessions   MockInterviewSession[]
-  socialProfile           SocialProfile?
-  socialConnectionsSent   SocialConnection[]         @relation("SocialConnectionRequester")
-  socialConnectionsRecv   SocialConnection[]         @relation("SocialConnectionRecipient")
-  salaryNegotiations      SalaryNegotiationSession[]
-  botSubscriptions        BotSubscription[]
-  employerAiTasksCreated  EmployerAiTask[]           @relation("EmployerAiTaskCreator")
-  employerAiTasksReviewed EmployerAiTask[]           @relation("EmployerAiTaskReviewer")
-  candidateTrustProfile   CandidateTrustProfile?
-  verificationArtifacts   VerificationArtifact[]     @relation("UserVerificationArtifacts")
-  reviewedVerificationArtifacts VerificationArtifact[] @relation("VerificationArtifactReviewer")
-  trustRiskEvents         TrustRiskEvent[]
-  abuseReportsFiled       AbuseReport[]              @relation("AbuseReportReporter")
-  abuseReportsAgainst     AbuseReport[]              @relation("AbuseReportTargetUser")
-  abuseReportsAssigned    AbuseReport[]              @relation("AbuseReportAssignee")
-  trustCasesAssigned      TrustCase[]                @relation("TrustCaseAssignee")
-  trustCaseActions        TrustCaseAction[]          @relation("TrustCaseActionActor")
+  employer                      Employer?
+  applications                  Application[]
+  adminReviews                  AdminReview[]              @relation("AdminReviewer")
+  candidateProfile              CandidateProfile?
+  subscription                  Subscription?
+  notifications                 Notification[]
+  threadParticipants            ThreadParticipant[]
+  sentMessages                  Message[]                  @relation("MessageSender")
+  aiRuns                        AiRun[]
+  savedSearches                 SavedSearch[]
+  jobAlerts                     JobAlert[]
+  companyReviews                CompanyReview[]
+  skillAssessments              SkillAssessment[]
+  assessmentInvites             AssessmentInvite[]
+  passwordResets                PasswordResetToken[]
+  interviewExperiences          InterviewExperience[]
+  salaryReports                 SalaryReport[]
+  immigrationProcesses          ImmigrationProcess[]
+  referralsMade                 Referral[]                 @relation("ReferralsMade")
+  referralsReceived             Referral[]                 @relation("ReferralsReceived")
+  calendarEvents                CalendarEvent[]
+  chatConsent                   ChatConsent?
+  chatConversations             ChatConversation[]
+  billingProfile                UserBillingProfile?
+  oauthAccounts                 OAuthAccount[]
+  emailVerificationTokens       EmailVerificationToken[]
+  notificationPreferences       NotificationPreference?
+  pushSubscriptions             PushSubscription[]
+  analyticsEvents               AnalyticsEvent[]
+  mockInterviewSessions         MockInterviewSession[]
+  socialProfile                 SocialProfile?
+  socialConnectionsSent         SocialConnection[]         @relation("SocialConnectionRequester")
+  socialConnectionsRecv         SocialConnection[]         @relation("SocialConnectionRecipient")
+  salaryNegotiations            SalaryNegotiationSession[]
+  botSubscriptions              BotSubscription[]
+  employerAiTasksCreated        EmployerAiTask[]           @relation("EmployerAiTaskCreator")
+  employerAiTasksReviewed       EmployerAiTask[]           @relation("EmployerAiTaskReviewer")
+  billingEvents                 BillingEventAudit[]
+  billingDiscrepancies          BillingDiscrepancy[]
+  billingEntitlementState       BillingEntitlementState?
+  candidateTrustProfile         CandidateTrustProfile?
+  billingSupportActions         BillingSupportAction[]     @relation("BillingSupportTarget")
+  billingSupportActionsTaken    BillingSupportAction[]     @relation("BillingSupportActor")
+  verificationArtifacts         VerificationArtifact[]     @relation("UserVerificationArtifacts")
+  reviewedVerificationArtifacts VerificationArtifact[]     @relation("VerificationArtifactReviewer")
+  trustRiskEvents               TrustRiskEvent[]
+  abuseReportsFiled             AbuseReport[]              @relation("AbuseReportReporter")
+  abuseReportsAgainst           AbuseReport[]              @relation("AbuseReportTargetUser")
+  abuseReportsAssigned          AbuseReport[]              @relation("AbuseReportAssignee")
+  trustCasesAssigned            TrustCase[]                @relation("TrustCaseAssignee")
+  trustCaseActions              TrustCaseAction[]          @relation("TrustCaseActionActor")
 
   @@index([role])
   @@index([createdAt])
@@ -543,13 +590,13 @@ model Employer {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id])
 
-  jobs           Job[]
-  atsConnections ATSConnection[]
-  aiTasks        EmployerAiTask[]
-  trustProfile   EmployerTrustProfile?
+  jobs                  Job[]
+  atsConnections        ATSConnection[]
+  aiTasks               EmployerAiTask[]
+  trustProfile          EmployerTrustProfile?
   verificationArtifacts VerificationArtifact[] @relation("EmployerVerificationArtifacts")
-  trustRiskEvents TrustRiskEvent[]
-  abuseReports   AbuseReport[]
+  trustRiskEvents       TrustRiskEvent[]
+  abuseReports          AbuseReport[]
 }
 
 model Job {
@@ -579,12 +626,12 @@ model Job {
   sourceName           String? // company name for aggregated jobs
 
   // Job expiry tracking
-  expiresAt     DateTime? // when the listing expires (from source or heuristic)
-  lastCheckedAt DateTime? // last time we verified the listing is still live
-  isExpired     Boolean   @default(false)
-  riskScore     Int       @default(0)
-  riskLevel     TrustRiskLevel @default(LOW)
-  trustFlags    Json?
+  expiresAt        DateTime? // when the listing expires (from source or heuristic)
+  lastCheckedAt    DateTime? // last time we verified the listing is still live
+  isExpired        Boolean        @default(false)
+  riskScore        Int            @default(0)
+  riskLevel        TrustRiskLevel @default(LOW)
+  trustFlags       Json?
   qualityCheckedAt DateTime?
 
   // Nullable for aggregated jobs (no Employer profile in DB)
@@ -633,11 +680,11 @@ model Application {
   candidateId String
   candidate   User   @relation(fields: [candidateId], references: [id])
 
-  adminReviews AdminReview[]  @relation("ApplicationReviews")
-  thread       MessageThread?
+  adminReviews    AdminReview[]    @relation("ApplicationReviews")
+  thread          MessageThread?
   trustRiskEvents TrustRiskEvent[]
-  abuseReports AbuseReport[]
-  trustCases TrustCase[]
+  abuseReports    AbuseReport[]
+  trustCases      TrustCase[]
 
   @@unique([jobId, candidateId])
   @@index([jobId])
@@ -721,29 +768,29 @@ model CandidateProfile {
 }
 
 model EmployerTrustProfile {
-  id                         String                    @id @default(uuid())
-  employerId                 String                    @unique
-  employer                   Employer                  @relation(fields: [employerId], references: [id], onDelete: Cascade)
-  verificationLevel          EmployerVerificationLevel @default(UNVERIFIED)
-  authenticityScore          Int                       @default(0)
-  riskScore                  Int                       @default(0)
-  riskLevel                  TrustRiskLevel            @default(LOW)
-  postingEligibility         Boolean                   @default(false)
-  requiresEnhancedVerification Boolean                 @default(false)
-  verifiedDomain             String?                   @db.VarChar(255)
-  websiteMatchesEmail        Boolean                   @default(false)
-  throwawayDomainDetected    Boolean                   @default(false)
-  linkedInCompanyUrl         String?                   @db.VarChar(500)
-  domainVerifiedAt           DateTime?
-  businessDocVerifiedAt      DateTime?
-  manualApprovedAt           DateTime?
-  premiumTrustedAt           DateTime?
-  suspiciousSignals          Json?
-  internalNotes              String?                   @db.Text
-  createdAt                  DateTime                  @default(now())
-  updatedAt                  DateTime                  @updatedAt
+  id                           String                    @id @default(uuid())
+  employerId                   String                    @unique
+  employer                     Employer                  @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  verificationLevel            EmployerVerificationLevel @default(UNVERIFIED)
+  authenticityScore            Int                       @default(0)
+  riskScore                    Int                       @default(0)
+  riskLevel                    TrustRiskLevel            @default(LOW)
+  postingEligibility           Boolean                   @default(false)
+  requiresEnhancedVerification Boolean                   @default(false)
+  verifiedDomain               String?                   @db.VarChar(255)
+  websiteMatchesEmail          Boolean                   @default(false)
+  throwawayDomainDetected      Boolean                   @default(false)
+  linkedInCompanyUrl           String?                   @db.VarChar(500)
+  domainVerifiedAt             DateTime?
+  businessDocVerifiedAt        DateTime?
+  manualApprovedAt             DateTime?
+  premiumTrustedAt             DateTime?
+  suspiciousSignals            Json?
+  internalNotes                String?                   @db.Text
+  createdAt                    DateTime                  @default(now())
+  updatedAt                    DateTime                  @updatedAt
 
-  trustCases            TrustCase[]
+  trustCases TrustCase[]
 
   @@index([verificationLevel])
   @@index([riskLevel, riskScore])
@@ -751,25 +798,25 @@ model EmployerTrustProfile {
 }
 
 model CandidateTrustProfile {
-  id                     String                     @id @default(uuid())
-  userId                 String                     @unique
-  user                   User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  verificationLevel      CandidateVerificationLevel @default(UNVERIFIED)
-  authenticityScore      Int                        @default(0)
-  riskScore              Int                        @default(0)
-  riskLevel              TrustRiskLevel             @default(LOW)
-  phoneNumber            String?                    @db.VarChar(30)
-  phoneVerifiedAt        DateTime?
-  identityVerifiedAt     DateTime?
-  skillsVerifiedAt       DateTime?
-  employmentVerifiedAt   DateTime?
-  linkedinVerified       Boolean                    @default(false)
-  githubVerified         Boolean                    @default(false)
-  portfolioVerified      Boolean                    @default(false)
-  premiumFilterEligible  Boolean                    @default(false)
-  suspiciousSignals      Json?
-  createdAt              DateTime                   @default(now())
-  updatedAt              DateTime                   @updatedAt
+  id                    String                     @id @default(uuid())
+  userId                String                     @unique
+  user                  User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verificationLevel     CandidateVerificationLevel @default(UNVERIFIED)
+  authenticityScore     Int                        @default(0)
+  riskScore             Int                        @default(0)
+  riskLevel             TrustRiskLevel             @default(LOW)
+  phoneNumber           String?                    @db.VarChar(30)
+  phoneVerifiedAt       DateTime?
+  identityVerifiedAt    DateTime?
+  skillsVerifiedAt      DateTime?
+  employmentVerifiedAt  DateTime?
+  linkedinVerified      Boolean                    @default(false)
+  githubVerified        Boolean                    @default(false)
+  portfolioVerified     Boolean                    @default(false)
+  premiumFilterEligible Boolean                    @default(false)
+  suspiciousSignals     Json?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
 
   phoneChallenges PhoneVerificationChallenge[]
   trustCases      TrustCase[]
@@ -820,26 +867,26 @@ model VerificationArtifact {
 }
 
 model TrustRiskEvent {
-  id                      String         @id @default(uuid())
-  entityType              TrustEntityType
-  reasonCode              String         @db.VarChar(100)
-  summary                 String         @db.VarChar(255)
-  evidence                Json?
-  scoreDelta              Int
-  resultingScore          Int
-  riskLevel               TrustRiskLevel
-  autoHeld                Boolean        @default(false)
-  userId                  String?
-  user                    User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  employerId              String?
-  employer                Employer?      @relation(fields: [employerId], references: [id], onDelete: SetNull)
-  jobId                   String?
-  job                     Job?           @relation(fields: [jobId], references: [id], onDelete: SetNull)
-  applicationId           String?
-  application             Application?   @relation(fields: [applicationId], references: [id], onDelete: SetNull)
-  threadId                String?
-  thread                  MessageThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
-  createdAt               DateTime       @default(now())
+  id             String          @id @default(uuid())
+  entityType     TrustEntityType
+  reasonCode     String          @db.VarChar(100)
+  summary        String          @db.VarChar(255)
+  evidence       Json?
+  scoreDelta     Int
+  resultingScore Int
+  riskLevel      TrustRiskLevel
+  autoHeld       Boolean         @default(false)
+  userId         String?
+  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  employerId     String?
+  employer       Employer?       @relation(fields: [employerId], references: [id], onDelete: SetNull)
+  jobId          String?
+  job            Job?            @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  applicationId  String?
+  application    Application?    @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  threadId       String?
+  thread         MessageThread?  @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  createdAt      DateTime        @default(now())
 
   @@index([entityType, createdAt(sort: Desc)])
   @@index([riskLevel, createdAt(sort: Desc)])
@@ -879,33 +926,33 @@ model AbuseReport {
 }
 
 model TrustCase {
-  id                      String            @id @default(uuid())
+  id                      String                 @id @default(uuid())
   entityType              TrustEntityType
-  status                  TrustCaseStatus   @default(OPEN)
-  priority                TrustRiskLevel    @default(MEDIUM)
-  title                   String            @db.VarChar(200)
-  reasonCode              String?           @db.VarChar(100)
-  summary                 String?           @db.Text
+  status                  TrustCaseStatus        @default(OPEN)
+  priority                TrustRiskLevel         @default(MEDIUM)
+  title                   String                 @db.VarChar(200)
+  reasonCode              String?                @db.VarChar(100)
+  summary                 String?                @db.Text
   employerTrustProfileId  String?
-  employerTrustProfile    EmployerTrustProfile? @relation(fields: [employerTrustProfileId], references: [id], onDelete: SetNull)
+  employerTrustProfile    EmployerTrustProfile?  @relation(fields: [employerTrustProfileId], references: [id], onDelete: SetNull)
   candidateTrustProfileId String?
   candidateTrustProfile   CandidateTrustProfile? @relation(fields: [candidateTrustProfileId], references: [id], onDelete: SetNull)
   jobId                   String?
-  job                     Job?              @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  job                     Job?                   @relation(fields: [jobId], references: [id], onDelete: SetNull)
   applicationId           String?
-  application             Application?      @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  application             Application?           @relation(fields: [applicationId], references: [id], onDelete: SetNull)
   threadId                String?
-  thread                  MessageThread?    @relation(fields: [threadId], references: [id], onDelete: SetNull)
-  reportId                String?           @unique
-  report                  AbuseReport?      @relation(fields: [reportId], references: [id], onDelete: SetNull)
-  artifactId              String?           @unique
-  artifact                VerificationArtifact? @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  thread                  MessageThread?         @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  reportId                String?                @unique
+  report                  AbuseReport?           @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  artifactId              String?                @unique
+  artifact                VerificationArtifact?  @relation(fields: [artifactId], references: [id], onDelete: SetNull)
   assignedAdminId         String?
-  assignedAdmin           User?             @relation("TrustCaseAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
-  openedAt                DateTime          @default(now())
+  assignedAdmin           User?                  @relation("TrustCaseAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  openedAt                DateTime               @default(now())
   closedAt                DateTime?
-  createdAt               DateTime          @default(now())
-  updatedAt               DateTime          @updatedAt
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
 
   actions TrustCaseAction[]
 
@@ -915,15 +962,15 @@ model TrustCase {
 
 model TrustCaseAction {
   id         String               @id @default(uuid())
-  caseId      String
-  trustCase   TrustCase           @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  actorId     String?
-  actor       User?               @relation("TrustCaseActionActor", fields: [actorId], references: [id], onDelete: SetNull)
-  actionType  ModerationActionType
-  reasonCode  String?             @db.VarChar(100)
-  notes       String?             @db.Text
-  metadata    Json?
-  createdAt   DateTime            @default(now())
+  caseId     String
+  trustCase  TrustCase            @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      User?                @relation("TrustCaseActionActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actionType ModerationActionType
+  reasonCode String?              @db.VarChar(100)
+  notes      String?              @db.Text
+  metadata   Json?
+  createdAt  DateTime             @default(now())
 
   @@index([caseId, createdAt(sort: Desc)])
   @@index([actionType, createdAt(sort: Desc)])
@@ -981,11 +1028,11 @@ model MessageThread {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  participants ThreadParticipant[]
-  messages     Message[]
+  participants    ThreadParticipant[]
+  messages        Message[]
   trustRiskEvents TrustRiskEvent[]
-  abuseReports AbuseReport[]
-  trustCases TrustCase[]
+  abuseReports    AbuseReport[]
+  trustCases      TrustCase[]
 
   @@index([jobId])
 }
@@ -1317,9 +1364,157 @@ model Subscription {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
+  billingEvents         BillingEventAudit[]
+  billingDiscrepancies  BillingDiscrepancy[]
+  billingSupportActions BillingSupportAction[]
+  entitlementState      BillingEntitlementState?
+
   @@index([userId])
   @@index([stripeCustomerId])
   @@index([stripeSubId])
+}
+
+model BillingEntitlementState {
+  id              String             @id @default(uuid())
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionId  String?            @unique
+  subscription    Subscription?      @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  effectivePlan   SubscriptionPlan
+  effectiveStatus SubscriptionStatus
+  billingRegion   BillingRegion?
+  currency        String?            @db.VarChar(3)
+  pricingVersion  Int?
+  entitlements    Json
+  checksum        String             @db.VarChar(64)
+  isInSync        Boolean            @default(true)
+  mismatchReason  String?            @db.VarChar(160)
+  source          String             @default("system") @db.VarChar(50)
+  lastSyncedAt    DateTime           @default(now())
+  lastValidatedAt DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([userId, lastSyncedAt(sort: Desc)])
+  @@index([isInSync, lastValidatedAt(sort: Desc)])
+}
+
+model BillingEventAudit {
+  id                    String              @id @default(uuid())
+  userId                String?
+  user                  User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  subscriptionId        String?
+  subscription          Subscription?       @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  eventId               String?             @db.VarChar(255)
+  source                String              @db.VarChar(40)
+  eventType             String              @db.VarChar(120)
+  outcome               BillingEventOutcome @default(RECEIVED)
+  plan                  SubscriptionPlan?
+  status                SubscriptionStatus?
+  billingRegion         BillingRegion?
+  currency              String?             @db.VarChar(3)
+  amountMinor           Int?
+  stripeCustomerId      String?             @db.VarChar(255)
+  stripeSubscriptionId  String?             @db.VarChar(255)
+  stripeInvoiceId       String?             @db.VarChar(255)
+  stripePaymentIntentId String?             @db.VarChar(255)
+  stripeChargeId        String?             @db.VarChar(255)
+  stripeRefundId        String?             @db.VarChar(255)
+  reasonCode            String?             @db.VarChar(120)
+  message               String?             @db.VarChar(500)
+  metadata              Json?
+  rawPayload            Json?
+  occurredAt            DateTime            @default(now())
+  processedAt           DateTime?
+  createdAt             DateTime            @default(now())
+
+  supportActions BillingSupportAction[]
+  discrepancies  BillingDiscrepancy[]
+
+  @@index([eventId])
+  @@index([source, eventType, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([subscriptionId, createdAt(sort: Desc)])
+  @@index([outcome, createdAt(sort: Desc)])
+  @@index([stripeInvoiceId])
+  @@index([stripePaymentIntentId])
+  @@index([stripeRefundId])
+}
+
+model BillingReconciliationRun {
+  id                     String                      @id @default(uuid())
+  status                 BillingReconciliationStatus @default(SUCCESS)
+  triggeredBy            String                      @default("scheduler") @db.VarChar(50)
+  checkedSubscriptions   Int                         @default(0)
+  successPayments        Int                         @default(0)
+  failedPayments         Int                         @default(0)
+  webhookFailures        Int                         @default(0)
+  subscriptionMismatches Int                         @default(0)
+  unpaidEntitlements     Int                         @default(0)
+  paidNotEntitled        Int                         @default(0)
+  pendingRefunds         Int                         @default(0)
+  summary                Json?
+  errorMessage           String?                     @db.VarChar(500)
+  startedAt              DateTime                    @default(now())
+  completedAt            DateTime?
+  createdAt              DateTime                    @default(now())
+
+  discrepancies BillingDiscrepancy[]
+
+  @@index([status, startedAt(sort: Desc)])
+}
+
+model BillingDiscrepancy {
+  id                  String                    @id @default(uuid())
+  userId              String?
+  user                User?                     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  subscriptionId      String?
+  subscription        Subscription?             @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  billingEventId      String?
+  billingEvent        BillingEventAudit?        @relation(fields: [billingEventId], references: [id], onDelete: SetNull)
+  reconciliationRunId String?
+  reconciliationRun   BillingReconciliationRun? @relation(fields: [reconciliationRunId], references: [id], onDelete: SetNull)
+  type                BillingDiscrepancyType
+  status              BillingDiscrepancyStatus  @default(OPEN)
+  severity            String                    @default("MEDIUM") @db.VarChar(20)
+  title               String                    @db.VarChar(160)
+  reasonCode          String?                   @db.VarChar(120)
+  details             Json?
+  dueAt               DateTime?
+  detectedAt          DateTime                  @default(now())
+  lastSeenAt          DateTime                  @default(now())
+  acknowledgedAt      DateTime?
+  resolvedAt          DateTime?
+  updatedAt           DateTime                  @updatedAt
+
+  supportActions BillingSupportAction[]
+
+  @@index([status, type, detectedAt(sort: Desc)])
+  @@index([userId, status, detectedAt(sort: Desc)])
+  @@index([subscriptionId, status, detectedAt(sort: Desc)])
+}
+
+model BillingSupportAction {
+  id             String                   @id @default(uuid())
+  actorId        String
+  actor          User                     @relation("BillingSupportActor", fields: [actorId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                     @relation("BillingSupportTarget", fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionId String?
+  subscription   Subscription?            @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  billingEventId String?
+  billingEvent   BillingEventAudit?       @relation(fields: [billingEventId], references: [id], onDelete: SetNull)
+  discrepancyId  String?
+  discrepancy    BillingDiscrepancy?      @relation(fields: [discrepancyId], references: [id], onDelete: SetNull)
+  actionType     BillingSupportActionType
+  reasonCode     String                   @db.VarChar(120)
+  notes          String?                  @db.VarChar(2000)
+  metadata       Json?
+  createdAt      DateTime                 @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([actionType, createdAt(sort: Desc)])
 }
 
 // ──────────────── AI Run Persistence ────────────────

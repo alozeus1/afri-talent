@@ -97,6 +97,15 @@ When prices change:
 - `checkout.session.completed` → activates subscription
 - `customer.subscription.updated` → syncs plan/status changes
 - `customer.subscription.deleted` → cancels, removes grandfathering
+- `invoice.payment_failed` / `invoice.paid` → update payment risk and entitlement sync state
+- `refund.created` / `refund.updated` / `charge.refunded` → create refund audit history and pending refund discrepancies
+
+## Pricing Safety Hardening
+
+- Checkout now validates that the stored billing currency is allowed for the stored region.
+- Checkout is blocked when a non-grandfathered account's selected billing country conflicts with the last verified Stripe payment country.
+- Billing events, support actions, entitlement sync state, and reconciliation discrepancies are stored for operational auditability.
+- Daily billing reconciliation validates stale entitlement state, plan drift, unpaid-but-entitled users, paid-but-not-entitled users, and pending refunds.
 
 ## API Endpoints
 

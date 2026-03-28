@@ -248,6 +248,58 @@ export const adminTrust = {
     }),
 };
 
+export const adminBilling = {
+  dashboard: () => fetchAPI<AdminBillingDashboard>("/api/admin/billing/dashboard"),
+  discrepancies: (params?: { status?: "ALL" | "OPEN" | "ACKNOWLEDGED" | "RESOLVED"; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.limit) searchParams.set("limit", params.limit.toString());
+    const query = searchParams.toString();
+    return fetchAPI<{ discrepancies: AdminBillingDiscrepancy[] }>(`/api/admin/billing/discrepancies${query ? `?${query}` : ""}`);
+  },
+  reconciliationRuns: (limit = 20) =>
+    fetchAPI<{ runs: AdminBillingReconciliationRun[] }>(`/api/admin/billing/reconciliation-runs?limit=${limit}`),
+  triggerReconciliation: () =>
+    fetchAPI<{ result: AdminBillingReconciliationRun }>("/api/admin/billing/reconcile", {
+      method: "POST",
+    }),
+  searchCustomers: (query: string) =>
+    fetchAPI<{ customers: AdminBillingCustomerSearchResult[] }>(`/api/admin/billing/customers/search?query=${encodeURIComponent(query)}`),
+  customer: (userId: string) =>
+    fetchAPI<{ customer: AdminBillingCustomerDetail }>(`/api/admin/billing/customers/${userId}`),
+  resyncEntitlements: (userId: string) =>
+    fetchAPI<{
+      state: BillingEntitlementState;
+      validation: BillingEntitlementValidation;
+      action: BillingSupportActionRecord;
+    }>(`/api/admin/billing/customers/${userId}/resync-entitlements`, {
+      method: "POST",
+    }),
+  supportAction: (
+    userId: string,
+    data: {
+      actionType: "NOTE" | "RESYNC_ENTITLEMENTS" | "RESEND_RECEIPT" | "REFUND_REVIEW" | "CANCEL_SUBSCRIPTION" | "UPGRADE_DOWNGRADE_CORRECTION" | "GRANDFATHER_OVERRIDE";
+      reasonCode: string;
+      notes?: string;
+      billingEventId?: string;
+      discrepancyId?: string;
+      invoiceId?: string;
+      metadata?: Record<string, string | number | boolean | null>;
+    },
+  ) =>
+    fetchAPI<{
+      action: BillingSupportActionRecord;
+      receiptDelivery: {
+        attempted: boolean;
+        delivered: boolean;
+        message: string;
+      } | null;
+    }>(`/api/admin/billing/customers/${userId}/actions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
 // Billing
 export const billing = {
   checkout: (plan: string, interval: "MONTHLY" | "YEARLY" = "MONTHLY") =>
@@ -934,6 +986,204 @@ export interface BillingStatus {
   status: "ACTIVE" | "INACTIVE" | "PAST_DUE" | "CANCELLED";
   currentPeriodEnd: string | null;
   hasCustomer: boolean;
+}
+
+export interface BillingEntitlementState {
+  id: string;
+  effectivePlan: BillingStatus["plan"];
+  effectiveStatus: BillingStatus["status"];
+  billingRegion: "AFRICA" | "EUROPE" | "ROW" | null;
+  currency: string | null;
+  pricingVersion: number | null;
+  checksum: string;
+  isInSync: boolean;
+  source: string;
+  lastSyncedAt: string;
+  lastValidatedAt: string | null;
+}
+
+export interface BillingEntitlementValidation {
+  currentState: {
+    id: string;
+    effectivePlan: BillingStatus["plan"];
+    effectiveStatus: BillingStatus["status"];
+    checksum: string;
+    billingRegion: "AFRICA" | "EUROPE" | "ROW" | null;
+    currency: string | null;
+    pricingVersion: number | null;
+  } | null;
+  expected: {
+    subscriptionId: string | null;
+    subscriptionPlan: BillingStatus["plan"];
+    subscriptionStatus: BillingStatus["status"];
+    effectivePlan: BillingStatus["plan"];
+    effectiveStatus: BillingStatus["status"];
+    billingRegion: "AFRICA" | "EUROPE" | "ROW" | null;
+    currency: string | null;
+    pricingVersion: number | null;
+    checksum: string;
+    isGrandfathered: boolean;
+    profileCountry: string | null;
+    stripeCountry: string | null;
+  };
+  reasons: string[];
+  isStale: boolean;
+}
+
+export interface BillingAuditEventRecord {
+  id: string;
+  eventId: string | null;
+  source: string;
+  eventType: string;
+  outcome: "RECEIVED" | "PROCESSED" | "FAILED" | "DUPLICATE" | "RECONCILED";
+  plan: BillingStatus["plan"] | null;
+  status: BillingStatus["status"] | null;
+  billingRegion: "AFRICA" | "EUROPE" | "ROW" | null;
+  currency: string | null;
+  amountMinor: number | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripeInvoiceId: string | null;
+  stripePaymentIntentId: string | null;
+  stripeChargeId: string | null;
+  stripeRefundId: string | null;
+  reasonCode: string | null;
+  message: string | null;
+  metadata: Record<string, unknown> | null;
+  occurredAt: string;
+  processedAt: string | null;
+  createdAt: string;
+}
+
+export interface BillingSupportActionRecord {
+  id: string;
+  actionType: "NOTE" | "RESYNC_ENTITLEMENTS" | "RESEND_RECEIPT" | "REFUND_REVIEW" | "CANCEL_SUBSCRIPTION" | "UPGRADE_DOWNGRADE_CORRECTION" | "GRANDFATHER_OVERRIDE";
+  reasonCode: string;
+  notes: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  actor?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+export interface AdminBillingDiscrepancy {
+  id: string;
+  type: "WEBHOOK_FAILURE" | "SUBSCRIPTION_STATE_MISMATCH" | "PLAN_MISMATCH" | "UNPAID_BUT_ENTITLED" | "PAID_BUT_NOT_ENTITLED" | "PENDING_REFUND" | "REGION_MISMATCH" | "STALE_ENTITLEMENT" | "PAYMENT_FAILURE";
+  status: "OPEN" | "ACKNOWLEDGED" | "RESOLVED";
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  title: string;
+  reasonCode: string | null;
+  details: Record<string, unknown> | null;
+  dueAt: string | null;
+  detectedAt: string;
+  lastSeenAt: string;
+  resolvedAt: string | null;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  subscription?: {
+    id: string;
+    plan: BillingStatus["plan"];
+    status: BillingStatus["status"];
+  } | null;
+}
+
+export interface AdminBillingReconciliationRun {
+  id: string;
+  status: "SUCCESS" | "PARTIAL" | "FAILED";
+  triggeredBy: string;
+  checkedSubscriptions: number;
+  successPayments: number;
+  failedPayments: number;
+  webhookFailures: number;
+  subscriptionMismatches: number;
+  unpaidEntitlements: number;
+  paidNotEntitled: number;
+  pendingRefunds: number;
+  summary: Record<string, unknown> | null;
+  errorMessage: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminBillingDashboard {
+  metrics: {
+    successfulPayments: number;
+    failedPayments: number;
+    webhookFailures: number;
+    mismatchedSubscriptionStates: number;
+    unpaidButEntitled: number;
+    paidButNotEntitled: number;
+    pendingRefunds: number;
+  };
+  lastReconciliationRun: AdminBillingReconciliationRun | null;
+  recentDiscrepancies: AdminBillingDiscrepancy[];
+  windows: {
+    paymentsSince: string;
+  };
+}
+
+export interface AdminBillingCustomerSearchResult {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  subscription: {
+    id: string;
+    plan: BillingStatus["plan"];
+    status: BillingStatus["status"];
+    stripeCustomerId: string | null;
+    stripeSubId: string | null;
+  } | null;
+  billingProfile: {
+    region: "AFRICA" | "EUROPE" | "ROW";
+    country: string | null;
+    currency: string;
+    isGrandfathered: boolean;
+    pricingVersion: number;
+  } | null;
+}
+
+export interface AdminBillingCustomerDetail {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  createdAt: string;
+  subscription: {
+    id: string;
+    plan: BillingStatus["plan"];
+    status: BillingStatus["status"];
+    stripeCustomerId: string | null;
+    stripeSubId: string | null;
+    currentPeriodEnd: string | null;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+  billingProfile: {
+    region: "AFRICA" | "EUROPE" | "ROW";
+    country: string | null;
+    currency: string;
+    regionSource: string;
+    pricingVersion: number;
+    isGrandfathered: boolean;
+    grandfatheredAt: string | null;
+    taxIdType: string | null;
+    taxIdValue: string | null;
+    stripeCountry: string | null;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+  billingEntitlementState: BillingEntitlementState | null;
+  billingEvents: BillingAuditEventRecord[];
+  billingDiscrepancies: AdminBillingDiscrepancy[];
+  billingSupportActions: BillingSupportActionRecord[];
 }
 
 export interface RegionalPriceInfo {

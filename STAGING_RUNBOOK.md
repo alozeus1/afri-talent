@@ -32,6 +32,16 @@ For any future deployment or incident task:
 4. Check `git status` before editing anything
 5. Do not revert unrelated local changes in `backend/dist/*` or `infra/terraform/modules/apprunner/*`
 
+## Operational References
+
+For incidents, readiness work, or monitoring changes, use these docs after this runbook:
+
+- `docs/ops/README.md`
+- `docs/ops/SLO_DEFINITIONS.md`
+- `docs/ops/ALERT_CATALOG.md`
+- `docs/ops/INCIDENT_SEVERITY_AND_ESCALATION.md`
+- `docs/runbooks/`
+
 ## Current Live AWS State
 
 - AWS account: `260820061731`

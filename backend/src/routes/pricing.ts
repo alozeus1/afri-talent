@@ -141,6 +141,13 @@ router.post("/billing-country", authenticate, async (req: Request, res: Response
       const region = countryToRegion(country);
       const regionConfig = await prisma.regionConfig.findUnique({ where: { region } });
 
+      if (currency && regionConfig && !regionConfig.currencies.includes(currency.toUpperCase())) {
+        res.status(400).json({
+          error: `Currency ${currency.toUpperCase()} is not supported for ${region}`,
+        });
+        return;
+      }
+
       await prisma.userBillingProfile.update({
         where: { userId: req.user!.userId },
         data: {

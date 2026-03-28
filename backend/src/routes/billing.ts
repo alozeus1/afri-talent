@@ -4,7 +4,12 @@ import prisma from "../lib/prisma.js";
 import { authenticate, requireVerifiedEmail } from "../middleware/auth.js";
 import { getStripe, isStripeConfigured, STRIPE_PRICES } from "../lib/stripe.js";
 import { SubscriptionPlan, BillingInterval } from "@prisma/client";
-import { resolveStripePriceId, resolveUserRegion } from "../lib/billing/index.js";
+import {
+  resolveStripePriceId,
+  resolveUserRegion,
+  recordBillingEvent,
+  validateCheckoutSafety,
+} from "../lib/billing/index.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
 
 const router = Router();
@@ -35,6 +40,27 @@ router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Reque
 
     const stripe = getStripe();
     const { plan, interval } = checkoutSchema.parse(req.body);
+    const safety = await validateCheckoutSafety(req.user!.userId);
+
+    if (!safety.allowed) {
+      await recordBillingEvent({
+        userId: req.user!.userId,
+        source: "CHECKOUT_API",
+        eventType: "billing.checkout.blocked",
+        outcome: "FAILED",
+        plan: plan as SubscriptionPlan,
+        reasonCode: safety.code,
+        message: safety.message,
+        metadata: {
+          profileRegion: safety.profile?.region ?? null,
+          profileCurrency: safety.profile?.currency ?? null,
+          stripeCountry: safety.profile?.stripeCountry ?? null,
+        },
+        processedAt: new Date(),
+      });
+      res.status(409).json({ error: safety.message });
+      return;
+    }
 
     // Resolve regional price
     const regionalPrice = await resolveStripePriceId(
@@ -45,8 +71,23 @@ router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Reque
 
     // Fallback to legacy env-var prices if no regional price configured
     const priceId = regionalPrice?.stripePriceId ?? STRIPE_PRICES[plan as SubscriptionPlan];
+    const usedLegacyFallback = !regionalPrice?.stripePriceId && !!STRIPE_PRICES[plan as SubscriptionPlan];
 
     if (!priceId) {
+      await recordBillingEvent({
+        userId: req.user!.userId,
+        source: "CHECKOUT_API",
+        eventType: "billing.checkout.failed",
+        outcome: "FAILED",
+        plan: plan as SubscriptionPlan,
+        reasonCode: "missing_price_id",
+        metadata: {
+          interval,
+          profileRegion: safety.profile?.region ?? null,
+          profileCurrency: safety.profile?.currency ?? null,
+        },
+        processedAt: new Date(),
+      });
       recordOpsEvent({
         metricName: "billing_checkout_failure",
         category: "billing",
@@ -84,6 +125,7 @@ router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Reque
         metadata: {
           userId: req.user!.userId,
           billingRegion: region.region,
+          billingCountry: region.country,
         },
       });
 
@@ -101,6 +143,7 @@ router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Reque
     }
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const resolvedRegion = await resolveUserRegion(req.user!.userId);
 
     const sessionParams: Record<string, unknown> = {
       customer: customerId,
@@ -109,20 +152,69 @@ router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Reque
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${frontendUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontendUrl}/billing`,
-      metadata: { userId: req.user!.userId, plan, interval },
+      metadata: {
+        userId: req.user!.userId,
+        plan,
+        interval,
+        billingRegion: resolvedRegion.region,
+        billingCountry: resolvedRegion.country,
+        currency: regionalPrice?.currency ?? safety.profile?.currency ?? null,
+        pricingVersion: safety.profile?.pricingVersion ?? null,
+        isGrandfathered: safety.profile?.isGrandfathered ?? false,
+      },
+      client_reference_id: req.user!.userId,
     };
 
     // For European customers, collect tax ID
     const billingProfile = await prisma.userBillingProfile.findUnique({
       where: { userId: req.user!.userId },
-      select: { region: true },
+      select: { region: true, taxIdType: true, taxIdValue: true, country: true },
     });
 
     if (billingProfile?.region === "EUROPE") {
       sessionParams.tax_id_collection = { enabled: true };
+      sessionParams.customer_update = {
+        address: "auto",
+        name: "auto",
+      };
+      sessionParams.tax_id_collection = { enabled: true };
+      sessionParams.automatic_tax = { enabled: true };
+    }
+
+    if (billingProfile?.taxIdType && billingProfile.taxIdValue) {
+      sessionParams.customer_update = {
+        ...(sessionParams.customer_update as Record<string, unknown> | undefined),
+        address: "auto",
+        name: "auto",
+      };
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams as Parameters<typeof stripe.checkout.sessions.create>[0]);
+
+    await recordBillingEvent({
+      userId: req.user!.userId,
+      subscriptionId: subscription?.id ?? null,
+      source: "CHECKOUT_API",
+      eventType: "billing.checkout.created",
+      outcome: "PROCESSED",
+      plan: plan as SubscriptionPlan,
+      billingRegion: resolvedRegion.region,
+      currency: regionalPrice?.currency ?? safety.profile?.currency ?? null,
+      amountMinor: regionalPrice?.amount ?? null,
+      stripeCustomerId: customerId,
+      eventId: session.id,
+      reasonCode: usedLegacyFallback ? "legacy_price_fallback" : null,
+      metadata: {
+        interval,
+        stripePriceId: priceId,
+        billingCountry: resolvedRegion.country,
+        pricingVersion: safety.profile?.pricingVersion ?? null,
+        isGrandfathered: safety.profile?.isGrandfathered ?? false,
+        usedLegacyFallback,
+        taxIdType: billingProfile?.taxIdType ?? null,
+      },
+      processedAt: new Date(),
+    });
 
     res.json({
       url: session.url,
@@ -156,6 +248,15 @@ router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Reque
       return;
     }
     console.error("Checkout error:", error);
+    await recordBillingEvent({
+      userId: req.user?.userId ?? null,
+      source: "CHECKOUT_API",
+      eventType: "billing.checkout.failed",
+      outcome: "FAILED",
+      reasonCode: "internal_error",
+      message: error instanceof Error ? error.message : "Unknown checkout failure",
+      processedAt: new Date(),
+    }).catch(() => undefined);
     recordOpsEvent({
       metricName: "billing_checkout_failure",
       category: "billing",

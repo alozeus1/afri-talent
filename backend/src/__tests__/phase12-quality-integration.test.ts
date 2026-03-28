@@ -44,6 +44,7 @@ const {
     subscription: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
+      findMany: vi.fn(),
       upsert: vi.fn(),
       updateMany: vi.fn(),
     },
@@ -54,6 +55,30 @@ const {
     },
     billingRegionAudit: {
       create: vi.fn(),
+    },
+    billingEntitlementState: {
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
+    },
+    billingEventAudit: {
+      create: vi.fn(),
+      count: vi.fn(),
+    },
+    billingDiscrepancy: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+      count: vi.fn(),
+    },
+    billingSupportAction: {
+      create: vi.fn(),
+    },
+    billingReconciliationRun: {
+      create: vi.fn(),
+      update: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
     regionConfig: {
       findUnique: vi.fn(),
@@ -140,6 +165,12 @@ const {
         create: vi.fn(),
       },
     },
+    subscriptions: {
+      retrieve: vi.fn(),
+    },
+    invoices: {
+      sendInvoice: vi.fn(),
+    },
     webhooks: {
       constructEvent: vi.fn(),
     },
@@ -213,6 +244,13 @@ describe("Phase 1/2 quality integration suite", () => {
       id: "bps_123",
       url: "https://billing.stripe.test/portal",
     });
+    stripeApiMock.subscriptions.retrieve.mockResolvedValue({
+      status: "active",
+      items: {
+        data: [{ price: { id: "price_regional_basic" } }],
+      },
+    });
+    stripeApiMock.invoices.sendInvoice.mockResolvedValue({ id: "in_test_123" });
     stripeApiMock.webhooks.constructEvent.mockReset();
 
     prismaMock.$transaction.mockImplementation(async (value: unknown) => {
@@ -229,7 +267,7 @@ describe("Phase 1/2 quality integration suite", () => {
     prismaMock.regionConfig.findUnique.mockResolvedValue({
       region: "ROW",
       defaultCurrency: "USD",
-      currencies: ["USD"],
+      currencies: ["USD", "EUR"],
       taxBehavior: "exclusive",
       taxLabel: "Tax excluded",
       metadata: {},
@@ -248,6 +286,7 @@ describe("Phase 1/2 quality integration suite", () => {
     });
     prismaMock.subscription.findUnique.mockResolvedValue(null);
     prismaMock.subscription.findFirst.mockResolvedValue(null);
+    prismaMock.subscription.findMany.mockResolvedValue([]);
     prismaMock.subscription.upsert.mockResolvedValue({
       id: "sub-1",
       userId: "user-1",
@@ -267,6 +306,25 @@ describe("Phase 1/2 quality integration suite", () => {
       taxIdValue: null,
     });
     prismaMock.userBillingProfile.update.mockResolvedValue({});
+    prismaMock.billingEntitlementState.findUnique.mockResolvedValue(null);
+    prismaMock.billingEntitlementState.upsert.mockResolvedValue({
+      id: "state-1",
+      effectivePlan: SubscriptionPlan.FREE,
+      effectiveStatus: "INACTIVE",
+      checksum: "checksum",
+    });
+    prismaMock.billingEventAudit.create.mockResolvedValue({ id: "billing-event-1" });
+    prismaMock.billingEventAudit.count.mockResolvedValue(0);
+    prismaMock.billingDiscrepancy.findFirst.mockResolvedValue(null);
+    prismaMock.billingDiscrepancy.create.mockResolvedValue({ id: "billing-discrepancy-1" });
+    prismaMock.billingDiscrepancy.update.mockResolvedValue({ id: "billing-discrepancy-1" });
+    prismaMock.billingDiscrepancy.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.billingDiscrepancy.count.mockResolvedValue(0);
+    prismaMock.billingSupportAction.create.mockResolvedValue({ id: "billing-support-1" });
+    prismaMock.billingReconciliationRun.create.mockResolvedValue({ id: "billing-run-1" });
+    prismaMock.billingReconciliationRun.update.mockResolvedValue({ id: "billing-run-1" });
+    prismaMock.billingReconciliationRun.findFirst.mockResolvedValue(null);
+    prismaMock.billingReconciliationRun.findMany.mockResolvedValue([]);
     prismaMock.analyticsEvent.createMany.mockResolvedValue({ count: 1 });
     prismaMock.analyticsEvent.count.mockResolvedValue(0);
     prismaMock.analyticsEvent.groupBy.mockResolvedValue([]);
