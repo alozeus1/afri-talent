@@ -14,6 +14,7 @@ import {
   recordTrustRiskEvent,
   refreshEmployerTrustProfile,
 } from "../lib/trust/service.js";
+import { recordLatencyMetric, recordOpsEvent } from "../lib/ops/events.js";
 
 const router = Router();
 
@@ -182,11 +183,15 @@ router.get("/ai-search", authenticate, authorize(Role.CANDIDATE), async (req: Re
 
 // GET /api/jobs - Public: list published jobs
 router.get("/", async (req: Request, res: Response) => {
+  const startedAt = Date.now();
   try {
     const cacheKey = buildCacheKey("jobs:list", req.query);
     const cachedResponse = await getCachedJson<Record<string, unknown>>(cacheKey);
     if (cachedResponse) {
       res.setHeader("X-Cache", "HIT");
+      recordLatencyMetric("job_search_latency", Date.now() - startedAt, {
+        cache: "hit",
+      });
       res.json(cachedResponse);
       return;
     }
@@ -292,6 +297,10 @@ router.get("/", async (req: Request, res: Response) => {
       const payload = { jobs: aiJobs, total };
       await setCachedJson(cacheKey, payload, 60);
       res.setHeader("X-Cache", "MISS");
+      recordLatencyMetric("job_search_latency", Date.now() - startedAt, {
+        cache: "miss",
+        ai: true,
+      });
       res.json(payload);
       return;
     }
@@ -307,9 +316,20 @@ router.get("/", async (req: Request, res: Response) => {
     };
     await setCachedJson(cacheKey, payload, 60);
     res.setHeader("X-Cache", "MISS");
+    recordLatencyMetric("job_search_latency", Date.now() - startedAt, {
+      cache: "miss",
+      ai: false,
+    });
     res.json(payload);
   } catch (error) {
     console.error("List jobs error:", error);
+    recordOpsEvent({
+      metricName: "job_search_failure",
+      category: "jobs",
+      outcome: "failure",
+      severity: "warning",
+      durationMs: Date.now() - startedAt,
+    });
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -376,6 +396,7 @@ router.get("/:slug", async (req: Request, res: Response) => {
 
 // POST /api/jobs - Employer: create job
 router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(), async (req: Request, res: Response) => {
+  const startedAt = Date.now();
   try {
     const data = createJobSchema.parse(req.body);
 
@@ -384,6 +405,16 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
     });
 
     if (!employer) {
+      recordOpsEvent({
+        metricName: "job_publish_failure",
+        category: "jobs",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "missing_employer_profile",
+        },
+      });
       res.status(400).json({ error: "Employer profile not found" });
       return;
     }
@@ -392,6 +423,17 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
     const trust = employerTrustSummary(trustProfile);
 
     if (!trustProfile.postingEligibility) {
+      recordOpsEvent({
+        metricName: "job_publish_failure",
+        category: "jobs",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "trust_requirement_not_met",
+          risk_level: trustProfile.riskLevel,
+        },
+      });
       res.status(403).json({
         error: "Complete employer verification before publishing jobs.",
         code: "EMPLOYER_TRUST_REQUIRED",
@@ -474,18 +516,50 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
       moderationRequired: requiresModeration,
       trust,
     });
+    recordOpsEvent({
+      metricName: requiresModeration ? "job_publish_held" : "job_publish_success",
+      category: "jobs",
+      outcome: requiresModeration ? "held" : "success",
+      severity: requiresModeration ? "warning" : "info",
+      durationMs: Date.now() - startedAt,
+      details: {
+        risk_level: jobRisk.level,
+        employer_requires_enhanced_verification: trustProfile.requiresEnhancedVerification,
+      },
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      recordOpsEvent({
+        metricName: "job_publish_failure",
+        category: "jobs",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "validation_failed",
+        },
+      });
       res.status(400).json({ error: "Validation failed", details: error.issues });
       return;
     }
     console.error("Create job error:", error);
+    recordOpsEvent({
+      metricName: "job_publish_failure",
+      category: "jobs",
+      outcome: "failure",
+      severity: "critical",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "internal_error",
+      },
+    });
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // PUT /api/jobs/:id - Employer: update own job
 router.put("/:id", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(), async (req: Request, res: Response) => {
+  const startedAt = Date.now();
   try {
     const data = updateJobSchema.parse(req.body);
 
@@ -494,6 +568,17 @@ router.put("/:id", authenticate, authorize(Role.EMPLOYER), requireAccountStandin
     });
 
     if (!employer) {
+      recordOpsEvent({
+        metricName: "job_publish_failure",
+        category: "jobs",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "missing_employer_profile",
+          operation: "update",
+        },
+      });
       res.status(400).json({ error: "Employer profile not found" });
       return;
     }
@@ -503,6 +588,17 @@ router.put("/:id", authenticate, authorize(Role.EMPLOYER), requireAccountStandin
     });
 
     if (!existingJob) {
+      recordOpsEvent({
+        metricName: "job_publish_failure",
+        category: "jobs",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "job_not_found",
+          operation: "update",
+        },
+      });
       res.status(404).json({ error: "Job not found" });
       return;
     }
@@ -511,6 +607,18 @@ router.put("/:id", authenticate, authorize(Role.EMPLOYER), requireAccountStandin
     const trust = employerTrustSummary(trustProfile);
 
     if (!trustProfile.postingEligibility) {
+      recordOpsEvent({
+        metricName: "job_publish_failure",
+        category: "jobs",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "trust_requirement_not_met",
+          operation: "update",
+          risk_level: trustProfile.riskLevel,
+        },
+      });
       res.status(403).json({
         error: "Complete employer verification before republishing jobs.",
         code: "EMPLOYER_TRUST_REQUIRED",
@@ -591,12 +699,45 @@ router.put("/:id", authenticate, authorize(Role.EMPLOYER), requireAccountStandin
       moderationRequired: requiresModeration,
       trust,
     });
+    recordOpsEvent({
+      metricName: requiresModeration ? "job_publish_held" : "job_publish_success",
+      category: "jobs",
+      outcome: requiresModeration ? "held" : "success",
+      severity: requiresModeration ? "warning" : "info",
+      durationMs: Date.now() - startedAt,
+      details: {
+        operation: "update",
+        risk_level: jobRisk.level,
+      },
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      recordOpsEvent({
+        metricName: "job_publish_failure",
+        category: "jobs",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "validation_failed",
+          operation: "update",
+        },
+      });
       res.status(400).json({ error: "Validation failed", details: error.issues });
       return;
     }
     console.error("Update job error:", error);
+    recordOpsEvent({
+      metricName: "job_publish_failure",
+      category: "jobs",
+      outcome: "failure",
+      severity: "critical",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "internal_error",
+        operation: "update",
+      },
+    });
     res.status(500).json({ error: "Internal server error" });
   }
 });

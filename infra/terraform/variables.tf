@@ -375,6 +375,54 @@ variable "alerts_email" {
   default     = "alozeus1@gmail.com"
 }
 
+variable "enable_ops_monitoring" {
+  type        = bool
+  description = "Enable CloudWatch dashboards, alarms, and operational telemetry resources."
+  default     = true
+}
+
+variable "enable_synthetic_canaries" {
+  type        = bool
+  description = "Enable CloudWatch Synthetics canaries for public journey monitoring."
+  default     = true
+}
+
+variable "synthetics_schedule_expression" {
+  type        = string
+  description = "Schedule expression for production synthetic journey monitoring."
+  default     = "rate(5 minutes)"
+}
+
+variable "job_ingestion_staleness_threshold_minutes" {
+  type        = number
+  description = "Alarm threshold for stale job ingestion freshness snapshots."
+  default     = 180
+}
+
+variable "moderation_queue_backlog_threshold" {
+  type        = number
+  description = "Alarm threshold for moderation queue backlog."
+  default     = 50
+}
+
+variable "verification_queue_backlog_threshold" {
+  type        = number
+  description = "Alarm threshold for employer verification queue backlog."
+  default     = 20
+}
+
+variable "fraud_detection_wave_threshold" {
+  type        = number
+  description = "Alarm threshold for fraud detections over 24 hours."
+  default     = 25
+}
+
+variable "notification_failure_threshold" {
+  type        = number
+  description = "Alarm threshold for notification delivery failures in a 5 minute window."
+  default     = 10
+}
+
 variable "ses_region" {
   type        = string
   description = "AWS region used for SES sends"

@@ -18,10 +18,14 @@ import { runJobMatcherCycle } from "./job-matcher.js";
 import { runAlertDispatchCycle } from "./alert-sender.js";
 import { runAutoApplyCycle, AUTO_APPLY_INTERVAL_MS } from "./auto-apply.js";
 import { runJobCleanupCycle, CLEANUP_INTERVAL_MS } from "./job-cleanup.js";
+import { runOperationalSnapshotCycle } from "./operational-snapshot.js";
+import { pushDeadLetter, recordWorkerState, withRetry } from "../lib/ops/resilience.js";
+import { recordOpsEvent } from "../lib/ops/events.js";
 
 const AGGREGATOR_INTERVAL_MS = parseInt(process.env.AGGREGATOR_INTERVAL_HOURS || "6", 10) * 60 * 60 * 1000;
 const MATCHER_INTERVAL_MS = parseInt(process.env.MATCHER_INTERVAL_MINUTES || "30", 10) * 60 * 1000;
 const ALERT_INTERVAL_MS = parseInt(process.env.ALERT_INTERVAL_MINUTES || "15", 10) * 60 * 1000;
+const OPS_SNAPSHOT_INTERVAL_MS = parseInt(process.env.OPS_SNAPSHOT_INTERVAL_MINUTES || "15", 10) * 60 * 1000;
 
 const LOCK_TTL_SECONDS = 300; // 5 min lock
 
@@ -59,12 +63,57 @@ async function safeRun(name: string, fn: () => Promise<void>): Promise<void> {
   }
 
   const start = Date.now();
+  const startedAtIso = new Date(start).toISOString();
   try {
     logger.info({ task: name }, "[scheduler] starting task");
-    await fn();
-    logger.info({ task: name, durationMs: Date.now() - start }, "[scheduler] task complete");
+    await withRetry(fn, {
+      operationName: `scheduler_${name}`,
+      attempts: 3,
+      initialDelayMs: 1_000,
+    });
+    const durationMs = Date.now() - start;
+    logger.info({ task: name, durationMs }, "[scheduler] task complete");
+    await recordWorkerState(name, {
+      status: "success",
+      startedAt: startedAtIso,
+      completedAt: new Date().toISOString(),
+      durationMs,
+    });
+    recordOpsEvent({
+      metricName: "scheduler_task_success",
+      category: "scheduler",
+      details: {
+        task: name,
+      },
+    });
   } catch (err) {
-    logger.error({ task: name, err, durationMs: Date.now() - start }, "[scheduler] task failed");
+    const durationMs = Date.now() - start;
+    logger.error({ task: name, err, durationMs }, "[scheduler] task failed");
+    await recordWorkerState(name, {
+      status: "failed",
+      startedAt: startedAtIso,
+      completedAt: new Date().toISOString(),
+      durationMs,
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    await pushDeadLetter({
+      category: "scheduler",
+      source: name,
+      reasonCode: "scheduler_task_failed",
+      error: err,
+      payload: {
+        durationMs,
+      },
+    });
+    recordOpsEvent({
+      metricName: "scheduler_task_failure",
+      category: "scheduler",
+      outcome: "failure",
+      severity: "warning",
+      details: {
+        task: name,
+      },
+    });
   } finally {
     await releaseLock(name);
   }
@@ -81,6 +130,7 @@ export function startScheduler(): void {
       aggregatorIntervalHours: AGGREGATOR_INTERVAL_MS / 3600000,
       matcherIntervalMinutes: MATCHER_INTERVAL_MS / 60000,
       alertIntervalMinutes: ALERT_INTERVAL_MS / 60000,
+      opsSnapshotIntervalMinutes: OPS_SNAPSHOT_INTERVAL_MS / 60000,
     },
     "[scheduler] starting proactive agent scheduler"
   );
@@ -105,6 +155,10 @@ export function startScheduler(): void {
   );
 
   intervals.push(
+    setInterval(() => void safeRun("ops-snapshot", runOperationalSnapshotCycle), OPS_SNAPSHOT_INTERVAL_MS)
+  );
+
+  intervals.push(
     setInterval(() => void safeRun("auto-apply", runAutoApplyCycle), AUTO_APPLY_INTERVAL_MS)
   );
 
@@ -112,6 +166,11 @@ export function startScheduler(): void {
   intervals.push(
     setInterval(() => void safeRun("job-cleanup", runJobCleanupCycle), CLEANUP_INTERVAL_MS)
   );
+
+  const opsDelay = setTimeout(() => {
+    void safeRun("ops-snapshot", runOperationalSnapshotCycle);
+  }, 30_000);
+  intervals.push(opsDelay as unknown as IntervalRef);
 }
 
 export function stopScheduler(): void {

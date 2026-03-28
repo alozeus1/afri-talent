@@ -11,6 +11,8 @@
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { jobMatchEmail } from "../lib/email.js";
+import { createUserNotification } from "../lib/notifications.js";
+import { pushDeadLetter } from "../lib/ops/resilience.js";
 
 const BATCH_SIZE = parseInt(process.env.ALERT_BATCH_SIZE || "100", 10);
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
@@ -68,22 +70,20 @@ export async function runAlertDispatchCycle(): Promise<void> {
         const companyName =
           alert.job.employer?.companyName ?? alert.job.sourceName ?? "Unknown Company";
 
-        await prisma.notification.create({
-          data: {
-            userId,
-            type: "JOB_MATCH",
-            title: `New job match: ${alert.job.title}`,
-            body: `${alert.job.title} at ${companyName} (${alert.job.location}) matches your profile${alert.matchScore ? ` — ${alert.matchScore}% match` : ""}.`,
-            metadata: {
-              jobId: alert.job.id,
-              jobSlug: alert.job.slug,
-              matchScore: alert.matchScore,
-            },
+        await createUserNotification({
+          userId,
+          type: "JOB_MATCH",
+          title: `New job match: ${alert.job.title}`,
+          body: `${alert.job.title} at ${companyName} (${alert.job.location}) matches your profile${alert.matchScore ? ` — ${alert.matchScore}% match` : ""}.`,
+          channel: "savedSearchAlerts",
+          metadata: {
+            jobId: alert.job.id,
+            jobSlug: alert.job.slug,
+            matchScore: alert.matchScore,
           },
         });
 
-        // Send email (fire-and-forget, non-fatal)
-        void jobMatchEmail({
+        await jobMatchEmail({
           to: user.email,
           candidateName: user.name,
           jobTitle: alert.job.title,
@@ -103,16 +103,15 @@ export async function runAlertDispatchCycle(): Promise<void> {
           .map((a) => a.job.title)
           .join(", ");
 
-        await prisma.notification.create({
-          data: {
-            userId,
-            type: "JOB_MATCH",
-            title: `${userAlerts.length} new job matches found`,
-            body: `We found ${userAlerts.length} jobs matching your profile: ${jobTitles}${userAlerts.length > 5 ? ` and ${userAlerts.length - 5} more` : ""}.`,
-            metadata: {
-              alertCount: userAlerts.length,
-              topJobIds: topJobs.map((a) => a.job.id),
-            },
+        await createUserNotification({
+          userId,
+          type: "JOB_MATCH",
+          title: `${userAlerts.length} new job matches found`,
+          body: `We found ${userAlerts.length} jobs matching your profile: ${jobTitles}${userAlerts.length > 5 ? ` and ${userAlerts.length - 5} more` : ""}.`,
+          channel: "savedSearchAlerts",
+          metadata: {
+            alertCount: userAlerts.length,
+            topJobIds: topJobs.map((a) => a.job.id),
           },
         });
 
@@ -121,7 +120,7 @@ export async function runAlertDispatchCycle(): Promise<void> {
         const topCompany =
           topAlert.job.employer?.companyName ?? topAlert.job.sourceName ?? "Unknown Company";
 
-        void jobMatchEmail({
+        await jobMatchEmail({
           to: user.email,
           candidateName: user.name,
           jobTitle: `${topAlert.job.title} (+${userAlerts.length - 1} more)`,
@@ -142,6 +141,16 @@ export async function runAlertDispatchCycle(): Promise<void> {
       sent += userAlerts.length;
     } catch (err) {
       errors += userAlerts.length;
+      await pushDeadLetter({
+        category: "scheduler",
+        source: "alert-dispatch",
+        reasonCode: "user_alert_batch_failed",
+        error: err,
+        payload: {
+          userId,
+          alertCount: userAlerts.length,
+        },
+      });
       logger.error(
         { userId: userId.slice(0, 8), alertCount: userAlerts.length, err },
         "[alert-sender] failed processing user alerts"

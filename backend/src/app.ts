@@ -6,6 +6,7 @@ const pinoHttp = pinoHttpModule as unknown as typeof import("pino-http").default
 import prisma from "./lib/prisma.js";
 import logger from "./lib/logger.js";
 import { initSentry, setupExpressErrorHandler } from "./lib/sentry.js";
+import { redisHealthStatus } from "./lib/redis.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import {
   securityHeaders,
@@ -71,6 +72,16 @@ const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 const isTest = process.env.NODE_ENV === "test";
 const docsEnabled = process.env.ENABLE_API_DOCS === "true" || !isProduction;
+const serviceMetadata = {
+  service: "afritalent-backend",
+  environment: process.env.APP_ENV || process.env.NODE_ENV || "development",
+  release: process.env.RELEASE_VERSION || process.env.IMAGE_TAG || "local",
+  commitSha:
+    process.env.GITHUB_SHA
+    || process.env.VERCEL_GIT_COMMIT_SHA
+    || process.env.RENDER_GIT_COMMIT
+    || "unknown",
+};
 
 // Request ID middleware (must be first)
 app.use(requestIdMiddleware);
@@ -151,20 +162,44 @@ app.use(sanitizeRequest);
 const healthHandler = async (_req: express.Request, res: express.Response) => {
   // Skip DB check in test environment — no DB required to run tests
   if (isTest) {
-    res.json({ status: "ok", db: "skipped-in-test", timestamp: new Date().toISOString() });
-    return;
-  }
-  try {
-    await prisma.$queryRaw`SELECT 1`;
     res.json({
       status: "ok",
-      db: "connected",
+      ...serviceMetadata,
+      checks: {
+        database: "skipped-in-test",
+        redis: "skipped-in-test",
+      },
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    });
+    return;
+  }
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    const redis = await redisHealthStatus();
+    res.json({
+      status: redis === "connected" || redis === "not_configured" ? "ok" : "degraded",
+      ...serviceMetadata,
+      checks: {
+        database: "connected",
+        redis,
+      },
+      degraded: redis === "degraded",
+      uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
   } catch {
+    const redis = await redisHealthStatus();
     res.status(500).json({
       status: "error",
-      db: "disconnected",
+      ...serviceMetadata,
+      checks: {
+        database: "disconnected",
+        redis,
+      },
+      degraded: redis === "degraded",
+      uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
   }
@@ -179,23 +214,40 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
   if (isTest) {
     res.json({
       status: "ready",
-      checks: { database: "skipped-in-test" },
+      ...serviceMetadata,
+      checks: {
+        database: "skipped-in-test",
+        redis: "skipped-in-test",
+      },
+      degraded: false,
       timestamp: new Date().toISOString(),
     });
     return;
   }
   try {
     await prisma.$queryRaw`SELECT 1`;
+    const redis = await redisHealthStatus();
     res.json({
       status: "ready",
-      checks: { database: "ok" },
+      ...serviceMetadata,
+      checks: {
+        database: "ok",
+        redis,
+      },
+      degraded: redis === "degraded",
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
     logger.error({ error }, "Readiness check failed");
+    const redis = await redisHealthStatus();
     res.status(503).json({
       status: "not_ready",
-      checks: { database: "failed" },
+      ...serviceMetadata,
+      checks: {
+        database: "failed",
+        redis,
+      },
+      degraded: redis === "degraded",
       timestamp: new Date().toISOString(),
     });
   }
@@ -208,6 +260,7 @@ app.get("/api/ready", readyHandler);
 const liveHandler = (_req: express.Request, res: express.Response) => {
   res.json({
     status: "alive",
+    ...serviceMetadata,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });

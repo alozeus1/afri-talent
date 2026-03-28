@@ -60,4 +60,29 @@ export async function isTokenBlocked(token: string): Promise<boolean> {
   }
 }
 
+export function isRedisConfigured(): boolean {
+  return Boolean(REDIS_URL);
+}
+
+export function isRedisAvailable(): boolean {
+  return available;
+}
+
+export async function redisHealthStatus(): Promise<"connected" | "degraded" | "not_configured"> {
+  if (!REDIS_URL) {
+    return "not_configured";
+  }
+
+  if (!client || !available) {
+    return "degraded";
+  }
+
+  try {
+    await client.ping();
+    return "connected";
+  } catch {
+    return "degraded";
+  }
+}
+
 export { client as redisClient };

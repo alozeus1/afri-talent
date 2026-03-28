@@ -12,6 +12,7 @@ import {
   recordTrustRiskEvent,
   refreshCandidateTrustProfile,
 } from "../lib/trust/service.js";
+import { recordOpsEvent } from "../lib/ops/events.js";
 
 const router = Router();
 
@@ -60,6 +61,7 @@ router.post(
   requireAccountStanding(),
   requireVerifiedEmail({ roles: [Role.CANDIDATE] }),
   async (req: Request, res: Response) => {
+  const startedAt = Date.now();
   try {
     const data = applySchema.parse(req.body);
 
@@ -69,6 +71,16 @@ router.post(
     });
 
     if (!job || job.status !== JobStatus.PUBLISHED || job.isExpired) {
+      recordOpsEvent({
+        metricName: "application_submission_failure",
+        category: "applications",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "job_not_available",
+        },
+      });
       res.status(404).json({ error: "Job not found or not available" });
       return;
     }
@@ -82,6 +94,16 @@ router.post(
     });
 
     if (existingApplication) {
+      recordOpsEvent({
+        metricName: "application_submission_failure",
+        category: "applications",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "duplicate_application",
+        },
+      });
       res.status(400).json({ error: "You have already applied to this job" });
       return;
     }
@@ -189,12 +211,43 @@ router.post(
       ...application,
       heldForReview,
     });
+    recordOpsEvent({
+      metricName: heldForReview ? "application_submission_held" : "application_submission_success",
+      category: "applications",
+      outcome: heldForReview ? "held" : "success",
+      severity: heldForReview ? "warning" : "info",
+      durationMs: Date.now() - startedAt,
+      details: {
+        risk_level: applicationRisk.level,
+        applications_last_24h: applicationsLast24h,
+      },
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      recordOpsEvent({
+        metricName: "application_submission_failure",
+        category: "applications",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "validation_failed",
+        },
+      });
       res.status(400).json({ error: "Validation failed", details: error.issues });
       return;
     }
     console.error("Apply error:", error);
+    recordOpsEvent({
+      metricName: "application_submission_failure",
+      category: "applications",
+      outcome: "failure",
+      severity: "critical",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "internal_error",
+      },
+    });
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -4,27 +4,83 @@ import prisma from "../lib/prisma.js";
 import { SubscriptionStatus, SubscriptionPlan } from "@prisma/client";
 import { updateStripeCountry } from "../lib/billing/region-resolver.js";
 import { createUserNotification } from "../lib/notifications.js";
+import { redisClient } from "../lib/redis.js";
+import { recordOpsEvent } from "../lib/ops/events.js";
+import { pushDeadLetter } from "../lib/ops/resilience.js";
 
 const router = Router();
 
 // Processed event IDs for idempotency (resets on restart; use Redis for production)
 const processedEvents = new Set<string>();
+const WEBHOOK_IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+async function reserveEventId(eventId: string): Promise<boolean> {
+  if (redisClient) {
+    try {
+      const result = await redisClient.set(
+        `idempotency:stripe:${eventId}`,
+        new Date().toISOString(),
+        "EX",
+        WEBHOOK_IDEMPOTENCY_TTL_SECONDS,
+        "NX",
+      );
+      return result === "OK";
+    } catch {
+      // Fall back to in-memory duplicate protection.
+    }
+  }
+
+  if (processedEvents.has(eventId)) {
+    return false;
+  }
+
+  processedEvents.add(eventId);
+  if (processedEvents.size > 10000) {
+    const first = processedEvents.values().next().value;
+    if (first) {
+      processedEvents.delete(first);
+    }
+  }
+
+  return true;
+}
 
 // POST /api/webhooks/stripe
 // IMPORTANT: This route MUST be registered BEFORE express.json() in server.ts
 // because Stripe signature verification requires the raw request body.
 router.post("/stripe", async (req: Request, res: Response) => {
+  const startedAt = Date.now();
   const sig = req.headers["stripe-signature"] as string;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!isStripeConfigured()) {
     console.error("[webhook] STRIPE_SECRET_KEY not set");
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "warning",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "stripe_not_configured",
+      },
+    });
     res.status(503).json({ error: "Stripe is not configured" });
     return;
   }
 
   if (!webhookSecret) {
     console.error("[webhook] STRIPE_WEBHOOK_SECRET not set");
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "critical",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "webhook_secret_missing",
+      },
+    });
     res.status(500).json({ error: "Webhook secret not configured" });
     return;
   }
@@ -34,20 +90,34 @@ router.post("/stripe", async (req: Request, res: Response) => {
     event = getStripe().webhooks.constructEvent(req.body, sig, webhookSecret);
   } catch (err) {
     console.error("[webhook] Signature verification failed:", err);
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "warning",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "invalid_signature",
+      },
+    });
     res.status(400).json({ error: "Invalid webhook signature" });
     return;
   }
 
   // Idempotency guard
-  if (processedEvents.has(event.id)) {
+  const reserved = await reserveEventId(event.id);
+  if (!reserved) {
+    recordOpsEvent({
+      metricName: "billing_checkout_duplicate",
+      category: "billing",
+      outcome: "duplicate",
+      durationMs: Date.now() - startedAt,
+      details: {
+        event_type: event.type,
+      },
+    });
     res.json({ received: true, duplicate: true });
     return;
-  }
-  processedEvents.add(event.id);
-  // Keep set bounded (prevent unbounded memory growth in long-running processes)
-  if (processedEvents.size > 10000) {
-    const first = processedEvents.values().next().value;
-    if (first) processedEvents.delete(first);
   }
 
   try {
@@ -86,6 +156,15 @@ router.post("/stripe", async (req: Request, res: Response) => {
             body: `Your ${plan} plan is now active.`,
             channel: "subscriptionNotices",
             metadata: { event: event.type, plan },
+          });
+          recordOpsEvent({
+            metricName: "billing_checkout_success",
+            category: "billing",
+            durationMs: Date.now() - startedAt,
+            details: {
+              event_type: event.type,
+              plan,
+            },
           });
         }
         break;
@@ -196,6 +275,17 @@ router.post("/stripe", async (req: Request, res: Response) => {
             metadata: { event: event.type },
           });
         }
+        recordOpsEvent({
+          metricName: "billing_checkout_failure",
+          category: "billing",
+          outcome: "failure",
+          severity: "warning",
+          durationMs: Date.now() - startedAt,
+          details: {
+            event_type: event.type,
+            reason: "invoice_payment_failed",
+          },
+        });
         break;
       }
 
@@ -207,6 +297,27 @@ router.post("/stripe", async (req: Request, res: Response) => {
     res.json({ received: true });
   } catch (error) {
     console.error("[webhook] Handler error:", error);
+    await pushDeadLetter({
+      category: "webhook",
+      source: "stripe",
+      reasonCode: "stripe_webhook_handler_failed",
+      error,
+      payload: {
+        eventId: event.id,
+        eventType: event.type,
+      },
+    });
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "critical",
+      durationMs: Date.now() - startedAt,
+      details: {
+        event_type: event.type,
+        reason: "handler_error",
+      },
+    });
     // Return 200 to prevent Stripe from retrying (state may be partially applied)
     res.json({ received: true, error: "Handler error — check server logs" });
   }

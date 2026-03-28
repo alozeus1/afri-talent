@@ -3,6 +3,8 @@ import { nanoid } from "nanoid";
 import prisma from "../lib/prisma.js";
 import { authenticate } from "../middleware/auth.js";
 import rateLimit from "express-rate-limit";
+import { accountEmailVerificationEmail } from "../lib/email.js";
+import { recordOpsEvent } from "../lib/ops/events.js";
 
 const router = Router();
 
@@ -24,42 +26,12 @@ const verifyLimiter = rateLimit({
 async function sendVerificationEmail(email: string, token: string, name: string): Promise<void> {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
   const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
-
-  // In production, use SES. For now, log the URL.
-  if (process.env.NODE_ENV === "production") {
-    try {
-      const { SESClient, SendEmailCommand } = await import("@aws-sdk/client-ses");
-      const ses = new SESClient({});
-      await ses.send(
-        new SendEmailCommand({
-          Source: process.env.SES_FROM_EMAIL || "noreply@afritalent.com",
-          Destination: { ToAddresses: [email] },
-          Message: {
-            Subject: { Data: "Verify your AfriTalent email" },
-            Body: {
-              Html: {
-                Data: `
-                  <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2>Welcome to AfriTalent, ${name}!</h2>
-                    <p>Please verify your email address by clicking the button below:</p>
-                    <a href="${verifyUrl}" style="display: inline-block; background: #059669; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-                      Verify Email
-                    </a>
-                    <p style="margin-top: 16px; color: #666;">This link expires in ${VERIFICATION_EXPIRY_HOURS} hours.</p>
-                    <p style="color: #999; font-size: 12px;">If you didn't create an account, you can safely ignore this email.</p>
-                  </div>
-                `,
-              },
-            },
-          },
-        })
-      );
-    } catch (err) {
-      console.error("SES send failed:", err);
-    }
-  } else {
-    console.log(`[EMAIL VERIFICATION] ${email} → ${verifyUrl}`);
-  }
+  await accountEmailVerificationEmail({
+    to: email,
+    candidateName: name,
+    verifyUrl,
+    expiresInHours: VERIFICATION_EXPIRY_HOURS,
+  });
 }
 
 export async function issueEmailVerification(opts: {
@@ -83,20 +55,46 @@ export async function issueEmailVerification(opts: {
   });
 
   await sendVerificationEmail(opts.email, token, opts.name);
+  recordOpsEvent({
+    metricName: "verification_email_sent",
+    category: "verification",
+    details: {
+      mode: process.env.NODE_ENV === "production" ? "ses" : "local",
+    },
+  });
 
   return { token, expiresAt };
 }
 
 // POST /api/auth/email/send-verification — authenticated, sends a new token
 router.post("/send-verification", authenticate, resendLimiter, async (req: Request, res: Response) => {
+  const startedAt = Date.now();
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user) {
+      recordOpsEvent({
+        metricName: "verification_email_failure",
+        category: "verification",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "user_not_found",
+        },
+      });
       res.status(404).json({ error: "User not found" });
       return;
     }
 
     if (user.emailVerified) {
+      recordOpsEvent({
+        metricName: "verification_email_sent",
+        category: "verification",
+        durationMs: Date.now() - startedAt,
+        details: {
+          already_verified: true,
+        },
+      });
       res.json({ message: "Email already verified" });
       return;
     }
@@ -111,15 +109,33 @@ router.post("/send-verification", authenticate, resendLimiter, async (req: Reque
     res.json({ message: "Verification email sent" });
   } catch (error) {
     console.error("Send verification error:", error);
+    recordOpsEvent({
+      metricName: "verification_email_failure",
+      category: "verification",
+      outcome: "failure",
+      severity: "warning",
+      durationMs: Date.now() - startedAt,
+    });
     res.status(500).json({ error: "Failed to send verification email" });
   }
 });
 
 // POST /api/auth/email/verify — public, verifies the token
 router.post("/verify", verifyLimiter, async (req: Request, res: Response) => {
+  const startedAt = Date.now();
   try {
     const { token } = req.body;
     if (!token || typeof token !== "string") {
+      recordOpsEvent({
+        metricName: "verification_verify_failure",
+        category: "verification",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "missing_token",
+        },
+      });
       res.status(400).json({ error: "Token is required" });
       return;
     }
@@ -130,16 +146,46 @@ router.post("/verify", verifyLimiter, async (req: Request, res: Response) => {
     });
 
     if (!record) {
+      recordOpsEvent({
+        metricName: "verification_verify_failure",
+        category: "verification",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "invalid_token",
+        },
+      });
       res.status(400).json({ error: "Invalid verification token" });
       return;
     }
 
     if (record.usedAt) {
+      recordOpsEvent({
+        metricName: "verification_verify_failure",
+        category: "verification",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "token_used",
+        },
+      });
       res.status(400).json({ error: "Token has already been used" });
       return;
     }
 
     if (record.expiresAt < new Date()) {
+      recordOpsEvent({
+        metricName: "verification_verify_failure",
+        category: "verification",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "token_expired",
+        },
+      });
       res.status(400).json({ error: "Token has expired. Please request a new one." });
       return;
     }
@@ -155,9 +201,21 @@ router.post("/verify", verifyLimiter, async (req: Request, res: Response) => {
       }),
     ]);
 
+    recordOpsEvent({
+      metricName: "verification_verify_success",
+      category: "verification",
+      durationMs: Date.now() - startedAt,
+    });
     res.json({ message: "Email verified successfully" });
   } catch (error) {
     console.error("Verify email error:", error);
+    recordOpsEvent({
+      metricName: "verification_verify_failure",
+      category: "verification",
+      outcome: "failure",
+      severity: "warning",
+      durationMs: Date.now() - startedAt,
+    });
     res.status(500).json({ error: "Verification failed" });
   }
 });

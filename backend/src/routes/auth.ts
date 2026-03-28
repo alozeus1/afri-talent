@@ -13,6 +13,7 @@ import {
   ensureEmployerTrustProfile,
   refreshEmployerTrustProfile,
 } from "../lib/trust/service.js";
+import { recordOpsEvent } from "../lib/ops/events.js";
 
 const router = Router();
 
@@ -62,10 +63,22 @@ const loginSchema = z.object({
 
 // POST /api/auth/register - with strict rate limiting
 router.post("/register", registerLimiter, async (req: Request, res: Response) => {
+  const startedAt = Date.now();
   try {
     const data = registerSchema.parse(req.body);
 
     if (data.role === "EMPLOYER" && (!data.companyName || !data.location)) {
+      recordOpsEvent({
+        metricName: "signup_failure",
+        category: "auth",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          role: data.role,
+          reason: "missing_employer_fields",
+        },
+      });
       res.status(400).json({ error: "Employer registration requires companyName and location" });
       return;
     }
@@ -82,6 +95,17 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     if (existingUser) {
       const providerNames = (existingUser.oauthAccounts || []).map((acc) => acc.provider);
       if (existingUser.password === "" && providerNames.length > 0) {
+        recordOpsEvent({
+          metricName: "signup_failure",
+          category: "auth",
+          outcome: "failure",
+          severity: "warning",
+          durationMs: Date.now() - startedAt,
+          details: {
+            role: data.role,
+            reason: "provider_mismatch",
+          },
+        });
         res.status(409).json({
           error: `This email is already registered via ${providerNames.join(", ")}. Please continue with social sign in.`,
           code: "PROVIDER_MISMATCH",
@@ -89,6 +113,17 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
         });
         return;
       }
+      recordOpsEvent({
+        metricName: "signup_failure",
+        category: "auth",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          role: data.role,
+          reason: "email_exists",
+        },
+      });
       res.status(400).json({ error: "Email already registered" });
       return;
     }
@@ -128,6 +163,15 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
         invalidateExisting: true,
       }).catch((verificationError) => {
         console.error("Failed to send verification email:", verificationError);
+        recordOpsEvent({
+          metricName: "verification_email_failure",
+          category: "verification",
+          outcome: "failure",
+          severity: "warning",
+          details: {
+            source: "register",
+          },
+        });
       });
     }
 
@@ -148,18 +192,47 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       },
       expiresIn: getTokenExpiresIn(),
     });
+    recordOpsEvent({
+      metricName: "signup_success",
+      category: "auth",
+      durationMs: Date.now() - startedAt,
+      details: {
+        role: user.role,
+      },
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      recordOpsEvent({
+        metricName: "signup_failure",
+        category: "auth",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "validation_failed",
+        },
+      });
       res.status(400).json({ error: "Validation failed", details: error.issues });
       return;
     }
     console.error("Register error:", error);
+    recordOpsEvent({
+      metricName: "signup_failure",
+      category: "auth",
+      outcome: "failure",
+      severity: "critical",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "internal_error",
+      },
+    });
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // POST /api/auth/login - with rate limiting
 router.post("/login", authLimiter, async (req: Request, res: Response) => {
+  const startedAt = Date.now();
   try {
     const data = loginSchema.parse(req.body);
 
@@ -174,6 +247,16 @@ router.post("/login", authLimiter, async (req: Request, res: Response) => {
     });
 
     if (!user) {
+      recordOpsEvent({
+        metricName: "login_failure",
+        category: "auth",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "user_not_found",
+        },
+      });
       res.status(401).json({ error: "Invalid email or password" });
       return;
     }
@@ -185,12 +268,32 @@ router.post("/login", authLimiter, async (req: Request, res: Response) => {
         code: "PROVIDER_MISMATCH",
         providers,
       });
+      recordOpsEvent({
+        metricName: "login_failure",
+        category: "auth",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "provider_mismatch",
+        },
+      });
       return;
     }
 
     const validPassword = await bcrypt.compare(data.password, user.password || "");
 
     if (!validPassword) {
+      recordOpsEvent({
+        metricName: "login_failure",
+        category: "auth",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "invalid_password",
+        },
+      });
       res.status(401).json({ error: "Invalid email or password" });
       return;
     }
@@ -215,12 +318,41 @@ router.post("/login", authLimiter, async (req: Request, res: Response) => {
       },
       expiresIn: getTokenExpiresIn(),
     });
+    recordOpsEvent({
+      metricName: "login_success",
+      category: "auth",
+      durationMs: Date.now() - startedAt,
+      details: {
+        role: user.role,
+        email_verified: user.emailVerified,
+      },
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      recordOpsEvent({
+        metricName: "login_failure",
+        category: "auth",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "validation_failed",
+        },
+      });
       res.status(400).json({ error: "Validation failed", details: error.issues });
       return;
     }
     console.error("Login error:", error);
+    recordOpsEvent({
+      metricName: "login_failure",
+      category: "auth",
+      outcome: "failure",
+      severity: "critical",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "internal_error",
+      },
+    });
     res.status(500).json({ error: "Internal server error" });
   }
 });

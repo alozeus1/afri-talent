@@ -5,6 +5,7 @@ import { authenticate, requireVerifiedEmail } from "../middleware/auth.js";
 import { getStripe, isStripeConfigured, STRIPE_PRICES } from "../lib/stripe.js";
 import { SubscriptionPlan, BillingInterval } from "@prisma/client";
 import { resolveStripePriceId, resolveUserRegion } from "../lib/billing/index.js";
+import { recordOpsEvent } from "../lib/ops/events.js";
 
 const router = Router();
 
@@ -15,8 +16,19 @@ const checkoutSchema = z.object({
 
 // POST /api/billing/checkout — create Stripe checkout session
 router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Request, res: Response) => {
+  const startedAt = Date.now();
   try {
     if (!isStripeConfigured()) {
+      recordOpsEvent({
+        metricName: "billing_checkout_failure",
+        category: "billing",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "stripe_not_configured",
+        },
+      });
       res.status(503).json({ error: "Billing is not configured for this environment" });
       return;
     }
@@ -35,6 +47,18 @@ router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Reque
     const priceId = regionalPrice?.stripePriceId ?? STRIPE_PRICES[plan as SubscriptionPlan];
 
     if (!priceId) {
+      recordOpsEvent({
+        metricName: "billing_checkout_failure",
+        category: "billing",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          plan,
+          interval,
+          reason: "missing_price_id",
+        },
+      });
       res.status(400).json({ error: `Price not configured for plan: ${plan}` });
       return;
     }
@@ -106,12 +130,42 @@ router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Reque
       currency: regionalPrice?.currency ?? "usd",
       amount: regionalPrice?.amount ?? null,
     });
+    recordOpsEvent({
+      metricName: "billing_checkout_session_success",
+      category: "billing",
+      durationMs: Date.now() - startedAt,
+      details: {
+        plan,
+        interval,
+        currency: regionalPrice?.currency ?? "usd",
+      },
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      recordOpsEvent({
+        metricName: "billing_checkout_failure",
+        category: "billing",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: {
+          reason: "validation_failed",
+        },
+      });
       res.status(400).json({ error: "Validation failed", details: error.issues });
       return;
     }
     console.error("Checkout error:", error);
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "critical",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "internal_error",
+      },
+    });
     res.status(500).json({ error: "Internal server error" });
   }
 });
