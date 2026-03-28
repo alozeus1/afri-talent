@@ -362,13 +362,25 @@ export const files = {
 
 // Talent
 export const talent = {
-  search: (params?: { skills?: string; location?: string; minExperience?: number; page?: number; verifiedOnly?: boolean }) => {
+  search: (params?: {
+    skills?: string;
+    location?: string;
+    minExperience?: number;
+    page?: number;
+    verifiedOnly?: boolean;
+    verifiedSkillsOnly?: boolean;
+    fullyCompletedOnly?: boolean;
+    assessmentBackedOnly?: boolean;
+  }) => {
     const searchParams = new URLSearchParams();
     if (params?.skills) searchParams.set("skills", params.skills);
     if (params?.location) searchParams.set("location", params.location);
     if (params?.minExperience) searchParams.set("minExperience", params.minExperience.toString());
     if (params?.page) searchParams.set("page", params.page.toString());
     if (params?.verifiedOnly) searchParams.set("verifiedOnly", "true");
+    if (params?.verifiedSkillsOnly) searchParams.set("verifiedSkillsOnly", "true");
+    if (params?.fullyCompletedOnly) searchParams.set("fullyCompletedOnly", "true");
+    if (params?.assessmentBackedOnly) searchParams.set("assessmentBackedOnly", "true");
     const query = searchParams.toString();
     return fetchAPI<TalentSearchResponse>(`/api/talent${query ? `?${query}` : ""}`);
   },
@@ -415,6 +427,24 @@ export const trust = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  submitCandidateSkillVerification: (data: {
+    skillName: string;
+    method: "CERTIFICATE" | "PORTFOLIO" | "ASSESSMENT";
+    evidenceLabel?: string;
+    fileKey?: string;
+    fileName?: string;
+    externalUrl?: string;
+    assessmentId?: string;
+    metadata?: Record<string, unknown>;
+  }) =>
+    fetchAPI<{
+      skillVerification: CandidateVerifiedSkillItem;
+      trust: CandidateTrustSummary;
+      caseId: string | null;
+    }>("/api/trust/candidate/skills", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   reportAbuse: (data: AbuseReportInput) =>
     fetchAPI<{ reportId: string; caseId: string; message: string }>("/api/trust/reports", {
       method: "POST",
@@ -450,6 +480,62 @@ export const employerAnalytics = {
   updateBranding: (data: { companyName?: string; website?: string; location?: string; bio?: string }) =>
     fetchAPI<EmployerBranding>("/api/employer/branding", {
       method: "PUT",
+      body: JSON.stringify(data),
+    }),
+};
+
+export const adminPartners = {
+  list: () => fetchAPI<{ partners: AdminPartnerSummary[] }>("/api/university-partners/admin/partners"),
+  create: (data: {
+    externalId: string;
+    name: string;
+    organizationType: PartnerOrganizationType;
+    country: string;
+    website?: string;
+    apiKey: string;
+  }) =>
+    fetchAPI<{
+      partner: AdminPartnerSummary;
+      keyAccepted: boolean;
+    }>("/api/university-partners/admin/partners", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  detail: (partnerId: string) =>
+    fetchAPI<AdminPartnerDetail>(`/api/university-partners/admin/partners/${partnerId}/records`),
+  issueMarker: (
+    partnerId: string,
+    data: {
+      userId: string;
+      markerType: CandidatePartnerMarkerType;
+      partnerRecordId?: string;
+      label?: string;
+      description?: string;
+      expiresAt?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ) =>
+    fetchAPI<{ marker: AdminIssuedPartnerMarker }>(`/api/university-partners/admin/partners/${partnerId}/markers`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  issueVerifiedSkill: (
+    partnerId: string,
+    data: {
+      userId: string;
+      skillName: string;
+      method: "PARTNER_ISSUED" | "MANUAL_REVIEW";
+      partnerRecordId?: string;
+      evidenceLabel?: string;
+      evidenceUrl?: string;
+      score?: number;
+      confidenceNote?: string;
+      expiresAt?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ) =>
+    fetchAPI<{ skill: AdminIssuedPartnerSkill }>(`/api/university-partners/admin/partners/${partnerId}/verified-skills`, {
+      method: "POST",
       body: JSON.stringify(data),
     }),
 };
@@ -619,6 +705,34 @@ export type CandidateVerificationLevel =
   | "IDENTITY_DOCUMENT_VERIFIED"
   | "SKILLS_VERIFIED"
   | "EMPLOYMENT_HISTORY_PARTIALLY_VERIFIED";
+export type PartnerOrganizationType =
+  | "UNIVERSITY"
+  | "BOOTCAMP"
+  | "TRAINING_INSTITUTE"
+  | "SCHOLARSHIP_PARTNER";
+export type CandidateSkillVerificationMethod =
+  | "CERTIFICATE"
+  | "PORTFOLIO"
+  | "ASSESSMENT"
+  | "MANUAL_REVIEW"
+  | "PARTNER_ISSUED";
+export type CandidateSkillVerificationStatus =
+  | "PENDING"
+  | "VERIFIED"
+  | "REJECTED"
+  | "EXPIRED";
+export type CandidatePartnerMarkerType =
+  | "UNIVERSITY_VERIFIED"
+  | "BOOTCAMP_VERIFIED"
+  | "TRAINING_VERIFIED"
+  | "SCHOLARSHIP_ALUMNI"
+  | "SCHOLARSHIP_FELLOW"
+  | "PARTNER_RECOMMENDED";
+export type CandidatePartnerMarkerStatus =
+  | "PENDING"
+  | "ACTIVE"
+  | "REVOKED"
+  | "EXPIRED";
 
 export interface TrustChecklistItem {
   key: string;
@@ -646,9 +760,75 @@ export interface CandidateTrustSummary {
   riskScore: number;
   riskLevel: TrustRiskLevel;
   premiumFilterEligible: boolean;
+  verifiedSkillCount: number;
+  partnerSignalCount: number;
+  assessmentBacked: boolean;
+  fullyCompletedProfile: boolean;
+  explainability: CandidateTrustExplainabilityItem[];
   maskedPhone: string | null;
   warnings: string[];
   checklist: TrustChecklistItem[];
+}
+
+export interface CandidateTrustExplainabilityItem {
+  key: string;
+  label: string;
+  status: "verified" | "strengthening" | "needs_attention";
+  detail: string;
+}
+
+export interface CandidateVerifiedSkillItem {
+  id: string;
+  skillName: string;
+  method: CandidateSkillVerificationMethod;
+  status: CandidateSkillVerificationStatus;
+  evidenceLabel: string | null;
+  evidenceUrl: string | null;
+  score: number | null;
+  confidenceNote: string | null;
+  verifiedAt: string | null;
+  createdAt: string;
+  partner: {
+    id: string;
+    name: string;
+    organizationType: PartnerOrganizationType;
+  } | null;
+}
+
+export interface CandidatePartnerMarkerItem {
+  id: string;
+  markerType: CandidatePartnerMarkerType;
+  status: CandidatePartnerMarkerStatus;
+  label: string;
+  description: string | null;
+  issuedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  partner: {
+    id: string;
+    name: string;
+    country: string;
+    organizationType: PartnerOrganizationType;
+  };
+}
+
+export interface CandidateWorkHistoryItem {
+  company: string | null;
+  title: string | null;
+  period: string | null;
+  description: string | null;
+}
+
+export interface CandidateEducationItem {
+  institution: string | null;
+  degree: string | null;
+  period: string | null;
+}
+
+export interface CandidateCertificationItem {
+  name: string | null;
+  issuer: string | null;
+  credentialUrl: string | null;
 }
 
 export interface JobTrustSummary {
@@ -755,9 +935,15 @@ export interface CandidateTrustDashboard {
     linkedinUrl: string | null;
     githubUrl: string | null;
     portfolioUrl: string | null;
+    workHistory: CandidateWorkHistoryItem[] | null;
+    educationHistory: CandidateEducationItem[] | null;
+    certifications: CandidateCertificationItem[] | null;
   } | null;
   trust: CandidateTrustSummary;
   artifacts: VerificationArtifactItem[];
+  skillVerifications: CandidateVerifiedSkillItem[];
+  partnerMarkers: CandidatePartnerMarkerItem[];
+  assessments: SkillAssessmentItem[];
 }
 
 export interface AdminTrustDashboard {
@@ -843,6 +1029,46 @@ export interface AdminAbuseReport {
   targetApplication?: { id: string; status: string } | null;
   assignedAdmin?: { id: string; name: string } | null;
   trustCase?: { id: string; actions: AdminTrustCaseAction[] } | null;
+}
+
+export interface AdminPartnerSummary {
+  id: string;
+  externalId: string;
+  name: string;
+  organizationType: PartnerOrganizationType;
+  country: string;
+  website: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+  updatedAt?: string;
+  _count?: {
+    records: number;
+    verifiedSkills: number;
+    partnerMarkers: number;
+  };
+}
+
+export interface AdminIssuedPartnerSkill extends CandidateVerifiedSkillItem {
+  user: { id: string; name: string; email: string };
+}
+
+export interface AdminIssuedPartnerMarker extends CandidatePartnerMarkerItem {
+  user: { id: string; name: string; email: string };
+}
+
+export interface AdminPartnerDetail {
+  partner: AdminPartnerSummary;
+  records: Array<{
+    id: string;
+    type: string;
+    externalRecordId: string;
+    status: string;
+    payload: Record<string, unknown>;
+    receivedAt: string;
+    processedAt: string | null;
+  }>;
+  issuedSkills: AdminIssuedPartnerSkill[];
+  issuedMarkers: AdminIssuedPartnerMarker[];
 }
 
 export interface AbuseReportInput {
@@ -1383,8 +1609,13 @@ export interface TalentProfile {
   linkedinUrl: string | null;
   githubUrl: string | null;
   portfolioUrl: string | null;
+  workHistory?: CandidateWorkHistoryItem[] | null;
+  educationHistory?: CandidateEducationItem[] | null;
+  certifications?: CandidateCertificationItem[] | null;
   user: { id: string; name: string; email: string };
   skillAssessments?: Array<{ skillName: string; score: number | null; level: string | null }>;
+  verifiedSkills?: CandidateVerifiedSkillItem[];
+  partnerMarkers?: CandidatePartnerMarkerItem[];
   trust?: CandidateTrustSummary | null;
 }
 
@@ -1884,6 +2115,9 @@ export interface CandidateProfile {
   linkedinUrl: string | null;
   githubUrl: string | null;
   portfolioUrl: string | null;
+  workHistory?: CandidateWorkHistoryItem[] | null;
+  educationHistory?: CandidateEducationItem[] | null;
+  certifications?: CandidateCertificationItem[] | null;
   openToWork: boolean;
   profileCompleteness: number;
   resumes?: ResumeFile[];
@@ -1934,6 +2168,9 @@ export interface ResumeProfileDraft {
   linkedinUrl?: string;
   githubUrl?: string;
   portfolioUrl?: string;
+  workHistory?: CandidateWorkHistoryItem[];
+  educationHistory?: CandidateEducationItem[];
+  certifications?: CandidateCertificationItem[];
 }
 
 export interface ResumeParseResponse {
@@ -2129,7 +2366,10 @@ export interface SkillAssessmentItem {
   status: string;
   score: number | null;
   level: string | null;
+  percentile?: number | null;
+  resultUrl?: string | null;
   completedAt: string | null;
+  expiresAt?: string | null;
   createdAt: string;
 }
 

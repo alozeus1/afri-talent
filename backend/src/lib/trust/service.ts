@@ -1,6 +1,9 @@
 import {
   AbuseReportReason,
   AbuseReportStatus,
+  CandidatePartnerMarkerStatus,
+  CandidateSkillVerificationMethod,
+  CandidateSkillVerificationStatus,
   CandidateVerificationLevel,
   EmployerVerificationLevel,
   ModerationActionType,
@@ -44,6 +47,168 @@ export function maskPhoneNumber(phoneNumber?: string | null): string | null {
   const trimmed = phoneNumber.trim();
   if (trimmed.length <= 4) return trimmed;
   return `${"*".repeat(Math.max(0, trimmed.length - 4))}${trimmed.slice(-4)}`;
+}
+
+function jsonArray(value: Prisma.JsonValue | null | undefined): Prisma.JsonArray {
+  return Array.isArray(value) ? value : [];
+}
+
+function hasText(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function jsonObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function countStructuredEntries(
+  value: Prisma.JsonValue | null | undefined,
+  requiredKeys: string[],
+): number {
+  return jsonArray(value).filter((entry) => {
+    const record = jsonObject(entry);
+    if (!record) return false;
+    return requiredKeys.some((key) => hasText(record[key]));
+  }).length;
+}
+
+function isWorkHistoryConsistent(value: Prisma.JsonValue | null | undefined): boolean {
+  const entries = jsonArray(value)
+    .map((entry) => jsonObject(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+
+  if (entries.length === 0) return false;
+
+  const strongEntries = entries.filter((entry) => {
+    let signals = 0;
+    if (hasText(entry.title)) signals += 1;
+    if (hasText(entry.company)) signals += 1;
+    if (hasText(entry.period)) signals += 1;
+    if (hasText(entry.description)) signals += 1;
+    return signals >= 2;
+  }).length;
+
+  return strongEntries >= Math.max(1, Math.ceil(entries.length * 0.6));
+}
+
+function buildCandidateExplainabilitySignals(input: {
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  identityVerified: boolean;
+  hasResume: boolean;
+  profileCompleteness: number;
+  verifiedSkillCount: number;
+  assessmentBackedSkillCount: number;
+  partnerSignalCount: number;
+  workHistoryEntries: number;
+  workHistoryConsistent: boolean;
+  educationEvidenceCount: number;
+  certificationEvidenceCount: number;
+  hasLinkedIn: boolean;
+  hasGitHub: boolean;
+  hasPortfolio: boolean;
+}) {
+  return [
+    {
+      key: "email",
+      label: "Email verification",
+      status: input.emailVerified ? "verified" : "needs_attention",
+      detail: input.emailVerified
+        ? "Email ownership is confirmed."
+        : "Verify your email to establish baseline account trust.",
+    },
+    {
+      key: "phone",
+      label: "Phone verification",
+      status: input.phoneVerified ? "verified" : "needs_attention",
+      detail: input.phoneVerified
+        ? "A verified phone number is attached to the profile."
+        : "Phone verification helps employers trust candidate reachability.",
+    },
+    {
+      key: "identity",
+      label: "Identity evidence",
+      status: input.identityVerified ? "verified" : "strengthening",
+      detail: input.identityVerified
+        ? "Identity documentation has been approved."
+        : "Optional identity review adds a higher-confidence trust layer.",
+    },
+    {
+      key: "profile",
+      label: "Profile completeness",
+      status:
+        input.profileCompleteness >= 85
+          ? "verified"
+          : input.profileCompleteness >= 60
+            ? "strengthening"
+            : "needs_attention",
+      detail: `${input.profileCompleteness}% of the trust-critical profile fields are complete.`,
+    },
+    {
+      key: "resume",
+      label: "Resume and work history",
+      status:
+        input.hasResume && input.workHistoryEntries > 0 && input.workHistoryConsistent
+          ? "verified"
+          : input.hasResume || input.workHistoryEntries > 0
+            ? "strengthening"
+            : "needs_attention",
+      detail:
+        input.hasResume && input.workHistoryEntries > 0
+          ? `${input.workHistoryEntries} structured work entr${input.workHistoryEntries === 1 ? "y" : "ies"} captured.`
+          : "Add an active resume and structured work history.",
+    },
+    {
+      key: "skills",
+      label: "Evidence-backed skills",
+      status:
+        input.verifiedSkillCount > 0
+          ? "verified"
+          : input.certificationEvidenceCount > 0 || input.assessmentBackedSkillCount > 0
+            ? "strengthening"
+            : "needs_attention",
+      detail:
+        input.verifiedSkillCount > 0
+          ? `${input.verifiedSkillCount} verified skill badge${input.verifiedSkillCount === 1 ? "" : "s"} are visible to employers.`
+          : "Add assessment, certificate, or portfolio-backed skill evidence.",
+    },
+    {
+      key: "education",
+      label: "Education and certification evidence",
+      status:
+        input.educationEvidenceCount > 0 || input.certificationEvidenceCount > 0
+          ? "strengthening"
+          : "needs_attention",
+      detail:
+        input.educationEvidenceCount > 0 || input.certificationEvidenceCount > 0
+          ? `${input.educationEvidenceCount} education entr${input.educationEvidenceCount === 1 ? "y" : "ies"} and ${input.certificationEvidenceCount} certification signal${input.certificationEvidenceCount === 1 ? "" : "s"} are present.`
+          : "Add education history or certification evidence to strengthen credibility.",
+    },
+    {
+      key: "partner",
+      label: "Partner-issued trust markers",
+      status: input.partnerSignalCount > 0 ? "verified" : "strengthening",
+      detail:
+        input.partnerSignalCount > 0
+          ? `${input.partnerSignalCount} university or training partner marker${input.partnerSignalCount === 1 ? "" : "s"} are active.`
+          : "Partner-issued markers are optional but valuable for employer trust.",
+    },
+    {
+      key: "links",
+      label: "Public proof links",
+      status:
+        input.hasLinkedIn || input.hasGitHub || input.hasPortfolio
+          ? "strengthening"
+          : "needs_attention",
+      detail:
+        input.hasLinkedIn || input.hasGitHub || input.hasPortfolio
+          ? "LinkedIn, GitHub, or portfolio links support authenticity review."
+          : "Add LinkedIn, GitHub, or portfolio links to support your profile claims.",
+    },
+  ];
 }
 
 export async function ensureEmployerTrustProfile(employerId: string) {
@@ -229,7 +394,18 @@ export async function refreshEmployerTrustProfile(employerId: string) {
 export async function refreshCandidateTrustProfile(userId: string) {
   const existing = await ensureCandidateTrustProfile(userId);
 
-  const [user, candidateProfile, approvedIdentityDocs, approvedCertifications, approvedEmploymentProofs, openReports, applicationsLast24h, completedAssessments] =
+  const [
+    user,
+    candidateProfile,
+    activeResumeCount,
+    approvedIdentityDocs,
+    approvedCertificationArtifacts,
+    approvedEmploymentProofs,
+    openReports,
+    applicationsLast24h,
+    verifiedSkills,
+    activePartnerMarkers,
+  ] =
     await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
@@ -239,9 +415,19 @@ export async function refreshCandidateTrustProfile(userId: string) {
         where: { userId },
         select: {
           profileCompleteness: true,
+          skills: true,
           linkedinUrl: true,
           githubUrl: true,
           portfolioUrl: true,
+          workHistory: true,
+          educationHistory: true,
+          certifications: true,
+        },
+      }),
+      prisma.resume.count({
+        where: {
+          profile: { userId },
+          isActive: true,
         },
       }),
       prisma.verificationArtifact.count({
@@ -277,11 +463,20 @@ export async function refreshCandidateTrustProfile(userId: string) {
           createdAt: { gte: startOfWindow(24) },
         },
       }),
-      prisma.skillAssessment.count({
+      prisma.candidateVerifiedSkill.findMany({
         where: {
           userId,
-          status: "COMPLETED",
-        } as Prisma.SkillAssessmentWhereInput,
+          status: CandidateSkillVerificationStatus.VERIFIED,
+        },
+        select: {
+          method: true,
+        },
+      }),
+      prisma.candidatePartnerMarker.count({
+        where: {
+          userId,
+          status: CandidatePartnerMarkerStatus.ACTIVE,
+        },
       }),
     ]);
 
@@ -289,18 +484,74 @@ export async function refreshCandidateTrustProfile(userId: string) {
     throw new Error("User not found");
   }
 
+  const workHistoryEntries = countStructuredEntries(candidateProfile?.workHistory, [
+    "title",
+    "company",
+    "period",
+    "description",
+  ]);
+  const educationEvidenceCount = countStructuredEntries(candidateProfile?.educationHistory, [
+    "institution",
+    "degree",
+    "period",
+  ]);
+  const certificationEntries = countStructuredEntries(candidateProfile?.certifications, [
+    "name",
+    "issuer",
+    "credentialUrl",
+  ]);
+  const workHistoryConsistent = isWorkHistoryConsistent(candidateProfile?.workHistory);
+  const verifiedSkillCount = verifiedSkills.length;
+  const assessmentBackedSkillCount = verifiedSkills.filter(
+    (skill) => skill.method === CandidateSkillVerificationMethod.ASSESSMENT,
+  ).length;
+  const certificationEvidenceCount = approvedCertificationArtifacts + certificationEntries;
+  const hasResume = activeResumeCount > 0;
+  const fullyCompletedProfile =
+    (candidateProfile?.profileCompleteness ?? 0) >= 80 &&
+    hasResume &&
+    workHistoryEntries > 0 &&
+    educationEvidenceCount > 0 &&
+    ((candidateProfile?.skills.length ?? 0) >= 3 || verifiedSkillCount > 0);
+
   const assessment = assessCandidateTrust({
     emailVerified: user.emailVerified,
     phoneVerified: Boolean(existing.phoneVerifiedAt),
     identityVerified: approvedIdentityDocs > 0,
-    skillsVerified: approvedCertifications > 0 || completedAssessments > 0,
+    skillsVerified: verifiedSkillCount > 0,
+    verifiedSkillCount,
+    assessmentBackedSkillCount,
+    partnerSignalCount: activePartnerMarkers,
     employmentVerified: approvedEmploymentProofs > 0,
     hasLinkedIn: Boolean(candidateProfile?.linkedinUrl),
     hasGitHub: Boolean(candidateProfile?.githubUrl),
     hasPortfolio: Boolean(candidateProfile?.portfolioUrl),
+    hasResume,
     profileCompleteness: candidateProfile?.profileCompleteness ?? 0,
+    workHistoryEntries,
+    workHistoryConsistent,
+    educationEvidenceCount,
+    certificationEvidenceCount,
     openReports,
     applicationsLast24h,
+  });
+
+  const explainabilitySignals = buildCandidateExplainabilitySignals({
+    emailVerified: user.emailVerified,
+    phoneVerified: Boolean(existing.phoneVerifiedAt),
+    identityVerified: approvedIdentityDocs > 0,
+    hasResume,
+    profileCompleteness: candidateProfile?.profileCompleteness ?? 0,
+    verifiedSkillCount,
+    assessmentBackedSkillCount,
+    partnerSignalCount: activePartnerMarkers,
+    workHistoryEntries,
+    workHistoryConsistent,
+    educationEvidenceCount,
+    certificationEvidenceCount,
+    hasLinkedIn: Boolean(candidateProfile?.linkedinUrl),
+    hasGitHub: Boolean(candidateProfile?.githubUrl),
+    hasPortfolio: Boolean(candidateProfile?.portfolioUrl),
   });
 
   const updated = await prisma.candidateTrustProfile.update({
@@ -313,8 +564,7 @@ export async function refreshCandidateTrustProfile(userId: string) {
       identityVerifiedAt:
         approvedIdentityDocs > 0 ? existing.identityVerifiedAt ?? new Date() : null,
       skillsVerifiedAt:
-        assessment.verificationLevel === CandidateVerificationLevel.SKILLS_VERIFIED ||
-        assessment.verificationLevel === CandidateVerificationLevel.EMPLOYMENT_HISTORY_PARTIALLY_VERIFIED
+        verifiedSkillCount > 0
           ? existing.skillsVerifiedAt ?? new Date()
           : null,
       employmentVerifiedAt:
@@ -323,6 +573,11 @@ export async function refreshCandidateTrustProfile(userId: string) {
       githubVerified: Boolean(candidateProfile?.githubUrl),
       portfolioVerified: Boolean(candidateProfile?.portfolioUrl),
       premiumFilterEligible: assessment.premiumFilterEligible,
+      verifiedSkillCount,
+      partnerSignalCount: activePartnerMarkers,
+      assessmentBacked: assessmentBackedSkillCount > 0,
+      fullyCompletedProfile,
+      explainabilitySignals,
       suspiciousSignals: assessment.warnings,
     },
   });
@@ -502,12 +757,20 @@ export function candidateTrustSummary(
     riskScore: number;
     riskLevel: TrustRiskLevel;
     premiumFilterEligible: boolean;
+    verifiedSkillCount?: number;
+    partnerSignalCount?: number;
+    assessmentBacked?: boolean;
+    fullyCompletedProfile?: boolean;
+    explainabilitySignals?: unknown;
     phoneNumber?: string | null;
     suspiciousSignals?: unknown;
   },
 ) {
   const warnings = Array.isArray(trustProfile.suspiciousSignals)
     ? trustProfile.suspiciousSignals.filter((item): item is string => typeof item === "string")
+    : [];
+  const explainability = Array.isArray(trustProfile.explainabilitySignals)
+    ? trustProfile.explainabilitySignals.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
     : [];
 
   return {
@@ -517,6 +780,11 @@ export function candidateTrustSummary(
     riskScore: trustProfile.riskScore,
     riskLevel: trustProfile.riskLevel,
     premiumFilterEligible: trustProfile.premiumFilterEligible,
+    verifiedSkillCount: trustProfile.verifiedSkillCount ?? 0,
+    partnerSignalCount: trustProfile.partnerSignalCount ?? 0,
+    assessmentBacked: Boolean(trustProfile.assessmentBacked),
+    fullyCompletedProfile: Boolean(trustProfile.fullyCompletedProfile),
+    explainability,
     maskedPhone: maskPhoneNumber(trustProfile.phoneNumber ?? null),
     warnings,
     checklist: [
@@ -543,6 +811,16 @@ export function candidateTrustSummary(
           CandidateVerificationLevel.SKILLS_VERIFIED,
           CandidateVerificationLevel.EMPLOYMENT_HISTORY_PARTIALLY_VERIFIED,
         ] as CandidateVerificationLevel[]).includes(trustProfile.verificationLevel),
+      },
+      {
+        key: "skills",
+        label: "Add at least one verified skill",
+        done: (trustProfile.verifiedSkillCount ?? 0) > 0,
+      },
+      {
+        key: "profile",
+        label: "Complete the full employer-facing profile",
+        done: Boolean(trustProfile.fullyCompletedProfile),
       },
     ],
   };

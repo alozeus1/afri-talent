@@ -2,7 +2,14 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import { AssessmentProvider, AssessmentStatus, Role } from "@prisma/client";
+import {
+  AssessmentProvider,
+  AssessmentStatus,
+  CandidateSkillVerificationMethod,
+  CandidateSkillVerificationStatus,
+  Role,
+} from "@prisma/client";
+import { refreshCandidateTrustProfile } from "../lib/trust/service.js";
 
 const router = Router();
 
@@ -157,6 +164,62 @@ router.put("/:id/complete", authenticate, async (req: Request, res: Response) =>
         completedAt: new Date(),
       },
     });
+
+    const verificationStatus =
+      data.score >= 70
+        ? CandidateSkillVerificationStatus.VERIFIED
+        : CandidateSkillVerificationStatus.REJECTED;
+
+    const existingVerifiedSkill = await prisma.candidateVerifiedSkill.findFirst({
+      where: {
+        userId: req.user!.userId,
+        skillName: assessment.skillName,
+        method: CandidateSkillVerificationMethod.ASSESSMENT,
+      },
+      select: { id: true },
+    });
+
+    if (existingVerifiedSkill) {
+      await prisma.candidateVerifiedSkill.update({
+        where: { id: existingVerifiedSkill.id },
+        data: {
+          status: verificationStatus,
+          assessmentId: assessment.id,
+          evidenceLabel: `${assessment.provider} assessment`,
+          score: data.score,
+          confidenceNote:
+            verificationStatus === CandidateSkillVerificationStatus.VERIFIED
+              ? "Assessment-backed verification passed the trust threshold."
+              : "Assessment result did not meet the verification threshold yet.",
+          verifiedAt:
+            verificationStatus === CandidateSkillVerificationStatus.VERIFIED
+              ? new Date()
+              : null,
+        },
+      });
+    } else {
+      await prisma.candidateVerifiedSkill.create({
+        data: {
+          userId: req.user!.userId,
+          skillName: assessment.skillName,
+          method: CandidateSkillVerificationMethod.ASSESSMENT,
+          status: verificationStatus,
+          assessmentId: assessment.id,
+          evidenceLabel: `${assessment.provider} assessment`,
+          score: data.score,
+          confidenceNote:
+            verificationStatus === CandidateSkillVerificationStatus.VERIFIED
+              ? "Assessment-backed verification passed the trust threshold."
+              : "Assessment result did not meet the verification threshold yet.",
+          verifiedAt:
+            verificationStatus === CandidateSkillVerificationStatus.VERIFIED
+              ? new Date()
+              : null,
+        },
+      });
+    }
+
+    await refreshCandidateTrustProfile(req.user!.userId).catch(() => undefined);
 
     res.json(updatedAssessment);
   } catch (error) {

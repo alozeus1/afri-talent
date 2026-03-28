@@ -11,6 +11,7 @@ import {
   CandidateProfileDraft,
 } from "../lib/resume-parser.js";
 import { computeProfileCompleteness } from "../lib/profile-completeness.js";
+import { refreshCandidateTrustProfile } from "../lib/trust/service.js";
 
 const router = Router();
 
@@ -43,6 +44,28 @@ const profileDraftSchema = z
     linkedinUrl: z.string().url().max(500).optional(),
     githubUrl: z.string().url().max(500).optional(),
     portfolioUrl: z.string().url().max(500).optional(),
+    workHistory: z.array(
+      z.object({
+        company: z.string().max(160).optional(),
+        title: z.string().max(160).optional(),
+        period: z.string().max(120).optional(),
+        description: z.string().max(1200).optional(),
+      }),
+    ).max(20).optional(),
+    educationHistory: z.array(
+      z.object({
+        institution: z.string().max(160).optional(),
+        degree: z.string().max(160).optional(),
+        period: z.string().max(120).optional(),
+      }),
+    ).max(12).optional(),
+    certifications: z.array(
+      z.object({
+        name: z.string().max(160).optional(),
+        issuer: z.string().max(160).optional(),
+        credentialUrl: z.string().url().max(500).optional(),
+      }),
+    ).max(20).optional(),
   })
   .partial();
 
@@ -59,16 +82,21 @@ function mergeDraft(
     skills: string[];
     targetRoles: string[];
     targetCountries: string[];
-    yearsExperience: number | null;
-    visaStatus: string | null;
-    linkedinUrl: string | null;
-    githubUrl: string | null;
-    portfolioUrl: string | null;
-  } | null,
+        yearsExperience: number | null;
+        visaStatus: string | null;
+        linkedinUrl: string | null;
+        githubUrl: string | null;
+        portfolioUrl: string | null;
+        workHistory?: unknown;
+        educationHistory?: unknown;
+        certifications?: unknown;
+      } | null,
   draft: CandidateProfileDraft,
   overwriteExisting: boolean,
 ) {
   const ensureUnique = (arr: string[]) => Array.from(new Set(arr.map((item) => item.trim()).filter(Boolean)));
+  const useDraftOrExisting = <T>(existingValue: T | undefined | null, draftValue: T | undefined) =>
+    overwriteExisting && draftValue !== undefined ? draftValue : existingValue ?? draftValue;
 
   const merged = {
     headline:
@@ -103,6 +131,9 @@ function mergeDraft(
       overwriteExisting && draft.portfolioUrl !== undefined
         ? draft.portfolioUrl
         : existing?.portfolioUrl || draft.portfolioUrl || null,
+    workHistory: useDraftOrExisting(existing?.workHistory, draft.workHistory) || [],
+    educationHistory: useDraftOrExisting(existing?.educationHistory, draft.educationHistory) || [],
+    certifications: useDraftOrExisting(existing?.certifications, draft.certifications) || [],
   };
 
   return merged;
@@ -143,6 +174,9 @@ router.post(
           linkedinUrl: true,
           githubUrl: true,
           portfolioUrl: true,
+          workHistory: true,
+          educationHistory: true,
+          certifications: true,
         },
       });
 
@@ -192,6 +226,9 @@ router.post("/apply-draft", authenticate, authorize(Role.CANDIDATE), async (req:
         linkedinUrl: true,
         githubUrl: true,
         portfolioUrl: true,
+        workHistory: true,
+        educationHistory: true,
+        certifications: true,
         resumes: { select: { id: true } },
       },
     });
@@ -219,6 +256,8 @@ router.post("/apply-draft", authenticate, authorize(Role.CANDIDATE), async (req:
         },
       },
     });
+
+    await refreshCandidateTrustProfile(req.user!.userId).catch(() => undefined);
 
     res.json({
       profile,

@@ -26,6 +26,9 @@ export default function TalentMarketplacePage() {
   const [location, setLocation] = useState("");
   const [minExperience, setMinExperience] = useState("");
   const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [verifiedSkillsOnly, setVerifiedSkillsOnly] = useState(false);
+  const [fullyCompletedOnly, setFullyCompletedOnly] = useState(false);
+  const [assessmentBackedOnly, setAssessmentBackedOnly] = useState(false);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -45,12 +48,18 @@ export default function TalentMarketplacePage() {
         minExperience: minExperience ? parseInt(minExperience) : undefined,
         page,
         verifiedOnly,
+        verifiedSkillsOnly,
+        fullyCompletedOnly,
+        assessmentBackedOnly,
       }) as TalentSearchResponse;
       setData(response);
       employerOnboardingEvents.talentResultsLoaded({
         results_count: response.pagination.total,
         page,
         verified_only: verifiedOnly,
+        verified_skills_only: verifiedSkillsOnly,
+        fully_completed_only: fullyCompletedOnly,
+        assessment_backed_only: assessmentBackedOnly,
         skills_count: skills
           .split(",")
           .map((item) => item.trim())
@@ -62,7 +71,7 @@ export default function TalentMarketplacePage() {
     } finally {
       setLoading(false);
     }
-  }, [user, skills, location, minExperience, page, verifiedOnly]);
+  }, [user, skills, location, minExperience, page, verifiedOnly, verifiedSkillsOnly, fullyCompletedOnly, assessmentBackedOnly]);
 
   useEffect(() => {
     if (user?.role === "EMPLOYER") {
@@ -140,30 +149,58 @@ export default function TalentMarketplacePage() {
                 setLocation("");
                 setMinExperience("");
                 setVerifiedOnly(false);
+                setVerifiedSkillsOnly(false);
+                setFullyCompletedOnly(false);
+                setAssessmentBackedOnly(false);
                 setPage(1);
               }}
             >
               Clear Filters
             </Button>
           </div>
-          <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3">
-            <label className="flex items-start gap-3 text-sm text-blue-900">
-              <input
-                type="checkbox"
-                checked={verifiedOnly}
-                onChange={(event) => {
-                  setVerifiedOnly(event.target.checked);
-                  setPage(1);
-                }}
-                className="mt-0.5 h-4 w-4 rounded border-blue-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span>
-                <span className="block font-semibold">Show verified candidates only</span>
-                <span className="block text-blue-800">
-                  Premium employers can filter for candidates with stronger verification and authenticity signals.
+          <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 space-y-3">
+            {[
+              {
+                checked: verifiedOnly,
+                onChange: (checked: boolean) => setVerifiedOnly(checked),
+                title: "Show verified candidates only",
+                body: "Premium employers can filter for candidates with stronger verification and authenticity signals.",
+              },
+              {
+                checked: verifiedSkillsOnly,
+                onChange: (checked: boolean) => setVerifiedSkillsOnly(checked),
+                title: "Require verified skills",
+                body: "Only show candidates with at least one employer-facing verified skill badge.",
+              },
+              {
+                checked: assessmentBackedOnly,
+                onChange: (checked: boolean) => setAssessmentBackedOnly(checked),
+                title: "Assessment-backed candidates",
+                body: "Prioritize candidates whose trust profile includes verified assessment signals.",
+              },
+              {
+                checked: fullyCompletedOnly,
+                onChange: (checked: boolean) => setFullyCompletedOnly(checked),
+                title: "Fully completed profiles",
+                body: "Show candidates with complete employer-facing trust and profile data.",
+              },
+            ].map((filter) => (
+              <label key={filter.title} className="flex items-start gap-3 text-sm text-blue-900">
+                <input
+                  type="checkbox"
+                  checked={filter.checked}
+                  onChange={(event) => {
+                    filter.onChange(event.target.checked);
+                    setPage(1);
+                  }}
+                  className="mt-0.5 h-4 w-4 rounded border-blue-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>
+                  <span className="block font-semibold">{filter.title}</span>
+                  <span className="block text-blue-800">{filter.body}</span>
                 </span>
-              </span>
-            </label>
+              </label>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -272,7 +309,31 @@ export default function TalentMarketplacePage() {
                           {candidate.trust.maskedPhone && (
                             <TrustBadge label={`Phone verified`} variant="info" />
                           )}
+                          {candidate.trust.assessmentBacked && (
+                            <TrustBadge label="Assessment-backed" variant="success" />
+                          )}
+                          {candidate.trust.fullyCompletedProfile && (
+                            <TrustBadge label="Fully completed" variant="success" />
+                          )}
                         </div>
+                        {candidate.verifiedSkills && candidate.verifiedSkills.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {candidate.verifiedSkills.slice(0, 3).map((skill) => (
+                              <TrustBadge
+                                key={skill.id}
+                                label={`${skill.skillName} verified`}
+                                variant="success"
+                              />
+                            ))}
+                          </div>
+                        )}
+                        {candidate.partnerMarkers && candidate.partnerMarkers.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {candidate.partnerMarkers.slice(0, 2).map((marker) => (
+                              <TrustBadge key={marker.id} label={marker.label} variant="info" />
+                            ))}
+                          </div>
+                        )}
                         {candidate.trust.warnings.length > 0 && (
                           <p className="text-xs text-amber-700">
                             {candidate.trust.warnings[0]}

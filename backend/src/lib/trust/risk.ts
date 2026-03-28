@@ -212,15 +212,30 @@ export function assessCandidateTrust(input: {
   emailVerified: boolean;
   phoneVerified: boolean;
   identityVerified: boolean;
-  skillsVerified: boolean;
+  skillsVerified?: boolean;
+  verifiedSkillCount?: number;
+  assessmentBackedSkillCount?: number;
+  partnerSignalCount?: number;
   employmentVerified: boolean;
   hasLinkedIn: boolean;
   hasGitHub: boolean;
   hasPortfolio: boolean;
+  hasResume?: boolean;
   profileCompleteness: number;
+  workHistoryEntries?: number;
+  workHistoryConsistent?: boolean;
+  educationEvidenceCount?: number;
+  certificationEvidenceCount?: number;
   openReports: number;
   applicationsLast24h: number;
 }): CandidateTrustAssessment {
+  const verifiedSkillCount = Math.max(0, input.verifiedSkillCount ?? (input.skillsVerified ? 1 : 0));
+  const assessmentBackedSkillCount = Math.max(0, input.assessmentBackedSkillCount ?? 0);
+  const partnerSignalCount = Math.max(0, input.partnerSignalCount ?? 0);
+  const workHistoryEntries = Math.max(0, input.workHistoryEntries ?? 0);
+  const educationEvidenceCount = Math.max(0, input.educationEvidenceCount ?? 0);
+  const certificationEvidenceCount = Math.max(0, input.certificationEvidenceCount ?? 0);
+
   let authenticityScore = 0;
   let riskScore = 0;
   const warnings: string[] = [];
@@ -237,13 +252,28 @@ export function assessCandidateTrust(input: {
   }
 
   if (input.identityVerified) {
-    authenticityScore += 25;
+    authenticityScore += 18;
     verificationLevel = CandidateVerificationLevel.IDENTITY_DOCUMENT_VERIFIED;
   }
 
-  if (input.skillsVerified) {
-    authenticityScore += 15;
+  if (input.hasResume) {
+    authenticityScore += 8;
+  } else {
+    riskScore += 8;
+    warnings.push("Add an active resume so employers can trust your profile details.");
+  }
+
+  if (verifiedSkillCount > 0) {
+    authenticityScore += Math.min(18, verifiedSkillCount * 6);
     verificationLevel = CandidateVerificationLevel.SKILLS_VERIFIED;
+  }
+
+  if (assessmentBackedSkillCount > 0) {
+    authenticityScore += Math.min(12, assessmentBackedSkillCount * 4);
+  }
+
+  if (partnerSignalCount > 0) {
+    authenticityScore += Math.min(10, partnerSignalCount * 5);
   }
 
   if (input.employmentVerified) {
@@ -251,15 +281,34 @@ export function assessCandidateTrust(input: {
     verificationLevel = CandidateVerificationLevel.EMPLOYMENT_HISTORY_PARTIALLY_VERIFIED;
   }
 
-  if (input.hasLinkedIn) authenticityScore += 5;
-  if (input.hasGitHub) authenticityScore += 5;
-  if (input.hasPortfolio) authenticityScore += 5;
+  if (workHistoryEntries > 0) {
+    authenticityScore += Math.min(8, workHistoryEntries >= 2 ? 8 : 5);
+  }
 
-  if (input.profileCompleteness < 40) {
-    riskScore += 10;
+  if (input.workHistoryConsistent) {
+    authenticityScore += 8;
+  } else if (workHistoryEntries >= 2) {
+    riskScore += 6;
+    warnings.push("Make sure your work history dates and titles are internally consistent.");
+  }
+
+  if (educationEvidenceCount > 0) {
+    authenticityScore += Math.min(6, educationEvidenceCount * 3);
+  }
+
+  if (certificationEvidenceCount > 0) {
+    authenticityScore += Math.min(6, certificationEvidenceCount * 3);
+  }
+
+  if (input.hasLinkedIn) authenticityScore += 4;
+  if (input.hasGitHub) authenticityScore += 4;
+  if (input.hasPortfolio) authenticityScore += 4;
+
+  if (input.profileCompleteness < 50) {
+    riskScore += 12;
     warnings.push("Complete more of your profile to improve authenticity.");
   } else if (input.profileCompleteness >= 80) {
-    authenticityScore += 5;
+    authenticityScore += 8;
   }
 
   if (input.openReports > 0) {
@@ -274,10 +323,16 @@ export function assessCandidateTrust(input: {
     riskScore += 10;
   }
 
+  if (verifiedSkillCount === 0 && !input.hasPortfolio && !input.hasGitHub && !input.hasLinkedIn) {
+    warnings.push("Add evidence-backed skills or portfolio links to increase employer confidence.");
+  }
+
   const premiumFilterEligible =
-    authenticityScore >= 60 &&
-    riskScore < 40 &&
-    verificationLevel !== CandidateVerificationLevel.UNVERIFIED;
+    authenticityScore >= 68 &&
+    riskScore < 35 &&
+    input.profileCompleteness >= 70 &&
+    verificationLevel !== CandidateVerificationLevel.UNVERIFIED &&
+    (input.identityVerified || verifiedSkillCount > 0 || partnerSignalCount > 0);
 
   return {
     authenticityScore: clamp(authenticityScore),

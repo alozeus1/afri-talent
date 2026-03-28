@@ -71,6 +71,9 @@ export default function AdminDashboard() {
           <Link href="/admin/billing">
             <Button variant="outline">Billing Operations</Button>
           </Link>
+          <Link href="/admin/partners">
+            <Button variant="outline">Partner Operations</Button>
+          </Link>
           <Link href="/admin/trust">
             <Button variant="outline">Trust Operations</Button>
           </Link>

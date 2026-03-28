@@ -41,6 +41,13 @@ export interface CandidateProfileDraft {
   linkedinUrl?: string;
   githubUrl?: string;
   portfolioUrl?: string;
+  workHistory?: ParsedResumeWorkItem[];
+  educationHistory?: ParsedResumeEducationItem[];
+  certifications?: Array<{
+    name?: string;
+    issuer?: string;
+    credentialUrl?: string;
+  }>;
 }
 
 const KNOWN_SKILLS = [
@@ -296,5 +303,8 @@ export function toCandidateProfileDraft(parsed: ParsedResumeData): CandidateProf
     linkedinUrl: parsed.linkedinUrl,
     githubUrl: parsed.githubUrl,
     portfolioUrl: parsed.portfolioUrl,
+    workHistory: parsed.workHistory,
+    educationHistory: parsed.education,
+    certifications: parsed.certifications.map((name) => ({ name })),
   };
 }

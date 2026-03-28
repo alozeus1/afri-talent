@@ -226,6 +226,26 @@ export default function CandidateDashboard() {
                 <p className="mt-2 text-sm text-gray-600">
                   Authenticity score {trustDashboard.trust.authenticityScore} • Risk score {trustDashboard.trust.riskScore}
                 </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {trustDashboard.trust.verifiedSkillCount > 0 && (
+                    <TrustBadge
+                      label={`${trustDashboard.trust.verifiedSkillCount} verified skill badge${trustDashboard.trust.verifiedSkillCount === 1 ? "" : "s"}`}
+                      variant="success"
+                    />
+                  )}
+                  {trustDashboard.trust.partnerSignalCount > 0 && (
+                    <TrustBadge
+                      label={`${trustDashboard.trust.partnerSignalCount} partner marker${trustDashboard.trust.partnerSignalCount === 1 ? "" : "s"}`}
+                      variant="info"
+                    />
+                  )}
+                  {trustDashboard.trust.assessmentBacked && (
+                    <TrustBadge label="Assessment-backed" variant="success" />
+                  )}
+                  {trustDashboard.trust.fullyCompletedProfile && (
+                    <TrustBadge label="Fully completed profile" variant="success" />
+                  )}
+                </div>
                 {trustDashboard.trust.warnings.length > 0 && (
                   <ul className="mt-3 space-y-1 text-sm text-gray-700">
                     {trustDashboard.trust.warnings.map((warning) => (

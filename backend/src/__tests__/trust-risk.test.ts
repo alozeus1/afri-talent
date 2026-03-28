@@ -51,11 +51,19 @@ describe("trust risk scoring", () => {
       phoneVerified: true,
       identityVerified: true,
       skillsVerified: true,
+      verifiedSkillCount: 3,
+      assessmentBackedSkillCount: 1,
+      partnerSignalCount: 1,
       employmentVerified: true,
       hasLinkedIn: true,
       hasGitHub: true,
       hasPortfolio: true,
+      hasResume: true,
       profileCompleteness: 92,
+      workHistoryEntries: 3,
+      workHistoryConsistent: true,
+      educationEvidenceCount: 1,
+      certificationEvidenceCount: 2,
       openReports: 0,
       applicationsLast24h: 2,
     });
@@ -63,6 +71,35 @@ describe("trust risk scoring", () => {
     expect(result.premiumFilterEligible).toBe(true);
     expect(result.authenticityScore).toBeGreaterThanOrEqual(60);
     expect(result.riskLevel).toBe("LOW");
+  });
+
+  it("holds back premium trust when resume-backed evidence is thin or inconsistent", () => {
+    const result = assessCandidateTrust({
+      emailVerified: true,
+      phoneVerified: true,
+      identityVerified: false,
+      skillsVerified: false,
+      verifiedSkillCount: 0,
+      assessmentBackedSkillCount: 0,
+      partnerSignalCount: 0,
+      employmentVerified: false,
+      hasLinkedIn: false,
+      hasGitHub: false,
+      hasPortfolio: false,
+      hasResume: false,
+      profileCompleteness: 48,
+      workHistoryEntries: 2,
+      workHistoryConsistent: false,
+      educationEvidenceCount: 0,
+      certificationEvidenceCount: 0,
+      openReports: 1,
+      applicationsLast24h: 12,
+    });
+
+    expect(result.premiumFilterEligible).toBe(false);
+    expect(result.riskScore).toBeGreaterThanOrEqual(25);
+    expect(result.warnings).toContain("Add an active resume so employers can trust your profile details.");
+    expect(result.warnings).toContain("Make sure your work history dates and titles are internally consistent.");
   });
 
   it("auto-holds content that contains fee requests and off-platform contact patterns", () => {

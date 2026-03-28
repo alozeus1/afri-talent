@@ -15,7 +15,7 @@ router.get("/", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async (req: 
   try {
     const {
       skills, location, minExperience, maxExperience,
-      visaStatus, verifiedOnly, page = "1", limit = "10",
+      visaStatus, verifiedOnly, verifiedSkillsOnly, fullyCompletedOnly, assessmentBackedOnly, page = "1", limit = "10",
     } = req.query;
 
     const where: any = {
@@ -34,7 +34,10 @@ router.get("/", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async (req: 
       }).catch(() => null)
       : null;
 
-    if (verifiedOnly === "true" && !canUseVerifiedCandidateFilter(subscription?.plan, req.user!.role)) {
+    const requiresPremiumTrustFilters =
+      verifiedOnly === "true" || verifiedSkillsOnly === "true" || assessmentBackedOnly === "true";
+
+    if (requiresPremiumTrustFilters && !canUseVerifiedCandidateFilter(subscription?.plan, req.user!.role)) {
       res.status(403).json({
         error: "Verified-candidate filters are available to premium trusted employers.",
         code: "PREMIUM_VERIFIED_FILTER_REQUIRED",
@@ -42,13 +45,29 @@ router.get("/", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async (req: 
       return;
     }
 
+    const trustFilters: Record<string, unknown> = {};
+
     if (verifiedOnly === "true") {
+      trustFilters.premiumFilterEligible = true;
+    }
+
+    if (verifiedSkillsOnly === "true") {
+      trustFilters.verifiedSkillCount = { gt: 0 };
+    }
+
+    if (fullyCompletedOnly === "true") {
+      trustFilters.fullyCompletedProfile = true;
+    }
+
+    if (assessmentBackedOnly === "true") {
+      trustFilters.assessmentBacked = true;
+    }
+
+    if (Object.keys(trustFilters).length > 0) {
       where.user = {
         ...(where.user || {}),
         candidateTrustProfile: {
-          is: {
-            premiumFilterEligible: true,
-          },
+          is: trustFilters,
         },
       };
     }
@@ -123,6 +142,44 @@ router.get("/", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async (req: 
       })
       : [];
 
+    const [verifiedSkills, partnerMarkers] = userIds.length > 0
+      ? await Promise.all([
+        prisma.candidateVerifiedSkill.findMany({
+          where: {
+            userId: { in: userIds },
+            status: "VERIFIED",
+          },
+          orderBy: { verifiedAt: "desc" },
+          include: {
+            partner: {
+              select: {
+                id: true,
+                name: true,
+                organizationType: true,
+              },
+            },
+          },
+        }),
+        prisma.candidatePartnerMarker.findMany({
+          where: {
+            userId: { in: userIds },
+            status: "ACTIVE",
+          },
+          orderBy: { issuedAt: "desc" },
+          include: {
+            partner: {
+              select: {
+                id: true,
+                name: true,
+                country: true,
+                organizationType: true,
+              },
+            },
+          },
+        }),
+      ])
+      : [[], []];
+
     const assessmentMap = new Map<string, typeof assessments>();
     for (const a of assessments) {
       const list = assessmentMap.get(a.userId) ?? [];
@@ -130,9 +187,25 @@ router.get("/", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async (req: 
       assessmentMap.set(a.userId, list);
     }
 
+    const verifiedSkillMap = new Map<string, typeof verifiedSkills>();
+    for (const skill of verifiedSkills) {
+      const list = verifiedSkillMap.get(skill.userId) ?? [];
+      list.push(skill);
+      verifiedSkillMap.set(skill.userId, list);
+    }
+
+    const partnerMarkerMap = new Map<string, typeof partnerMarkers>();
+    for (const marker of partnerMarkers) {
+      const list = partnerMarkerMap.get(marker.userId) ?? [];
+      list.push(marker);
+      partnerMarkerMap.set(marker.userId, list);
+    }
+
     const results = candidates.map((c) => ({
       ...c,
       skillAssessments: assessmentMap.get(c.userId) ?? [],
+      verifiedSkills: verifiedSkillMap.get(c.userId) ?? [],
+      partnerMarkers: partnerMarkerMap.get(c.userId) ?? [],
       trust: c.user.candidateTrustProfile
         ? candidateTrustSummary(c.user.candidateTrustProfile)
         : null,
@@ -183,9 +256,47 @@ router.get("/:userId", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async
       where: { userId: req.params.userId },
     });
 
+    const [verifiedSkills, partnerMarkers] = await Promise.all([
+      prisma.candidateVerifiedSkill.findMany({
+        where: {
+          userId: req.params.userId,
+          status: "VERIFIED",
+        },
+        orderBy: { verifiedAt: "desc" },
+        include: {
+          partner: {
+            select: {
+              id: true,
+              name: true,
+              organizationType: true,
+            },
+          },
+        },
+      }),
+      prisma.candidatePartnerMarker.findMany({
+        where: {
+          userId: req.params.userId,
+          status: "ACTIVE",
+        },
+        orderBy: { issuedAt: "desc" },
+        include: {
+          partner: {
+            select: {
+              id: true,
+              name: true,
+              country: true,
+              organizationType: true,
+            },
+          },
+        },
+      }),
+    ]);
+
     res.json({
       ...profile,
       skillAssessments,
+      verifiedSkills,
+      partnerMarkers,
       trust: profile.user.candidateTrustProfile
         ? candidateTrustSummary(profile.user.candidateTrustProfile)
         : null,

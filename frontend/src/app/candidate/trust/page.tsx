@@ -4,7 +4,13 @@ import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { CandidateTrustDashboard, trust, VerificationArtifactItem } from "@/lib/api";
+import {
+  CandidatePartnerMarkerItem,
+  CandidateTrustDashboard,
+  CandidateVerifiedSkillItem,
+  trust,
+  VerificationArtifactItem,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +28,7 @@ const candidateArtifactTypes = [
 ] as const;
 
 type CandidateArtifactType = (typeof candidateArtifactTypes)[number]["value"];
+type CandidateSkillMethod = "CERTIFICATE" | "PORTFOLIO" | "ASSESSMENT";
 
 export default function CandidateTrustPage() {
   const locale = useLocale();
@@ -42,6 +49,13 @@ export default function CandidateTrustPage() {
   const [artifactFile, setArtifactFile] = useState<File | null>(null);
   const [artifactUrl, setArtifactUrl] = useState("");
   const [submittingArtifact, setSubmittingArtifact] = useState(false);
+  const [skillName, setSkillName] = useState("");
+  const [skillMethod, setSkillMethod] = useState<CandidateSkillMethod>("ASSESSMENT");
+  const [skillEvidenceLabel, setSkillEvidenceLabel] = useState("");
+  const [skillEvidenceFile, setSkillEvidenceFile] = useState<File | null>(null);
+  const [skillEvidenceUrl, setSkillEvidenceUrl] = useState("");
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState("");
+  const [submittingSkill, setSubmittingSkill] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "CANDIDATE")) {
@@ -63,6 +77,11 @@ export default function CandidateTrustPage() {
       dashboard.profile.portfolioUrl,
     ].filter(Boolean).length;
   }, [dashboard?.profile]);
+
+  const completedAssessments = useMemo(
+    () => (dashboard?.assessments || []).filter((assessment) => assessment.status === "COMPLETED"),
+    [dashboard?.assessments],
+  );
 
   const loadDashboard = async () => {
     setLoading(true);
@@ -145,6 +164,48 @@ export default function CandidateTrustPage() {
     }
   };
 
+  const handleSkillVerificationSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSubmittingSkill(true);
+    setPageError(null);
+    setPageSuccess(null);
+
+    try {
+      let uploaded: { fileKey?: string; fileName?: string } = {};
+      if (skillEvidenceFile) {
+        uploaded = await uploadVerificationFile(skillEvidenceFile, "candidate-verification");
+      }
+
+      await trust.submitCandidateSkillVerification({
+        skillName,
+        method: skillMethod,
+        evidenceLabel: skillEvidenceLabel.trim() || undefined,
+        fileKey: uploaded.fileKey,
+        fileName: uploaded.fileName,
+        externalUrl: skillEvidenceUrl.trim() || undefined,
+        assessmentId: skillMethod === "ASSESSMENT" ? selectedAssessmentId || undefined : undefined,
+      });
+
+      setSkillName("");
+      setSkillEvidenceLabel("");
+      setSkillEvidenceFile(null);
+      setSkillEvidenceUrl("");
+      setSelectedAssessmentId("");
+      await loadDashboard();
+      setPageSuccess(
+        skillMethod === "ASSESSMENT"
+          ? "Assessment-backed skill verification processed."
+          : "Skill evidence submitted for trust review.",
+      );
+    } catch (error) {
+      setPageError(
+        error instanceof Error ? error.message : "Failed to submit skill verification evidence.",
+      );
+    } finally {
+      setSubmittingSkill(false);
+    }
+  };
+
   if (isLoading || !user) {
     return (
       <div className="flex justify-center py-24">
@@ -217,6 +278,18 @@ export default function CandidateTrustPage() {
                 {dashboard.trust.premiumFilterEligible && (
                   <TrustBadge label="Eligible for premium verified filters" variant="success" />
                 )}
+                {dashboard.trust.verifiedSkillCount > 0 && (
+                  <TrustBadge label={`${dashboard.trust.verifiedSkillCount} verified skill badge${dashboard.trust.verifiedSkillCount === 1 ? "" : "s"}`} variant="success" />
+                )}
+                {dashboard.trust.partnerSignalCount > 0 && (
+                  <TrustBadge label={`${dashboard.trust.partnerSignalCount} partner trust marker${dashboard.trust.partnerSignalCount === 1 ? "" : "s"}`} variant="info" />
+                )}
+                {dashboard.trust.assessmentBacked && (
+                  <TrustBadge label="Assessment-backed candidate" variant="success" />
+                )}
+                {dashboard.trust.fullyCompletedProfile && (
+                  <TrustBadge label="Fully completed profile" variant="success" />
+                )}
               </div>
               <p className="mt-4 text-sm text-gray-600">
                 Profile completeness is{" "}
@@ -247,6 +320,31 @@ export default function CandidateTrustPage() {
           </div>
         </div>
       </TrustScoreCard>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {dashboard.trust.explainability.map((signal) => (
+          <Card key={signal.key}>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{signal.label}</p>
+                  <p className="mt-2 text-sm text-gray-600">{signal.detail}</p>
+                </div>
+                <TrustBadge
+                  label={humanizeTrustValue(signal.status)}
+                  variant={
+                    signal.status === "verified"
+                      ? "success"
+                      : signal.status === "needs_attention"
+                        ? "warning"
+                        : "info"
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -347,6 +445,207 @@ export default function CandidateTrustPage() {
                 {submittingArtifact ? "Submitting..." : "Submit for review"}
               </Button>
             </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold text-gray-900">Verified skills</h2>
+            <p className="text-sm text-gray-600">
+              Submit certificate-backed, portfolio-backed, or assessment-backed skills. Only approved checks become employer-facing badges.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSkillVerificationSubmit} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  label="Skill"
+                  value={skillName}
+                  onChange={(event) => setSkillName(event.target.value)}
+                  placeholder="TypeScript"
+                />
+                <div>
+                  <label htmlFor="skillMethod" className="block text-sm font-medium text-gray-700 mb-1">
+                    Verification method
+                  </label>
+                  <select
+                    id="skillMethod"
+                    value={skillMethod}
+                    onChange={(event) => setSkillMethod(event.target.value as CandidateSkillMethod)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="ASSESSMENT">Assessment-backed</option>
+                    <option value="CERTIFICATE">Certificate-backed</option>
+                    <option value="PORTFOLIO">Portfolio-backed</option>
+                  </select>
+                </div>
+              </div>
+
+              <Input
+                label="Evidence label"
+                value={skillEvidenceLabel}
+                onChange={(event) => setSkillEvidenceLabel(event.target.value)}
+                placeholder="AWS Certified Developer or Production case study"
+              />
+
+              {skillMethod === "ASSESSMENT" && (
+                <div>
+                  <label htmlFor="selectedAssessmentId" className="block text-sm font-medium text-gray-700 mb-1">
+                    Completed assessment
+                  </label>
+                  <select
+                    id="selectedAssessmentId"
+                    value={selectedAssessmentId}
+                    onChange={(event) => setSelectedAssessmentId(event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="">Choose an assessment</option>
+                    {completedAssessments.map((assessment) => (
+                      <option key={assessment.id} value={assessment.id}>
+                        {assessment.skillName} {assessment.score != null ? `(${assessment.score})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Assessment-backed badges are only granted when the result clears AfriTalent&apos;s verification threshold.
+                  </p>
+                </div>
+              )}
+
+              {skillMethod !== "ASSESSMENT" && (
+                <>
+                  {skillMethod === "CERTIFICATE" && (
+                    <div>
+                      <label htmlFor="skillEvidenceFile" className="block text-sm font-medium text-gray-700 mb-1">
+                        Upload certificate
+                      </label>
+                      <input
+                        id="skillEvidenceFile"
+                        type="file"
+                        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        onChange={(event: ChangeEvent<HTMLInputElement>) => setSkillEvidenceFile(event.target.files?.[0] || null)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700"
+                      />
+                    </div>
+                  )}
+                  <Input
+                    label={skillMethod === "CERTIFICATE" ? "Public credential URL" : "Portfolio or GitHub URL"}
+                    value={skillEvidenceUrl}
+                    onChange={(event) => setSkillEvidenceUrl(event.target.value)}
+                    placeholder={
+                      skillMethod === "CERTIFICATE"
+                        ? "https://credential.example"
+                        : "https://github.com/you/project"
+                    }
+                  />
+                </>
+              )}
+
+              <Button
+                type="submit"
+                disabled={
+                  submittingSkill ||
+                  !skillName.trim() ||
+                  (skillMethod === "ASSESSMENT" && !selectedAssessmentId)
+                }
+              >
+                {submittingSkill ? "Submitting..." : "Submit skill verification"}
+              </Button>
+            </form>
+
+            <div className="mt-6 space-y-3">
+              {dashboard.skillVerifications.length === 0 ? (
+                <p className="text-sm text-gray-600">No skill verification records yet.</p>
+              ) : (
+                dashboard.skillVerifications.map((skill: CandidateVerifiedSkillItem) => (
+                  <div key={skill.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-gray-900">{skill.skillName}</p>
+                      <TrustBadge
+                        label={humanizeTrustValue(skill.status)}
+                        variant={
+                          skill.status === "VERIFIED"
+                            ? "success"
+                            : skill.status === "REJECTED"
+                              ? "danger"
+                              : "warning"
+                        }
+                      />
+                      <TrustBadge label={humanizeTrustValue(skill.method)} variant="info" />
+                    </div>
+                    {(skill.evidenceLabel || skill.confidenceNote) && (
+                      <p className="mt-2 text-sm text-gray-600">
+                        {skill.evidenceLabel || skill.confidenceNote}
+                      </p>
+                    )}
+                    {skill.partner && (
+                      <p className="mt-2 text-xs text-gray-500">
+                        Verified via {skill.partner.name}
+                      </p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold text-gray-900">Partner-issued trust markers</h2>
+            <p className="text-sm text-gray-600">
+              Universities, bootcamps, training providers, and scholarship partners can issue high-confidence markers to your profile.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {dashboard.partnerMarkers.length === 0 ? (
+              <p className="text-sm text-gray-600">
+                No partner markers yet. These are added through approved institution or training partners.
+              </p>
+            ) : (
+              dashboard.partnerMarkers.map((marker: CandidatePartnerMarkerItem) => (
+                <div key={marker.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-gray-900">{marker.label}</p>
+                    <TrustBadge
+                      label={humanizeTrustValue(marker.status)}
+                      variant={marker.status === "ACTIVE" ? "success" : "warning"}
+                    />
+                  </div>
+                  <p className="mt-2 text-sm text-gray-600">
+                    {marker.description || `${marker.partner.name} issued this trust marker.`}
+                  </p>
+                  <p className="mt-2 text-xs text-gray-500">
+                    {marker.partner.name} • {humanizeTrustValue(marker.partner.organizationType)}
+                  </p>
+                </div>
+              ))
+            )}
+
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+              <p className="text-sm font-semibold text-blue-900">Assessment history</p>
+              <div className="mt-3 space-y-2">
+                {dashboard.assessments.length === 0 ? (
+                  <p className="text-sm text-blue-800">No skill assessments completed yet.</p>
+                ) : (
+                  dashboard.assessments.slice(0, 5).map((assessment) => (
+                    <div key={assessment.id} className="flex items-center justify-between gap-4 rounded-xl bg-white px-3 py-2 text-sm">
+                      <div>
+                        <p className="font-medium text-gray-900">{assessment.skillName}</p>
+                        <p className="text-xs text-gray-500">
+                          {humanizeTrustValue(assessment.status)} via {assessment.provider}
+                        </p>
+                      </div>
+                      {assessment.score != null && (
+                        <TrustBadge label={`Score ${assessment.score}`} variant="info" />
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

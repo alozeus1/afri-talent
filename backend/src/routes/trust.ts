@@ -3,6 +3,9 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import {
   AbuseReportReason,
+  AssessmentStatus,
+  CandidateSkillVerificationMethod,
+  CandidateSkillVerificationStatus,
   Prisma,
   Role,
   TrustEntityType,
@@ -67,6 +70,39 @@ const candidateArtifactSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+const candidateSkillVerificationSchema = z
+  .object({
+    skillName: z.string().trim().min(2).max(120),
+    method: z.enum([
+      CandidateSkillVerificationMethod.CERTIFICATE,
+      CandidateSkillVerificationMethod.PORTFOLIO,
+      CandidateSkillVerificationMethod.ASSESSMENT,
+    ]),
+    evidenceLabel: z.string().trim().max(200).optional(),
+    fileKey: z.string().trim().max(500).optional(),
+    fileName: z.string().trim().max(255).optional(),
+    externalUrl: z.string().trim().url().max(500).optional(),
+    assessmentId: z.string().uuid().optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.method === CandidateSkillVerificationMethod.CERTIFICATE && !value.fileKey && !value.externalUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["fileKey"],
+        message: "Upload a certificate or provide a public credential URL.",
+      });
+    }
+
+    if (value.method === CandidateSkillVerificationMethod.PORTFOLIO && !value.externalUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["externalUrl"],
+        message: "Add a public portfolio, GitHub, or work sample link.",
+      });
+    }
+  });
+
 const phoneOtpRequestSchema = z.object({
   phoneNumber: phoneNumberSchema,
 });
@@ -128,6 +164,73 @@ function mapArtifact(artifact: {
     reviewerNotes: artifact.reviewerNotes,
     submittedAt: artifact.submittedAt,
     reviewedAt: artifact.reviewedAt,
+  };
+}
+
+function mapVerifiedSkill(skill: {
+  id: string;
+  skillName: string;
+  method: CandidateSkillVerificationMethod;
+  status: CandidateSkillVerificationStatus;
+  evidenceLabel: string | null;
+  evidenceUrl: string | null;
+  score: number | null;
+  confidenceNote: string | null;
+  verifiedAt: Date | null;
+  createdAt: Date;
+  partner?: {
+    id: string;
+    name: string;
+    organizationType: string;
+  } | null;
+}) {
+  return {
+    id: skill.id,
+    skillName: skill.skillName,
+    method: skill.method,
+    status: skill.status,
+    evidenceLabel: skill.evidenceLabel,
+    evidenceUrl: skill.evidenceUrl,
+    score: skill.score,
+    confidenceNote: skill.confidenceNote,
+    verifiedAt: skill.verifiedAt,
+    createdAt: skill.createdAt,
+    partner: skill.partner
+      ? {
+        id: skill.partner.id,
+        name: skill.partner.name,
+        organizationType: skill.partner.organizationType,
+      }
+      : null,
+  };
+}
+
+function mapPartnerMarker(marker: {
+  id: string;
+  markerType: string;
+  status: string;
+  label: string;
+  description: string | null;
+  issuedAt: Date | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+  partner: {
+    id: string;
+    name: string;
+    country: string;
+    organizationType: string;
+  };
+}) {
+  return {
+    id: marker.id,
+    markerType: marker.markerType,
+    status: marker.status,
+    label: marker.label,
+    description: marker.description,
+    issuedAt: marker.issuedAt,
+    expiresAt: marker.expiresAt,
+    createdAt: marker.createdAt,
+    partner: marker.partner,
   };
 }
 
@@ -341,7 +444,7 @@ router.get(
   requireAccountStanding({ allowLimited: true }),
   async (req: Request, res: Response) => {
     try {
-      const [candidateProfile, trustProfile, artifacts] = await Promise.all([
+      const [candidateProfile, trustProfile, artifacts, skillVerifications, partnerMarkers, assessments] = await Promise.all([
         prisma.candidateProfile.findUnique({
           where: { userId: req.user!.userId },
           select: {
@@ -357,6 +460,9 @@ router.get(
             linkedinUrl: true,
             githubUrl: true,
             portfolioUrl: true,
+            workHistory: true,
+            educationHistory: true,
+            certifications: true,
           },
         }),
         refreshCandidateTrustProfile(req.user!.userId),
@@ -365,12 +471,70 @@ router.get(
           orderBy: { submittedAt: "desc" },
           take: 10,
         }),
+        prisma.candidateVerifiedSkill.findMany({
+          where: { userId: req.user!.userId },
+          orderBy: [
+            { status: "asc" },
+            { verifiedAt: "desc" },
+            { createdAt: "desc" },
+          ],
+          take: 20,
+          include: {
+            partner: {
+              select: {
+                id: true,
+                name: true,
+                organizationType: true,
+              },
+            },
+          },
+        }),
+        prisma.candidatePartnerMarker.findMany({
+          where: { userId: req.user!.userId },
+          orderBy: [
+            { status: "asc" },
+            { issuedAt: "desc" },
+            { createdAt: "desc" },
+          ],
+          take: 20,
+          include: {
+            partner: {
+              select: {
+                id: true,
+                name: true,
+                country: true,
+                organizationType: true,
+              },
+            },
+          },
+        }),
+        prisma.skillAssessment.findMany({
+          where: { userId: req.user!.userId },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          select: {
+            id: true,
+            skillName: true,
+            provider: true,
+            status: true,
+            score: true,
+            level: true,
+            percentile: true,
+            resultUrl: true,
+            completedAt: true,
+            expiresAt: true,
+            createdAt: true,
+          },
+        }),
       ]);
 
       res.json({
         profile: candidateProfile,
         trust: candidateTrustSummary(trustProfile),
         artifacts: artifacts.map(mapArtifact),
+        skillVerifications: skillVerifications.map(mapVerifiedSkill),
+        partnerMarkers: partnerMarkers.map(mapPartnerMarker),
+        assessments,
       });
     } catch (error) {
       logger.error({ error }, "Candidate trust summary error");
@@ -574,6 +738,215 @@ router.post(
         return;
       }
       logger.error({ error }, "Candidate artifact submission error");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+router.post(
+  "/candidate/skills",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  requireAccountStanding({ allowLimited: true }),
+  async (req: Request, res: Response) => {
+    try {
+      const data = candidateSkillVerificationSchema.parse(req.body);
+      const [trustProfile, candidateProfile] = await Promise.all([
+        ensureCandidateTrustProfile(req.user!.userId),
+        prisma.candidateProfile.findUnique({
+          where: { userId: req.user!.userId },
+          select: {
+            linkedinUrl: true,
+            githubUrl: true,
+            portfolioUrl: true,
+          },
+        }),
+      ]);
+
+      let artifactId: string | null = null;
+      let trustCaseId: string | null = null;
+      let verificationStatus: CandidateSkillVerificationStatus = CandidateSkillVerificationStatus.PENDING;
+      let confidenceNote: string | null = null;
+      let verifiedAt: Date | null = null;
+      let score: number | null = null;
+      let assessmentId: string | null = null;
+
+      if (data.method === CandidateSkillVerificationMethod.ASSESSMENT) {
+        const assessment = await prisma.skillAssessment.findFirst({
+          where: {
+            userId: req.user!.userId,
+            ...(data.assessmentId ? { id: data.assessmentId } : {}),
+            skillName: {
+              equals: data.skillName,
+              mode: "insensitive",
+            },
+            status: AssessmentStatus.COMPLETED,
+          },
+          orderBy: { completedAt: "desc" },
+        });
+
+        if (!assessment) {
+          res.status(400).json({ error: "Complete an assessment for this skill before submitting it for verification." });
+          return;
+        }
+
+        assessmentId = assessment.id;
+        score = assessment.score ?? null;
+        verificationStatus =
+          (assessment.score ?? 0) >= 70
+            ? CandidateSkillVerificationStatus.VERIFIED
+            : CandidateSkillVerificationStatus.REJECTED;
+        confidenceNote =
+          verificationStatus === CandidateSkillVerificationStatus.VERIFIED
+            ? "Assessment score met the verification threshold."
+            : "Assessment score did not meet the current verification threshold.";
+        verifiedAt =
+          verificationStatus === CandidateSkillVerificationStatus.VERIFIED
+            ? assessment.completedAt ?? new Date()
+            : null;
+      }
+
+      if (data.method === CandidateSkillVerificationMethod.CERTIFICATE) {
+        const artifact = await prisma.verificationArtifact.create({
+          data: {
+            userId: req.user!.userId,
+            type: VerificationArtifactType.CERTIFICATION,
+            fileKey: data.fileKey ?? null,
+            fileName: data.fileName ?? null,
+            externalUrl: data.externalUrl ?? null,
+            metadata: {
+              ...(data.metadata ?? {}),
+              skillName: data.skillName,
+              evidenceLabel: data.evidenceLabel ?? null,
+            } as Prisma.InputJsonValue,
+          },
+        });
+        artifactId = artifact.id;
+      }
+
+      const existingSkill = await prisma.candidateVerifiedSkill.findFirst({
+        where: {
+          userId: req.user!.userId,
+          skillName: {
+            equals: data.skillName,
+            mode: "insensitive",
+          },
+          method: data.method,
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+
+      const savedSkill = existingSkill
+        ? await prisma.candidateVerifiedSkill.update({
+          where: { id: existingSkill.id },
+          data: {
+            status: verificationStatus,
+            evidenceLabel: data.evidenceLabel ?? null,
+            evidenceUrl: data.externalUrl ?? null,
+            artifactId,
+            assessmentId,
+            score,
+            confidenceNote,
+            verifiedAt,
+            metadata: {
+              ...(data.metadata ?? {}),
+              portfolioMatchesProfile:
+                data.method === CandidateSkillVerificationMethod.PORTFOLIO
+                  ? Boolean(
+                    data.externalUrl &&
+                    [
+                      candidateProfile?.portfolioUrl,
+                      candidateProfile?.githubUrl,
+                      candidateProfile?.linkedinUrl,
+                    ].includes(data.externalUrl),
+                  )
+                  : undefined,
+            } as Prisma.InputJsonValue,
+          },
+          include: {
+            partner: {
+              select: {
+                id: true,
+                name: true,
+                organizationType: true,
+              },
+            },
+          },
+        })
+        : await prisma.candidateVerifiedSkill.create({
+          data: {
+            userId: req.user!.userId,
+            skillName: data.skillName,
+            method: data.method,
+            status: verificationStatus,
+            evidenceLabel: data.evidenceLabel ?? null,
+            evidenceUrl: data.externalUrl ?? null,
+            artifactId,
+            assessmentId,
+            score,
+            confidenceNote,
+            verifiedAt,
+            metadata: {
+              ...(data.metadata ?? {}),
+              portfolioMatchesProfile:
+                data.method === CandidateSkillVerificationMethod.PORTFOLIO
+                  ? Boolean(
+                    data.externalUrl &&
+                    [
+                      candidateProfile?.portfolioUrl,
+                      candidateProfile?.githubUrl,
+                      candidateProfile?.linkedinUrl,
+                    ].includes(data.externalUrl),
+                  )
+                  : undefined,
+            } as Prisma.InputJsonValue,
+          },
+          include: {
+            partner: {
+              select: {
+                id: true,
+                name: true,
+                organizationType: true,
+              },
+            },
+          },
+        });
+
+      if (verificationStatus === CandidateSkillVerificationStatus.PENDING) {
+        const trustCase = await createTrustCase({
+          entityType: TrustEntityType.CANDIDATE,
+          priority: TrustRiskLevel.MEDIUM,
+          title: `Candidate skill verification review: ${data.skillName}`,
+          reasonCode: "candidate_skill_verification_submitted",
+          summary: `Candidate submitted ${data.method.toLowerCase()} evidence for ${data.skillName}.`,
+          candidateTrustProfileId: trustProfile.id,
+          artifactId,
+        });
+
+        await addTrustCaseAction({
+          caseId: trustCase.id,
+          actorId: req.user!.userId,
+          actionType: "NOTE",
+          reasonCode: "candidate_skill_submitted",
+          notes: `Submitted ${data.method.toLowerCase()} evidence for ${data.skillName}.`,
+        });
+
+        trustCaseId = trustCase.id;
+      }
+
+      const refreshedTrustProfile = await refreshCandidateTrustProfile(req.user!.userId);
+      res.status(201).json({
+        skillVerification: mapVerifiedSkill(savedSkill),
+        trust: candidateTrustSummary(refreshedTrustProfile),
+        caseId: trustCaseId,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        validationFailure(res, error);
+        return;
+      }
+      logger.error({ error }, "Candidate skill verification submission error");
       res.status(500).json({ error: "Internal server error" });
     }
   },

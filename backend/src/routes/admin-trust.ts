@@ -2,13 +2,17 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import {
   AbuseReportStatus,
+  CandidateSkillVerificationMethod,
+  CandidateSkillVerificationStatus,
   JobStatus,
   ModerationActionType,
+  Prisma,
   Role,
   TrustEntityType,
   TrustCaseStatus,
   TrustRiskLevel,
   VerificationArtifactStatus,
+  VerificationArtifactType,
 } from "@prisma/client";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
@@ -429,6 +433,62 @@ router.post("/artifacts/:id/review", async (req: Request, res: Response) => {
     }
 
     if (artifact.userId) {
+      if (artifact.type === VerificationArtifactType.CERTIFICATION) {
+        const skillStatus =
+          data.status === VerificationArtifactStatus.APPROVED
+            ? CandidateSkillVerificationStatus.VERIFIED
+            : data.status === VerificationArtifactStatus.REJECTED
+              ? CandidateSkillVerificationStatus.REJECTED
+              : CandidateSkillVerificationStatus.PENDING;
+
+        await prisma.candidateVerifiedSkill.updateMany({
+          where: { artifactId: artifact.id },
+          data: {
+            status: skillStatus,
+            reviewerId: req.user!.userId,
+            confidenceNote: data.reviewerNotes ?? undefined,
+            verifiedAt:
+              data.status === VerificationArtifactStatus.APPROVED
+                ? new Date()
+                : null,
+          },
+        });
+
+        const metadata = artifact.metadata as Prisma.JsonObject | null;
+        const skillName = typeof metadata?.skillName === "string" ? metadata.skillName.trim() : "";
+
+        if (skillName) {
+          const linkedSkill = await prisma.candidateVerifiedSkill.findFirst({
+            where: {
+              artifactId: artifact.id,
+              userId: artifact.userId,
+            },
+            select: { id: true },
+          });
+
+          if (!linkedSkill) {
+            await prisma.candidateVerifiedSkill.create({
+              data: {
+                userId: artifact.userId,
+                skillName,
+                method: CandidateSkillVerificationMethod.CERTIFICATE,
+                status: skillStatus,
+                artifactId: artifact.id,
+                reviewerId: req.user!.userId,
+                evidenceLabel:
+                  typeof metadata?.evidenceLabel === "string" ? metadata.evidenceLabel : null,
+                evidenceUrl: artifact.externalUrl,
+                confidenceNote: data.reviewerNotes ?? undefined,
+                verifiedAt:
+                  data.status === VerificationArtifactStatus.APPROVED
+                    ? new Date()
+                    : null,
+              },
+            });
+          }
+        }
+      }
+
       await refreshCandidateTrustProfile(artifact.userId).catch(() => undefined);
       await createUserNotification({
         userId: artifact.userId,
