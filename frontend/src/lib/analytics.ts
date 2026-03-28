@@ -19,10 +19,15 @@ function classifyEvent(name: string): AnalyticsCategory {
   if (name.includes("oauth") || name.includes("signup") || name.includes("landing")) {
     return "ACQUISITION";
   }
-  if (name.includes("profile") || name.includes("first_")) {
+  if (name.includes("profile") || name.includes("first_") || name.includes("onboarding")) {
     return "ACTIVATION";
   }
-  if (name.includes("pipeline") || name.includes("application_status")) {
+  if (
+    name.includes("pipeline") ||
+    name.includes("application_status") ||
+    name.includes("candidate_list") ||
+    name.includes("talent_results")
+  ) {
     return "EMPLOYER_PIPELINE";
   }
   return "ENGAGEMENT";
@@ -111,4 +116,38 @@ export const pricingEvents = {
 
   upgradeCtaClick: (feature: string, currentPlan: string) =>
     trackEvent("upgrade_cta_click", { feature, current_plan: currentPlan }),
+};
+
+export const jobDiscoveryEvents = {
+  resultsLoaded: (properties: EventProperties) =>
+    trackEvent("job_search_results_loaded", properties),
+
+  resultClicked: (properties: EventProperties) =>
+    trackEvent("job_search_result_clicked", properties),
+
+  explanationViewed: (properties: EventProperties) =>
+    trackEvent("job_ranking_explanation_viewed", properties),
+};
+
+export const employerOnboardingEvents = {
+  onboardingViewed: (properties: EventProperties) =>
+    trackEvent("employer_onboarding_viewed", properties),
+
+  stepCompleted: (properties: EventProperties) =>
+    trackEvent("employer_onboarding_step_completed", properties),
+
+  candidateFiltersSaved: (properties: EventProperties) =>
+    trackEvent("employer_candidate_filters_saved", properties),
+
+  upgradeCtaClicked: (properties: EventProperties) =>
+    trackEvent("employer_upgrade_cta_clicked", properties),
+
+  jobQualityPreviewViewed: (properties: EventProperties) =>
+    trackEvent("employer_job_quality_preview_viewed", properties),
+
+  candidateListViewed: (properties: EventProperties) =>
+    trackEvent("employer_candidate_list_viewed", properties),
+
+  talentResultsLoaded: (properties: EventProperties) =>
+    trackEvent("employer_talent_results_loaded", properties),
 };

@@ -12,6 +12,8 @@
 
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
+import { buildJobSearchWhere, buildPreferenceContext, publicJobInclude } from "../lib/jobs/search.js";
+import { collapseDuplicateRankedJobs, scoreJobForSearch } from "../lib/jobs/discovery.js";
 
 // Minimum overlap score (0-100) to consider a job a match worth alerting on
 const ALERT_SCORE_THRESHOLD = parseInt(process.env.ALERT_SCORE_THRESHOLD || "40", 10);
@@ -49,7 +51,7 @@ export async function runJobMatcherCycle(): Promise<void> {
         });
         if (exists) continue;
 
-        const score = computeMatchScore(search, job);
+        const score = job.rankingScore;
         if (score < ALERT_SCORE_THRESHOLD) continue;
 
         await prisma.jobAlert.create({
@@ -101,126 +103,38 @@ async function findNewMatchingJobs(
   },
   sinceDate: Date
 ) {
-  const conditions: Record<string, unknown>[] = [
-    { status: "PUBLISHED" },
-    { publishedAt: { gt: sinceDate } },
-  ];
+  const filters = {
+    search: search.keywords.join(" ").trim() || undefined,
+    location: search.locations[0] || undefined,
+    type: search.jobTypes[0] || undefined,
+    seniority: search.seniorities[0] || undefined,
+    salaryMin: search.salaryMin ?? null,
+    salaryMax: search.salaryMax ?? null,
+    remote: search.remoteOnly,
+    visaSponsorship: search.visaSponsorship ? "YES" : undefined,
+  };
 
-  if (search.keywords.length > 0) {
-    conditions.push({
-      OR: search.keywords.flatMap((kw) => [
-        { title: { contains: kw, mode: "insensitive" as const } },
-        { description: { contains: kw, mode: "insensitive" as const } },
-        { tags: { has: kw.toLowerCase() } },
-      ]),
-    });
-  }
-
-  if (search.locations.length > 0) {
-    conditions.push({
-      OR: search.locations.map((loc) => ({
-        location: { contains: loc, mode: "insensitive" as const },
-      })),
-    });
-  }
-
-  if (search.jobTypes.length > 0) {
-    conditions.push({ type: { in: search.jobTypes } });
-  }
-
-  if (search.seniorities.length > 0) {
-    conditions.push({ seniority: { in: search.seniorities } });
-  }
-
-  if (search.remoteOnly) {
-    conditions.push({
-      OR: [
-        { location: { contains: "remote", mode: "insensitive" as const } },
-        { type: { contains: "remote", mode: "insensitive" as const } },
+  const jobs = await prisma.job.findMany({
+    where: {
+      AND: [
+        buildJobSearchWhere(filters),
+        { publishedAt: { gt: sinceDate } },
       ],
-    });
-  }
-
-  if (search.visaSponsorship) {
-    conditions.push({ visaSponsorship: "YES" });
-  }
-
-  return prisma.job.findMany({
-    where: { AND: conditions },
-    orderBy: { publishedAt: "desc" },
-    take: 50,
-    select: {
-      id: true,
-      title: true,
-      slug: true,
-      location: true,
-      type: true,
-      seniority: true,
-      tags: true,
-      salaryMin: true,
-      salaryMax: true,
-      visaSponsorship: true,
-      relocationAssistance: true,
-      sourceName: true,
-      employerId: true,
-      employer: { select: { companyName: true } },
     },
+    include: publicJobInclude,
+    orderBy: [
+      { publishedAt: "desc" },
+      { updatedAt: "desc" },
+    ],
+    take: 150,
   });
-}
 
-// Lightweight skill-overlap scoring (no AI API call)
-function computeMatchScore(
-  search: {
-    keywords: string[];
-    locations: string[];
-    visaSponsorship: boolean;
-    remoteOnly: boolean;
-  },
-  job: {
-    title: string;
-    tags: string[];
-    location: string;
-    visaSponsorship: string;
-  }
-): number {
-  let score = 0;
-  const maxScore = 100;
-  const jobText = `${job.title} ${job.tags.join(" ")}`.toLowerCase();
-  const jobLoc = job.location.toLowerCase();
-
-  // Keyword match (up to 50 points)
-  if (search.keywords.length > 0) {
-    const matched = search.keywords.filter(
-      (kw) => jobText.includes(kw.toLowerCase())
-    ).length;
-    score += Math.round((matched / search.keywords.length) * 50);
-  } else {
-    score += 25; // no keywords = generic match
-  }
-
-  // Location match (up to 20 points)
-  if (search.locations.length > 0) {
-    const locMatch = search.locations.some(
-      (loc) => jobLoc.includes(loc.toLowerCase())
-    );
-    if (locMatch) score += 20;
-  } else {
-    score += 10;
-  }
-
-  // Remote bonus (10 points)
-  if (search.remoteOnly && jobLoc.includes("remote")) {
-    score += 10;
-  }
-
-  // Visa sponsorship bonus (20 points)
-  if (search.visaSponsorship && job.visaSponsorship === "YES") {
-    score += 20;
-  } else if (!search.visaSponsorship) {
-    score += 10;
-  }
-
-  return Math.min(score, maxScore);
+  return collapseDuplicateRankedJobs(
+    jobs.map((job) => scoreJobForSearch(job, buildPreferenceContext(filters))),
+  ).map((result) => ({
+    ...result.job,
+    rankingScore: result.score,
+  }));
 }
 
 // Match candidate profiles that don't have saved searches
@@ -262,24 +176,26 @@ async function matchCandidateProfiles(): Promise<number> {
       status: "PUBLISHED",
       publishedAt: { gt: since },
     },
-    select: {
-      id: true,
-      title: true,
-      tags: true,
-      location: true,
-      visaSponsorship: true,
-      eligibleCountries: true,
-    },
+    include: publicJobInclude,
     take: 200,
   });
 
   for (const profile of orphanProfiles) {
-    for (const job of recentJobs) {
-      const score = computeProfileJobScore(profile, job);
+    const rankedJobs = collapseDuplicateRankedJobs(
+      recentJobs.map((job) => scoreJobForSearch(job, {
+        skills: profile.skills,
+        targetRoles: profile.targetRoles,
+        targetCountries: profile.targetCountries,
+        requiresVisaSponsorship: Boolean(profile.visaStatus && profile.visaStatus.toLowerCase() !== "citizen"),
+      })),
+    );
+
+    for (const rankedJob of rankedJobs) {
+      const score = rankedJob.score;
       if (score < ALERT_SCORE_THRESHOLD) continue;
 
       const exists = await prisma.jobAlert.findUnique({
-        where: { userId_jobId: { userId: profile.userId, jobId: job.id } },
+        where: { userId_jobId: { userId: profile.userId, jobId: rankedJob.job.id } },
       });
       if (exists) continue;
 
@@ -287,7 +203,7 @@ async function matchCandidateProfiles(): Promise<number> {
         await prisma.jobAlert.create({
           data: {
             userId: profile.userId,
-            jobId: job.id,
+            jobId: rankedJob.job.id,
             matchScore: score,
           },
         });
@@ -299,54 +215,4 @@ async function matchCandidateProfiles(): Promise<number> {
   }
 
   return alerts;
-}
-
-function computeProfileJobScore(
-  profile: {
-    skills: string[];
-    targetRoles: string[];
-    targetCountries: string[];
-    visaStatus: string | null;
-  },
-  job: {
-    title: string;
-    tags: string[];
-    location: string;
-    visaSponsorship: string;
-    eligibleCountries: string[];
-  }
-): number {
-  let score = 0;
-  const jobText = `${job.title} ${job.tags.join(" ")}`.toLowerCase();
-
-  // Skills overlap (up to 40 points)
-  if (profile.skills.length > 0) {
-    const matched = profile.skills.filter(
-      (s) => jobText.includes(s.toLowerCase())
-    ).length;
-    score += Math.round((matched / profile.skills.length) * 40);
-  }
-
-  // Target role match (up to 30 points)
-  if (profile.targetRoles.length > 0) {
-    const titleLower = job.title.toLowerCase();
-    const roleMatch = profile.targetRoles.some(
-      (r) => titleLower.includes(r.toLowerCase())
-    );
-    if (roleMatch) score += 30;
-  }
-
-  // Country/location match (up to 15 points)
-  if (profile.targetCountries.length > 0) {
-    const locLower = job.location.toLowerCase();
-    const countryMatch =
-      profile.targetCountries.some((c) => locLower.includes(c.toLowerCase())) ||
-      job.eligibleCountries.some((c) => profile.targetCountries.includes(c));
-    if (countryMatch) score += 15;
-  }
-
-  // Visa sponsorship bonus (15 points)
-  if (job.visaSponsorship === "YES") score += 15;
-
-  return Math.min(score, 100);
 }

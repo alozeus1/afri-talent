@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { formatSalaryRange } from "@/lib/salary";
+import { jobDiscoveryEvents } from "@/lib/analytics";
 
 interface JobCardProps {
   job: Job;
@@ -16,9 +17,26 @@ export function JobCard({ job }: JobCardProps) {
     currency: job.currency,
     salaryPeriod: job.salaryPeriod,
   });
+  const freshnessLabel = job.discovery?.freshnessLabel.toLowerCase();
+  const discoverySummary = job.rankingExplanation?.summary || job.trust?.guidance;
+  const lastSeenText = job.discovery?.lastSeenAt
+    ? new Date(job.discovery.lastSeenAt).toLocaleDateString()
+    : null;
 
   return (
-    <Link href={`/jobs/${job.slug}`}>
+    <Link
+      href={`/jobs/${job.slug}`}
+      onClick={() => {
+        jobDiscoveryEvents.resultClicked({
+          job_id: job.id,
+          quality_score: job.discovery?.qualityScore ?? 0,
+          freshness_score: job.discovery?.freshnessScore ?? 0,
+          ranking_score: job.rankingExplanation?.score ?? 0,
+          trusted_job: job.discovery?.trustedJob ?? false,
+          source_count: job.discovery?.sourceCount ?? 1,
+        });
+      }}
+    >
       <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
         <CardContent className="p-6">
           <div className="flex justify-between items-start mb-3">
@@ -46,6 +64,12 @@ export function JobCard({ job }: JobCardProps) {
                 {job.trust?.newEmployerCaution && (
                   <TrustBadge label="New employer" riskLevel="MEDIUM" variant="warning" />
                 )}
+                {job.discovery?.trustedJob && (
+                  <TrustBadge label="Trusted job" variant="success" />
+                )}
+                {job.discovery?.sourceCount && job.discovery.sourceCount > 1 && (
+                  <TrustBadge label={`Cross-checked x${job.discovery.sourceCount}`} variant="info" />
+                )}
               </div>
             </div>
             <Badge variant="success">{job.type}</Badge>
@@ -71,9 +95,29 @@ export function JobCard({ job }: JobCardProps) {
             <p className="text-gray-900 dark:text-gray-100 font-semibold mb-4">{salary}</p>
           )}
 
-          {job.trust?.guidance && (
+          {job.discovery && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {job.discovery.freshnessLabel !== "ACTIVE" && (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                  {freshnessLabel}
+                </span>
+              )}
+              {job.discovery.salaryTransparent && (
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  Salary disclosed
+                </span>
+              )}
+              {job.discovery.visaClear && job.visaSponsorship === "YES" && (
+                <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                  Visa clarified
+                </span>
+              )}
+            </div>
+          )}
+
+          {discoverySummary && (
             <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
-              {job.trust.guidance}
+              {discoverySummary}
             </p>
           )}
 
@@ -105,6 +149,12 @@ export function JobCard({ job }: JobCardProps) {
                 <Badge variant="default">+{job.tags.length - 3}</Badge>
               )}
             </div>
+          )}
+
+          {job.discovery?.sourceCount && job.discovery.sourceCount > 1 && lastSeenText && (
+            <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+              Cross-checked across {job.discovery.sourceCount} sources, refreshed {lastSeenText}
+            </p>
           )}
         </CardContent>
       </Card>

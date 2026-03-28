@@ -14,6 +14,7 @@ import { JobDetailSkeleton } from "@/components/ui/skeleton";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { formatSalaryRange } from "@/lib/salary";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { jobDiscoveryEvents } from "@/lib/analytics";
 
 export default function JobDetailPage() {
   const locale = useLocale();
@@ -42,6 +43,18 @@ export default function JobDetailPage() {
     }
     fetchJob();
   }, [params.slug]);
+
+  useEffect(() => {
+    if (job?.rankingExplanation) {
+      jobDiscoveryEvents.explanationViewed({
+        job_id: job.id,
+        ranking_score: job.rankingExplanation.score,
+        quality_score: job.discovery?.qualityScore ?? 0,
+        freshness_score: job.discovery?.freshnessScore ?? 0,
+        source_count: job.discovery?.sourceCount ?? 1,
+      });
+    }
+  }, [job]);
 
   const handleApply = async () => {
     if (!user) {
@@ -126,10 +139,25 @@ export default function JobDetailPage() {
                   {job.trust?.newEmployerCaution && (
                     <TrustBadge label="New employer" riskLevel="MEDIUM" variant="warning" />
                   )}
+                  {job.discovery?.trustedJob && (
+                    <TrustBadge label="Trusted job" variant="success" />
+                  )}
+                  {job.discovery?.sourceCount && job.discovery.sourceCount > 1 && (
+                    <TrustBadge label={`Cross-checked x${job.discovery.sourceCount}`} variant="info" />
+                  )}
                 </div>
               </div>
               <Badge variant="success" className="text-sm">{job.type}</Badge>
             </div>
+
+            {job.discovery?.stale && (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
+                <p className="font-semibold text-amber-900">Aging listing</p>
+                <p className="mt-2 text-sm text-amber-900">
+                  This job has not been refreshed recently, so AfriTalent downranks it and recommends extra caution before applying.
+                </p>
+              </div>
+            )}
 
             {job.trust && (job.trust.newEmployerCaution || job.trust.riskLevel === "MEDIUM" || job.trust.riskLevel === "HIGH") && (
               <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
@@ -205,6 +233,40 @@ export default function JobDetailPage() {
                       ))}
                     </div>
                   </div>
+                )}
+              </div>
+            )}
+
+            {job.discovery && (
+              <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Signal quality</h3>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-white px-4 py-3">
+                    <p className="text-xs font-medium text-slate-500">Freshness</p>
+                    <p className="mt-1 text-base font-semibold text-slate-900">{job.discovery.freshnessLabel}</p>
+                  </div>
+                  <div className="rounded-xl bg-white px-4 py-3">
+                    <p className="text-xs font-medium text-slate-500">Quality</p>
+                    <p className="mt-1 text-base font-semibold text-slate-900">{job.discovery.qualityLabel}</p>
+                  </div>
+                  <div className="rounded-xl bg-white px-4 py-3">
+                    <p className="text-xs font-medium text-slate-500">Salary clarity</p>
+                    <p className="mt-1 text-base font-semibold text-slate-900">{job.discovery.salaryTransparent ? "Disclosed" : "Not disclosed"}</p>
+                  </div>
+                  <div className="rounded-xl bg-white px-4 py-3">
+                    <p className="text-xs font-medium text-slate-500">Application path</p>
+                    <p className="mt-1 text-base font-semibold text-slate-900">{job.discovery.validApplicationPath ? "Verified" : "Needs caution"}</p>
+                  </div>
+                </div>
+                {job.rankingExplanation?.summary && (
+                  <p className="mt-4 text-sm text-slate-700">
+                    Why this ranks well: {job.rankingExplanation.summary}
+                  </p>
+                )}
+                {job.discovery.sourceCount > 1 && (
+                  <p className="mt-2 text-sm text-slate-600">
+                    AfriTalent merged this listing from {job.discovery.sourceCount} sources to reduce duplicates and preserve the strongest application path.
+                  </p>
                 )}
               </div>
             )}

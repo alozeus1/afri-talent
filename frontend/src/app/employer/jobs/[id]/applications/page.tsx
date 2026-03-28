@@ -5,9 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { applications, Application } from "@/lib/api";
+import { employerOnboardingEvents } from "@/lib/analytics";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 
 const statusVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
   PENDING: "warning",
@@ -18,6 +20,7 @@ const statusVariants: Record<string, "default" | "success" | "warning" | "danger
 };
 
 export default function JobApplicationsPage() {
+  const locale = useLocale();
   const params = useParams();
   const router = useRouter();
   const { user, isLoading } = useAuth();
@@ -27,15 +30,21 @@ export default function JobApplicationsPage() {
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "EMPLOYER")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
 
   useEffect(() => {
     if (user?.role === "EMPLOYER") {
       applications
         .forJob(params.id as string)
-        .then(setJobApplications)
+        .then((response) => {
+          setJobApplications(response);
+          employerOnboardingEvents.candidateListViewed({
+            job_id: params.id as string,
+            applicant_count: response.length,
+          });
+        })
         .catch(console.error)
         .finally(() => setLoading(false));
     }
@@ -66,7 +75,7 @@ export default function JobApplicationsPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <Link href="/employer" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
+      <Link href={localizePath("/employer", locale)} className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
         <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>

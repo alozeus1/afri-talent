@@ -10,6 +10,7 @@
 
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
+import { buildJobIntelligenceUpdate } from "../lib/jobs/discovery.js";
 
 const STALE_THRESHOLD_DAYS = parseInt(process.env.JOB_STALE_DAYS || "30", 10);
 const BATCH_SIZE = 100;
@@ -45,15 +46,49 @@ export async function runJobCleanupCycle(): Promise<void> {
       jobSource: "AGGREGATED",
       isExpired: false,
       status: "PUBLISHED",
-      updatedAt: { lte: staleCutoff },
-      expiresAt: null, // only those without an explicit expiry
+      OR: [
+        { staleAt: { lte: new Date() } },
+        { sourceLastSeenAt: { lte: staleCutoff } },
+        {
+          AND: [
+            { sourceLastSeenAt: null },
+            { updatedAt: { lte: staleCutoff } },
+          ],
+        },
+      ],
+      expiresAt: null,
     },
     data: {
       isExpired: true,
       status: "REJECTED",
+      freshnessScore: 0,
     },
   });
   stats.expiredByStale = staleExpired.count;
+
+  const freshnessBatch = await prisma.job.findMany({
+    where: {
+      jobSource: "AGGREGATED",
+      isExpired: false,
+      status: "PUBLISHED",
+    },
+    orderBy: { sourceLastSeenAt: { sort: "asc", nulls: "first" } },
+    take: BATCH_SIZE,
+  });
+
+  for (const job of freshnessBatch) {
+    const intelligence = buildJobIntelligenceUpdate(job, job.sourceLineage);
+    await prisma.job.update({
+      where: { id: job.id },
+      data: {
+        freshnessScore: intelligence.freshnessScore,
+        freshnessSignals: intelligence.freshnessSignals,
+        staleAt: intelligence.staleAt,
+        sourceFirstSeenAt: intelligence.sourceFirstSeenAt,
+        sourceLastSeenAt: intelligence.sourceLastSeenAt,
+      },
+    });
+  }
 
   // Phase 3: Optional URL liveness check on a sample of aggregated jobs
   if (URL_CHECK_ENABLED) {

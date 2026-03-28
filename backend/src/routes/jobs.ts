@@ -1,11 +1,19 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
-import { authenticate, authorize } from "../middleware/auth.js";
+import { authenticate, authorize, optionalAuth } from "../middleware/auth.js";
 import { JobStatus, Role, TrustEntityType, TrustRiskLevel } from "@prisma/client";
 import { buildCacheKey, getCachedJson, setCachedJson } from "../lib/cache.js";
 import { requireAccountStanding } from "../middleware/account-standing.js";
 import { assessJobPostingRisk } from "../lib/trust/risk.js";
+import { buildJobIntelligenceUpdate, scoreJobForSearch } from "../lib/jobs/discovery.js";
+import {
+  buildJobSearchWhere,
+  buildPreferenceContext,
+  fetchRankedJobs,
+  loadCandidatePreferenceContext,
+  publicJobInclude,
+} from "../lib/jobs/search.js";
 import {
   addTrustCaseAction,
   createTrustCase,
@@ -41,6 +49,9 @@ function generateSlug(title: string): string {
 }
 
 function serializeJob<T extends {
+  title: string;
+  description: string;
+  location: string;
   riskLevel: TrustRiskLevel;
   riskScore: number;
   qualityCheckedAt?: Date | null;
@@ -71,10 +82,14 @@ function serializeJob<T extends {
     employerCreatedAt: job.employer?.createdAt ?? null,
     employerTrustProfile: job.employer?.trustProfile ?? null,
   });
+  const ranked = scoreJobForSearch(job);
 
   return {
     ...job,
     trust,
+    discovery: ranked.discovery,
+    rankingExplanation: ranked.explanation,
+    sourceLineage: ranked.sourceLineage,
     employer: job.employer
       ? {
           ...job.employer,
@@ -135,32 +150,14 @@ router.get("/ai-search", authenticate, authorize(Role.CANDIDATE), async (req: Re
   try {
     const { query = "", limit = "10" } = req.query;
     const take = Math.min(parseInt(limit as string) || 10, 50);
-
-    const jobs = await prisma.job.findMany({
-      where: {
-        status: JobStatus.PUBLISHED,
-        isExpired: false,
-        ...(query ? {
-          OR: [
-            { title: { contains: query as string, mode: "insensitive" } },
-            { description: { contains: query as string, mode: "insensitive" } },
-            { sourceName: { contains: query as string, mode: "insensitive" } },
-          ],
-        } : {}),
-      },
-      select: {
-        id: true,
-        title: true,
-        location: true,
-        type: true,
-        seniority: true,
-        description: true,
-        sourceName: true,
-        sourceUrl: true,
-        employer: { select: { companyName: true } },
-      },
-      orderBy: { publishedAt: "desc" },
-      take,
+    const candidateContext = await loadCandidatePreferenceContext(req);
+    const filters = { search: query as string };
+    const { jobs } = await fetchRankedJobs({
+      where: buildJobSearchWhere(filters),
+      page: 1,
+      limit: take,
+      take: Math.max(120, take * 8),
+      preferenceContext: buildPreferenceContext(filters, candidateContext),
     });
 
     res.json({
@@ -173,6 +170,7 @@ router.get("/ai-search", authenticate, authorize(Role.CANDIDATE), async (req: Re
         seniority: j.seniority,
         rawText: j.description,
         url: j.sourceUrl ?? null,
+        rankingExplanation: j.rankingExplanation.summary,
       })),
     });
   } catch (err) {
@@ -182,10 +180,11 @@ router.get("/ai-search", authenticate, authorize(Role.CANDIDATE), async (req: Re
 });
 
 // GET /api/jobs - Public: list published jobs
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", optionalAuth, async (req: Request, res: Response) => {
   const startedAt = Date.now();
   try {
-    const cacheKey = buildCacheKey("jobs:list", req.query);
+    const viewerKey = req.user?.role === Role.CANDIDATE ? req.user.userId : "anon";
+    const cacheKey = buildCacheKey("jobs:list", { ...req.query, viewer: viewerKey });
     const cachedResponse = await getCachedJson<Record<string, unknown>>(cacheKey);
     if (cachedResponse) {
       res.setHeader("X-Cache", "HIT");
@@ -203,86 +202,28 @@ router.get("/", async (req: Request, res: Response) => {
       page = "1", limit = "10", forAI,
     } = req.query;
     const searchTerm = (search || queryAlias) as string | undefined;
-
-    const where: any = { status: JobStatus.PUBLISHED, isExpired: false };
-
-    if (searchTerm) {
-      where.OR = [
-        { title: { contains: searchTerm, mode: "insensitive" } },
-        { description: { contains: searchTerm, mode: "insensitive" } },
-      ];
-    }
-
-    if (location) {
-      where.location = { contains: location as string, mode: "insensitive" };
-    }
-
-    if (type) {
-      where.type = type as string;
-    }
-
-    if (seniority) {
-      where.seniority = seniority as string;
-    }
-
-    if (visaSponsorship) {
-      where.visaSponsorship = visaSponsorship as string;
-    }
-
-    if (relocationAssistance === "true") {
-      where.relocationAssistance = true;
-    }
-
-    if (remote === "true") {
-      where.location = { contains: "remote", mode: "insensitive" };
-    }
-
-    if (salaryMin) {
-      where.salaryMax = { gte: parseInt(salaryMin as string) };
-    }
-
-    if (salaryMax) {
-      where.salaryMin = { lte: parseInt(salaryMax as string) };
-    }
-
-    if (country) {
-      where.eligibleCountries = { has: country as string };
-    }
-
     const parsedLimit = Math.min(parseInt(limit as string) || 10, 100);
-    const skip = (parseInt(page as string) - 1) * parsedLimit;
-    const take = parsedLimit;
-
-    const [jobs, total] = await Promise.all([
-      prisma.job.findMany({
-        where,
-        include: {
-          employer: {
-            select: {
-              companyName: true,
-              location: true,
-              createdAt: true,
-              trustProfile: {
-                select: {
-                  verificationLevel: true,
-                  authenticityScore: true,
-                  riskScore: true,
-                  riskLevel: true,
-                  postingEligibility: true,
-                  requiresEnhancedVerification: true,
-                  verifiedDomain: true,
-                  suspiciousSignals: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: { publishedAt: "desc" },
-        skip,
-        take,
-      }),
-      prisma.job.count({ where }),
-    ]);
+    const currentPage = Math.max(parseInt(page as string) || 1, 1);
+    const filters = {
+      search: searchTerm,
+      location: location as string | undefined,
+      type: type as string | undefined,
+      seniority: seniority as string | undefined,
+      visaSponsorship: visaSponsorship as string | undefined,
+      relocationAssistance: relocationAssistance === "true",
+      remote: remote === "true",
+      salaryMin: salaryMin ? parseInt(salaryMin as string, 10) : null,
+      salaryMax: salaryMax ? parseInt(salaryMax as string, 10) : null,
+      country: country as string | undefined,
+    };
+    const candidateContext = await loadCandidatePreferenceContext(req);
+    const preferenceContext = buildPreferenceContext(filters, candidateContext);
+    const { jobs, total } = await fetchRankedJobs({
+      where: buildJobSearchWhere(filters),
+      page: currentPage,
+      limit: parsedLimit,
+      preferenceContext,
+    });
 
     if (forAI === "true") {
       const aiJobs = jobs.map(job => ({
@@ -293,6 +234,7 @@ router.get("/", async (req: Request, res: Response) => {
         type: job.type,
         seniority: job.seniority,
         description: job.description,
+        rankingExplanation: job.rankingExplanation.summary,
       }));
       const payload = { jobs: aiJobs, total };
       await setCachedJson(cacheKey, payload, 60);
@@ -308,10 +250,10 @@ router.get("/", async (req: Request, res: Response) => {
     const payload = {
       jobs: jobs.map(serializeJob),
       pagination: {
-        page: parseInt(page as string),
-        limit: take,
+        page: currentPage,
+        limit: parsedLimit,
         total,
-        totalPages: Math.ceil(total / take),
+        totalPages: Math.max(1, Math.ceil(total / parsedLimit)),
       },
     };
     await setCachedJson(cacheKey, payload, 60);
@@ -347,30 +289,7 @@ router.get("/:slug", async (req: Request, res: Response) => {
 
     const job = await prisma.job.findUnique({
       where: { slug: req.params.slug },
-      include: {
-        employer: {
-          select: {
-            companyName: true,
-            location: true,
-            website: true,
-            bio: true,
-            createdAt: true,
-            trustProfile: {
-              select: {
-                verificationLevel: true,
-                authenticityScore: true,
-                riskScore: true,
-                riskLevel: true,
-                postingEligibility: true,
-                requiresEnhancedVerification: true,
-                verifiedDomain: true,
-                suspiciousSignals: true,
-              },
-            },
-          },
-        },
-        _count: { select: { applications: true } },
-      },
+      include: publicJobInclude,
     });
 
     if (!job) {
@@ -454,6 +373,28 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
       jobRisk.autoHold ||
       jobRisk.level === TrustRiskLevel.HIGH ||
       jobRisk.level === TrustRiskLevel.CRITICAL;
+    const publishedAt = requiresModeration ? null : new Date();
+    const intelligence = buildJobIntelligenceUpdate({
+      title: data.title,
+      description: data.description,
+      location: data.location,
+      type: data.type,
+      seniority: data.seniority,
+      salaryMin: data.salaryMin ?? null,
+      salaryMax: data.salaryMax ?? null,
+      currency: data.currency ?? null,
+      tags: data.tags || [],
+      publishedAt,
+      riskScore: jobRisk.score,
+      riskLevel: jobRisk.level,
+      sourceName: employer.companyName,
+      jobSource: "EMPLOYER_POSTED",
+      employer: {
+        companyName: employer.companyName,
+        createdAt: employer.createdAt,
+        trustProfile,
+      },
+    });
 
     const job = await prisma.job.create({
       data: {
@@ -461,12 +402,14 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
         slug: generateSlug(data.title),
         tags: data.tags || [],
         status: requiresModeration ? JobStatus.PENDING_REVIEW : JobStatus.PUBLISHED,
-        publishedAt: requiresModeration ? null : new Date(),
+        publishedAt,
         employerId: employer.id,
         riskScore: jobRisk.score,
         riskLevel: jobRisk.level,
         trustFlags: jobRisk.flags,
         qualityCheckedAt: requiresModeration ? null : new Date(),
+        sourceName: employer.companyName,
+        ...intelligence,
       },
     });
 
@@ -639,17 +582,44 @@ router.put("/:id", authenticate, authorize(Role.EMPLOYER), requireAccountStandin
       jobRisk.autoHold ||
       jobRisk.level === TrustRiskLevel.HIGH ||
       jobRisk.level === TrustRiskLevel.CRITICAL;
+    const nextPublishedAt = requiresModeration ? existingJob.publishedAt : existingJob.publishedAt ?? new Date();
+    const intelligence = buildJobIntelligenceUpdate({
+      title: data.title ?? existingJob.title,
+      description: data.description ?? existingJob.description,
+      location: data.location ?? existingJob.location,
+      type: data.type ?? existingJob.type,
+      seniority: data.seniority ?? existingJob.seniority,
+      salaryMin: data.salaryMin ?? existingJob.salaryMin ?? null,
+      salaryMax: data.salaryMax ?? existingJob.salaryMax ?? null,
+      currency: data.currency ?? existingJob.currency ?? null,
+      tags: data.tags ?? existingJob.tags,
+      publishedAt: nextPublishedAt,
+      sourceName: employer.companyName,
+      jobSource: existingJob.jobSource,
+      sourceLineage: existingJob.sourceLineage,
+      sourceFirstSeenAt: existingJob.sourceFirstSeenAt,
+      sourceLastSeenAt: existingJob.sourceLastSeenAt,
+      riskScore: jobRisk.score,
+      riskLevel: jobRisk.level,
+      employer: {
+        companyName: employer.companyName,
+        createdAt: employer.createdAt,
+        trustProfile,
+      },
+    }, existingJob.sourceLineage);
 
     const job = await prisma.job.update({
       where: { id: req.params.id },
       data: {
         ...data,
         status: requiresModeration ? JobStatus.PENDING_REVIEW : JobStatus.PUBLISHED,
-        publishedAt: requiresModeration ? existingJob.publishedAt : existingJob.publishedAt ?? new Date(),
+        publishedAt: nextPublishedAt,
         riskScore: jobRisk.score,
         riskLevel: jobRisk.level,
         trustFlags: jobRisk.flags,
         qualityCheckedAt: requiresModeration ? null : new Date(),
+        sourceName: employer.companyName,
+        ...intelligence,
       },
     });
 

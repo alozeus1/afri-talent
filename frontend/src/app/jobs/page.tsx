@@ -6,6 +6,7 @@ import { JobCard } from "@/components/jobs/job-card";
 import { JobFilters } from "@/components/jobs/job-filters";
 import { Button } from "@/components/ui/button";
 import { JobListSkeleton } from "@/components/ui/skeleton";
+import { jobDiscoveryEvents } from "@/lib/analytics";
 
 export default function JobsPage() {
   const [data, setData] = useState<JobListResponse | null>(null);
@@ -50,6 +51,28 @@ export default function JobsPage() {
     }, 300);
     return () => clearTimeout(debounce);
   }, [fetchJobs]);
+
+  useEffect(() => {
+    if (!loading && data) {
+      const trustedJobs = data.jobs.filter((job) => job.discovery?.trustedJob).length;
+      const freshJobs = data.jobs.filter((job) => {
+        const label = job.discovery?.freshnessLabel;
+        return label === "FRESH" || label === "RECENT";
+      }).length;
+
+      jobDiscoveryEvents.resultsLoaded({
+        results: data.pagination.total,
+        visible_results: data.jobs.length,
+        trusted_results: trustedJobs,
+        fresh_results: freshJobs,
+        has_search: Boolean(search),
+        has_location: Boolean(location),
+        remote_only: remote === "true",
+        visa_required: visaSponsorship === "YES",
+        page,
+      });
+    }
+  }, [data, loading, search, location, remote, visaSponsorship, page]);
 
   const clearFilters = () => {
     setSearch("");
@@ -100,6 +123,12 @@ export default function JobsPage() {
           <div className="mb-4 text-gray-600 dark:text-gray-300">
             {data.pagination.total} job{data.pagination.total !== 1 ? "s" : ""} found
           </div>
+
+          {data.jobs.length > 0 && (
+            <div className="mb-6 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-4 text-sm text-emerald-900">
+              Search ranking now prioritizes relevance, recent refreshes, verified employers, salary transparency, and visa or relocation fit when it matters.
+            </div>
+          )}
 
           {data.jobs.length === 0 ? (
             <div className="text-center py-12">

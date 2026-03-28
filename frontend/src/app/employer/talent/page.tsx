@@ -5,13 +5,16 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { talent, TalentSearchResponse } from "@/lib/api";
+import { employerOnboardingEvents } from "@/lib/analytics";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TrustBadge } from "@/components/trust/trust-badge";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 
 export default function TalentMarketplacePage() {
+  const locale = useLocale();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -27,9 +30,9 @@ export default function TalentMarketplacePage() {
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "EMPLOYER")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
 
   const fetchTalent = useCallback(async () => {
     if (!user || user.role !== "EMPLOYER") return;
@@ -44,6 +47,16 @@ export default function TalentMarketplacePage() {
         verifiedOnly,
       }) as TalentSearchResponse;
       setData(response);
+      employerOnboardingEvents.talentResultsLoaded({
+        results_count: response.pagination.total,
+        page,
+        verified_only: verifiedOnly,
+        skills_count: skills
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean).length,
+        location: location || null,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load candidates");
     } finally {
@@ -76,7 +89,7 @@ export default function TalentMarketplacePage() {
           Discover skilled African professionals for your team
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Link href="/employer/trust">
+          <Link href={localizePath("/employer/trust", locale)}>
             <Button variant="outline" size="sm">Employer Trust Profile</Button>
           </Link>
         </div>

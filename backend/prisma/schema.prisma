@@ -593,10 +593,26 @@ model Employer {
   jobs                  Job[]
   atsConnections        ATSConnection[]
   aiTasks               EmployerAiTask[]
+  onboardingState       EmployerOnboardingState?
   trustProfile          EmployerTrustProfile?
   verificationArtifacts VerificationArtifact[] @relation("EmployerVerificationArtifacts")
   trustRiskEvents       TrustRiskEvent[]
   abuseReports          AbuseReport[]
+}
+
+model EmployerOnboardingState {
+  id               String           @id @default(uuid())
+  employerId       String           @unique
+  employer         Employer         @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  currentStep      String           @default("company_setup") @db.VarChar(80)
+  teamMemberEmails String[]
+  candidateFilters Json?
+  selectedPlan     SubscriptionPlan?
+  helperState      Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([currentStep, updatedAt(sort: Desc)])
 }
 
 model Job {
@@ -624,6 +640,17 @@ model Job {
   sourceUrl            String?
   sourceId             String? // external ATS/job board ID (for dedup)
   sourceName           String? // company name for aggregated jobs
+  applicationUrl       String?
+  sourceFingerprint    String?               @db.VarChar(80)
+  sourceLineage        Json?
+  sourceFirstSeenAt    DateTime?
+  sourceLastSeenAt     DateTime?
+  freshnessScore       Int                   @default(0)
+  qualityScore         Int                   @default(0)
+  applicationLikelihoodScore Int            @default(0)
+  freshnessSignals     Json?
+  qualitySignals       Json?
+  staleAt              DateTime?
 
   // Job expiry tracking
   expiresAt        DateTime? // when the listing expires (from source or heuristic)
@@ -657,8 +684,12 @@ model Job {
   @@index([visaSponsorship])
   @@index([jobSource])
   @@index([sourceId])
+  @@index([sourceFingerprint])
   @@index([isExpired, status])
   @@index([expiresAt])
+  @@index([staleAt])
+  @@index([sourceLastSeenAt])
+  @@index([freshnessScore, qualityScore])
   @@index([riskLevel, riskScore])
 }
 

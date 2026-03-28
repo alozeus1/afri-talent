@@ -6,6 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import logger from "../../logger.js";
 import type { AggregatedJob, AggregatorResult, JobSource, JobRegion } from "./types.js";
 import { AFRICA_FRIENDLY_KEYWORDS } from "./types.js";
+import { buildJobIntelligenceUpdate, buildSourceFingerprint } from "../discovery.js";
 import { RemoteOKSource } from "./sources/remoteok.js";
 import { WeWorkRemotelySource } from "./sources/weworkremotely.js";
 import { AdzunaSource } from "./sources/adzuna.js";
@@ -17,6 +18,11 @@ import { GreenhouseSource } from "./sources/greenhouse.js";
 import { LeverSource } from "./sources/lever.js";
 import { WorkableSource } from "./sources/workable.js";
 import type { BaseJobSource, JobQuery } from "./sources/base.js";
+
+interface AggregatedJobGroup {
+  canonical: AggregatedJob;
+  variants: AggregatedJob[];
+}
 
 export class JobAggregator {
   private sources: BaseJobSource[] = [];
@@ -119,7 +125,7 @@ export class JobAggregator {
     const allJobs = results.flatMap((r) => r.jobs);
 
     // Deduplicate by externalId
-    const uniqueJobs = this.deduplicateJobs(allJobs);
+    const groupedJobs = this.groupDuplicateJobs(allJobs);
 
     let inserted = 0;
     let updated = 0;
@@ -133,9 +139,10 @@ export class JobAggregator {
     };
     const bySource: Partial<Record<JobSource, number>> = {};
 
-    for (const job of uniqueJobs) {
+    for (const group of groupedJobs) {
+      const job = group.canonical;
       try {
-        const result = await this.upsertJob(job);
+        const result = await this.upsertJob(job, group.variants);
         if (result === "inserted") inserted++;
         else if (result === "updated") updated++;
         else skipped++;
@@ -149,12 +156,12 @@ export class JobAggregator {
     }
 
     logger.info(
-      { total: uniqueJobs.length, inserted, updated, skipped },
+      { total: groupedJobs.length, inserted, updated, skipped },
       "[aggregator] Sync completed"
     );
 
     return {
-      total: uniqueJobs.length,
+      total: groupedJobs.length,
       inserted,
       updated,
       skipped,
@@ -163,34 +170,38 @@ export class JobAggregator {
     };
   }
 
-  private deduplicateJobs(jobs: AggregatedJob[]): AggregatedJob[] {
-    const seen = new Map<string, AggregatedJob>();
+  private groupDuplicateJobs(jobs: AggregatedJob[]): AggregatedJobGroup[] {
+    const seen = new Map<string, AggregatedJobGroup>();
 
     for (const job of jobs) {
-      const normalizedTitle = job.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      const normalizedCompany = job.company.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      const normalizedLocation = job.location.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      const canonicalUrl = (() => {
-        try {
-          const parsed = new URL(job.sourceUrl);
-          return `${parsed.hostname}${parsed.pathname}`.toLowerCase();
-        } catch {
-          return "";
-        }
-      })();
+      const key = buildSourceFingerprint({
+        title: job.title,
+        description: job.description,
+        location: job.location,
+        sourceUrl: job.sourceUrl,
+        sourceId: job.externalId,
+        sourceName: job.company,
+        jobSource: job.source,
+      });
 
-      // Prefer source URL + semantic title/company, fallback to title/company/location.
-      const key = canonicalUrl
-        ? `${canonicalUrl}|${normalizedTitle}|${normalizedCompany}`
-        : `${normalizedTitle}|${normalizedCompany}|${normalizedLocation}`;
-      
       if (!seen.has(key)) {
-        seen.set(key, job);
+        seen.set(key, {
+          canonical: job,
+          variants: [job],
+        });
       } else {
-        // Prefer jobs with more complete data
         const existing = seen.get(key)!;
-        if (this.jobCompleteness(job) > this.jobCompleteness(existing)) {
-          seen.set(key, job);
+        existing.variants.push(job);
+
+        // Prefer jobs with more complete data, then fresher postings.
+        if (
+          this.jobCompleteness(job) > this.jobCompleteness(existing.canonical) ||
+          (
+            this.jobCompleteness(job) === this.jobCompleteness(existing.canonical) &&
+            job.postedAt.getTime() > existing.canonical.postedAt.getTime()
+          )
+        ) {
+          existing.canonical = job;
         }
       }
     }
@@ -209,18 +220,60 @@ export class JobAggregator {
     return score;
   }
 
-  private async upsertJob(job: AggregatedJob): Promise<"inserted" | "updated" | "skipped"> {
-    // Check if job already exists by sourceId
+  private toJobDocument(job: AggregatedJob) {
+    return {
+      title: job.title,
+      description: job.description,
+      location: job.location,
+      type: job.jobType,
+      seniority: job.seniority,
+      tags: job.skills,
+      salaryMin: job.salary?.min ?? null,
+      salaryMax: job.salary?.max ?? null,
+      currency: job.salary?.currency ?? null,
+      visaSponsorship: job.visaSponsorship,
+      relocationAssistance: job.relocationAssistance,
+      eligibleCountries: job.eligibleCountries,
+      sourceUrl: job.sourceUrl,
+      sourceId: job.externalId,
+      sourceName: job.company,
+      jobSource: job.source,
+      applicationUrl: job.applicationUrl,
+      publishedAt: job.postedAt,
+      sourceFirstSeenAt: job.postedAt,
+      sourceLastSeenAt: new Date(),
+      expiresAt: job.expiresAt ?? null,
+      riskScore: 0,
+      riskLevel: "LOW" as const,
+    };
+  }
+
+  private async upsertJob(job: AggregatedJob, variants: AggregatedJob[] = [job]): Promise<"inserted" | "updated" | "skipped"> {
+    const fingerprint = buildSourceFingerprint(this.toJobDocument(job));
     const existing = await this.prisma.job.findFirst({
       where: {
-        sourceId: job.externalId,
         jobSource: "AGGREGATED",
+        OR: [
+          { sourceId: job.externalId },
+          { sourceFingerprint: fingerprint },
+        ],
       },
+      orderBy: [
+        { qualityScore: "desc" },
+        { publishedAt: "desc" },
+      ],
     });
 
     // Generate slug
     const baseSlug = this.generateSlug(job.title, job.company);
     const slug = existing?.slug || await this.ensureUniqueSlug(baseSlug);
+
+    const relatedJobs = variants.map((variant) => this.toJobDocument(variant));
+    const intelligence = buildJobIntelligenceUpdate(
+      this.toJobDocument(job),
+      existing?.sourceLineage,
+      relatedJobs,
+    );
 
     const jobData = {
       title: job.title,
@@ -245,6 +298,10 @@ export class JobAggregator {
       expiresAt: job.expiresAt || null,
       lastCheckedAt: new Date(),
       isExpired: false,
+      riskScore: 0,
+      riskLevel: "LOW" as const,
+      qualityCheckedAt: new Date(),
+      ...intelligence,
     };
 
     if (existing) {

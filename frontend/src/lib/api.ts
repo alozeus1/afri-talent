@@ -436,6 +436,16 @@ export const employerAnalytics = {
   stats: () => fetchAPI<EmployerAnalytics>("/api/employer/analytics"),
   advanced: () => fetchAPI<EmployerAdvancedAnalytics>("/api/employer/analytics/advanced"),
   onboarding: () => fetchAPI<EmployerOnboarding>("/api/employer/onboarding"),
+  updateOnboarding: (data: EmployerOnboardingUpdateInput) =>
+    fetchAPI<{ message: string; onboardingState: EmployerOnboardingStateSnapshot }>("/api/employer/onboarding", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  jobPreview: (data: EmployerJobPreviewInput) =>
+    fetchAPI<EmployerJobPreview>("/api/employer/onboarding/job-preview", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   getBranding: () => fetchAPI<EmployerBranding>("/api/employer/branding"),
   updateBranding: (data: { companyName?: string; website?: string; location?: string; bio?: string }) =>
     fetchAPI<EmployerBranding>("/api/employer/branding", {
@@ -653,6 +663,51 @@ export interface JobTrustSummary {
   employer: EmployerTrustSummary | null;
 }
 
+export interface JobSourceLineageItem {
+  source: string | null;
+  sourceId: string | null;
+  sourceUrl: string | null;
+  applicationUrl: string | null;
+  company: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
+
+export interface JobRankingExplanation {
+  score: number;
+  summary: string;
+  reasons: string[];
+  matchedPreferences: string[];
+  components: {
+    relevance: number;
+    freshness: number;
+    applicationLikelihood: number;
+    employerTrust: number;
+    salaryTransparency: number;
+    mobilityRelevance: number;
+    candidatePreferenceMatch: number;
+    quality: number;
+  };
+}
+
+export interface JobDiscoverySummary {
+  qualityScore: number;
+  freshnessScore: number;
+  applicationLikelihoodScore: number;
+  trustedJob: boolean;
+  stale: boolean;
+  freshnessLabel: "FRESH" | "RECENT" | "ACTIVE" | "AGING" | "STALE" | "EXPIRED";
+  qualityLabel: "TRUSTED" | "SOLID" | "REVIEW" | "THIN";
+  salaryTransparent: boolean;
+  verifiedEmployer: boolean;
+  visaClear: boolean;
+  relocationClear: boolean;
+  validApplicationPath: boolean;
+  sourceCount: number;
+  sourceNames: string[];
+  lastSeenAt: string | null;
+}
+
 export interface VerificationArtifactItem {
   id: string;
   type: string;
@@ -859,6 +914,9 @@ export interface Job {
   createdAt: string;
   moderationRequired?: boolean;
   trust?: JobTrustSummary;
+  discovery?: JobDiscoverySummary;
+  rankingExplanation?: JobRankingExplanation;
+  sourceLineage?: JobSourceLineageItem[];
   employer: {
     companyName: string;
     location: string;
@@ -1339,8 +1397,15 @@ export interface EmployerAnalytics {
   totalJobs: number;
   publishedJobs: number;
   totalApplications: number;
+  qualifiedApplicants: number;
+  shortlistRate: number;
   applicationsByStatus: Record<string, number>;
   recentApplications: Array<{ id: string; status: string; createdAt: string; candidate: { name: string }; job: { title: string } }>;
+  activationMilestones: EmployerActivationMilestones;
+  activationState: EmployerActivationState;
+  timeToFirstQualifiedApplicantHours: number | null;
+  verificationImpact: EmployerVerificationImpact;
+  viewsByDay: Array<{ date: string; views: number }>;
 }
 
 export interface EmployerAdvancedAnalytics {
@@ -1354,8 +1419,13 @@ export interface EmployerAdvancedAnalytics {
     title: string;
     status: string;
     applicationCount: number;
+    qualifiedApplicants: number;
     shortlistRate: number;
     acceptanceRate: number;
+    impressions: number;
+    clicks: number;
+    ctr: number;
+    qualityScore: number;
     timeToFirstApplicationHours: number | null;
   }>;
   candidatePipeline: {
@@ -1367,6 +1437,8 @@ export interface EmployerAdvancedAnalytics {
     rejected: number;
     avgReviewTimeHours: number | null;
   };
+  roi: EmployerRoiSummary;
+  activationMilestones: EmployerActivationMilestones;
 }
 
 export interface ATSConnection {
@@ -1427,13 +1499,31 @@ export interface MockInterviewSession {
 }
 
 export interface EmployerOnboarding {
-  checklist: Array<{ key: string; label: string; done: boolean }>;
+  currentStep: EmployerOnboardingStep;
+  checklist: EmployerOnboardingChecklistItem[];
   completionPct: number;
   stats: {
     jobCount: number;
     publishedJobs: number;
+    totalApplications: number;
+    qualifiedApplicants: number;
   };
+  milestones: EmployerActivationMilestones;
+  activationState: EmployerActivationState;
+  candidateFilters: EmployerCandidateFilters;
+  teamMemberEmails: string[];
+  selectedPlan: BillingStatus["plan"];
+  trust: EmployerTrustSummary;
+  company: {
+    companyName: string;
+    website: string | null;
+    location: string;
+    bio: string | null;
+    email: string;
+  };
+  nextAction: EmployerNextAction;
   recommendation: string;
+  upgradeJourney: EmployerUpgradeJourney;
 }
 
 export interface EmployerBranding {
@@ -1442,6 +1532,122 @@ export interface EmployerBranding {
   website: string | null;
   location: string;
   bio: string | null;
+}
+
+export type EmployerOnboardingStep =
+  | "company_setup"
+  | "verification"
+  | "team_setup"
+  | "first_job_post"
+  | "candidate_filters"
+  | "subscription_choice"
+  | "trust_completion";
+
+export interface EmployerCandidateFilters {
+  skills: string[];
+  location: string | null;
+  minExperience: number | null;
+  verifiedOnly: boolean;
+  visaPreference: "ANY" | "SPONSORED_ONLY";
+}
+
+export interface EmployerActivationMilestones {
+  firstApprovedJobAt: string | null;
+  firstCandidateViewAt: string | null;
+  firstQualifiedShortlistAt: string | null;
+}
+
+export interface EmployerActivationState {
+  label: string;
+  state: "not_started" | "in_progress" | "activated";
+}
+
+export interface EmployerVerificationImpact {
+  verified: boolean;
+  qualifiedApplicantRate: number;
+  insight: string;
+}
+
+export interface EmployerUpgradeJourney {
+  targetPlan: BillingStatus["plan"] | null;
+  headline: string;
+  body: string;
+  ctaLabel: string;
+}
+
+export interface EmployerOnboardingChecklistItem {
+  key: EmployerOnboardingStep;
+  label: string;
+  description: string;
+  done: boolean;
+  href: string;
+}
+
+export interface EmployerNextAction {
+  key: EmployerOnboardingStep;
+  title: string;
+  body: string;
+  href: string;
+  ctaLabel: string;
+}
+
+export interface EmployerRoiSummary {
+  impressions: number;
+  clicks: number;
+  applies: number;
+  qualifiedApplicants: number;
+  shortlistRate: number;
+  clickToApplyRate: number;
+  timeToFirstQualifiedApplicantHours: number | null;
+  averageJobQuality: number;
+  verificationImpact: EmployerVerificationImpact;
+  upgradeJourney: EmployerUpgradeJourney;
+}
+
+export interface EmployerOnboardingUpdateInput {
+  currentStep?: EmployerOnboardingStep;
+  selectedPlan?: Extract<BillingStatus["plan"], "EMPLOYER_FREE" | "EMPLOYER_BASIC" | "EMPLOYER_PREMIUM"> | null;
+  teamMemberEmails?: string[];
+  candidateFilters?: EmployerCandidateFilters;
+  companyName?: string;
+  website?: string;
+  location?: string;
+  bio?: string;
+}
+
+export interface EmployerOnboardingStateSnapshot {
+  currentStep: EmployerOnboardingStep;
+  teamMemberEmails: string[];
+  candidateFilters: EmployerCandidateFilters;
+  selectedPlan: Extract<BillingStatus["plan"], "EMPLOYER_FREE" | "EMPLOYER_BASIC" | "EMPLOYER_PREMIUM"> | null;
+}
+
+export interface EmployerJobPreviewInput {
+  title: string;
+  description: string;
+  location: string;
+  type: string;
+  seniority: string;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+  currency?: string | null;
+  tags?: string[];
+}
+
+export interface EmployerJobPreview {
+  qualityScore: number;
+  qualityLabel: "TRUSTED" | "SOLID" | "REVIEW" | "THIN";
+  moderationRiskLevel: TrustRiskLevel;
+  moderationRequired: boolean;
+  guidance: string;
+  flags: string[];
+  strengths: string[];
+  tips: string[];
+  checklist: Array<{
+    key: string;
+    label: string;
+    done: boolean;
+  }>;
 }
 
 // Profile
