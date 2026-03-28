@@ -266,6 +266,12 @@ afri-tech/
 | `APPLE_CLIENT_ID` / `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` | Enable Apple OAuth |
 | `SES_FROM_EMAIL` | Sender used for email verification/reset emails |
 | `ENABLE_API_DOCS` | Set `true` to expose `/api/docs` in production |
+| `PHASE4_SOCIAL_ENABLED` | Enable social graph/profile endpoints (`/api/social/*`) |
+| `PHASE4_SALARY_NEGOTIATION_ENABLED` | Enable salary negotiation assistant (`/api/salary-negotiation/*`) |
+| `PHASE4_UNIVERSITY_API_ENABLED` | Enable university partner API (`/api/university-partners/*`) |
+| `PHASE4_EMPLOYER_AI_ENABLED` | Enable employer AI tools (`/api/employer/ai/*`) |
+| `PHASE4_BOTS_ENABLED` | Enable WhatsApp/Telegram bot integration routes (`/api/bots/*`) |
+| `BOT_WEBHOOK_SECRET` | Shared secret for inbound bot webhook calls |
 
 **Frontend (required):**
 | Variable | Description |
@@ -281,6 +287,7 @@ afri-tech/
 - Phase 3 analytics event model: [docs/PHASE3_ANALYTICS_EVENT_MODEL.md](./docs/PHASE3_ANALYTICS_EVENT_MODEL.md)
 - Phase 3 billing localization plan: [docs/PHASE3_BILLING_LOCALIZATION_PLAN.md](./docs/PHASE3_BILLING_LOCALIZATION_PLAN.md)
 - Phase 3 phased rollout plan: [docs/PHASE3_ROLLOUT_PLAN.md](./docs/PHASE3_ROLLOUT_PLAN.md)
+- Phase 4 moat architecture and API contracts: [docs/PHASE4_MOAT_ARCHITECTURE.md](./docs/PHASE4_MOAT_ARCHITECTURE.md)
 
 
    •  Frontend: http://localhost:3000

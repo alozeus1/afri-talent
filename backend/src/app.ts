@@ -55,6 +55,11 @@ import preferencesRoutes from "./routes/preferences.js";
 import atsRoutes from "./routes/ats.js";
 import mockInterviewsRoutes from "./routes/mock-interviews.js";
 import analyticsEventsRoutes from "./routes/analytics-events.js";
+import socialRoutes from "./routes/social.js";
+import salaryNegotiationRoutes from "./routes/salary-negotiation.js";
+import universityPartnersRoutes from "./routes/university-partners.js";
+import employerAiRoutes from "./routes/employer-ai.js";
+import botsRoutes from "./routes/bots.js";
 import { swaggerSpec } from "./lib/swagger.js";
 
 dotenv.config({ quiet: true });
@@ -249,6 +254,11 @@ app.use("/api/preferences", preferencesRoutes);
 app.use("/api/ats", atsRoutes);
 app.use("/api/mock-interviews", mockInterviewsRoutes);
 app.use("/api/analytics", analyticsEventsRoutes);
+app.use("/api/social", socialRoutes);
+app.use("/api/salary-negotiation", salaryNegotiationRoutes);
+app.use("/api/university-partners", universityPartnersRoutes);
+app.use("/api/employer/ai", employerAiRoutes);
+app.use("/api/bots", botsRoutes);
 
 // OpenAPI/Swagger docs
 app.get("/api/docs/spec.json", (_req, res) => {

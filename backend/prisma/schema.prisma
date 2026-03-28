@@ -151,6 +151,59 @@ enum AnalyticsEventCategory {
   SYSTEM
 }
 
+enum SocialConnectionStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  BLOCKED
+}
+
+enum SalaryNegotiationStatus {
+  DRAFT
+  READY
+  ARCHIVED
+}
+
+enum UniversityPartnerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum UniversityRecordType {
+  INTERNSHIP
+  GRADUATE_PIPELINE
+  SKILLS_VERIFICATION
+}
+
+enum UniversityRecordStatus {
+  RECEIVED
+  VALIDATED
+  REJECTED
+}
+
+enum EmployerAiTaskType {
+  CANDIDATE_RANKING
+  JOB_DESCRIPTION_GENERATION
+}
+
+enum EmployerAiTaskStatus {
+  GENERATED
+  APPROVED
+  REJECTED
+}
+
+enum BotChannel {
+  WHATSAPP
+  TELEGRAM
+}
+
+enum BotSubscriptionStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  PAUSED
+  REVOKED
+}
+
 // ──────────────── OAuth & Email Verification ────────────────
 
 enum OAuthProvider {
@@ -325,12 +378,12 @@ model User {
 
   employer                Employer?
   applications            Application[]
-  adminReviews            AdminReview[]            @relation("AdminReviewer")
+  adminReviews            AdminReview[]              @relation("AdminReviewer")
   candidateProfile        CandidateProfile?
   subscription            Subscription?
   notifications           Notification[]
   threadParticipants      ThreadParticipant[]
-  sentMessages            Message[]                @relation("MessageSender")
+  sentMessages            Message[]                  @relation("MessageSender")
   aiRuns                  AiRun[]
   savedSearches           SavedSearch[]
   jobAlerts               JobAlert[]
@@ -341,8 +394,8 @@ model User {
   interviewExperiences    InterviewExperience[]
   salaryReports           SalaryReport[]
   immigrationProcesses    ImmigrationProcess[]
-  referralsMade           Referral[]               @relation("ReferralsMade")
-  referralsReceived       Referral[]               @relation("ReferralsReceived")
+  referralsMade           Referral[]                 @relation("ReferralsMade")
+  referralsReceived       Referral[]                 @relation("ReferralsReceived")
   calendarEvents          CalendarEvent[]
   chatConsent             ChatConsent?
   chatConversations       ChatConversation[]
@@ -353,6 +406,13 @@ model User {
   pushSubscriptions       PushSubscription[]
   analyticsEvents         AnalyticsEvent[]
   mockInterviewSessions   MockInterviewSession[]
+  socialProfile           SocialProfile?
+  socialConnectionsSent   SocialConnection[]         @relation("SocialConnectionRequester")
+  socialConnectionsRecv   SocialConnection[]         @relation("SocialConnectionRecipient")
+  salaryNegotiations      SalaryNegotiationSession[]
+  botSubscriptions        BotSubscription[]
+  employerAiTasksCreated  EmployerAiTask[]           @relation("EmployerAiTaskCreator")
+  employerAiTasksReviewed EmployerAiTask[]           @relation("EmployerAiTaskReviewer")
 
   @@index([role])
   @@index([createdAt])
@@ -372,6 +432,7 @@ model Employer {
 
   jobs           Job[]
   atsConnections ATSConnection[]
+  aiTasks        EmployerAiTask[]
 }
 
 model Job {
@@ -409,11 +470,12 @@ model Job {
   employerId String?
   employer   Employer? @relation(fields: [employerId], references: [id])
 
-  applications      Application[]
-  adminReviews      AdminReview[]      @relation("JobReviews")
-  threads           MessageThread[]
-  jobAlerts         JobAlert[]
-  assessmentInvites AssessmentInvite[]
+  applications              Application[]
+  adminReviews              AdminReview[]              @relation("JobReviews")
+  threads                   MessageThread[]
+  jobAlerts                 JobAlert[]
+  assessmentInvites         AssessmentInvite[]
+  salaryNegotiationSessions SalaryNegotiationSession[]
 
   @@index([status])
   @@index([status, publishedAt(sort: Desc)])
@@ -761,6 +823,142 @@ model AnalyticsEvent {
   @@index([category, occurredAt(sort: Desc)])
   @@index([eventName, occurredAt(sort: Desc)])
   @@index([userId, occurredAt(sort: Desc)])
+}
+
+model SocialProfile {
+  id                      String   @id @default(uuid())
+  userId                  String   @unique
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline                String?  @db.VarChar(160)
+  bio                     String?  @db.VarChar(1000)
+  location                String?  @db.VarChar(120)
+  discoverable            Boolean  @default(false)
+  collaborationOpen       Boolean  @default(false)
+  allowConnectionRequests Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([discoverable])
+}
+
+model SocialConnection {
+  id          String                 @id @default(uuid())
+  requesterId String
+  requester   User                   @relation("SocialConnectionRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   User                   @relation("SocialConnectionRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  status      SocialConnectionStatus @default(PENDING)
+  note        String?                @db.VarChar(300)
+  respondedAt DateTime?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@unique([requesterId, recipientId])
+  @@index([requesterId, status])
+  @@index([recipientId, status])
+}
+
+model SalaryNegotiationSession {
+  id                  String                  @id @default(uuid())
+  userId              String
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId               String?
+  job                 Job?                    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  jobTitle            String                  @db.VarChar(200)
+  country             String?                 @db.VarChar(100)
+  region              BillingRegion?
+  currency            String                  @default("USD") @db.VarChar(3)
+  currentCompensation Int?
+  targetCompensation  Int?
+  marketMin           Int?
+  marketMedian        Int?
+  marketMax           Int?
+  strategySummary     String?                 @db.Text
+  talkingPoints       Json?
+  riskFlags           Json?
+  status              SalaryNegotiationStatus @default(DRAFT)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([jobId])
+}
+
+model UniversityPartner {
+  id         String                  @id @default(uuid())
+  externalId String                  @unique @db.VarChar(120)
+  name       String                  @db.VarChar(200)
+  country    String                  @db.VarChar(2)
+  website    String?                 @db.VarChar(500)
+  status     UniversityPartnerStatus @default(ACTIVE)
+  apiKeyHash String                  @unique @db.VarChar(128)
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  records UniversityPartnerRecord[]
+
+  @@index([status])
+}
+
+model UniversityPartnerRecord {
+  id               String                 @id @default(uuid())
+  partnerId        String
+  partner          UniversityPartner      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  type             UniversityRecordType
+  externalRecordId String                 @db.VarChar(120)
+  payload          Json
+  status           UniversityRecordStatus @default(RECEIVED)
+  receivedAt       DateTime               @default(now())
+  processedAt      DateTime?
+
+  @@unique([partnerId, type, externalRecordId])
+  @@index([type, status])
+}
+
+model EmployerAiTask {
+  id               String               @id @default(uuid())
+  employerId       String
+  employer         Employer             @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  createdByUserId  String
+  createdByUser    User                 @relation("EmployerAiTaskCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  reviewedByUserId String?
+  reviewedByUser   User?                @relation("EmployerAiTaskReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  type             EmployerAiTaskType
+  status           EmployerAiTaskStatus @default(GENERATED)
+  title            String?              @db.VarChar(200)
+  input            Json
+  output           Json?
+  reviewNotes      String?              @db.Text
+  humanApproved    Boolean              @default(false)
+  reviewedAt       DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([employerId, type, status])
+  @@index([createdByUserId, createdAt(sort: Desc)])
+}
+
+model BotSubscription {
+  id                         String                @id @default(uuid())
+  userId                     String
+  user                       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel                    BotChannel
+  chatHandle                 String                @db.VarChar(120)
+  status                     BotSubscriptionStatus @default(PENDING_VERIFICATION)
+  verificationCodeHash       String?               @db.VarChar(128)
+  isAlertsEnabled            Boolean               @default(true)
+  isJobMatchesEnabled        Boolean               @default(true)
+  isRemindersEnabled         Boolean               @default(true)
+  isApplicationStatusEnabled Boolean               @default(true)
+  locale                     SupportedLocale       @default(EN)
+  metadata                   Json?
+  verifiedAt                 DateTime?
+  lastNotifiedAt             DateTime?
+  createdAt                  DateTime              @default(now())
+  updatedAt                  DateTime              @updatedAt
+
+  @@unique([channel, chatHandle])
+  @@index([userId, status])
 }
 
 model Subscription {
