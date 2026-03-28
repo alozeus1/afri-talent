@@ -4,12 +4,21 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { applications, Application, billing, BillingStatus, emailVerification } from "@/lib/api";
+import {
+  applications,
+  Application,
+  billing,
+  BillingStatus,
+  CandidateTrustDashboard,
+  emailVerification,
+  trust,
+} from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
 import { PushOptInCard } from "@/components/notifications/push-opt-in";
+import { TrustBadge } from "@/components/trust/trust-badge";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -69,6 +78,7 @@ export default function CandidateDashboard() {
   const [openToWork, setOpenToWork] = useState(false);
   const [togglingOtw, setTogglingOtw] = useState(false);
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
+  const [trustDashboard, setTrustDashboard] = useState<CandidateTrustDashboard | null>(null);
   const [emailVerified, setEmailVerified] = useState<boolean>(true);
   const [sendingVerification, setSendingVerification] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
@@ -77,7 +87,7 @@ export default function CandidateDashboard() {
     if (!isLoading && (!user || user.role !== "CANDIDATE")) {
       router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
 
   useEffect(() => {
     if (user?.role === "CANDIDATE") {
@@ -102,12 +112,17 @@ export default function CandidateDashboard() {
         .then(setBillingStatus)
         .catch(console.error);
 
+      trust
+        .candidateSummary()
+        .then(setTrustDashboard)
+        .catch(() => {});
+
       emailVerification
         .status()
         .then((status) => setEmailVerified(status.verified))
         .catch(() => setEmailVerified(true));
     }
-  }, [user]);
+  }, [user, locale]);
 
   const toggleOpenToWork = async () => {
     setTogglingOtw(true);
@@ -182,6 +197,46 @@ export default function CandidateDashboard() {
               >
                 {sendingVerification ? "Sending..." : "Resend Verification Email"}
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {trustDashboard && (
+        <Card className={`mb-8 ${trustDashboard.trust.premiumFilterEligible ? "border-emerald-200 bg-emerald-50/40" : "border-blue-200 bg-blue-50/50"}`}>
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  <TrustBadge
+                    label={trustDashboard.trust.badge}
+                    riskLevel={trustDashboard.trust.riskLevel}
+                    variant="success"
+                  />
+                  {trustDashboard.trust.maskedPhone && (
+                    <TrustBadge label={`Phone: ${trustDashboard.trust.maskedPhone}`} variant="info" />
+                  )}
+                  {trustDashboard.trust.premiumFilterEligible && (
+                    <TrustBadge label="Eligible for premium employer filters" variant="success" />
+                  )}
+                </div>
+                <h2 className="mt-4 text-lg font-semibold text-gray-900">
+                  Build a stronger verified profile
+                </h2>
+                <p className="mt-2 text-sm text-gray-600">
+                  Authenticity score {trustDashboard.trust.authenticityScore} • Risk score {trustDashboard.trust.riskScore}
+                </p>
+                {trustDashboard.trust.warnings.length > 0 && (
+                  <ul className="mt-3 space-y-1 text-sm text-gray-700">
+                    {trustDashboard.trust.warnings.map((warning) => (
+                      <li key={warning}>• {warning}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <Link href={localizePath("/candidate/trust", locale)}>
+                <Button>Open trust profile</Button>
+              </Link>
             </div>
           </CardContent>
         </Card>
@@ -303,7 +358,7 @@ export default function CandidateDashboard() {
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
         <Link href={localizePath("/candidate/chat", locale)}>
           <Card className="hover:shadow-md transition-shadow cursor-pointer border-emerald-200 bg-emerald-50/30">
             <CardContent className="p-4 text-center">
@@ -341,6 +396,14 @@ export default function CandidateDashboard() {
             <CardContent className="p-4 text-center">
               <span className="text-2xl mb-1 block">💳</span>
               <span className="text-sm font-medium text-gray-900">Billing</span>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href={localizePath("/candidate/trust", locale)}>
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-blue-200 bg-blue-50/40">
+            <CardContent className="p-4 text-center">
+              <span className="text-2xl mb-1 block">🛡️</span>
+              <span className="text-sm font-medium text-blue-900">Trust Profile</span>
             </CardContent>
           </Card>
         </Link>
@@ -411,10 +474,20 @@ export default function CandidateDashboard() {
                     <p className="text-xs text-gray-400 mt-1">
                       Applied {new Date(application.createdAt).toLocaleDateString()}
                     </p>
+                    {application.heldForReview && (
+                      <p className="text-xs text-amber-700 mt-2">
+                        This application is being reviewed by our trust and safety checks before delivery.
+                      </p>
+                    )}
                   </div>
-                  <Badge variant={statusVariants[application.status] || "default"}>
-                    {application.status}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={statusVariants[application.status] || "default"}>
+                      {application.status}
+                    </Badge>
+                    {application.heldForReview && (
+                      <TrustBadge label="Safety review" riskLevel="MEDIUM" variant="warning" />
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

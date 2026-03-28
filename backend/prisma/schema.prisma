@@ -743,7 +743,6 @@ model EmployerTrustProfile {
   createdAt                  DateTime                  @default(now())
   updatedAt                  DateTime                  @updatedAt
 
-  verificationArtifacts VerificationArtifact[] @relation("EmployerVerificationArtifacts")
   trustCases            TrustCase[]
 
   @@index([verificationLevel])

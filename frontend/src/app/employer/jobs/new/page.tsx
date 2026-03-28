@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { jobs } from "@/lib/api";
+import { EmployerTrustDashboard, jobs, trust } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { TrustBadge } from "@/components/trust/trust-badge";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 
 const jobTypes = ["Full-time", "Part-time", "Contract", "Freelance", "Internship"];
@@ -17,6 +18,8 @@ export default function NewJobPage() {
   const locale = useLocale();
   const router = useRouter();
   const { user } = useAuth();
+  const [trustDashboard, setTrustDashboard] = useState<EmployerTrustDashboard | null>(null);
+  const [loadingTrust, setLoadingTrust] = useState(true);
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   const [formData, setFormData] = useState({
@@ -33,9 +36,27 @@ export default function NewJobPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (user?.role === "EMPLOYER") {
+      trust
+        .employerSummary()
+        .then(setTrustDashboard)
+        .catch(() => {})
+        .finally(() => setLoadingTrust(false));
+    } else {
+      setLoadingTrust(false);
+    }
+  }, [user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (trustDashboard && !trustDashboard.trust.postingEligibility) {
+      setError("Complete the required employer trust checks before posting publicly.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -67,6 +88,10 @@ export default function NewJobPage() {
   const nextStep = () => {
     if (step === 1 && (!formData.title || !formData.description || !formData.location)) {
       setError("Please complete title, description, and location before continuing.");
+      return;
+    }
+    if (trustDashboard && !trustDashboard.trust.postingEligibility) {
+      setError("Finish employer verification before continuing to publish.");
       return;
     }
     if (step === 2 && (!formData.type || !formData.seniority)) {
@@ -105,7 +130,9 @@ export default function NewJobPage() {
       <Card>
         <CardHeader>
           <h1 className="text-2xl font-bold text-gray-900">Post a New Job</h1>
-          <p className="text-gray-600">Your job will be reviewed before being published</p>
+          <p className="text-gray-600">
+            Trusted employers publish faster. Higher-risk jobs are held for moderation before they go live.
+          </p>
           <div className="mt-4 grid grid-cols-3 gap-2">
             {[
               { n: 1, label: "Basics" },
@@ -124,6 +151,46 @@ export default function NewJobPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {loadingTrust ? (
+            <div className="mb-6 flex justify-center py-3">
+              <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-emerald-600" />
+            </div>
+          ) : trustDashboard ? (
+            <div className={`mb-6 rounded-2xl border px-4 py-4 ${trustDashboard.trust.postingEligibility ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap gap-2">
+                    <TrustBadge
+                      label={trustDashboard.trust.badge}
+                      riskLevel={trustDashboard.trust.riskLevel}
+                      variant="success"
+                    />
+                    {trustDashboard.trust.verifiedDomain && (
+                      <TrustBadge label={`Domain matched: ${trustDashboard.trust.verifiedDomain}`} variant="info" />
+                    )}
+                  </div>
+                  <p className="mt-3 text-sm text-gray-700">
+                    {trustDashboard.trust.postingEligibility
+                      ? "Your account meets the current minimum threshold for public posting."
+                      : "Public posting is blocked until the minimum employer trust threshold is met."}
+                  </p>
+                  {trustDashboard.trust.warnings.length > 0 && (
+                    <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                      {trustDashboard.trust.warnings.map((warning) => (
+                        <li key={warning}>• {warning}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <Link href={localizePath("/employer/trust", locale)}>
+                  <Button variant={trustDashboard.trust.postingEligibility ? "outline" : "primary"}>
+                    {trustDashboard.trust.postingEligibility ? "Review trust profile" : "Complete verification"}
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          ) : null}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{error}</div>

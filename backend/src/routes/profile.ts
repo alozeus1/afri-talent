@@ -4,6 +4,7 @@ import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { Role } from "@prisma/client";
 import { computeProfileCompleteness } from "../lib/profile-completeness.js";
+import { refreshCandidateTrustProfile } from "../lib/trust/service.js";
 
 const router = Router();
 
@@ -100,6 +101,8 @@ router.put("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, re
         },
       },
     });
+
+    await refreshCandidateTrustProfile(req.user!.userId).catch(() => undefined);
 
     res.json(updated);
   } catch (error) {

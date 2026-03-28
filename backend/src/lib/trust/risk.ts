@@ -116,14 +116,18 @@ export function assessEmployerTrust(input: {
   const emailDomain = domainFromEmail(input.email);
   const websiteDomain = normalizeDomain(input.website);
   const throwaway = isThrowawayDomain(emailDomain);
-  const websiteMatchesEmail =
-    Boolean(emailDomain && websiteDomain) &&
-    (websiteDomain === emailDomain || websiteDomain.endsWith(`.${emailDomain}`) || emailDomain.endsWith(`.${websiteDomain}`));
+  const websiteMatchesEmail = Boolean(
+    emailDomain &&
+      websiteDomain &&
+      (websiteDomain === emailDomain ||
+        websiteDomain.endsWith(`.${emailDomain}`) ||
+        emailDomain.endsWith(`.${websiteDomain}`)),
+  );
 
   let authenticityScore = 0;
   let riskScore = 0;
   const warnings: string[] = [];
-  let verificationLevel = EmployerVerificationLevel.UNVERIFIED;
+  let verificationLevel: EmployerVerificationLevel = EmployerVerificationLevel.UNVERIFIED;
 
   if (emailDomain && !throwaway) {
     authenticityScore += 20;
@@ -180,11 +184,11 @@ export function assessEmployerTrust(input: {
   }
 
   const minimumThresholdMet = verificationLevel !== EmployerVerificationLevel.UNVERIFIED;
-  const strongThresholdMet = [
+  const strongThresholdMet = ([
     EmployerVerificationLevel.BUSINESS_DOC_VERIFIED,
     EmployerVerificationLevel.MANUAL_REVIEW_APPROVED,
     EmployerVerificationLevel.PREMIUM_TRUSTED,
-  ].includes(verificationLevel);
+  ] as EmployerVerificationLevel[]).includes(verificationLevel);
 
   const postingEligibility =
     riskScore < 55 &&
@@ -220,7 +224,7 @@ export function assessCandidateTrust(input: {
   let authenticityScore = 0;
   let riskScore = 0;
   const warnings: string[] = [];
-  let verificationLevel = CandidateVerificationLevel.UNVERIFIED;
+  let verificationLevel: CandidateVerificationLevel = CandidateVerificationLevel.UNVERIFIED;
 
   if (input.emailVerified) {
     authenticityScore += 20;

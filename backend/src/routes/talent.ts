@@ -3,6 +3,10 @@ import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { Role } from "@prisma/client";
 import logger from "../lib/logger.js";
+import {
+  candidateTrustSummary,
+  canUseVerifiedCandidateFilter,
+} from "../lib/trust/service.js";
 
 const router = Router();
 
@@ -11,10 +15,43 @@ router.get("/", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async (req: 
   try {
     const {
       skills, location, minExperience, maxExperience,
-      visaStatus, page = "1", limit = "10",
+      visaStatus, verifiedOnly, page = "1", limit = "10",
     } = req.query;
 
-    const where: any = { openToWork: true };
+    const where: any = {
+      openToWork: true,
+      user: {
+        accountRestrictionStatus: {
+          not: "SUSPENDED",
+        },
+      },
+    };
+
+    const subscription = req.user!.role === Role.EMPLOYER
+      ? await prisma.subscription.findUnique({
+        where: { userId: req.user!.userId },
+        select: { plan: true },
+      }).catch(() => null)
+      : null;
+
+    if (verifiedOnly === "true" && !canUseVerifiedCandidateFilter(subscription?.plan, req.user!.role)) {
+      res.status(403).json({
+        error: "Verified-candidate filters are available to premium trusted employers.",
+        code: "PREMIUM_VERIFIED_FILTER_REQUIRED",
+      });
+      return;
+    }
+
+    if (verifiedOnly === "true") {
+      where.user = {
+        ...(where.user || {}),
+        candidateTrustProfile: {
+          is: {
+            premiumFilterEligible: true,
+          },
+        },
+      };
+    }
 
     if (skills) {
       const skillList = (skills as string).split(",").map((s) => s.trim()).filter(Boolean);
@@ -59,7 +96,13 @@ router.get("/", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async (req: 
         where,
         include: {
           user: {
-            select: { id: true, name: true, email: true, role: true },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+              candidateTrustProfile: true,
+            },
           },
           resumes: {
             where: { isActive: true },
@@ -90,6 +133,9 @@ router.get("/", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async (req: 
     const results = candidates.map((c) => ({
       ...c,
       skillAssessments: assessmentMap.get(c.userId) ?? [],
+      trust: c.user.candidateTrustProfile
+        ? candidateTrustSummary(c.user.candidateTrustProfile)
+        : null,
     }));
 
     res.json({
@@ -114,7 +160,13 @@ router.get("/:userId", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async
       where: { userId: req.params.userId },
       include: {
         user: {
-          select: { id: true, name: true, email: true, role: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            candidateTrustProfile: true,
+          },
         },
         resumes: {
           where: { isActive: true },
@@ -131,7 +183,13 @@ router.get("/:userId", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async
       where: { userId: req.params.userId },
     });
 
-    res.json({ ...profile, skillAssessments });
+    res.json({
+      ...profile,
+      skillAssessments,
+      trust: profile.user.candidateTrustProfile
+        ? candidateTrustSummary(profile.user.candidateTrustProfile)
+        : null,
+    });
   } catch (error) {
     logger.error({ error }, "Talent detail error");
     res.status(500).json({ error: "Internal server error" });

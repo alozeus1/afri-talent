@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TrustBadge } from "@/components/trust/trust-badge";
 
 export default function TalentMarketplacePage() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function TalentMarketplacePage() {
   const [skills, setSkills] = useState("");
   const [location, setLocation] = useState("");
   const [minExperience, setMinExperience] = useState("");
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -34,18 +36,20 @@ export default function TalentMarketplacePage() {
     setLoading(true);
     setError(null);
     try {
-      const params: Record<string, string | number> = { page, limit: 12 };
-      if (skills) params.skills = skills;
-      if (location) params.location = location;
-      if (minExperience) params.minExperience = parseInt(minExperience);
-      const response = await talent.search(params) as TalentSearchResponse;
+      const response = await talent.search({
+        skills: skills || undefined,
+        location: location || undefined,
+        minExperience: minExperience ? parseInt(minExperience) : undefined,
+        page,
+        verifiedOnly,
+      }) as TalentSearchResponse;
       setData(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load candidates");
     } finally {
       setLoading(false);
     }
-  }, [user, skills, location, minExperience, page]);
+  }, [user, skills, location, minExperience, page, verifiedOnly]);
 
   useEffect(() => {
     if (user?.role === "EMPLOYER") {
@@ -71,6 +75,11 @@ export default function TalentMarketplacePage() {
         <p className="text-gray-600">
           Discover skilled African professionals for your team
         </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link href="/employer/trust">
+            <Button variant="outline" size="sm">Employer Trust Profile</Button>
+          </Link>
+        </div>
       </div>
 
       {/* Search Filters */}
@@ -117,11 +126,31 @@ export default function TalentMarketplacePage() {
                 setSkills("");
                 setLocation("");
                 setMinExperience("");
+                setVerifiedOnly(false);
                 setPage(1);
               }}
             >
               Clear Filters
             </Button>
+          </div>
+          <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3">
+            <label className="flex items-start gap-3 text-sm text-blue-900">
+              <input
+                type="checkbox"
+                checked={verifiedOnly}
+                onChange={(event) => {
+                  setVerifiedOnly(event.target.checked);
+                  setPage(1);
+                }}
+                className="mt-0.5 h-4 w-4 rounded border-blue-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span>
+                <span className="block font-semibold">Show verified candidates only</span>
+                <span className="block text-blue-800">
+                  Premium employers can filter for candidates with stronger verification and authenticity signals.
+                </span>
+              </span>
+            </label>
           </div>
         </CardContent>
       </Card>
@@ -158,9 +187,18 @@ export default function TalentMarketplacePage() {
                 <Card key={candidate.user.id} className="h-full">
                   <CardContent className="p-6">
                     <div className="mb-3">
-                      <h3 className="font-semibold text-gray-900 text-lg">
-                        {candidate.user.name}
-                      </h3>
+                      <div className="flex flex-wrap items-start gap-2">
+                        <h3 className="font-semibold text-gray-900 text-lg">
+                          {candidate.user.name}
+                        </h3>
+                        {candidate.trust && (
+                          <TrustBadge
+                            label={candidate.trust.badge}
+                            riskLevel={candidate.trust.riskLevel}
+                            variant="success"
+                          />
+                        )}
+                      </div>
                       {candidate.headline && (
                         <p className="text-sm text-gray-600 mt-1">{candidate.headline}</p>
                       )}
@@ -209,6 +247,24 @@ export default function TalentMarketplacePage() {
                             style={{ width: `${candidate.profileCompleteness}%` }}
                           />
                         </div>
+                      </div>
+                    )}
+
+                    {candidate.trust && (
+                      <div className="mb-4 space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          {candidate.trust.premiumFilterEligible && (
+                            <TrustBadge label="Premium filter eligible" variant="success" />
+                          )}
+                          {candidate.trust.maskedPhone && (
+                            <TrustBadge label={`Phone verified`} variant="info" />
+                          )}
+                        </div>
+                        {candidate.trust.warnings.length > 0 && (
+                          <p className="text-xs text-amber-700">
+                            {candidate.trust.warnings[0]}
+                          </p>
+                        )}
                       </div>
                     )}
 

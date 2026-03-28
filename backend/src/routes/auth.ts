@@ -8,6 +8,11 @@ import { authLimiter, registerLimiter } from "../middleware/security.js";
 import { blockToken } from "../lib/redis.js";
 import { Role } from "@prisma/client";
 import { issueEmailVerification } from "./email-verification.js";
+import {
+  ensureCandidateTrustProfile,
+  ensureEmployerTrustProfile,
+  refreshEmployerTrustProfile,
+} from "../lib/trust/service.js";
 
 const router = Router();
 
@@ -101,13 +106,18 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
 
     // If employer, create employer profile
     if (data.role === "EMPLOYER") {
-      await prisma.employer.create({
+      const employer = await prisma.employer.create({
         data: {
           userId: user.id,
           companyName: data.companyName!,
           location: data.location || "Remote",
         },
       });
+
+      await ensureEmployerTrustProfile(employer.id);
+      await refreshEmployerTrustProfile(employer.id).catch(() => undefined);
+    } else {
+      await ensureCandidateTrustProfile(user.id);
     }
 
     if (process.env.NODE_ENV !== "test") {

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { nanoid } from "nanoid";
-import { authenticate, authorize } from "../middleware/auth.js";
+import { authenticate } from "../middleware/auth.js";
 import { Role } from "@prisma/client";
 
 const router = Router();
@@ -19,6 +19,7 @@ const ALLOWED_CONTENT_TYPES: Record<string, string> = {
 };
 
 const presignSchema = z.object({
+  scope: z.enum(["resume", "candidate-verification", "employer-verification"]).default("resume"),
   contentType: z.enum([
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -41,7 +42,7 @@ function getS3Client(): S3Client {
 //   1. Frontend calls this to get a presigned URL + s3Key
 //   2. Frontend PUTs the file directly to S3 (browser → S3, no server bandwidth)
 //   3. Frontend calls POST /api/profile/resumes with the s3Key to register the metadata
-router.post("/presign", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response) => {
+router.post("/presign", authenticate, async (req: Request, res: Response) => {
   if (!BUCKET) {
     res.status(503).json({
       error: "File uploads are not configured on this server",
@@ -53,7 +54,25 @@ router.post("/presign", authenticate, authorize(Role.CANDIDATE), async (req: Req
   try {
     const data = presignSchema.parse(req.body);
     const ext = ALLOWED_CONTENT_TYPES[data.contentType];
-    const s3Key = `resumes/${req.user!.userId}/${nanoid()}.${ext}`;
+    const scopeRoleMap: Record<string, Role[]> = {
+      resume: [Role.CANDIDATE],
+      "candidate-verification": [Role.CANDIDATE],
+      "employer-verification": [Role.EMPLOYER],
+    };
+
+    if (!scopeRoleMap[data.scope].includes(req.user!.role)) {
+      res.status(403).json({ error: "This upload scope is not available for your account." });
+      return;
+    }
+
+    const scopePrefix =
+      data.scope === "resume"
+        ? `resumes/${req.user!.userId}`
+        : data.scope === "candidate-verification"
+          ? `trust/candidates/${req.user!.userId}`
+          : `trust/employers/${req.user!.userId}`;
+
+    const s3Key = `${scopePrefix}/${nanoid()}.${ext}`;
 
     const command = new PutObjectCommand({
       Bucket: BUCKET,
@@ -63,6 +82,7 @@ router.post("/presign", authenticate, authorize(Role.CANDIDATE), async (req: Req
       ServerSideEncryption: "aws:kms", // KMS encryption at rest
       Metadata: {
         userId: req.user!.userId,
+        scope: data.scope,
         originalFileName: encodeURIComponent(data.fileName),
       },
     });

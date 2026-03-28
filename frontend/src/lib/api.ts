@@ -199,6 +199,55 @@ export const admin = {
   },
 };
 
+export const adminTrust = {
+  dashboard: () => fetchAPI<AdminTrustDashboard>("/api/admin/trust/dashboard"),
+  verificationQueue: (params?: { subject?: "ALL" | "EMPLOYER" | "CANDIDATE"; status?: "ALL" | "PENDING" | "APPROVED" | "REJECTED" | "NEEDS_MORE_INFO" }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.subject) searchParams.set("subject", params.subject);
+    if (params?.status) searchParams.set("status", params.status);
+    const query = searchParams.toString();
+    return fetchAPI<{ queue: AdminVerificationQueueItem[] }>(`/api/admin/trust/verification-queue${query ? `?${query}` : ""}`);
+  },
+  reviewArtifact: (id: string, data: { status: "APPROVED" | "REJECTED" | "NEEDS_MORE_INFO"; reasonCode: string; reviewerNotes?: string }) =>
+    fetchAPI<{ artifact: VerificationArtifactItem; caseId: string }>(`/api/admin/trust/artifacts/${id}/review`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  riskQueue: (params?: { status?: "ALL" | "ACTIVE" }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set("status", params.status);
+    const query = searchParams.toString();
+    return fetchAPI<{ queue: AdminTrustCase[] }>(`/api/admin/trust/risk-queue${query ? `?${query}` : ""}`);
+  },
+  caseAction: (id: string, data: {
+    actionType: "NOTE" | "APPROVE" | "REJECT" | "HOLD" | "LIMIT" | "SUSPEND" | "REINSTATE" | "ESCALATE";
+    reasonCode: string;
+    notes?: string;
+    status?: "OPEN" | "IN_REVIEW" | "ACTIONED" | "DISMISSED";
+    priority?: TrustRiskLevel;
+  }) =>
+    fetchAPI<{ trustCase: AdminTrustCase; action: AdminTrustCaseAction }>(`/api/admin/trust/cases/${id}/actions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  reports: (params?: { status?: "ALL" | "ACTIVE" | "OPEN" | "TRIAGED" | "RESOLVED" | "DISMISSED" }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set("status", params.status);
+    const query = searchParams.toString();
+    return fetchAPI<{ reports: AdminAbuseReport[] }>(`/api/admin/trust/reports${query ? `?${query}` : ""}`);
+  },
+  reportAction: (id: string, data: {
+    status: "TRIAGED" | "RESOLVED" | "DISMISSED";
+    reasonCode: string;
+    notes?: string;
+    actionType?: "NOTE" | "APPROVE" | "REJECT" | "HOLD" | "LIMIT" | "SUSPEND" | "REINSTATE" | "ESCALATE";
+  }) =>
+    fetchAPI<{ report: AdminAbuseReport }>(`/api/admin/trust/reports/${id}/action`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
 // Billing
 export const billing = {
   checkout: (plan: string, interval: "MONTHLY" | "YEARLY" = "MONTHLY") =>
@@ -238,18 +287,96 @@ export const pricing = {
   entitlements: (plan: string) => fetchAPI<PlanEntitlements>(`/api/pricing/entitlements/${plan}`),
 };
 
+export const files = {
+  presign: (data: {
+    scope: "resume" | "candidate-verification" | "employer-verification";
+    contentType: "application/pdf" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    fileName: string;
+    fileSizeBytes: number;
+  }) =>
+    fetchAPI<{
+      presignedUrl: string;
+      s3Key: string;
+      expiresIn: number;
+      method: "PUT";
+      headers: {
+        "Content-Type": string;
+      };
+    }>("/api/files/presign", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
 // Talent
 export const talent = {
-  search: (params?: { skills?: string; location?: string; minExperience?: number; page?: number }) => {
+  search: (params?: { skills?: string; location?: string; minExperience?: number; page?: number; verifiedOnly?: boolean }) => {
     const searchParams = new URLSearchParams();
     if (params?.skills) searchParams.set("skills", params.skills);
     if (params?.location) searchParams.set("location", params.location);
     if (params?.minExperience) searchParams.set("minExperience", params.minExperience.toString());
     if (params?.page) searchParams.set("page", params.page.toString());
+    if (params?.verifiedOnly) searchParams.set("verifiedOnly", "true");
     const query = searchParams.toString();
     return fetchAPI<TalentSearchResponse>(`/api/talent${query ? `?${query}` : ""}`);
   },
   get: (userId: string) => fetchAPI<TalentProfile>(`/api/talent/${userId}`),
+};
+
+export const trust = {
+  employerSummary: () => fetchAPI<EmployerTrustDashboard>("/api/trust/employer/summary"),
+  updateEmployerProfile: (data: { website?: string; linkedInCompanyUrl?: string }) =>
+    fetchAPI<{ trust: EmployerTrustSummary; linkedInCompanyUrl?: string | null }>("/api/trust/employer/profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  submitEmployerArtifact: (data: {
+    type: "BUSINESS_REGISTRATION" | "DOMAIN_OWNERSHIP" | "LINKEDIN_COMPANY";
+    fileKey?: string;
+    fileName?: string;
+    externalUrl?: string;
+    metadata?: Record<string, unknown>;
+  }) =>
+    fetchAPI<{ artifact: VerificationArtifactItem; trust: EmployerTrustSummary; caseId: string }>("/api/trust/employer/artifacts", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  candidateSummary: () => fetchAPI<CandidateTrustDashboard>("/api/trust/candidate/summary"),
+  requestPhoneOtp: (phoneNumber: string) =>
+    fetchAPI<{ message: string; expiresAt: string; previewCode?: string }>("/api/trust/candidate/phone/request-otp", {
+      method: "POST",
+      body: JSON.stringify({ phoneNumber }),
+    }),
+  verifyPhoneOtp: (phoneNumber: string, code: string) =>
+    fetchAPI<{ message: string; trust: CandidateTrustSummary }>("/api/trust/candidate/phone/verify-otp", {
+      method: "POST",
+      body: JSON.stringify({ phoneNumber, code }),
+    }),
+  submitCandidateArtifact: (data: {
+    type: "IDENTITY_DOCUMENT" | "CERTIFICATION" | "EMPLOYMENT_PROOF";
+    fileKey?: string;
+    fileName?: string;
+    externalUrl?: string;
+    metadata?: Record<string, unknown>;
+  }) =>
+    fetchAPI<{ artifact: VerificationArtifactItem; trust: CandidateTrustSummary; caseId: string }>("/api/trust/candidate/artifacts", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  reportAbuse: (data: AbuseReportInput) =>
+    fetchAPI<{ reportId: string; caseId: string; message: string }>("/api/trust/reports", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  messagingGuidance: () =>
+    fetchAPI<{
+      headline: string;
+      tips: string[];
+      rulePreview: {
+        riskScore: number;
+        blockedPatterns: string[];
+      };
+    }>("/api/trust/messaging-guidance"),
 };
 
 // Employer Analytics
@@ -416,6 +543,221 @@ export const passwordReset = {
 };
 
 // Types
+export type TrustRiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type EmployerVerificationLevel =
+  | "UNVERIFIED"
+  | "EMAIL_DOMAIN_VERIFIED"
+  | "BUSINESS_DOC_VERIFIED"
+  | "MANUAL_REVIEW_APPROVED"
+  | "PREMIUM_TRUSTED";
+export type CandidateVerificationLevel =
+  | "UNVERIFIED"
+  | "EMAIL_VERIFIED"
+  | "PHONE_VERIFIED"
+  | "IDENTITY_DOCUMENT_VERIFIED"
+  | "SKILLS_VERIFIED"
+  | "EMPLOYMENT_HISTORY_PARTIALLY_VERIFIED";
+
+export interface TrustChecklistItem {
+  key: string;
+  label: string;
+  done: boolean;
+}
+
+export interface EmployerTrustSummary {
+  badge: string;
+  verificationLevel: EmployerVerificationLevel;
+  authenticityScore: number;
+  riskScore: number;
+  riskLevel: TrustRiskLevel;
+  postingEligibility: boolean;
+  requiresEnhancedVerification: boolean;
+  verifiedDomain: string | null;
+  warnings: string[];
+  checklist: TrustChecklistItem[];
+}
+
+export interface CandidateTrustSummary {
+  badge: string;
+  verificationLevel: CandidateVerificationLevel;
+  authenticityScore: number;
+  riskScore: number;
+  riskLevel: TrustRiskLevel;
+  premiumFilterEligible: boolean;
+  maskedPhone: string | null;
+  warnings: string[];
+  checklist: TrustChecklistItem[];
+}
+
+export interface JobTrustSummary {
+  riskLevel: TrustRiskLevel;
+  riskScore: number;
+  jobQualityChecked: boolean;
+  companyReviewed: boolean;
+  newEmployerCaution: boolean;
+  publishedRecently: boolean;
+  guidance: string;
+  employerMemberSince: string | null;
+  employer: EmployerTrustSummary | null;
+}
+
+export interface VerificationArtifactItem {
+  id: string;
+  type: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "NEEDS_MORE_INFO";
+  fileName: string | null;
+  externalUrl: string | null;
+  reviewerNotes: string | null;
+  submittedAt: string;
+  reviewedAt: string | null;
+}
+
+export interface EmployerTrustDashboard {
+  employer: {
+    id: string;
+    companyName: string;
+    website: string | null;
+    location: string;
+    bio: string | null;
+    email: string;
+    emailVerified: boolean;
+  };
+  trust: EmployerTrustSummary;
+  linkedInCompanyUrl?: string | null;
+  artifacts: VerificationArtifactItem[];
+  recentJobs: Array<{
+    id: string;
+    title: string;
+    status: string;
+    riskLevel: TrustRiskLevel;
+    createdAt: string;
+  }>;
+}
+
+export interface CandidateTrustDashboard {
+  profile: {
+    headline: string | null;
+    bio: string | null;
+    skills: string[];
+    targetRoles: string[];
+    targetCountries: string[];
+    yearsExperience: number | null;
+    visaStatus: string | null;
+    openToWork: boolean;
+    profileCompleteness: number;
+    linkedinUrl: string | null;
+    githubUrl: string | null;
+    portfolioUrl: string | null;
+  } | null;
+  trust: CandidateTrustSummary;
+  artifacts: VerificationArtifactItem[];
+}
+
+export interface AdminTrustDashboard {
+  pendingVerificationArtifacts: number;
+  openRiskCases: number;
+  openReports: number;
+  limitedAccounts: number;
+  suspendedAccounts: number;
+  heldJobs: number;
+}
+
+export interface AdminTrustCaseAction {
+  id: string;
+  actionType: string;
+  reasonCode: string | null;
+  notes: string | null;
+  createdAt: string;
+  actor?: { id: string; name: string } | null;
+}
+
+export interface AdminVerificationQueueItem extends VerificationArtifactItem {
+  user?: { id: string; name: string; email: string } | null;
+  employer?: { id: string; companyName: string; userId: string } | null;
+  reviewer?: { id: string; name: string } | null;
+  trustCase?: {
+    id: string;
+    actions: AdminTrustCaseAction[];
+  } | null;
+}
+
+export interface AdminTrustCase {
+  id: string;
+  entityType: string;
+  status: "OPEN" | "IN_REVIEW" | "ACTIONED" | "DISMISSED";
+  priority: TrustRiskLevel;
+  title: string;
+  reasonCode: string | null;
+  summary: string | null;
+  openedAt: string;
+  closedAt: string | null;
+  assignedAdmin?: { id: string; name: string } | null;
+  employerTrustProfile?: {
+    employer: { id: string; companyName: string; userId: string };
+  } | null;
+  candidateTrustProfile?: {
+    user: { id: string; name: string; email: string };
+  } | null;
+  job?: {
+    id: string;
+    title: string;
+    employer?: { id: string; companyName: string; userId: string };
+  } | null;
+  application?: {
+    id: string;
+    candidateId: string;
+    jobId: string;
+  } | null;
+  report?: {
+    id: string;
+    reason: string;
+    status: string;
+    reportedUserId: string | null;
+  } | null;
+  artifact?: {
+    id: string;
+    type: string;
+    status: string;
+  } | null;
+  actions: AdminTrustCaseAction[];
+}
+
+export interface AdminAbuseReport {
+  id: string;
+  reason: string;
+  details: string | null;
+  status: "OPEN" | "TRIAGED" | "RESOLVED" | "DISMISSED";
+  resolutionNotes: string | null;
+  createdAt: string;
+  reporter: { id: string; name: string; email: string };
+  reportedUser?: { id: string; name: string; email: string; role: string } | null;
+  employer?: { id: string; companyName: string; userId: string } | null;
+  targetJob?: { id: string; title: string; status: string } | null;
+  targetApplication?: { id: string; status: string } | null;
+  assignedAdmin?: { id: string; name: string } | null;
+  trustCase?: { id: string; actions: AdminTrustCaseAction[] } | null;
+}
+
+export interface AbuseReportInput {
+  reason:
+    | "SCAM"
+    | "FAKE_JOB"
+    | "IMPERSONATION"
+    | "SPAM"
+    | "OFF_PLATFORM_CONTACT"
+    | "ADVANCE_FEE_REQUEST"
+    | "HARASSMENT"
+    | "FAKE_PROFILE"
+    | "MISLEADING_SALARY"
+    | "OTHER";
+  details?: string;
+  reportedUserId?: string;
+  employerId?: string;
+  targetJobId?: string;
+  targetApplicationId?: string;
+  targetThreadId?: string;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -463,11 +805,14 @@ export interface Job {
   status: string;
   publishedAt?: string;
   createdAt: string;
+  moderationRequired?: boolean;
+  trust?: JobTrustSummary;
   employer: {
     companyName: string;
     location: string;
-    website?: string;
-    bio?: string;
+    website?: string | null;
+    bio?: string | null;
+    trust?: EmployerTrustSummary | null;
   };
   _count?: {
     applications: number;
@@ -519,6 +864,7 @@ export interface Application {
   coverLetter?: string;
   notes?: string;
   createdAt: string;
+  heldForReview?: boolean;
   job: {
     id: string;
     title: string;
@@ -731,6 +1077,7 @@ export interface TalentProfile {
   portfolioUrl: string | null;
   user: { id: string; name: string; email: string };
   skillAssessments?: Array<{ skillName: string; score: number | null; level: string | null }>;
+  trust?: CandidateTrustSummary | null;
 }
 
 export interface TalentSearchResponse {

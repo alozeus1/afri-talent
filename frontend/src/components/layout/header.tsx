@@ -110,6 +110,9 @@ export function Header() {
               <Link href={href("/pricing")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 {t("nav.pricing")}
               </Link>
+              <Link href={href("/trust")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+                Trust
+              </Link>
               {user?.role === "CANDIDATE" && (
                 <Link href={href("/candidate/ai-assistant")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                   AI Assistant
@@ -229,6 +232,7 @@ export function Header() {
                 { href: "/interviews", label: t("nav.interviews") },
                 { href: "/learning", label: t("nav.learn") },
                 { href: "/pricing", label: t("nav.pricing") },
+                { href: "/trust", label: "Trust" },
               ].map((item) => (
                 <Link
                   key={item.href}

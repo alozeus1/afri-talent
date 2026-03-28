@@ -60,6 +60,8 @@ import salaryNegotiationRoutes from "./routes/salary-negotiation.js";
 import universityPartnersRoutes from "./routes/university-partners.js";
 import employerAiRoutes from "./routes/employer-ai.js";
 import botsRoutes from "./routes/bots.js";
+import trustRoutes from "./routes/trust.js";
+import adminTrustRoutes from "./routes/admin-trust.js";
 import { swaggerSpec } from "./lib/swagger.js";
 
 dotenv.config({ quiet: true });
@@ -258,6 +260,8 @@ app.use("/api/social", socialRoutes);
 app.use("/api/salary-negotiation", salaryNegotiationRoutes);
 app.use("/api/university-partners", universityPartnersRoutes);
 app.use("/api/employer/ai", employerAiRoutes);
+app.use("/api/trust", trustRoutes);
+app.use("/api/admin/trust", adminTrustRoutes);
 app.use("/api/bots", botsRoutes);
 
 // OpenAPI/Swagger docs

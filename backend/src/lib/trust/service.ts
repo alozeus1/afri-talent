@@ -18,7 +18,9 @@ import {
   assessEmployerTrust,
   candidateBadgeLabel,
   employerBadgeLabel,
+  riskLevelForScore,
 } from "./risk.js";
+import { domainFromEmail, normalizeDomain } from "./throwaway-domains.js";
 
 function startOfWindow(hours: number): Date {
   return new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -63,7 +65,7 @@ export async function ensureCandidateTrustProfile(userId: string) {
 export async function refreshEmployerTrustProfile(employerId: string) {
   await ensureEmployerTrustProfile(employerId);
 
-  const [employer, approvedBusinessDocs, approvedManualReviews, openReports, postingVelocity24h, subscription] =
+  const [employer, approvedBusinessDocs, approvedManualReviews, openReports, postingVelocity24h] =
     await Promise.all([
       prisma.employer.findUnique({
         where: { id: employerId },
@@ -105,15 +107,56 @@ export async function refreshEmployerTrustProfile(employerId: string) {
           createdAt: { gte: startOfWindow(24) },
         },
       }),
-      prisma.subscription.findUnique({
-        where: { userId: employerId },
-        select: { plan: true },
-      }).catch(() => null),
     ]);
 
   if (!employer) {
     throw new Error("Employer not found");
   }
+
+  const [subscription, duplicateCompanyNameMatches, duplicateDomainMatches] = await Promise.all([
+    prisma.subscription.findUnique({
+      where: { userId: employer.userId },
+      select: { plan: true },
+    }).catch(() => null),
+    prisma.employer.count({
+      where: {
+        id: { not: employerId },
+        companyName: {
+          equals: employer.companyName,
+          mode: "insensitive",
+        },
+      },
+    }),
+    (async () => {
+      const lookupDomain =
+        normalizeDomain(employer.website) ?? domainFromEmail(employer.user.email);
+
+      if (!lookupDomain) {
+        return 0;
+      }
+
+      return prisma.employer.count({
+        where: {
+          id: { not: employerId },
+          OR: [
+            {
+              website: {
+                contains: lookupDomain,
+                mode: "insensitive",
+              },
+            },
+            {
+              trustProfile: {
+                is: {
+                  verifiedDomain: lookupDomain,
+                },
+              },
+            },
+          ],
+        },
+      });
+    })(),
+  ]);
 
   const assessment = assessEmployerTrust({
     email: employer.user.email,
@@ -126,14 +169,30 @@ export async function refreshEmployerTrustProfile(employerId: string) {
     isPremiumSubscription: subscription?.plan === SubscriptionPlan.EMPLOYER_PREMIUM,
   });
 
+  let riskScore = assessment.riskScore;
+  const warnings = [...assessment.warnings];
+
+  if (duplicateCompanyNameMatches > 0) {
+    riskScore = Math.min(100, riskScore + 16);
+    warnings.push("Another employer account is already using this company name.");
+  }
+
+  if (duplicateDomainMatches > 0) {
+    riskScore = Math.min(100, riskScore + 24);
+    warnings.push("This company domain already appears on another employer account and requires review.");
+  }
+
+  const riskLevel = riskLevelForScore(riskScore);
+  const postingEligibility = assessment.postingEligibility && riskScore < 55 && duplicateDomainMatches === 0;
+
   const updated = await prisma.employerTrustProfile.update({
     where: { employerId },
     data: {
       verificationLevel: assessment.verificationLevel,
       authenticityScore: assessment.authenticityScore,
-      riskScore: assessment.riskScore,
-      riskLevel: assessment.riskLevel,
-      postingEligibility: assessment.postingEligibility,
+      riskScore,
+      riskLevel,
+      postingEligibility,
       requiresEnhancedVerification: assessment.requiresEnhancedVerification,
       verifiedDomain: assessment.verifiedDomain,
       websiteMatchesEmail: assessment.websiteMatchesEmail,
@@ -150,11 +209,11 @@ export async function refreshEmployerTrustProfile(employerId: string) {
         assessment.verificationLevel === EmployerVerificationLevel.PREMIUM_TRUSTED
           ? employer.trustProfile?.premiumTrustedAt ?? new Date()
           : null,
-      suspiciousSignals: assessment.warnings,
+      suspiciousSignals: warnings,
     },
   });
 
-  const restriction = restrictionFromRisk(assessment.riskLevel);
+  const restriction = restrictionFromRisk(riskLevel);
   await prisma.user.update({
     where: { id: employer.userId },
     data: {
@@ -392,7 +451,7 @@ export function employerTrustSummary(
     postingEligibility: boolean;
     requiresEnhancedVerification: boolean;
     verifiedDomain: string | null;
-    suspiciousSignals: unknown;
+    suspiciousSignals?: unknown;
   },
 ) {
   const warnings = Array.isArray(trustProfile.suspiciousSignals)
@@ -418,19 +477,19 @@ export function employerTrustSummary(
       {
         key: "business_doc",
         label: "Upload business registration evidence",
-        done: [
+        done: ([
           EmployerVerificationLevel.BUSINESS_DOC_VERIFIED,
           EmployerVerificationLevel.MANUAL_REVIEW_APPROVED,
           EmployerVerificationLevel.PREMIUM_TRUSTED,
-        ].includes(trustProfile.verificationLevel),
+        ] as EmployerVerificationLevel[]).includes(trustProfile.verificationLevel),
       },
       {
         key: "manual_review",
         label: "Complete manual review for higher posting limits",
-        done: [
+        done: ([
           EmployerVerificationLevel.MANUAL_REVIEW_APPROVED,
           EmployerVerificationLevel.PREMIUM_TRUSTED,
-        ].includes(trustProfile.verificationLevel),
+        ] as EmployerVerificationLevel[]).includes(trustProfile.verificationLevel),
       },
     ],
   };
@@ -469,23 +528,74 @@ export function candidateTrustSummary(
       {
         key: "phone",
         label: "Verify your phone number",
-        done: [
+        done: ([
           CandidateVerificationLevel.PHONE_VERIFIED,
           CandidateVerificationLevel.IDENTITY_DOCUMENT_VERIFIED,
           CandidateVerificationLevel.SKILLS_VERIFIED,
           CandidateVerificationLevel.EMPLOYMENT_HISTORY_PARTIALLY_VERIFIED,
-        ].includes(trustProfile.verificationLevel),
+        ] as CandidateVerificationLevel[]).includes(trustProfile.verificationLevel),
       },
       {
         key: "identity",
         label: "Upload ID or certification evidence",
-        done: [
+        done: ([
           CandidateVerificationLevel.IDENTITY_DOCUMENT_VERIFIED,
           CandidateVerificationLevel.SKILLS_VERIFIED,
           CandidateVerificationLevel.EMPLOYMENT_HISTORY_PARTIALLY_VERIFIED,
-        ].includes(trustProfile.verificationLevel),
+        ] as CandidateVerificationLevel[]).includes(trustProfile.verificationLevel),
       },
     ],
+  };
+}
+
+export function jobTrustSummary(input: {
+  riskLevel: TrustRiskLevel;
+  riskScore: number;
+  qualityCheckedAt?: Date | null;
+  publishedAt?: Date | null;
+  employerCreatedAt?: Date | null;
+  employerTrustProfile?: {
+    verificationLevel: EmployerVerificationLevel;
+    authenticityScore: number;
+    riskScore: number;
+    riskLevel: TrustRiskLevel;
+    postingEligibility: boolean;
+    requiresEnhancedVerification: boolean;
+    verifiedDomain: string | null;
+    suspiciousSignals?: unknown;
+  } | null;
+}) {
+  const employerSummary = input.employerTrustProfile
+    ? employerTrustSummary(input.employerTrustProfile)
+    : null;
+  const isNewEmployer =
+    !input.employerTrustProfile ||
+    input.employerTrustProfile.verificationLevel === EmployerVerificationLevel.UNVERIFIED;
+
+  return {
+    riskLevel: input.riskLevel,
+    riskScore: input.riskScore,
+    jobQualityChecked:
+      Boolean(input.qualityCheckedAt) && input.riskLevel !== TrustRiskLevel.HIGH && input.riskLevel !== TrustRiskLevel.CRITICAL,
+    companyReviewed: Boolean(
+      input.employerTrustProfile &&
+      ([
+        EmployerVerificationLevel.MANUAL_REVIEW_APPROVED,
+        EmployerVerificationLevel.PREMIUM_TRUSTED,
+      ] as EmployerVerificationLevel[]).includes(input.employerTrustProfile.verificationLevel),
+    ),
+    newEmployerCaution: isNewEmployer,
+    publishedRecently:
+      Boolean(input.publishedAt) &&
+      input.publishedAt!.getTime() >= Date.now() - 7 * 24 * 60 * 60 * 1000,
+    employer: employerSummary,
+    guidance:
+      input.riskLevel === TrustRiskLevel.HIGH || input.riskLevel === TrustRiskLevel.CRITICAL
+        ? "This job is under additional trust review."
+        : isNewEmployer
+          ? "This employer is new and still building trust on AfriTalent."
+          : "This job has passed AfriTalent trust checks.",
+    employerMemberSince: input.employerCreatedAt?.toISOString() ?? null,
   };
 }
 

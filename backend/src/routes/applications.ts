@@ -2,8 +2,16 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize, requireVerifiedEmail } from "../middleware/auth.js";
-import { ApplicationStatus, JobStatus, Role } from "@prisma/client";
+import { ApplicationStatus, JobStatus, Role, TrustEntityType, TrustRiskLevel } from "@prisma/client";
 import { createUserNotification } from "../lib/notifications.js";
+import { requireAccountStanding } from "../middleware/account-standing.js";
+import { assessApplicationRisk } from "../lib/trust/risk.js";
+import {
+  addTrustCaseAction,
+  createTrustCase,
+  recordTrustRiskEvent,
+  refreshCandidateTrustProfile,
+} from "../lib/trust/service.js";
 
 const router = Router();
 
@@ -49,6 +57,7 @@ router.post(
   "/",
   authenticate,
   authorize(Role.CANDIDATE),
+  requireAccountStanding(),
   requireVerifiedEmail({ roles: [Role.CANDIDATE] }),
   async (req: Request, res: Response) => {
   try {
@@ -77,6 +86,28 @@ router.post(
       return;
     }
 
+    const [trustProfile, applicationsLast24h] = await Promise.all([
+      refreshCandidateTrustProfile(req.user!.userId),
+      prisma.application.count({
+        where: {
+          candidateId: req.user!.userId,
+          createdAt: {
+            gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
+          },
+        },
+      }),
+    ]);
+
+    const applicationRisk = assessApplicationRisk({
+      coverLetter: data.coverLetter ?? null,
+      applicationsLast24h,
+      candidateRiskScore: trustProfile.riskScore,
+    });
+    const heldForReview =
+      applicationRisk.autoHold ||
+      applicationRisk.level === TrustRiskLevel.HIGH ||
+      applicationRisk.level === TrustRiskLevel.CRITICAL;
+
     const application = await prisma.application.create({
       data: {
         jobId: data.jobId,
@@ -84,6 +115,9 @@ router.post(
         cvUrl: data.cvUrl,
         coverLetter: data.coverLetter,
         status: ApplicationStatus.PENDING,
+        riskScore: applicationRisk.score,
+        riskLevel: applicationRisk.level,
+        trustFlags: applicationRisk.flags,
       },
       include: {
         job: {
@@ -92,7 +126,48 @@ router.post(
       },
     });
 
-    if (job.employerId) {
+    if (applicationRisk.score > 0) {
+      await recordTrustRiskEvent({
+        entityType: TrustEntityType.APPLICATION,
+        reasonCode: "application_risk_assessment",
+        summary: `Application for "${job.title}" triggered trust checks.`,
+        scoreDelta: applicationRisk.score,
+        resultingScore: applicationRisk.score,
+        riskLevel: applicationRisk.level,
+        userId: req.user!.userId,
+        employerId: job.employerId ?? null,
+        jobId: job.id,
+        applicationId: application.id,
+        evidence: {
+          flags: applicationRisk.flags,
+        },
+        autoHeld: heldForReview,
+      });
+    }
+
+    if (heldForReview) {
+      const trustCase = await createTrustCase({
+        entityType: TrustEntityType.APPLICATION,
+        priority: applicationRisk.level,
+        title: `Application review required for ${job.title}`,
+        reasonCode: "application_auto_hold",
+        summary: `Application held because of ${applicationRisk.flags.join(", ") || "elevated candidate risk"}.`,
+        applicationId: application.id,
+      });
+
+      await addTrustCaseAction({
+        caseId: trustCase.id,
+        actorId: req.user!.userId,
+        actionType: "HOLD",
+        reasonCode: "application_auto_hold",
+        notes: "Application automatically held for trust review before employer visibility.",
+        metadata: {
+          flags: applicationRisk.flags,
+        },
+      });
+    }
+
+    if (job.employerId && !heldForReview) {
       const employer = await prisma.employer.findUnique({
         where: { id: job.employerId },
         select: { userId: true },
@@ -110,7 +185,10 @@ router.post(
       }
     }
 
-    res.status(201).json(application);
+    res.status(201).json({
+      ...application,
+      heldForReview,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: "Validation failed", details: error.issues });
@@ -173,7 +251,12 @@ router.get("/job/:jobId", authenticate, authorize(Role.EMPLOYER), async (req: Re
     }
 
     const applications = await prisma.application.findMany({
-      where: { jobId: req.params.jobId },
+      where: {
+        jobId: req.params.jobId,
+        riskLevel: {
+          notIn: [TrustRiskLevel.HIGH, TrustRiskLevel.CRITICAL],
+        },
+      },
       include: {
         candidate: {
           select: { id: true, name: true, email: true },

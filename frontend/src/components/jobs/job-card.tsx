@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Job } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TrustBadge } from "@/components/trust/trust-badge";
 import { formatSalaryRange } from "@/lib/salary";
 
 interface JobCardProps {
@@ -28,6 +29,24 @@ export function JobCard({ job }: JobCardProps) {
               <p className="text-emerald-600 font-medium">
                 {job.employer?.companyName || job.sourceName || "Unknown"}
               </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {job.employer?.trust && (
+                  <TrustBadge
+                    label={job.employer.trust.badge}
+                    riskLevel={job.employer.trust.riskLevel}
+                    variant="success"
+                  />
+                )}
+                {job.trust?.companyReviewed && (
+                  <TrustBadge label="Company reviewed" variant="info" />
+                )}
+                {job.trust?.jobQualityChecked && (
+                  <TrustBadge label="Job quality checked" variant="success" />
+                )}
+                {job.trust?.newEmployerCaution && (
+                  <TrustBadge label="New employer" riskLevel="MEDIUM" variant="warning" />
+                )}
+              </div>
             </div>
             <Badge variant="success">{job.type}</Badge>
           </div>
@@ -50,6 +69,12 @@ export function JobCard({ job }: JobCardProps) {
 
           {salary && (
             <p className="text-gray-900 dark:text-gray-100 font-semibold mb-4">{salary}</p>
+          )}
+
+          {job.trust?.guidance && (
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+              {job.trust.guidance}
+            </p>
           )}
 
           {(job.visaSponsorship === "YES" || job.relocationAssistance) && (

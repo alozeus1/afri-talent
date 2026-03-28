@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { QuickApplyModal } from "@/components/jobs/quick-apply-modal";
 import { JobJsonLd } from "@/components/jobs/job-jsonld";
 import { JobDetailSkeleton } from "@/components/ui/skeleton";
+import { TrustBadge } from "@/components/trust/trust-badge";
 import { formatSalaryRange } from "@/lib/salary";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 
@@ -108,9 +109,34 @@ export default function JobDetailPage() {
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{job.title}</h1>
                 <p className="text-emerald-600 font-semibold text-lg">{job.employer?.companyName || job.sourceName || "Company"}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {job.employer?.trust && (
+                    <TrustBadge
+                      label={job.employer.trust.badge}
+                      riskLevel={job.employer.trust.riskLevel}
+                      variant="success"
+                    />
+                  )}
+                  {job.trust?.companyReviewed && (
+                    <TrustBadge label="Company reviewed" variant="info" />
+                  )}
+                  {job.trust?.jobQualityChecked && (
+                    <TrustBadge label="Job quality checked" variant="success" />
+                  )}
+                  {job.trust?.newEmployerCaution && (
+                    <TrustBadge label="New employer" riskLevel="MEDIUM" variant="warning" />
+                  )}
+                </div>
               </div>
               <Badge variant="success" className="text-sm">{job.type}</Badge>
             </div>
+
+            {job.trust && (job.trust.newEmployerCaution || job.trust.riskLevel === "MEDIUM" || job.trust.riskLevel === "HIGH") && (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
+                <p className="font-semibold text-amber-900">Trust guidance</p>
+                <p className="mt-2 text-sm text-amber-900">{job.trust.guidance}</p>
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-4 mb-6 text-gray-600">
               <span className="inline-flex items-center">
@@ -194,6 +220,19 @@ export default function JobDetailPage() {
           <Card className="sticky top-24">
             <CardContent className="p-6">
               <h3 className="font-semibold text-gray-900 mb-4">Apply for this position</h3>
+
+              <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4">
+                <p className="text-sm font-semibold text-blue-900">Stay safe while applying</p>
+                <p className="mt-2 text-sm text-blue-900">
+                  Keep interviews and file sharing on AfriTalent when possible, and never pay application or processing fees.
+                </p>
+                <Link
+                  href={localizePath(`/trust/report?targetJobId=${job.id}`, locale)}
+                  className="mt-3 inline-flex text-sm font-medium text-blue-900 underline-offset-2 hover:underline"
+                >
+                  Report this job
+                </Link>
+              </div>
               
               {applied ? (
                 <div className="bg-emerald-50 text-emerald-700 p-4 rounded-lg mb-4">
@@ -255,6 +294,18 @@ export default function JobDetailPage() {
 
               <div className="border-t border-gray-200 pt-4">
                 <h4 className="font-medium text-gray-900 mb-3">About {job.employer?.companyName || job.sourceName || "Company"}</h4>
+                {job.employer?.trust && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <TrustBadge
+                      label={job.employer.trust.badge}
+                      riskLevel={job.employer.trust.riskLevel}
+                      variant="success"
+                    />
+                    {job.trust?.companyReviewed && (
+                      <TrustBadge label="Company reviewed" variant="info" />
+                    )}
+                  </div>
+                )}
                 <p className="text-gray-600 text-sm mb-2">{job.employer?.location}</p>
                 {job.employer?.bio && (
                   <p className="text-gray-600 text-sm mb-3">{job.employer.bio}</p>

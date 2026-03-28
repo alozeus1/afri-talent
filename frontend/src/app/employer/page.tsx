@@ -4,10 +4,18 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { jobs, Job, employerAnalytics, EmployerOnboarding } from "@/lib/api";
+import {
+  jobs,
+  Job,
+  employerAnalytics,
+  EmployerOnboarding,
+  EmployerTrustDashboard,
+  trust,
+} from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TrustBadge } from "@/components/trust/trust-badge";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 
 const statusVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
@@ -23,6 +31,7 @@ export default function EmployerDashboard() {
   const { user, isLoading } = useAuth();
   const [myJobs, setMyJobs] = useState<Job[]>([]);
   const [onboarding, setOnboarding] = useState<EmployerOnboarding | null>(null);
+  const [trustDashboard, setTrustDashboard] = useState<EmployerTrustDashboard | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,12 +42,18 @@ export default function EmployerDashboard() {
 
   useEffect(() => {
     if (user?.role === "EMPLOYER") {
-      jobs
-        .myJobs()
-        .then(setMyJobs)
+      Promise.all([
+        jobs.myJobs(),
+        employerAnalytics.onboarding().catch(() => null),
+        trust.employerSummary().catch(() => null),
+      ])
+        .then(([jobsData, onboardingData, trustData]) => {
+          setMyJobs(jobsData);
+          setOnboarding(onboardingData);
+          setTrustDashboard(trustData);
+        })
         .catch(console.error)
         .finally(() => setLoading(false));
-      employerAnalytics.onboarding().then(setOnboarding).catch(() => {});
     }
   }, [user]);
 
@@ -72,8 +87,53 @@ export default function EmployerDashboard() {
           <Link href={localizePath("/billing", locale)}>
             <Button variant="outline" size="sm">Billing & Upgrades</Button>
           </Link>
+          <Link href={localizePath("/employer/trust", locale)}>
+            <Button variant="outline" size="sm">Trust & Verification</Button>
+          </Link>
         </div>
       </div>
+
+      {trustDashboard && (
+        <Card className={`mb-8 ${trustDashboard.trust.postingEligibility ? "border-emerald-200 bg-emerald-50/40" : "border-amber-200 bg-amber-50/60"}`}>
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  <TrustBadge
+                    label={trustDashboard.trust.badge}
+                    riskLevel={trustDashboard.trust.riskLevel}
+                    variant="success"
+                  />
+                  {trustDashboard.trust.verifiedDomain && (
+                    <TrustBadge label={`Domain matched: ${trustDashboard.trust.verifiedDomain}`} variant="info" />
+                  )}
+                  {trustDashboard.trust.requiresEnhancedVerification && (
+                    <TrustBadge label="Enhanced verification required" riskLevel="MEDIUM" variant="warning" />
+                  )}
+                </div>
+                <h2 className="mt-4 text-lg font-semibold text-gray-900">
+                  {trustDashboard.trust.postingEligibility
+                    ? "Your employer account can publish jobs"
+                    : "Complete trust checks before publishing jobs"}
+                </h2>
+                <p className="mt-2 text-sm text-gray-600">
+                  Authenticity score {trustDashboard.trust.authenticityScore} • Risk score {trustDashboard.trust.riskScore}
+                </p>
+                {trustDashboard.trust.warnings.length > 0 && (
+                  <ul className="mt-3 space-y-1 text-sm text-gray-700">
+                    {trustDashboard.trust.warnings.map((warning) => (
+                      <li key={warning}>• {warning}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <Link href={localizePath("/employer/trust", locale)}>
+                <Button>{trustDashboard.trust.postingEligibility ? "Strengthen trust profile" : "Finish verification"}</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {onboarding && (
         <Card className="mb-8 border-emerald-200 bg-emerald-50/40 dark:bg-emerald-900/10">
@@ -169,10 +229,22 @@ export default function EmployerDashboard() {
                       <Badge variant={statusVariants[job.status] || "default"}>
                         {job.status.replace("_", " ")}
                       </Badge>
+                      {job.trust?.companyReviewed && (
+                        <TrustBadge label="Company reviewed" variant="info" />
+                      )}
+                      {job.trust?.jobQualityChecked && (
+                        <TrustBadge label="Quality checked" variant="success" />
+                      )}
+                      {job.trust?.newEmployerCaution && (
+                        <TrustBadge label="New employer caution" riskLevel="MEDIUM" variant="warning" />
+                      )}
                     </div>
                     <p className="text-sm text-gray-600">
                       {job.location} • {job.type} • {job.seniority}
                     </p>
+                    {job.trust?.guidance && (
+                      <p className="text-xs text-gray-500 mt-2">{job.trust.guidance}</p>
+                    )}
                     <p className="text-xs text-gray-400 mt-1">
                       {job._count?.applications || 0} application(s) • Created{" "}
                       {new Date(job.createdAt).toLocaleDateString()}

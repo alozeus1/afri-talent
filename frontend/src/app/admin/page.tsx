@@ -2,16 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { admin, AdminStats, Job } from "@/lib/api";
+import { admin, AdminStats, AdminTrustDashboard, Job, adminTrust } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TrustBadge } from "@/components/trust/trust-badge";
 
 export default function AdminDashboard() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [trustOverview, setTrustOverview] = useState<AdminTrustDashboard | null>(null);
   const [pendingJobs, setPendingJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewing, setReviewing] = useState<string | null>(null);
@@ -24,10 +27,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (user?.role === "ADMIN") {
-      Promise.all([admin.stats(), admin.pendingJobs()])
-        .then(([statsData, jobsData]) => {
+      Promise.all([admin.stats(), admin.pendingJobs(), adminTrust.dashboard().catch(() => null)])
+        .then(([statsData, jobsData, trustData]) => {
           setStats(statsData);
           setPendingJobs(jobsData);
+          setTrustOverview(trustData);
         })
         .catch(console.error)
         .finally(() => setLoading(false));
@@ -63,6 +67,17 @@ export default function AdminDashboard() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
         <p className="text-gray-600">Manage and moderate the platform</p>
+        <div className="flex flex-wrap gap-3 mt-4">
+          <Link href="/admin/trust">
+            <Button variant="outline">Trust Operations</Button>
+          </Link>
+          <Link href="/admin/users">
+            <Button variant="outline">Users</Button>
+          </Link>
+          <Link href="/admin/reviews">
+            <Button variant="outline">Reviews</Button>
+          </Link>
+        </div>
       </div>
 
       {loading ? (
@@ -103,6 +118,29 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {trustOverview && (
+            <Card className="mb-8 border-slate-200 bg-slate-50">
+              <CardContent className="p-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-3xl">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <TrustBadge label={`${trustOverview.pendingVerificationArtifacts} pending artifacts`} variant="warning" />
+                      <TrustBadge label={`${trustOverview.openRiskCases} open risk cases`} riskLevel={trustOverview.openRiskCases > 0 ? "HIGH" : "LOW"} />
+                      <TrustBadge label={`${trustOverview.openReports} open reports`} variant="info" />
+                    </div>
+                    <h2 className="mt-4 text-lg font-semibold text-gray-900">Trust moderation needs active coverage</h2>
+                    <p className="mt-2 text-sm text-gray-600">
+                      {trustOverview.limitedAccounts} limited account(s), {trustOverview.suspendedAccounts} suspended account(s), and {trustOverview.heldJobs} held job(s) are currently in the trust workflow.
+                    </p>
+                  </div>
+                  <Link href="/admin/trust">
+                    <Button>Open trust queue</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
