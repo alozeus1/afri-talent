@@ -89,6 +89,23 @@ describe("Jobs API", () => {
                 totalPages: 1
             });
         });
+
+        it("only queries published, non-expired jobs for public listing", async () => {
+            (prisma.job.count as any).mockResolvedValueOnce(0);
+            (prisma.job.findMany as any).mockResolvedValueOnce([]);
+
+            const res = await request(app).get("/api/jobs");
+            expect(res.status).toBe(200);
+
+            expect(prisma.job.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        status: "PUBLISHED",
+                        isExpired: false,
+                    }),
+                })
+            );
+        });
     });
 
     describe("GET /api/jobs/:slug", () => {
@@ -107,6 +124,17 @@ describe("Jobs API", () => {
             expect(res.status).toBe(200);
             expect(res.body.id).toBe("job123");
             expect(res.body.slug).toBe("frontend-engineer-123");
+        });
+
+        it("returns 404 for expired jobs", async () => {
+            (prisma.job.findUnique as any).mockResolvedValueOnce({
+                ...DUMMY_JOB,
+                isExpired: true,
+            });
+
+            const res = await request(app).get("/api/jobs/frontend-engineer-123");
+            expect(res.status).toBe(404);
+            expect(res.body.error).toBe("Job not found");
         });
     });
 

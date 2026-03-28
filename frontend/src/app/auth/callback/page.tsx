@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import Link from "next/link";
 import { trackEvent } from "@/lib/analytics";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -164,9 +165,9 @@ function OAuthCallbackInner() {
           </div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Authentication Failed</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
-          <a href="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
+          <Link href="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
             Back to Login
-          </a>
+          </Link>
         </div>
       </div>
     );

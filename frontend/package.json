@@ -9,9 +9,11 @@
     "lint": "eslint .",
     "test:unit": "jest",
     "test:unit:watch": "jest --watch",
+    "test:e2e": "playwright test",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "test:perf:lighthouse": "npx @lhci/cli@0.14.x autorun --config=./lighthouserc.json"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.43.0",

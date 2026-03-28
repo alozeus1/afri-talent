@@ -288,6 +288,11 @@ afri-tech/
 - Phase 3 billing localization plan: [docs/PHASE3_BILLING_LOCALIZATION_PLAN.md](./docs/PHASE3_BILLING_LOCALIZATION_PLAN.md)
 - Phase 3 phased rollout plan: [docs/PHASE3_ROLLOUT_PLAN.md](./docs/PHASE3_ROLLOUT_PLAN.md)
 - Phase 4 moat architecture and API contracts: [docs/PHASE4_MOAT_ARCHITECTURE.md](./docs/PHASE4_MOAT_ARCHITECTURE.md)
+- QA test matrix (Phase 1/2): [docs/qa/PHASE12_TEST_PLAN_MATRIX.md](./docs/qa/PHASE12_TEST_PLAN_MATRIX.md)
+- QA manual checklist (Phase 1/2): [docs/qa/PHASE12_MANUAL_QA_CHECKLIST.md](./docs/qa/PHASE12_MANUAL_QA_CHECKLIST.md)
+- QA bug severity rubric: [docs/qa/BUG_SEVERITY_RUBRIC.md](./docs/qa/BUG_SEVERITY_RUBRIC.md)
+- QA release readiness report: [docs/qa/PHASE12_RELEASE_READINESS_REPORT.md](./docs/qa/PHASE12_RELEASE_READINESS_REPORT.md)
+- QA go/no-go checklist: [docs/qa/GO_NO_GO_CHECKLIST.md](./docs/qa/GO_NO_GO_CHECKLIST.md)
 
 
    •  Frontend: http://localhost:3000
