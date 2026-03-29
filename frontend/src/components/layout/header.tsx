@@ -8,26 +8,83 @@ import { notifications as notificationsApi, messages as messagesApi } from "@/li
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { useNetworkProfile } from "@/lib/network-profile";
 
 export function Header() {
   const locale = useLocale();
   const t = useT();
   const { user, isLoading, logout } = useAuth();
+  const { online, isLowBandwidth } = useNetworkProfile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => {
-    if (!user) return;
-    notificationsApi.unreadCount().then(d => setUnreadNotifs(d.count)).catch(() => {});
-    messagesApi.unreadCount().then(d => setUnreadMessages(d.count)).catch(() => {});
-    const interval = setInterval(() => {
-      notificationsApi.unreadCount().then(d => setUnreadNotifs(d.count)).catch(() => {});
-      messagesApi.unreadCount().then(d => setUnreadMessages(d.count)).catch(() => {});
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
+    if (!user || !online) return;
+
+    let cancelled = false;
+    const intervalMs = isLowBandwidth ? 120000 : 30000;
+
+    const refreshCounts = async () => {
+      if (cancelled || document.visibilityState === "hidden") {
+        return;
+      }
+
+      const [notificationsResult, messagesResult] = await Promise.allSettled([
+        notificationsApi.unreadCount(),
+        messagesApi.unreadCount(),
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (notificationsResult.status === "fulfilled") {
+        setUnreadNotifs(notificationsResult.value.count);
+      }
+
+      if (messagesResult.status === "fulfilled") {
+        setUnreadMessages(messagesResult.value.count);
+      }
+    };
+
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    const idleHandle = idleWindow.requestIdleCallback
+      ? idleWindow.requestIdleCallback(() => {
+          void refreshCounts();
+        }, { timeout: 1000 })
+      : window.setTimeout(() => {
+          void refreshCounts();
+        }, 150);
+
+    const interval = window.setInterval(() => {
+      void refreshCounts();
+    }, intervalMs);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshCounts();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.clearInterval(interval);
+      if (idleWindow.cancelIdleCallback && typeof idleHandle === "number") {
+        idleWindow.cancelIdleCallback(idleHandle);
+      } else {
+        window.clearTimeout(idleHandle as number);
+      }
+    };
+  }, [isLowBandwidth, online, user]);
 
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? "hidden" : "";

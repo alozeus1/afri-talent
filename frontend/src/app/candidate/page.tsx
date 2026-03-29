@@ -9,10 +9,13 @@ import {
   Application,
   billing,
   BillingStatus,
+  candidateAnalytics,
+  CandidateRetentionSummaryResponse,
   CandidateTrustDashboard,
   emailVerification,
   trust,
 } from "@/lib/api";
+import { candidateRetentionEvents } from "@/lib/analytics";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,6 +82,7 @@ export default function CandidateDashboard() {
   const [togglingOtw, setTogglingOtw] = useState(false);
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [trustDashboard, setTrustDashboard] = useState<CandidateTrustDashboard | null>(null);
+  const [retentionSummary, setRetentionSummary] = useState<CandidateRetentionSummaryResponse | null>(null);
   const [emailVerified, setEmailVerified] = useState<boolean>(true);
   const [sendingVerification, setSendingVerification] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
@@ -115,6 +119,23 @@ export default function CandidateDashboard() {
       trust
         .candidateSummary()
         .then(setTrustDashboard)
+        .catch(() => {});
+
+      candidateAnalytics
+        .retentionSummary()
+        .then((summary) => {
+          setRetentionSummary(summary);
+          candidateRetentionEvents.summaryViewed({
+            recommendation_count: summary.recommendations.length,
+            saved_search_count: summary.snapshot.savedSearchCount,
+          });
+          summary.experiments.forEach((experiment) => {
+            candidateRetentionEvents.experimentExposed({
+              experiment_key: experiment.key,
+              variant: experiment.variant,
+            });
+          });
+        })
         .catch(() => {});
 
       emailVerification
@@ -262,6 +283,99 @@ export default function CandidateDashboard() {
         </Card>
       )}
 
+      {retentionSummary && (
+        <div className="mb-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <Card className="border-amber-200 bg-amber-50/40">
+            <CardHeader>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Your next best actions</h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    AfriTalent is prioritizing trusted jobs, verified employers, and low-noise nudges.
+                  </p>
+                </div>
+                <Link href={localizePath("/candidate/preferences", locale)}>
+                  <Button variant="outline">Manage alerts</Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {retentionSummary.journeys.slice(0, 3).map((journey) => (
+                <div key={journey.key} className="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{journey.title}</p>
+                      <p className="mt-1 text-xs text-gray-600">{journey.description}</p>
+                    </div>
+                    <Badge variant={journey.status === "DONE" ? "success" : journey.status === "READY" ? "warning" : "info"}>
+                      {journey.status}
+                    </Badge>
+                  </div>
+                  <div className="mt-3">
+                    <Link
+                      href={localizePath(journey.href, locale)}
+                      onClick={() =>
+                        candidateRetentionEvents.journeyCtaClicked({
+                          journey_key: journey.key,
+                          status: journey.status,
+                        })
+                      }
+                    >
+                      <Button size="sm" variant={journey.status === "DONE" ? "ghost" : "outline"}>
+                        {journey.ctaLabel}
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-semibold text-gray-900">Trusted matches this week</h2>
+              <p className="mt-1 text-sm text-gray-600">{retentionSummary.weeklyDigest.headline}</p>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-gray-100 p-3">
+                  <p className="text-xs uppercase tracking-wide text-gray-500">Trusted roles</p>
+                  <p className="mt-1 text-lg font-semibold text-gray-900">{retentionSummary.weeklyDigest.trustedJobCount}</p>
+                </div>
+                <div className="rounded-xl border border-gray-100 p-3">
+                  <p className="text-xs uppercase tracking-wide text-gray-500">Verified employers</p>
+                  <p className="mt-1 text-lg font-semibold text-gray-900">{retentionSummary.weeklyDigest.verifiedEmployerCount}</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {retentionSummary.recommendations.slice(0, 3).map((job) => (
+                  <div key={job.id} className="rounded-2xl border border-gray-100 p-4">
+                    <Link
+                      href={localizePath(`/jobs/${job.slug}`, locale)}
+                      className="text-sm font-semibold text-gray-900 hover:text-emerald-600"
+                      onClick={() =>
+                        candidateRetentionEvents.recommendationClicked({
+                          source: "candidate_dashboard",
+                          job_id: job.id,
+                        })
+                      }
+                    >
+                      {job.title}
+                    </Link>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {job.employer?.companyName} • {job.location}
+                    </p>
+                    <p className="mt-2 text-xs text-gray-600">
+                      {job.rankingExplanation?.summary}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Profile Completeness + Open to Work + Subscription */}
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         {/* Profile Completeness */}
@@ -378,7 +492,7 @@ export default function CandidateDashboard() {
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8">
         <Link href={localizePath("/candidate/chat", locale)}>
           <Card className="hover:shadow-md transition-shadow cursor-pointer border-emerald-200 bg-emerald-50/30">
             <CardContent className="p-4 text-center">
@@ -424,6 +538,14 @@ export default function CandidateDashboard() {
             <CardContent className="p-4 text-center">
               <span className="text-2xl mb-1 block">🛡️</span>
               <span className="text-sm font-medium text-blue-900">Trust Profile</span>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href={localizePath("/candidate/preferences", locale)}>
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-amber-200 bg-amber-50/40">
+            <CardContent className="p-4 text-center">
+              <span className="text-2xl mb-1 block">🔔</span>
+              <span className="text-sm font-medium text-amber-900">Alert Preferences</span>
             </CardContent>
           </Card>
         </Link>

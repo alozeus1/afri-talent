@@ -16,7 +16,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { TrustChecklist } from "@/components/trust/trust-checklist";
+import { TrustExplainerModal } from "@/components/trust/trust-explainer-modal";
 import { TrustScoreCard } from "@/components/trust/trust-score-card";
+import { TrustStatusBanner } from "@/components/trust/trust-status-banner";
+import { TrustSupportCard } from "@/components/trust/trust-support-card";
 import { uploadVerificationFile } from "@/lib/trust-files";
 import { humanizeTrustValue } from "@/lib/trust-labels";
 import { localizePath, useLocale } from "@/lib/i18n/client";
@@ -29,6 +32,34 @@ const candidateArtifactTypes = [
 
 type CandidateArtifactType = (typeof candidateArtifactTypes)[number]["value"];
 type CandidateSkillMethod = "CERTIFICATE" | "PORTFOLIO" | "ASSESSMENT";
+
+function artifactStatusCopy(status: VerificationArtifactItem["status"]) {
+  if (status === "APPROVED") {
+    return {
+      tone: "success" as const,
+      summary: "Approved and now strengthening your employer-facing trust profile.",
+    };
+  }
+
+  if (status === "REJECTED") {
+    return {
+      tone: "danger" as const,
+      summary: "This evidence was not accepted. Update it before resubmitting.",
+    };
+  }
+
+  if (status === "NEEDS_MORE_INFO") {
+    return {
+      tone: "warning" as const,
+      summary: "A reviewer needs more detail before this trust signal can be approved.",
+    };
+  }
+
+  return {
+    tone: "warning" as const,
+    summary: "Submitted and waiting for review.",
+  };
+}
 
 export default function CandidateTrustPage() {
   const locale = useLocale();
@@ -82,6 +113,58 @@ export default function CandidateTrustPage() {
     () => (dashboard?.assessments || []).filter((assessment) => assessment.status === "COMPLETED"),
     [dashboard?.assessments],
   );
+
+  const artifactSummary = useMemo(() => {
+    return (dashboard?.artifacts || []).reduce(
+      (summary, artifact) => {
+        if (artifact.status === "APPROVED") summary.approved += 1;
+        if (artifact.status === "REJECTED") summary.rejected += 1;
+        if (artifact.status === "PENDING" || artifact.status === "NEEDS_MORE_INFO") summary.pending += 1;
+        return summary;
+      },
+      { approved: 0, rejected: 0, pending: 0 },
+    );
+  }, [dashboard?.artifacts]);
+
+  const trustState = useMemo(() => {
+    if (!dashboard) {
+      return {
+        tone: "info" as const,
+        title: "Loading your trust profile",
+        body: "We are preparing your current authenticity summary.",
+      };
+    }
+
+    if (artifactSummary.rejected > 0) {
+      return {
+        tone: "danger" as const,
+        title: "Some verification evidence needs attention",
+        body: "At least one submission was rejected or needs more information. Updating it is the fastest way to avoid a confusing employer-facing trust profile.",
+      };
+    }
+
+    if (artifactSummary.pending > 0) {
+      return {
+        tone: "info" as const,
+        title: "Review in progress",
+        body: "Your latest verification evidence is being assessed. Employers still see your current approved signals while review is underway.",
+      };
+    }
+
+    if (!dashboard.trust.premiumFilterEligible) {
+      return {
+        tone: "warning" as const,
+        title: "Your trust profile is still building",
+        body: "Verification is optional at first, but stronger evidence helps employers feel safer shortlisting you and unlocks premium verified-candidate filters.",
+      };
+    }
+
+    return {
+      tone: "success" as const,
+      title: "Your trust profile is employer-ready",
+      body: "Your current evidence gives employers a stronger reason to trust your profile beyond self-reported information.",
+    };
+  }, [artifactSummary.pending, artifactSummary.rejected, dashboard]);
 
   const loadDashboard = async () => {
     setLoading(true);
@@ -230,23 +313,30 @@ export default function CandidateTrustPage() {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-700 mb-3">
           Candidate Trust
         </p>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Strengthen your authenticity signals for employers</h1>
-        <p className="max-w-3xl text-lg text-gray-600">
-          Verification stays optional at first, but stronger trust signals improve recruiter confidence and unlock premium candidate filters.
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">Show employers proof, not just profile claims</h1>
+        <p className="max-w-3xl text-lg leading-8 text-gray-600">
+          Verification stays optional at first, but stronger trust signals help recruiters move faster with more confidence. AfriTalent combines multiple signals so no single link or upload decides everything.
         </p>
       </section>
 
       {pageError && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {pageError}
-        </div>
+        <TrustStatusBanner tone="danger" title="We couldn't update your trust profile" body={pageError} />
       )}
 
       {pageSuccess && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {pageSuccess}
-        </div>
+        <TrustStatusBanner tone="success" title="Trust update saved" body={pageSuccess} />
       )}
+
+      <TrustStatusBanner
+        tone={trustState.tone}
+        title={trustState.title}
+        body={trustState.body}
+        actions={
+          <Link href={localizePath("/trust", locale)}>
+            <Button size="sm" variant="outline">Open trust center</Button>
+          </Link>
+        }
+      />
 
       <TrustScoreCard
         title={dashboard.profile?.headline || user.name}
@@ -260,6 +350,27 @@ export default function CandidateTrustPage() {
             <Link href={localizePath("/candidate/profile", locale)}>
               <Button size="sm">Update profile</Button>
             </Link>
+            <TrustExplainerModal
+              title="How employers interpret your trust profile"
+              description="Recruiters should be able to see which parts of your profile are verified, which are still improving, and which need more evidence."
+              items={dashboard.trust.explainability.map((signal) => ({
+                title: signal.label,
+                description: signal.detail,
+                statusLabel:
+                  signal.status === "verified"
+                    ? "Verified"
+                    : signal.status === "needs_attention"
+                      ? "Needs attention"
+                      : "Strengthening",
+                statusVariant:
+                  signal.status === "verified"
+                    ? "success"
+                    : signal.status === "needs_attention"
+                      ? "warning"
+                      : "info",
+              }))}
+              triggerLabel="What employers see"
+            />
             <Link href={localizePath("/trust", locale)}>
               <Button size="sm" variant="outline">Trust center</Button>
             </Link>
@@ -273,10 +384,10 @@ export default function CandidateTrustPage() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <TrustBadge label={dashboard.trust.badge} riskLevel={dashboard.trust.riskLevel} variant="success" />
                 {dashboard.trust.maskedPhone && (
-                  <TrustBadge label={`Phone on file: ${dashboard.trust.maskedPhone}`} variant="info" />
+                  <TrustBadge label={`Phone verified: ${dashboard.trust.maskedPhone}`} variant="info" />
                 )}
                 {dashboard.trust.premiumFilterEligible && (
-                  <TrustBadge label="Eligible for premium verified filters" variant="success" />
+                  <TrustBadge label="Eligible for verified-candidate filters" variant="success" />
                 )}
                 {dashboard.trust.verifiedSkillCount > 0 && (
                   <TrustBadge label={`${dashboard.trust.verifiedSkillCount} verified skill badge${dashboard.trust.verifiedSkillCount === 1 ? "" : "s"}`} variant="success" />
@@ -285,10 +396,10 @@ export default function CandidateTrustPage() {
                   <TrustBadge label={`${dashboard.trust.partnerSignalCount} partner trust marker${dashboard.trust.partnerSignalCount === 1 ? "" : "s"}`} variant="info" />
                 )}
                 {dashboard.trust.assessmentBacked && (
-                  <TrustBadge label="Assessment-backed candidate" variant="success" />
+                  <TrustBadge label="Assessment-verified" variant="success" />
                 )}
                 {dashboard.trust.fullyCompletedProfile && (
-                  <TrustBadge label="Fully completed profile" variant="success" />
+                  <TrustBadge label="Complete profile" variant="success" />
                 )}
               </div>
               <p className="mt-4 text-sm text-gray-600">
@@ -299,6 +410,9 @@ export default function CandidateTrustPage() {
                 {" "}and you currently have{" "}
                 <span className="font-semibold text-gray-900">{linkedSignalCount}</span>
                 {" "}linked profile signal{linkedSignalCount === 1 ? "" : "s"}.
+              </p>
+              <p className="mt-3 text-sm text-gray-600">
+                Employers may pay for premium filters, but they only see verified-candidate badges when your evidence actually clears AfriTalent trust checks.
               </p>
             </div>
 
@@ -355,6 +469,20 @@ export default function CandidateTrustPage() {
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
+            {dashboard.trust.maskedPhone ? (
+              <TrustStatusBanner
+                tone="success"
+                title="Phone verification already completed"
+                body={`Employers currently see a verified phone signal tied to ${dashboard.trust.maskedPhone}.`}
+              />
+            ) : (
+              <TrustStatusBanner
+                tone="info"
+                title="Phone verification is one of the fastest trust wins"
+                body="It gives employers one more real-world signal that your profile belongs to a reachable person."
+              />
+            )}
+
             <Input
               label="Phone number"
               value={phoneNumber}
@@ -444,6 +572,9 @@ export default function CandidateTrustPage() {
               <Button type="submit" disabled={submittingArtifact}>
                 {submittingArtifact ? "Submitting..." : "Submit for review"}
               </Button>
+              <p className="text-xs leading-5 text-gray-500">
+                Submissions are reviewed before they become visible to employers. If we need more detail, reviewer notes will appear in your evidence history below.
+              </p>
             </form>
           </CardContent>
         </Card>
@@ -553,11 +684,16 @@ export default function CandidateTrustPage() {
               >
                 {submittingSkill ? "Submitting..." : "Submit skill verification"}
               </Button>
+              <p className="text-xs leading-5 text-gray-500">
+                Skill badges are evidence-based. Uploading a file or link alone does not guarantee approval.
+              </p>
             </form>
 
             <div className="mt-6 space-y-3">
               {dashboard.skillVerifications.length === 0 ? (
-                <p className="text-sm text-gray-600">No skill verification records yet.</p>
+                <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+                  No skill verification records yet. Start with one high-confidence skill that you can prove clearly.
+                </div>
               ) : (
                 dashboard.skillVerifications.map((skill: CandidateVerifiedSkillItem) => (
                   <div key={skill.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
@@ -601,9 +737,9 @@ export default function CandidateTrustPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {dashboard.partnerMarkers.length === 0 ? (
-              <p className="text-sm text-gray-600">
-                No partner markers yet. These are added through approved institution or training partners.
-              </p>
+              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+                No partner markers yet. These are issued through approved universities, bootcamps, training institutes, and scholarship partners.
+              </div>
             ) : (
               dashboard.partnerMarkers.map((marker: CandidatePartnerMarkerItem) => (
                 <div key={marker.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
@@ -654,6 +790,9 @@ export default function CandidateTrustPage() {
         <Card>
           <CardHeader>
             <h2 className="text-xl font-semibold text-gray-900">Linked authenticity signals</h2>
+            <p className="text-sm text-gray-600">
+              LinkedIn, GitHub, and portfolio links help employers cross-check that your work history and skill claims are real.
+            </p>
           </CardHeader>
           <CardContent className="space-y-3">
             {dashboard.profile?.linkedinUrl && (
@@ -672,9 +811,9 @@ export default function CandidateTrustPage() {
               </a>
             )}
             {!dashboard.profile?.linkedinUrl && !dashboard.profile?.githubUrl && !dashboard.profile?.portfolioUrl && (
-              <p className="text-sm text-gray-600">
-                Add LinkedIn, GitHub, or a portfolio in your profile to strengthen authenticity.
-              </p>
+              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+                Add LinkedIn, GitHub, or a portfolio in your profile to strengthen authenticity and give employers more confidence in your work history.
+              </div>
             )}
           </CardContent>
         </Card>
@@ -685,19 +824,20 @@ export default function CandidateTrustPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {dashboard.artifacts.length === 0 ? (
-              <p className="text-sm text-gray-600">
-                No verification evidence has been submitted yet.
-              </p>
+              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+                No verification evidence has been submitted yet. A clear ID, certification, or employment proof is usually the best first step.
+              </div>
             ) : (
               dashboard.artifacts.map((artifact: VerificationArtifactItem) => (
                 <div key={artifact.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium text-gray-900">{humanizeTrustValue(artifact.type)}</p>
-                    <TrustBadge label={humanizeTrustValue(artifact.status)} variant={artifact.status === "APPROVED" ? "success" : artifact.status === "REJECTED" ? "danger" : "warning"} />
+                    <TrustBadge label={humanizeTrustValue(artifact.status)} variant={artifactStatusCopy(artifact.status).tone} />
                   </div>
                   <p className="mt-2 text-sm text-gray-500">
                     Submitted {new Date(artifact.submittedAt).toLocaleDateString()}
                   </p>
+                  <p className="mt-2 text-sm text-gray-700">{artifactStatusCopy(artifact.status).summary}</p>
                   {artifact.fileName && (
                     <p className="mt-2 text-sm text-gray-700">File: {artifact.fileName}</p>
                   )}
@@ -722,6 +862,12 @@ export default function CandidateTrustPage() {
           </CardContent>
         </Card>
       </div>
+
+      <TrustSupportCard
+        reportHref={localizePath("/trust/report", locale)}
+        title="Need help with a trust review?"
+        description="If a verification outcome looks wrong, you are dealing with suspicious outreach, or you need help understanding what employers can see, contact support or file a trust report."
+      />
     </div>
   );
 }

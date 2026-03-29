@@ -56,6 +56,8 @@ export function HomePageContent() {
                   fill
                   className="object-contain rounded-lg shadow-2xl"
                   priority
+                  quality={68}
+                  sizes="(max-width: 1023px) 0px, 50vw"
                 />
               </div>
             </div>

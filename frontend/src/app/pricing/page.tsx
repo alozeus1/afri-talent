@@ -9,6 +9,7 @@ import { RegionSelector } from "@/components/pricing/region-selector";
 import { FaqSection } from "@/components/pricing/faq-section";
 import { pricingEvents } from "@/lib/analytics";
 import { useT } from "@/lib/i18n/client";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   CANDIDATE_PLANS,
   EMPLOYER_PLANS,
@@ -187,37 +188,51 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Loading state */}
-      {loading && (
-        <div className="flex justify-center py-16">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
-        </div>
-      )}
-
       {/* Plan cards */}
-      {!loading && (
-        <section className="pb-16 px-4">
-          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-            {activePlans.map((plan) => (
-              <PlanCard
-                key={plan.key}
-                planKey={plan.key}
-                name={plan.name}
-                description={plan.description}
-                features={plan.features}
-                priceInfo={getPrice(prices, plan.key, interval)}
-                interval={interval}
-                isCurrent={!!user && currentPlan === plan.key}
-                isPopular={plan.popular}
-                isLoggedIn={!!user}
-                taxLabel={taxLabel}
-                onCheckout={handleCheckout}
-                checkoutLoading={checkoutLoading}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+      <section className="pb-16 px-4">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+          {loading
+            ? Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="rounded-2xl border-2 border-gray-100 bg-white px-6 py-8 shadow-sm"
+                >
+                  <div className="text-center">
+                    <Skeleton className="mx-auto h-6 w-28" />
+                    <Skeleton className="mx-auto mt-3 h-4 w-40" />
+                    <Skeleton className="mx-auto mt-6 h-10 w-24" />
+                    <Skeleton className="mx-auto mt-2 h-3 w-20" />
+                  </div>
+                  <div className="mt-8 space-y-3">
+                    {Array.from({ length: 6 }).map((__, rowIndex) => (
+                      <div key={rowIndex} className="flex items-center gap-2.5">
+                        <Skeleton className="h-5 w-5 rounded-full" />
+                        <Skeleton className="h-4 flex-1" />
+                      </div>
+                    ))}
+                  </div>
+                  <Skeleton className="mt-8 h-11 w-full rounded-lg" />
+                </div>
+              ))
+            : activePlans.map((plan) => (
+                <PlanCard
+                  key={plan.key}
+                  planKey={plan.key}
+                  name={plan.name}
+                  description={plan.description}
+                  features={plan.features}
+                  priceInfo={getPrice(prices, plan.key, interval)}
+                  interval={interval}
+                  isCurrent={!!user && currentPlan === plan.key}
+                  isPopular={plan.popular}
+                  isLoggedIn={!!user}
+                  taxLabel={taxLabel}
+                  onCheckout={handleCheckout}
+                  checkoutLoading={checkoutLoading}
+                />
+              ))}
+        </div>
+      </section>
 
       {/* Comparison table */}
       <section className="pb-16 px-4 bg-gray-50/70">

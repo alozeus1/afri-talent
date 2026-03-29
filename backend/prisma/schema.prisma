@@ -78,11 +78,25 @@ enum NotificationType {
   APPLICATION_STATUS
   JOB_MATCH
   VERIFICATION
+  RETENTION_NUDGE
+  WEEKLY_DIGEST
+  SALARY_INSIGHT
+  INTERVIEW_PREP
 }
 
 enum NotificationStatus {
   UNREAD
   READ
+}
+
+enum CandidateLifecycleTriggerType {
+  WEEKLY_DIGEST
+  APPLICATION_REMINDER
+  PROFILE_COMPLETION
+  VERIFICATION_COMPLETION
+  VISA_RELOCATION_MATCH
+  SALARY_INSIGHT
+  INTERVIEW_PREP
 }
 
 enum SubscriptionStatus {
@@ -610,6 +624,8 @@ model User {
   pushSubscriptions             PushSubscription[]
   analyticsEvents               AnalyticsEvent[]
   mockInterviewSessions         MockInterviewSession[]
+  candidateLifecycleState       CandidateLifecycleState?
+  candidateLifecycleEvents      CandidateLifecycleEvent[]
   socialProfile                 SocialProfile?
   socialConnectionsSent         SocialConnection[]         @relation("SocialConnectionRequester")
   socialConnectionsRecv         SocialConnection[]         @relation("SocialConnectionRecipient")
@@ -1177,23 +1193,80 @@ model Notification {
   metadata  Json?
   createdAt DateTime           @default(now())
 
+  candidateLifecycleEvents CandidateLifecycleEvent[]
+
   @@index([userId, status])
   @@index([userId, createdAt(sort: Desc)])
 }
 
 model NotificationPreference {
-  id                  String   @id @default(uuid())
-  userId              String   @unique
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  savedSearchAlerts   Boolean  @default(true)
-  interviewReminders  Boolean  @default(true)
-  applicationUpdates  Boolean  @default(true)
-  subscriptionNotices Boolean  @default(true)
-  marketing           Boolean  @default(false)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                               String   @id @default(uuid())
+  userId                           String   @unique
+  user                             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  savedSearchAlerts                Boolean  @default(true)
+  weeklyDigests                    Boolean  @default(true)
+  applicationReminders             Boolean  @default(true)
+  profileCompletionNudges          Boolean  @default(true)
+  verificationCompletionNudges     Boolean  @default(true)
+  visaRelocationAlerts             Boolean  @default(true)
+  salaryInsights                   Boolean  @default(true)
+  interviewPrepRecommendations     Boolean  @default(true)
+  interviewReminders               Boolean  @default(true)
+  applicationUpdates               Boolean  @default(true)
+  subscriptionNotices              Boolean  @default(true)
+  marketing                        Boolean  @default(false)
+  maxNotificationsPerWeek          Int      @default(6)
+  minimumHoursBetweenNotifications Int      @default(18)
+  createdAt                        DateTime @default(now())
+  updatedAt                        DateTime @updatedAt
 
   @@index([userId])
+}
+
+model CandidateLifecycleState {
+  id                        String    @id @default(uuid())
+  userId                    String    @unique
+  user                      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekWindowStartedAt       DateTime?
+  notificationsThisWeek     Int       @default(0)
+  lastNotificationAt        DateTime?
+  lastDigestAt              DateTime?
+  lastApplicationReminderAt DateTime?
+  lastProfileNudgeAt        DateTime?
+  lastVerificationNudgeAt   DateTime?
+  lastVisaAlertAt           DateTime?
+  lastSalaryInsightAt       DateTime?
+  lastInterviewPrepAt       DateTime?
+  lastDigestJobCount        Int       @default(0)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  events CandidateLifecycleEvent[]
+
+  @@index([weekWindowStartedAt])
+  @@index([lastNotificationAt])
+}
+
+model CandidateLifecycleEvent {
+  id               String                        @id @default(uuid())
+  userId           String
+  user             User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lifecycleStateId String?
+  lifecycleState   CandidateLifecycleState?      @relation(fields: [lifecycleStateId], references: [id], onDelete: SetNull)
+  triggerType      CandidateLifecycleTriggerType
+  channel          String                        @db.VarChar(40)
+  reasonCode       String                        @db.VarChar(120)
+  dedupeKey        String                        @unique @db.VarChar(180)
+  title            String                        @db.VarChar(255)
+  body             String                        @db.VarChar(1000)
+  metadata         Json?
+  notificationId   String?
+  notification     Notification?                 @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  sentAt           DateTime                      @default(now())
+  createdAt        DateTime                      @default(now())
+
+  @@index([userId, triggerType, createdAt(sort: Desc)])
+  @@index([channel, createdAt(sort: Desc)])
 }
 
 model PushSubscription {

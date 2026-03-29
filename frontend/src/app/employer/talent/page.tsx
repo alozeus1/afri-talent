@@ -4,14 +4,101 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { talent, TalentSearchResponse } from "@/lib/api";
+import { TalentProfile, talent, TalentSearchResponse } from "@/lib/api";
 import { employerOnboardingEvents } from "@/lib/analytics";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TrustBadge } from "@/components/trust/trust-badge";
+import { TrustExplainerModal, type TrustExplainerItem } from "@/components/trust/trust-explainer-modal";
+import { TrustStatusBanner } from "@/components/trust/trust-status-banner";
+import { TrustSupportCard } from "@/components/trust/trust-support-card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+
+function candidateTrustReasons(candidate: TalentProfile): TrustExplainerItem[] {
+  if (candidate.trust?.explainability?.length) {
+    return candidate.trust.explainability.slice(0, 3).map((signal) => ({
+      title: signal.label,
+      description: signal.detail,
+      statusLabel:
+        signal.status === "verified"
+          ? "Verified"
+          : signal.status === "needs_attention"
+            ? "Needs attention"
+            : "Strengthening",
+      statusVariant:
+        signal.status === "verified"
+          ? ("success" as const)
+          : signal.status === "needs_attention"
+            ? ("warning" as const)
+            : ("info" as const),
+    }));
+  }
+
+  const fallback: TrustExplainerItem[] = [];
+
+  if (candidate.trust?.maskedPhone) {
+    fallback.push({
+      title: "Phone verification",
+      description: `AfriTalent has a verified phone signal on file: ${candidate.trust.maskedPhone}.`,
+      statusLabel: "Verified",
+      statusVariant: "info" as const,
+    });
+  }
+
+  if (candidate.verifiedSkills?.length) {
+    fallback.push({
+      title: "Verified skills",
+      description: `${candidate.verifiedSkills.length} skill signal${candidate.verifiedSkills.length === 1 ? "" : "s"} passed evidence-based review.`,
+      statusLabel: "Evidence-backed",
+      statusVariant: "success" as const,
+    });
+  }
+
+  if (candidate.partnerMarkers?.length) {
+    fallback.push({
+      title: "Partner-issued trust marker",
+      description: "An approved university, training, or scholarship partner has added a trust marker to this profile.",
+      statusLabel: "Partner backed",
+      statusVariant: "info" as const,
+    });
+  }
+
+  if (candidate.profileCompleteness >= 80) {
+    fallback.push({
+      title: "Complete profile",
+      description: "This candidate has supplied a strong amount of employer-facing profile detail.",
+      statusLabel: "High completeness",
+      statusVariant: "success" as const,
+    });
+  }
+
+  return fallback.slice(0, 3);
+}
+
+function candidateTrustExplainerItems(candidate: TalentProfile): TrustExplainerItem[] {
+  if (candidate.trust?.explainability?.length) {
+    return candidate.trust.explainability.map((signal) => ({
+      title: signal.label,
+      description: signal.detail,
+      statusLabel:
+        signal.status === "verified"
+          ? "Verified"
+          : signal.status === "needs_attention"
+            ? "Needs attention"
+            : "Strengthening",
+      statusVariant:
+        signal.status === "verified"
+          ? ("success" as const)
+          : signal.status === "needs_attention"
+            ? ("warning" as const)
+            : ("info" as const),
+    }));
+  }
+
+  return candidateTrustReasons(candidate);
+}
 
 export default function TalentMarketplacePage() {
   const locale = useLocale();
@@ -30,6 +117,15 @@ export default function TalentMarketplacePage() {
   const [fullyCompletedOnly, setFullyCompletedOnly] = useState(false);
   const [assessmentBackedOnly, setAssessmentBackedOnly] = useState(false);
   const [page, setPage] = useState(1);
+
+  const hasActiveFilters =
+    Boolean(skills.trim()) ||
+    Boolean(location.trim()) ||
+    Boolean(minExperience) ||
+    verifiedOnly ||
+    verifiedSkillsOnly ||
+    fullyCompletedOnly ||
+    assessmentBackedOnly;
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "EMPLOYER")) {
@@ -94,15 +190,46 @@ export default function TalentMarketplacePage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Talent Marketplace</h1>
-        <p className="text-gray-600">
-          Discover skilled African professionals for your team
+        <p className="max-w-3xl text-gray-600">
+          Discover skilled African professionals with clearer trust signals, verified skills, and lower-noise search results.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <Link href={localizePath("/employer/trust", locale)}>
             <Button variant="outline" size="sm">Employer Trust Profile</Button>
           </Link>
+          <TrustExplainerModal
+            title="How verified candidate filters work"
+            description="Premium filters help you narrow the market, but candidates only qualify for these filters when they have real approved signals behind them."
+            items={[
+              {
+                title: "Verified candidates",
+                description: "These profiles passed stronger trust thresholds such as phone, identity, skills, profile consistency, or partner evidence.",
+                statusLabel: "Evidence required",
+                statusVariant: "success",
+              },
+              {
+                title: "Verified skills",
+                description: "Skill badges appear only after certificate, portfolio, assessment, partner, or manual review evidence is accepted.",
+                statusLabel: "Not self-claimed",
+                statusVariant: "success",
+              },
+              {
+                title: "Assessment-backed and complete profiles",
+                description: "These filters highlight candidates with stronger proof and enough profile context to support faster hiring decisions.",
+                statusLabel: "Higher confidence",
+                statusVariant: "info",
+              },
+            ]}
+            triggerLabel="How trust filters work"
+          />
         </div>
       </div>
+
+      <TrustStatusBanner
+        tone="info"
+        title="Filter for proof, not just keywords"
+        body="Paid plans unlock advanced filters, but candidates only appear in verified or assessment-backed views when the underlying trust signals actually passed review."
+      />
 
       {/* Search Filters */}
       <Card className="mb-8">
@@ -202,6 +329,9 @@ export default function TalentMarketplacePage() {
               </label>
             ))}
           </div>
+          <p className="mt-4 text-xs leading-5 text-gray-500">
+            Trust filters help reduce noise, but they do not replace human review. Use the trust explainer on profiles when you need to understand why someone is considered more credible.
+          </p>
         </CardContent>
       </Card>
 
@@ -212,7 +342,16 @@ export default function TalentMarketplacePage() {
       )}
 
       {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-8">{error}</div>
+        <TrustStatusBanner
+          tone="danger"
+          title="We couldn't load talent results"
+          body={error}
+          actions={
+            <Button size="sm" variant="outline" onClick={() => fetchTalent()}>
+              Retry search
+            </Button>
+          }
+        />
       )}
 
       {!loading && data && (
@@ -222,14 +361,38 @@ export default function TalentMarketplacePage() {
           </div>
 
           {data.candidates.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 px-6 py-12 text-center">
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-200">
                 <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
-              <p className="text-gray-600 mb-2 font-medium">No candidates match your criteria</p>
-              <p className="text-gray-500 text-sm">Try adjusting your filters to see more results</p>
+              <p className="text-gray-900 mb-2 font-semibold">No candidates match your current filters</p>
+              <p className="text-gray-600 text-sm max-w-xl mx-auto">
+                Try broadening experience, location, or trust filters. Narrow trust filters are useful, but the strongest hiring outcomes usually combine them with role-specific skills and context.
+              </p>
+              <div className="mt-5 flex flex-wrap justify-center gap-3">
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSkills("");
+                      setLocation("");
+                      setMinExperience("");
+                      setVerifiedOnly(false);
+                      setVerifiedSkillsOnly(false);
+                      setFullyCompletedOnly(false);
+                      setAssessmentBackedOnly(false);
+                      setPage(1);
+                    }}
+                  >
+                    Reset filters
+                  </Button>
+                )}
+                <Link href={localizePath("/trust", locale)}>
+                  <Button size="sm">Open trust center</Button>
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -304,16 +467,16 @@ export default function TalentMarketplacePage() {
                       <div className="mb-4 space-y-2">
                         <div className="flex flex-wrap gap-2">
                           {candidate.trust.premiumFilterEligible && (
-                            <TrustBadge label="Premium filter eligible" variant="success" />
+                            <TrustBadge label="Eligible for verified filters" variant="success" />
                           )}
                           {candidate.trust.maskedPhone && (
                             <TrustBadge label={`Phone verified`} variant="info" />
                           )}
                           {candidate.trust.assessmentBacked && (
-                            <TrustBadge label="Assessment-backed" variant="success" />
+                            <TrustBadge label="Assessment verified" variant="success" />
                           )}
                           {candidate.trust.fullyCompletedProfile && (
-                            <TrustBadge label="Fully completed" variant="success" />
+                            <TrustBadge label="Complete profile" variant="success" />
                           )}
                         </div>
                         {candidate.verifiedSkills && candidate.verifiedSkills.length > 0 && (
@@ -339,6 +502,40 @@ export default function TalentMarketplacePage() {
                             {candidate.trust.warnings[0]}
                           </p>
                         )}
+                      </div>
+                    )}
+
+                    {candidate.trust && (
+                      <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Why this candidate is trusted
+                            </p>
+                            <div className="mt-3 space-y-2">
+                              {candidateTrustReasons(candidate).length > 0 ? (
+                                candidateTrustReasons(candidate).map((reason) => (
+                                  <div key={`${candidate.user.id}-${reason.title}`} className="rounded-xl bg-white px-3 py-3">
+                                    <p className="text-sm font-medium text-slate-900">{reason.title}</p>
+                                    <p className="mt-1 text-xs leading-5 text-slate-600">{reason.description}</p>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="rounded-xl bg-white px-3 py-3 text-xs leading-5 text-slate-600">
+                                  This profile has some trust signals, but you may want to review the full profile before making a shortlist decision.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <TrustExplainerModal
+                            title={`Why ${candidate.user.name} looks credible`}
+                            description="AfriTalent explains trust using multiple evidence-backed signals so you can understand more than just a badge label."
+                            items={candidateTrustExplainerItems(candidate)}
+                            triggerLabel="See full trust breakdown"
+                          />
+                        </div>
                       </div>
                     )}
 
@@ -383,6 +580,12 @@ export default function TalentMarketplacePage() {
           )}
         </>
       )}
+
+      <TrustSupportCard
+        reportHref={localizePath("/trust/report", locale)}
+        title="Need to flag a suspicious profile or hiring interaction?"
+        description="If a candidate seems impersonated, inconsistent, or unsafe, file a trust report. Our moderation team uses those reports together with behavior and verification evidence."
+      />
     </div>
   );
 }

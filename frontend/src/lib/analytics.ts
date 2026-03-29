@@ -30,6 +30,16 @@ function classifyEvent(name: string): AnalyticsCategory {
   ) {
     return "EMPLOYER_PIPELINE";
   }
+  if (
+    name.includes("retention") ||
+    name.includes("digest") ||
+    name.includes("saved_search") ||
+    name.includes("interview_prep") ||
+    name.includes("journey_cta") ||
+    name.includes("recommendation_clicked")
+  ) {
+    return "RETENTION";
+  }
   return "ENGAGEMENT";
 }
 
@@ -150,4 +160,24 @@ export const employerOnboardingEvents = {
 
   talentResultsLoaded: (properties: EventProperties) =>
     trackEvent("employer_talent_results_loaded", properties),
+};
+
+export const candidateRetentionEvents = {
+  summaryViewed: (properties: EventProperties) =>
+    trackEvent("candidate_retention_summary_viewed", properties),
+
+  journeyCtaClicked: (properties: EventProperties) =>
+    trackEvent("candidate_journey_cta_clicked", properties),
+
+  preferencesUpdated: (properties: EventProperties) =>
+    trackEvent("candidate_preferences_updated", properties),
+
+  weeklyDigestViewed: (properties: EventProperties) =>
+    trackEvent("candidate_weekly_digest_viewed", properties),
+
+  recommendationClicked: (properties: EventProperties) =>
+    trackEvent("candidate_recommendation_clicked", properties),
+
+  experimentExposed: (properties: EventProperties) =>
+    trackEvent("candidate_experiment_exposed", properties),
 };

@@ -2217,7 +2217,20 @@ export const pushNotifications = {
       method: "DELETE",
       body: JSON.stringify({ endpoint }),
     }),
-  sendTest: (type: "savedSearchAlerts" | "interviewReminders" | "applicationUpdates" | "subscriptionNotices") =>
+  sendTest: (
+    type:
+      | "savedSearchAlerts"
+      | "weeklyDigests"
+      | "applicationReminders"
+      | "profileCompletionNudges"
+      | "verificationCompletionNudges"
+      | "visaRelocationAlerts"
+      | "salaryInsights"
+      | "interviewPrepRecommendations"
+      | "interviewReminders"
+      | "applicationUpdates"
+      | "subscriptionNotices",
+  ) =>
     fetchAPI<{ message: string; notificationId: string }>("/api/push/test", {
       method: "POST",
       body: JSON.stringify({ type }),
@@ -2225,12 +2238,40 @@ export const pushNotifications = {
 };
 
 // Saved Searches
+function unwrapSavedSearch(
+  payload:
+    | SavedSearchItem
+    | { savedSearch: SavedSearchItem }
+    | { savedSearches: SavedSearchItem[] }
+    | SavedSearchItem[],
+) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if ("savedSearches" in payload) {
+    return payload.savedSearches;
+  }
+  if ("savedSearch" in payload) {
+    return payload.savedSearch;
+  }
+  return payload;
+}
+
 export const savedSearches = {
-  list: () => fetchAPI<SavedSearchItem[]>("/api/saved-searches"),
+  list: async () =>
+    unwrapSavedSearch(
+      await fetchAPI<SavedSearchItem[] | { savedSearches: SavedSearchItem[] }>("/api/saved-searches"),
+    ) as SavedSearchItem[],
   create: (data: Partial<SavedSearchItem>) =>
-    fetchAPI<SavedSearchItem>("/api/saved-searches", { method: "POST", body: JSON.stringify(data) }),
+    fetchAPI<SavedSearchItem | { savedSearch: SavedSearchItem }>("/api/saved-searches", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((payload) => unwrapSavedSearch(payload) as SavedSearchItem),
   update: (id: string, data: Partial<SavedSearchItem>) =>
-    fetchAPI<SavedSearchItem>(`/api/saved-searches/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    fetchAPI<SavedSearchItem | { savedSearch: SavedSearchItem }>(`/api/saved-searches/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }).then((payload) => unwrapSavedSearch(payload) as SavedSearchItem),
   delete: (id: string) => fetchAPI<void>(`/api/saved-searches/${id}`, { method: "DELETE" }),
   getJobs: (id: string) => fetchAPI<JobListResponse>(`/api/saved-searches/${id}/jobs`),
 };
@@ -2361,6 +2402,7 @@ export const candidateAnalytics = {
   profileViews: () => fetchAPI<ProfileViewsData>("/api/candidate-analytics/profile-views"),
   applicationFunnel: () => fetchAPI<ApplicationFunnel>("/api/candidate-analytics/application-funnel"),
   recommendations: () => fetchAPI<Job[]>("/api/candidate-analytics/recommendations"),
+  retentionSummary: () => fetchAPI<CandidateRetentionSummaryResponse>("/api/candidate-analytics/retention-summary"),
 };
 
 // ──────── New Types ────────
@@ -2448,10 +2490,19 @@ export interface NotificationPreference {
   id: string;
   userId: string;
   savedSearchAlerts: boolean;
+  weeklyDigests: boolean;
+  applicationReminders: boolean;
+  profileCompletionNudges: boolean;
+  verificationCompletionNudges: boolean;
+  visaRelocationAlerts: boolean;
+  salaryInsights: boolean;
+  interviewPrepRecommendations: boolean;
   interviewReminders: boolean;
   applicationUpdates: boolean;
   subscriptionNotices: boolean;
   marketing: boolean;
+  maxNotificationsPerWeek: number;
+  minimumHoursBetweenNotifications: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -2498,7 +2549,70 @@ export interface SavedSearchItem {
   visaSponsorship: boolean;
   alertEnabled: boolean;
   alertFrequency: string;
+  matchCount?: number;
   createdAt: string;
+}
+
+export interface CandidateRetentionJourney {
+  key:
+    | "saved_search"
+    | "profile_completion"
+    | "verification_completion"
+    | "application_momentum"
+    | "salary_insight"
+    | "interview_prep";
+  title: string;
+  description: string;
+  status: "READY" | "DONE" | "WATCH";
+  href: string;
+  ctaLabel: string;
+  priority: number;
+}
+
+export interface CandidateRetentionExperiment {
+  key: "digest_hero_v1" | "recommendation_mix_v1";
+  variant: string;
+}
+
+export interface CandidateWeeklyDigestPreview {
+  headline: string;
+  trustedJobCount: number;
+  verifiedEmployerCount: number;
+  salaryTransparentCount: number;
+  visaFriendlyCount: number;
+  freshnessWindowLabel: string;
+  jobs: Job[];
+}
+
+export interface CandidateRetentionSummaryResponse {
+  snapshot: {
+    profileCompleteness: number;
+    trustScore: number;
+    verificationLevel: CandidateVerificationLevel;
+    savedSearchCount: number;
+    openApplications: number;
+    notificationBudgetRemaining: number;
+    lastDigestAt: string | null;
+    notificationCadenceHours: number;
+    maxNotificationsPerWeek: number;
+  };
+  recommendations: Job[];
+  weeklyDigest: CandidateWeeklyDigestPreview;
+  journeys: CandidateRetentionJourney[];
+  experiments: CandidateRetentionExperiment[];
+  preferences: Pick<
+    NotificationPreference,
+    | "weeklyDigests"
+    | "savedSearchAlerts"
+    | "applicationReminders"
+    | "profileCompletionNudges"
+    | "verificationCompletionNudges"
+    | "visaRelocationAlerts"
+    | "salaryInsights"
+    | "interviewPrepRecommendations"
+    | "maxNotificationsPerWeek"
+    | "minimumHoursBetweenNotifications"
+  >;
 }
 
 export interface SalaryReportItem {

@@ -20,6 +20,7 @@ import { runAutoApplyCycle, AUTO_APPLY_INTERVAL_MS } from "./auto-apply.js";
 import { runJobCleanupCycle, CLEANUP_INTERVAL_MS } from "./job-cleanup.js";
 import { runOperationalSnapshotCycle } from "./operational-snapshot.js";
 import { runBillingReconciliationWorker } from "./billing-reconciliation.js";
+import { runCandidateRetentionWorker } from "./candidate-retention.js";
 import { pushDeadLetter, recordWorkerState, withRetry } from "../lib/ops/resilience.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
 
@@ -28,6 +29,8 @@ const MATCHER_INTERVAL_MS = parseInt(process.env.MATCHER_INTERVAL_MINUTES || "30
 const ALERT_INTERVAL_MS = parseInt(process.env.ALERT_INTERVAL_MINUTES || "15", 10) * 60 * 1000;
 const OPS_SNAPSHOT_INTERVAL_MS = parseInt(process.env.OPS_SNAPSHOT_INTERVAL_MINUTES || "15", 10) * 60 * 1000;
 const BILLING_RECONCILIATION_INTERVAL_MS = parseInt(process.env.BILLING_RECONCILIATION_INTERVAL_HOURS || "24", 10) * 60 * 60 * 1000;
+const CANDIDATE_RETENTION_INTERVAL_MS =
+  parseInt(process.env.CANDIDATE_RETENTION_INTERVAL_HOURS || "12", 10) * 60 * 60 * 1000;
 
 const LOCK_TTL_SECONDS = 300; // 5 min lock
 
@@ -134,6 +137,7 @@ export function startScheduler(): void {
       alertIntervalMinutes: ALERT_INTERVAL_MS / 60000,
       opsSnapshotIntervalMinutes: OPS_SNAPSHOT_INTERVAL_MS / 60000,
       billingReconciliationIntervalHours: BILLING_RECONCILIATION_INTERVAL_MS / 3600000,
+      candidateRetentionIntervalHours: CANDIDATE_RETENTION_INTERVAL_MS / 3600000,
     },
     "[scheduler] starting proactive agent scheduler"
   );
@@ -169,6 +173,13 @@ export function startScheduler(): void {
   );
 
   intervals.push(
+    setInterval(
+      () => void safeRun("candidate-retention", runCandidateRetentionWorker),
+      CANDIDATE_RETENTION_INTERVAL_MS,
+    ),
+  );
+
+  intervals.push(
     setInterval(() => void safeRun("auto-apply", runAutoApplyCycle), AUTO_APPLY_INTERVAL_MS)
   );
 
@@ -186,6 +197,11 @@ export function startScheduler(): void {
     void safeRun("billing-reconciliation", runBillingReconciliationWorker);
   }, 60_000);
   intervals.push(billingDelay as unknown as IntervalRef);
+
+  const retentionDelay = setTimeout(() => {
+    void safeRun("candidate-retention", runCandidateRetentionWorker);
+  }, 90_000);
+  intervals.push(retentionDelay as unknown as IntervalRef);
 }
 
 export function stopScheduler(): void {

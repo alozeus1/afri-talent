@@ -15,6 +15,14 @@ jest.mock('@/lib/auth-context', () => ({
 jest.mock('@/components/layout/theme-toggle', () => ({
   ThemeToggle: () => <button type="button">Theme</button>,
 }));
+jest.mock('@/lib/network-profile', () => ({
+  useNetworkProfile: () => ({
+    online: true,
+    saveData: false,
+    effectiveType: "4g",
+    isLowBandwidth: false,
+  }),
+}));
 
 import { useAuth } from "@/lib/auth-context";
 

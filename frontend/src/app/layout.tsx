@@ -5,6 +5,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { NetworkStatusBanner } from "@/components/layout/network-status-banner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -27,6 +28,7 @@ export default function RootLayout({
           <AuthProvider>
             <div className="min-h-screen flex flex-col">
               <Header />
+              <NetworkStatusBanner />
               <main className="flex-1">{children}</main>
               <Footer />
             </div>

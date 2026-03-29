@@ -1,141 +1,91 @@
-"use client";
-
-import { useEffect, useState, useCallback } from "react";
-import { jobs, JobListResponse } from "@/lib/api";
+import Link from "next/link";
 import { JobCard } from "@/components/jobs/job-card";
-import { JobFilters } from "@/components/jobs/job-filters";
+import { JobsSearchShell } from "@/components/jobs/jobs-search-shell";
 import { Button } from "@/components/ui/button";
-import { JobListSkeleton } from "@/components/ui/skeleton";
-import { jobDiscoveryEvents } from "@/lib/analytics";
+import { RetryButton } from "@/components/ui/retry-button";
+import {
+  buildJobsHref,
+  hasActiveJobFilters,
+  parseJobSearchState,
+  toJobListParams,
+} from "@/lib/jobs-search";
+import { getJobsListServer } from "@/lib/server-public-api";
 
-export default function JobsPage() {
-  const [data, setData] = useState<JobListResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+type JobsPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
-  const [search, setSearch] = useState("");
-  const [location, setLocation] = useState("");
-  const [type, setType] = useState("");
-  const [seniority, setSeniority] = useState("");
-  const [visaSponsorship, setVisaSponsorship] = useState("");
-  const [relocationAssistance, setRelocationAssistance] = useState("");
-  const [remote, setRemote] = useState("");
-  const [page, setPage] = useState(1);
+export default async function JobsPage({ searchParams }: JobsPageProps) {
+  const filters = parseJobSearchState(await searchParams);
+  const { data, error } = await getJobsListServer(toJobListParams(filters));
 
-  const fetchJobs = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await jobs.list({
-        search: search || undefined,
-        location: location || undefined,
-        type: type || undefined,
-        seniority: seniority || undefined,
-        visaSponsorship: visaSponsorship || undefined,
-        relocationAssistance: relocationAssistance || undefined,
-        remote: remote || undefined,
-        page,
-        limit: 12,
-      });
-      setData(response);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load jobs");
-    } finally {
-      setLoading(false);
-    }
-  }, [search, location, type, seniority, visaSponsorship, relocationAssistance, remote, page]);
-
-  useEffect(() => {
-    const debounce = setTimeout(() => {
-      fetchJobs();
-    }, 300);
-    return () => clearTimeout(debounce);
-  }, [fetchJobs]);
-
-  useEffect(() => {
-    if (!loading && data) {
-      const trustedJobs = data.jobs.filter((job) => job.discovery?.trustedJob).length;
-      const freshJobs = data.jobs.filter((job) => {
-        const label = job.discovery?.freshnessLabel;
-        return label === "FRESH" || label === "RECENT";
-      }).length;
-
-      jobDiscoveryEvents.resultsLoaded({
-        results: data.pagination.total,
-        visible_results: data.jobs.length,
-        trusted_results: trustedJobs,
-        fresh_results: freshJobs,
-        has_search: Boolean(search),
-        has_location: Boolean(location),
-        remote_only: remote === "true",
-        visa_required: visaSponsorship === "YES",
-        page,
-      });
-    }
-  }, [data, loading, search, location, remote, visaSponsorship, page]);
-
-  const clearFilters = () => {
-    setSearch("");
-    setLocation("");
-    setType("");
-    setSeniority("");
-    setVisaSponsorship("");
-    setRelocationAssistance("");
-    setRemote("");
-    setPage(1);
-  };
+  const trustedResults = data?.jobs.filter((job) => job.discovery?.trustedJob).length ?? 0;
+  const freshResults =
+    data?.jobs.filter((job) => {
+      const label = job.discovery?.freshnessLabel;
+      return label === "FRESH" || label === "RECENT";
+    }).length ?? 0;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Find Your Next Role</h1>
-        <p className="text-gray-600 dark:text-gray-300">Browse remote and international opportunities from top companies</p>
+        <p className="text-gray-600 dark:text-gray-300">
+          Browse remote and international opportunities from top companies with a lighter, faster search experience.
+        </p>
       </div>
 
-      <JobFilters
-        search={search}
-        location={location}
-        type={type}
-        seniority={seniority}
-        onSearchChange={(v) => { setSearch(v); setPage(1); }}
-        onLocationChange={(v) => { setLocation(v); setPage(1); }}
-        onTypeChange={(v) => { setType(v); setPage(1); }}
-        onSeniorityChange={(v) => { setSeniority(v); setPage(1); }}
-        visaSponsorship={visaSponsorship}
-        relocationAssistance={relocationAssistance}
-        remote={remote}
-        onVisaSponsorshipChange={(v) => { setVisaSponsorship(v); setPage(1); }}
-        onRelocationChange={(v) => { setRelocationAssistance(v); setPage(1); }}
-        onRemoteChange={(v) => { setRemote(v); setPage(1); }}
-        onClear={clearFilters}
+      <JobsSearchShell
+        filters={filters}
+        resultMetrics={
+          data
+            ? {
+                totalResults: data.pagination.total,
+                visibleResults: data.jobs.length,
+                trustedResults,
+                freshResults,
+              }
+            : undefined
+        }
       />
 
-      {loading && <JobListSkeleton count={6} />}
-
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 p-4 rounded-lg mb-8">
-          {error}
+        <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">
+          <p className="font-semibold">We couldn&apos;t refresh jobs right now.</p>
+          <p className="mt-1 text-sm">{error}</p>
+          <div className="mt-4">
+            <RetryButton />
+          </div>
         </div>
       )}
 
-      {!loading && data && (
+      {!error && data && (
         <>
-          <div className="mb-4 text-gray-600 dark:text-gray-300">
-            {data.pagination.total} job{data.pagination.total !== 1 ? "s" : ""} found
+          <div className="mb-4 flex flex-col gap-2 text-gray-600 dark:text-gray-300 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              {data.pagination.total} job{data.pagination.total !== 1 ? "s" : ""} found
+            </p>
+            <p className="text-sm">
+              Server-rendered results improve load time on slower devices and unstable networks.
+            </p>
           </div>
 
           {data.jobs.length > 0 && (
             <div className="mb-6 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-4 text-sm text-emerald-900">
-              Search ranking now prioritizes relevance, recent refreshes, verified employers, salary transparency, and visa or relocation fit when it matters.
+              Search ranking prioritizes relevance, recent refreshes, verified employers, salary transparency, and visa or relocation fit when it matters.
             </div>
           )}
 
           {data.jobs.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-600 dark:text-gray-300 mb-4">No jobs found matching your criteria</p>
-              <Button variant="outline" onClick={clearFilters}>
-                Clear filters
-              </Button>
+              {hasActiveJobFilters(filters) ? (
+                <Link href="/jobs">
+                  <Button variant="outline">Clear filters</Button>
+                </Link>
+              ) : (
+                <RetryButton />
+              )}
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -147,23 +97,27 @@ export default function JobsPage() {
 
           {data.pagination.totalPages > 1 && (
             <div className="flex justify-center gap-2">
-              <Button
-                variant="outline"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                Previous
-              </Button>
+              {filters.page > 1 ? (
+                <Link href={buildJobsHref({ ...filters, page: filters.page - 1 })} prefetch={false}>
+                  <Button variant="outline">Previous</Button>
+                </Link>
+              ) : (
+                <Button variant="outline" disabled>
+                  Previous
+                </Button>
+              )}
               <span className="flex items-center px-4 text-gray-600 dark:text-gray-300">
-                Page {page} of {data.pagination.totalPages}
+                Page {filters.page} of {data.pagination.totalPages}
               </span>
-              <Button
-                variant="outline"
-                disabled={page === data.pagination.totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-              </Button>
+              {filters.page < data.pagination.totalPages ? (
+                <Link href={buildJobsHref({ ...filters, page: filters.page + 1 })} prefetch={false}>
+                  <Button variant="outline">Next</Button>
+                </Link>
+              ) : (
+                <Button variant="outline" disabled>
+                  Next
+                </Button>
+              )}
             </div>
           )}
         </>

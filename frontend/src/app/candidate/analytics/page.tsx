@@ -6,19 +6,22 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import {
   candidateAnalytics,
+  CandidateRetentionSummaryResponse,
   ProfileViewsData,
   ApplicationFunnel,
-  Job,
 } from "@/lib/api";
+import { candidateRetentionEvents } from "@/lib/analytics";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { JobCard } from "@/components/jobs/job-card";
+import { TrustBadge } from "@/components/trust/trust-badge";
 
 export default function CandidateAnalyticsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [profileViews, setProfileViews] = useState<ProfileViewsData | null>(null);
   const [funnel, setFunnel] = useState<ApplicationFunnel | null>(null);
-  const [recommendations, setRecommendations] = useState<Job[]>([]);
+  const [retentionSummary, setRetentionSummary] = useState<CandidateRetentionSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,12 +36,30 @@ export default function CandidateAnalyticsPage() {
       Promise.all([
         candidateAnalytics.profileViews(),
         candidateAnalytics.applicationFunnel(),
-        candidateAnalytics.recommendations(),
+        candidateAnalytics.retentionSummary(),
       ])
-        .then(([views, funnelData, recs]) => {
+        .then(([views, funnelData, retention]) => {
           setProfileViews(views);
           setFunnel(funnelData);
-          setRecommendations(recs);
+          setRetentionSummary(retention);
+          candidateRetentionEvents.summaryViewed({
+            surface: "candidate_analytics",
+            recommendation_count: retention.recommendations.length,
+            saved_search_count: retention.snapshot.savedSearchCount,
+          });
+          retention.experiments.forEach((experiment) => {
+            candidateRetentionEvents.experimentExposed({
+              surface: "candidate_analytics",
+              experiment_key: experiment.key,
+              variant: experiment.variant,
+            });
+          });
+          candidateRetentionEvents.weeklyDigestViewed({
+            surface: "candidate_analytics",
+            digest_job_count: retention.weeklyDigest.jobs.length,
+            verified_employer_count: retention.weeklyDigest.verifiedEmployerCount,
+            freshness_window: retention.weeklyDigest.freshnessWindowLabel,
+          });
         })
         .catch((err) => setError(err instanceof Error ? err.message : "Failed to load analytics"))
         .finally(() => setLoading(false));
@@ -76,6 +97,10 @@ export default function CandidateAnalyticsPage() {
         { label: "Accepted", count: funnel.accepted, color: "bg-emerald-500" },
       ]
     : [];
+  const recommendations = retentionSummary?.recommendations ?? [];
+  const digest = retentionSummary?.weeklyDigest;
+  const journeys = retentionSummary?.journeys ?? [];
+  const notificationBudgetRemaining = retentionSummary?.snapshot.notificationBudgetRemaining ?? 0;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -89,7 +114,7 @@ export default function CandidateAnalyticsPage() {
 
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Profile Analytics</h1>
-        <p className="text-gray-600">Insights into your profile visibility and job matches</p>
+        <p className="text-gray-600">Insights into your visibility, trusted matches, and retention momentum</p>
       </div>
 
       {error && (
@@ -102,6 +127,133 @@ export default function CandidateAnalyticsPage() {
         </div>
       ) : (
         <>
+          {retentionSummary && (
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] mb-8">
+              <Card className="border-amber-200 bg-amber-50/40">
+                <CardHeader>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">Retention control tower</h2>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Trusted jobs and verified employers are prioritized before AfriTalent nudges you.
+                      </p>
+                    </div>
+                    <Link href="/candidate/preferences">
+                      <Button variant="outline">Manage preferences</Button>
+                    </Link>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid sm:grid-cols-4 gap-3 mb-5">
+                    <div className="rounded-xl bg-white/90 p-4 shadow-sm">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Saved searches</p>
+                      <p className="mt-1 text-2xl font-semibold text-gray-900">{retentionSummary.snapshot.savedSearchCount}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/90 p-4 shadow-sm">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Trust score</p>
+                      <p className="mt-1 text-2xl font-semibold text-gray-900">{retentionSummary.snapshot.trustScore}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/90 p-4 shadow-sm">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Live applications</p>
+                      <p className="mt-1 text-2xl font-semibold text-gray-900">{retentionSummary.snapshot.openApplications}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/90 p-4 shadow-sm">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Nudges left</p>
+                      <p className="mt-1 text-2xl font-semibold text-gray-900">{notificationBudgetRemaining}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {journeys.slice(0, 3).map((journey) => (
+                      <div key={journey.key} className="rounded-xl border border-white/70 bg-white/90 p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{journey.title}</p>
+                            <p className="mt-1 text-xs text-gray-600">{journey.description}</p>
+                          </div>
+                          <TrustBadge
+                            label={journey.status}
+                            variant={journey.status === "DONE" ? "success" : journey.status === "READY" ? "warning" : "info"}
+                          />
+                        </div>
+                        <div className="mt-3">
+                          <Link
+                            href={journey.href}
+                            onClick={() =>
+                              candidateRetentionEvents.journeyCtaClicked({
+                                surface: "candidate_analytics",
+                                journey_key: journey.key,
+                                status: journey.status,
+                              })
+                            }
+                          >
+                            <Button size="sm" variant={journey.status === "DONE" ? "ghost" : "outline"}>
+                              {journey.ctaLabel}
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <h2 className="text-lg font-semibold text-gray-900">Weekly digest preview</h2>
+                  <p className="text-sm text-gray-600 mt-1">{digest?.headline}</p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="rounded-xl border border-gray-100 p-3">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Trusted roles</p>
+                      <p className="mt-1 text-xl font-semibold text-gray-900">{digest?.trustedJobCount ?? 0}</p>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 p-3">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Verified employers</p>
+                      <p className="mt-1 text-xl font-semibold text-gray-900">{digest?.verifiedEmployerCount ?? 0}</p>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 p-3">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Salary disclosed</p>
+                      <p className="mt-1 text-xl font-semibold text-gray-900">{digest?.salaryTransparentCount ?? 0}</p>
+                    </div>
+                    <div className="rounded-xl border border-gray-100 p-3">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Visa-friendly</p>
+                      <p className="mt-1 text-xl font-semibold text-gray-900">{digest?.visaFriendlyCount ?? 0}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+                    <p className="text-xs uppercase tracking-wide text-blue-700">Freshness window</p>
+                    <p className="mt-1 text-sm font-medium text-blue-900">{digest?.freshnessWindowLabel}</p>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {digest?.jobs.slice(0, 3).map((job) => (
+                      <div key={job.id} className="rounded-xl border border-gray-100 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{job.title}</p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {job.employer.companyName} • {job.location}
+                            </p>
+                          </div>
+                          {job.discovery?.trustedJob ? (
+                            <TrustBadge label="Trusted job" variant="success" />
+                          ) : (
+                            <TrustBadge label="Fresh match" variant="info" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {digest && digest.jobs.length === 0 && (
+                      <p className="text-sm text-gray-500">
+                        Your next digest will fill in as you save searches and strengthen your profile trust signals.
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {/* Section 1: Profile Views */}
           <div className="grid lg:grid-cols-3 gap-6 mb-8">
             {/* Total Views */}
@@ -230,7 +382,17 @@ export default function CandidateAnalyticsPage() {
 
           {/* Section 3: Recommended Jobs */}
           <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Recommended Jobs</h2>
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Recommended Jobs</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Ranked by trust, fit, freshness, and employer credibility.
+                </p>
+              </div>
+              <Link href="/candidate/preferences">
+                <Button variant="outline">Tune alerts</Button>
+              </Link>
+            </div>
             {recommendations.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center">
@@ -244,40 +406,18 @@ export default function CandidateAnalyticsPage() {
             ) : (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {recommendations.map((job) => (
-                  <Card key={job.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-5">
-                      <Link
-                        href={`/jobs/${job.slug}`}
-                        className="text-lg font-semibold text-gray-900 hover:text-emerald-600 line-clamp-1"
-                      >
-                        {job.title}
-                      </Link>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {job.employer?.companyName}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {job.location}
-                        {job.type && ` • ${job.type}`}
-                      </p>
-                      {job.tags && job.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-3">
-                          {job.tags.slice(0, 3).map((tag) => (
-                            <span
-                              key={tag}
-                              className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs rounded-full"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <div className="mt-3">
-                        <Link href={`/jobs/${job.slug}`}>
-                          <Button size="sm" variant="outline">View Job</Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div
+                    key={job.id}
+                    onClick={() =>
+                      candidateRetentionEvents.recommendationClicked({
+                        surface: "candidate_analytics",
+                        job_id: job.id,
+                        trusted_job: job.discovery?.trustedJob ?? false,
+                      })
+                    }
+                  >
+                    <JobCard job={job} />
+                  </div>
                 ))}
               </div>
             )}

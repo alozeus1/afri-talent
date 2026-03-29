@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { savedSearches, SavedSearchItem } from "@/lib/api";
@@ -285,10 +286,31 @@ export default function SavedSearchesPage() {
             Manage your job search alerts and preferences
           </p>
         </div>
-        {!showForm && (
-          <Button onClick={handleCreateNew}>Create New Search</Button>
-        )}
+        <div className="flex items-center gap-3">
+          <Link href="/candidate/preferences">
+            <Button variant="outline">Alert Preferences</Button>
+          </Link>
+          {!showForm && (
+            <Button onClick={handleCreateNew}>Create New Search</Button>
+          )}
+        </div>
       </div>
+
+      <Card className="mb-8 border-amber-200 bg-amber-50/40">
+        <CardContent className="p-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Build a low-noise alert stack</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Saved searches feed your weekly digest, visa or relocation alerts, and application-momentum reminders.
+              </p>
+            </div>
+            <Link href="/candidate/preferences">
+              <Button variant="outline">Tune lifecycle loops</Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Error */}
       {error && (

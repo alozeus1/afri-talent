@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { AbuseReportInput, trust } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { TrustStatusBanner } from "@/components/trust/trust-status-banner";
+import { TrustSupportCard } from "@/components/trust/trust-support-card";
 import { humanizeTrustValue } from "@/lib/trust-labels";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 
@@ -24,7 +26,7 @@ const reportReasons: AbuseReportInput["reason"][] = [
   "OTHER",
 ];
 
-export default function ReportAbusePage() {
+function ReportAbusePageContent() {
   const locale = useLocale();
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -101,19 +103,16 @@ export default function ReportAbusePage() {
       </section>
 
       {!user && (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-amber-900">Sign in to file a report</h2>
-              <p className="text-sm text-amber-800 mt-1">
-                We require authentication so our moderators can follow up and prevent abuse of the reporting system.
-              </p>
-            </div>
+        <TrustStatusBanner
+          tone="warning"
+          title="Sign in to file a report"
+          body="We require authentication so moderators can follow up, connect your report to platform activity, and reduce abuse of the reporting system."
+          actions={
             <Link href={localizePath("/login?redirect=/trust/report", locale)}>
               <Button className="bg-amber-700 hover:bg-amber-800">Sign in</Button>
             </Link>
-          </CardContent>
-        </Card>
+          }
+        />
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -127,17 +126,19 @@ export default function ReportAbusePage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {error}
-                </div>
+                <TrustStatusBanner
+                  tone="danger"
+                  title="We couldn't submit this report"
+                  body={error}
+                />
               )}
 
               {success && (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                  <p className="font-semibold">{success.message}</p>
-                  <p className="mt-1">Report ID: {success.reportId}</p>
-                  <p>Case ID: {success.caseId}</p>
-                </div>
+                <TrustStatusBanner
+                  tone="success"
+                  title="Report submitted"
+                  body={`${success.message} Report ID: ${success.reportId}. Case ID: ${success.caseId}.`}
+                />
               )}
 
               <div>
@@ -235,14 +236,14 @@ export default function ReportAbusePage() {
 
           <Card>
             <CardHeader>
-              <h2 className="text-xl font-semibold text-gray-900">What to include</h2>
+              <h2 className="text-xl font-semibold text-gray-900">What happens next</h2>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-gray-600">
               <p className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                Include the exact wording if someone asked you to move to WhatsApp, Telegram, personal email, or to pay a fee.
+                Moderators use your report together with account behavior, verification evidence, and other trust signals before taking action.
               </p>
               <p className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                Screenshots are useful, but IDs, links, and timestamps help moderators act faster.
+                Screenshots are useful, but IDs, links, timestamps, and the exact off-platform request usually help moderators act faster.
               </p>
               <p className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                 We use reports as one signal among many. A badge is never removed or granted based on a single self-assertion alone.
@@ -251,6 +252,26 @@ export default function ReportAbusePage() {
           </Card>
         </div>
       </div>
+
+      <TrustSupportCard
+        reportHref={localizePath("/trust/report", locale)}
+        title="Need urgent help instead?"
+        description="If you are unsure which reason code to choose or something feels actively unsafe, contact support and include the links, IDs, or payment request involved."
+      />
     </div>
+  );
+}
+
+export default function ReportAbusePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="h-48 animate-pulse rounded-3xl bg-gray-100 dark:bg-gray-800" />
+        </div>
+      }
+    >
+      <ReportAbusePageContent />
+    </Suspense>
   );
 }

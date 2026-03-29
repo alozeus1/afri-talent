@@ -4,8 +4,10 @@ import {
   ats,
   auth,
   billing,
+  candidateAnalytics,
   pricing,
   publicStats,
+  savedSearches,
 } from "../api";
 
 describe("Frontend API contract builders", () => {
@@ -126,5 +128,34 @@ describe("Frontend API contract builders", () => {
     await adminAts.dashboard();
     const [url] = (global.fetch as jest.Mock).mock.calls[0] as [string];
     expect(url).toBe("http://localhost:4000/api/admin/ats/dashboard");
+  });
+
+  it("loads candidate retention summary from the analytics surface", async () => {
+    await candidateAnalytics.retentionSummary();
+    const [url] = (global.fetch as jest.Mock).mock.calls[0] as [string];
+    expect(url).toBe("http://localhost:4000/api/candidate-analytics/retention-summary");
+  });
+
+  it("unwraps saved search list responses from the backend route shape", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        savedSearches: [
+          {
+            id: "search-1",
+            name: "Remote backend roles",
+          },
+        ],
+      }),
+    } as Response);
+
+    const searches = await savedSearches.list();
+
+    expect(searches).toEqual([
+      expect.objectContaining({
+        id: "search-1",
+        name: "Remote backend roles",
+      }),
+    ]);
   });
 });

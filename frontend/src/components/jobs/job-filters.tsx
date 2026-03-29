@@ -47,17 +47,25 @@ export function JobFilters({
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 mb-8">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Input
+          type="search"
+          inputMode="search"
+          autoComplete="off"
+          aria-label="Search jobs"
           placeholder="Search jobs..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
         />
         <Input
+          inputMode="text"
+          autoComplete="country-name"
+          aria-label="Filter by location"
           placeholder="Location"
           value={location}
           onChange={(e) => onLocationChange(e.target.value)}
         />
         <select
           className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          aria-label="Filter by job type"
           value={type}
           onChange={(e) => onTypeChange(e.target.value)}
         >
@@ -70,6 +78,7 @@ export function JobFilters({
         </select>
         <select
           className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          aria-label="Filter by seniority"
           value={seniority}
           onChange={(e) => onSeniorityChange(e.target.value)}
         >
@@ -83,7 +92,10 @@ export function JobFilters({
       </div>
       <div className="flex flex-wrap gap-2 mt-4">
         <button
+          type="button"
           onClick={() => onRemoteChange(remote ? "" : "true")}
+          aria-pressed={Boolean(remote)}
+          aria-label="Toggle remote only jobs"
           className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
             remote ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:border-emerald-500"
           }`}
@@ -91,7 +103,10 @@ export function JobFilters({
           Remote
         </button>
         <button
+          type="button"
           onClick={() => onVisaSponsorshipChange(visaSponsorship ? "" : "YES")}
+          aria-pressed={Boolean(visaSponsorship)}
+          aria-label="Toggle visa sponsored jobs"
           className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
             visaSponsorship ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:border-blue-500"
           }`}
@@ -99,7 +114,10 @@ export function JobFilters({
           Visa Sponsored
         </button>
         <button
+          type="button"
           onClick={() => onRelocationChange(relocationAssistance ? "" : "true")}
+          aria-pressed={Boolean(relocationAssistance)}
+          aria-label="Toggle relocation support jobs"
           className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
             relocationAssistance ? "bg-purple-600 text-white border-purple-600" : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:border-purple-500"
           }`}

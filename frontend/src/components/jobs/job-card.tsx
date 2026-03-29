@@ -22,10 +22,20 @@ export function JobCard({ job }: JobCardProps) {
   const lastSeenText = job.discovery?.lastSeenAt
     ? new Date(job.discovery.lastSeenAt).toLocaleDateString()
     : null;
+  const trustReasons = [
+    job.employer?.trust?.badge,
+    job.trust?.companyReviewed ? "Company reviewed" : null,
+    job.trust?.jobQualityChecked ? "Job quality checked" : null,
+    job.discovery?.salaryTransparent ? "Salary disclosed" : null,
+    job.discovery?.sourceCount && job.discovery.sourceCount > 1
+      ? `Cross-checked across ${job.discovery.sourceCount} sources`
+      : null,
+  ].filter(Boolean) as string[];
 
   return (
     <Link
       href={`/jobs/${job.slug}`}
+      prefetch={false}
       onClick={() => {
         jobDiscoveryEvents.resultClicked({
           job_id: job.id,
@@ -62,7 +72,7 @@ export function JobCard({ job }: JobCardProps) {
                   <TrustBadge label="Job quality checked" variant="success" />
                 )}
                 {job.trust?.newEmployerCaution && (
-                  <TrustBadge label="New employer" riskLevel="MEDIUM" variant="warning" />
+                  <TrustBadge label="New employer review" riskLevel="MEDIUM" variant="warning" />
                 )}
                 {job.discovery?.trustedJob && (
                   <TrustBadge label="Trusted job" variant="success" />
@@ -118,6 +128,12 @@ export function JobCard({ job }: JobCardProps) {
           {discoverySummary && (
             <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
               {discoverySummary}
+            </p>
+          )}
+
+          {trustReasons.length > 0 && (
+            <p className="mb-4 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              Why this looks credible: {trustReasons.slice(0, 3).join(" • ")}
             </p>
           )}
 
