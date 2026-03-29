@@ -1,90 +1,108 @@
 import { Router, Request, Response } from "express";
-import { ATSProvider, ATSConnectionStatus, ATSSyncStatus, JobStatus, Prisma, Role } from "@prisma/client";
+import { ATSProvider, ATSConnectionStatus, Prisma, Role } from "@prisma/client";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import { decryptString, encryptString } from "../lib/secure-string.js";
-import { fetchAtsJobs } from "../lib/ats/providers.js";
+import { encryptString } from "../lib/secure-string.js";
 import logger from "../lib/logger.js";
+import {
+  createAtsAuditLog,
+  getAtsConnectionDetailForEmployer,
+  getAtsConnectionLogs,
+  getEmployerAtsDashboard,
+  listEmployerAtsConnections,
+  refreshConnectionHealth,
+  retryAtsConnectionSync,
+  runAtsConnectionSync,
+  runAtsConnectionTest,
+} from "../lib/ats/service.js";
 
 const router = Router();
 
+router.use(authenticate, authorize(Role.EMPLOYER));
+
+const optionalTrimmedString = (minimumLength = 1) =>
+  z.preprocess(
+    (value) => (typeof value === "string" ? value.trim() || undefined : value),
+    z.string().min(minimumLength).optional(),
+  );
+
 const connectSchema = z.object({
   provider: z.nativeEnum(ATSProvider),
-  externalOrgId: z.string().min(2).max(255),
-  accessToken: z.string().min(10).optional(),
-  refreshToken: z.string().min(10).optional(),
+  externalOrgId: z.string().trim().min(2).max(255),
+  displayName: optionalTrimmedString(2),
+  accessToken: optionalTrimmedString(8),
+  refreshToken: optionalTrimmedString(8),
+  webhookSecret: optionalTrimmedString(6),
+  webhookSyncEnabled: z.boolean().optional(),
+  twoWaySyncEnabled: z.boolean().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    .slice(0, 90);
+const updateConnectionSchema = z.object({
+  externalOrgId: z.string().trim().min(2).max(255).optional(),
+  displayName: optionalTrimmedString(2),
+  accessToken: optionalTrimmedString(8),
+  refreshToken: optionalTrimmedString(8),
+  webhookSecret: optionalTrimmedString(6),
+  clearAccessToken: z.boolean().optional(),
+  clearRefreshToken: z.boolean().optional(),
+  clearWebhookSecret: z.boolean().optional(),
+  webhookSyncEnabled: z.boolean().optional(),
+  twoWaySyncEnabled: z.boolean().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+function getBaseUrl(req: Request): string {
+  return `${req.protocol}://${req.get("host")}`;
 }
 
-async function ensureUniqueSlug(baseSlug: string): Promise<string> {
-  let slug = baseSlug || `job-${Date.now()}`;
-  let index = 1;
-  while (await prisma.job.findUnique({ where: { slug } })) {
-    slug = `${baseSlug}-${index}`;
-    index += 1;
-  }
-  return slug;
+async function getEmployerId(userId: string): Promise<string | null> {
+  const employer = await prisma.employer.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+
+  return employer?.id ?? null;
 }
 
-router.get("/connections", authenticate, authorize(Role.EMPLOYER), async (req: Request, res: Response) => {
+router.get("/dashboard", async (req: Request, res: Response) => {
   try {
-    const employer = await prisma.employer.findUnique({
-      where: { userId: req.user!.userId },
-      select: { id: true },
-    });
-
-    if (!employer) {
+    const employerId = await getEmployerId(req.user!.userId);
+    if (!employerId) {
       res.status(404).json({ error: "Employer profile not found" });
       return;
     }
 
-    const connections = await prisma.aTSConnection.findMany({
-      where: { employerId: employer.id },
-      include: {
-        syncRuns: {
-          orderBy: { startedAt: "desc" },
-          take: 1,
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const dashboard = await getEmployerAtsDashboard(employerId, getBaseUrl(req));
+    res.json(dashboard);
+  } catch (error) {
+    logger.error({ error }, "ATS dashboard failed");
+    res.status(500).json({ error: "Failed to load ATS dashboard" });
+  }
+});
 
-    res.json(
-      connections.map((connection) => ({
-        id: connection.id,
-        provider: connection.provider,
-        externalOrgId: connection.externalOrgId,
-        status: connection.status,
-        metadata: connection.metadata,
-        lastSyncedAt: connection.lastSyncedAt,
-        lastSyncRun: connection.syncRuns[0] || null,
-        createdAt: connection.createdAt,
-      })),
-    );
+router.get("/connections", async (req: Request, res: Response) => {
+  try {
+    const employerId = await getEmployerId(req.user!.userId);
+    if (!employerId) {
+      res.status(404).json({ error: "Employer profile not found" });
+      return;
+    }
+
+    const connections = await listEmployerAtsConnections(employerId, getBaseUrl(req));
+    res.json(connections);
   } catch (error) {
     logger.error({ error }, "List ATS connections failed");
     res.status(500).json({ error: "Failed to load ATS connections" });
   }
 });
 
-router.post("/connections", authenticate, authorize(Role.EMPLOYER), async (req: Request, res: Response) => {
+router.post("/connections", async (req: Request, res: Response) => {
   try {
     const payload = connectSchema.parse(req.body);
-    const employer = await prisma.employer.findUnique({
-      where: { userId: req.user!.userId },
-      select: { id: true },
-    });
-
-    if (!employer) {
+    const employerId = await getEmployerId(req.user!.userId);
+    if (!employerId) {
       res.status(404).json({ error: "Employer profile not found" });
       return;
     }
@@ -92,54 +110,72 @@ router.post("/connections", authenticate, authorize(Role.EMPLOYER), async (req: 
     const connection = await prisma.aTSConnection.upsert({
       where: {
         employerId_provider_externalOrgId: {
-          employerId: employer.id,
+          employerId,
           provider: payload.provider,
           externalOrgId: payload.externalOrgId,
         },
       },
       create: {
-        employerId: employer.id,
+        employerId,
         provider: payload.provider,
         externalOrgId: payload.externalOrgId,
+        displayName: payload.displayName,
         encryptedAccessToken: payload.accessToken ? encryptString(payload.accessToken) : null,
         encryptedRefreshToken: payload.refreshToken ? encryptString(payload.refreshToken) : null,
+        encryptedWebhookSecret: payload.webhookSecret ? encryptString(payload.webhookSecret) : null,
+        webhookSyncEnabled: payload.webhookSyncEnabled ?? false,
+        twoWaySyncEnabled: payload.twoWaySyncEnabled ?? false,
         metadata: payload.metadata as Prisma.InputJsonValue | undefined,
         status: ATSConnectionStatus.ACTIVE,
       },
       update: {
+        displayName: payload.displayName ?? undefined,
         encryptedAccessToken: payload.accessToken ? encryptString(payload.accessToken) : undefined,
         encryptedRefreshToken: payload.refreshToken ? encryptString(payload.refreshToken) : undefined,
+        encryptedWebhookSecret: payload.webhookSecret ? encryptString(payload.webhookSecret) : undefined,
+        webhookSyncEnabled: payload.webhookSyncEnabled ?? undefined,
+        twoWaySyncEnabled: payload.twoWaySyncEnabled ?? undefined,
         metadata: payload.metadata as Prisma.InputJsonValue | undefined,
         status: ATSConnectionStatus.ACTIVE,
       },
     });
 
-    res.status(201).json({
-      id: connection.id,
-      provider: connection.provider,
-      externalOrgId: connection.externalOrgId,
-      status: connection.status,
-      metadata: connection.metadata,
-      createdAt: connection.createdAt,
+    await refreshConnectionHealth(connection.id);
+    await createAtsAuditLog({
+      connectionId: connection.id,
+      actorUserId: req.user!.userId,
+      actionType: "CONNECTION_SAVED",
+      reasonCode: "ats_connection_saved",
+      summary: `Saved ${payload.provider} integration for ${payload.externalOrgId}.`,
+      metadata: {
+        webhookSyncEnabled: payload.webhookSyncEnabled ?? false,
+        twoWaySyncEnabled: payload.twoWaySyncEnabled ?? false,
+      },
     });
+
+    const detail = await getAtsConnectionDetailForEmployer({
+      connectionId: connection.id,
+      employerId,
+      baseUrl: getBaseUrl(req),
+    });
+
+    res.status(201).json(detail);
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: "Validation failed", details: error.issues });
       return;
     }
+
     logger.error({ error }, "Create ATS connection failed");
     res.status(500).json({ error: "Failed to save ATS connection" });
   }
 });
 
-router.delete("/connections/:id", authenticate, authorize(Role.EMPLOYER), async (req: Request, res: Response) => {
+router.put("/connections/:id", async (req: Request, res: Response) => {
   try {
-    const employer = await prisma.employer.findUnique({
-      where: { userId: req.user!.userId },
-      select: { id: true },
-    });
-
-    if (!employer) {
+    const payload = updateConnectionSchema.parse(req.body);
+    const employerId = await getEmployerId(req.user!.userId);
+    if (!employerId) {
       res.status(404).json({ error: "Employer profile not found" });
       return;
     }
@@ -147,7 +183,7 @@ router.delete("/connections/:id", authenticate, authorize(Role.EMPLOYER), async 
     const connection = await prisma.aTSConnection.findFirst({
       where: {
         id: req.params.id,
-        employerId: employer.id,
+        employerId,
       },
     });
 
@@ -158,30 +194,102 @@ router.delete("/connections/:id", authenticate, authorize(Role.EMPLOYER), async 
 
     await prisma.aTSConnection.update({
       where: { id: connection.id },
-      data: { status: ATSConnectionStatus.DISCONNECTED },
+      data: {
+        externalOrgId: payload.externalOrgId ?? undefined,
+        displayName: payload.displayName ?? undefined,
+        encryptedAccessToken: payload.clearAccessToken
+          ? null
+          : payload.accessToken
+            ? encryptString(payload.accessToken)
+            : undefined,
+        encryptedRefreshToken: payload.clearRefreshToken
+          ? null
+          : payload.refreshToken
+            ? encryptString(payload.refreshToken)
+            : undefined,
+        encryptedWebhookSecret: payload.clearWebhookSecret
+          ? null
+          : payload.webhookSecret
+            ? encryptString(payload.webhookSecret)
+            : undefined,
+        webhookSyncEnabled: payload.webhookSyncEnabled ?? undefined,
+        twoWaySyncEnabled: payload.twoWaySyncEnabled ?? undefined,
+        metadata: payload.metadata as Prisma.InputJsonValue | undefined,
+        status: ATSConnectionStatus.ACTIVE,
+      },
     });
 
-    res.json({ message: "ATS connection disconnected" });
+    await refreshConnectionHealth(connection.id);
+    await createAtsAuditLog({
+      connectionId: connection.id,
+      actorUserId: req.user!.userId,
+      actionType: "CONNECTION_UPDATED",
+      reasonCode: "ats_connection_updated",
+      summary: `Updated ${connection.provider} integration settings.`,
+      metadata: {
+        clearedAccessToken: payload.clearAccessToken ?? false,
+        clearedRefreshToken: payload.clearRefreshToken ?? false,
+        clearedWebhookSecret: payload.clearWebhookSecret ?? false,
+        webhookSyncEnabled: payload.webhookSyncEnabled ?? connection.webhookSyncEnabled,
+        twoWaySyncEnabled: payload.twoWaySyncEnabled ?? connection.twoWaySyncEnabled,
+      },
+    });
+
+    const detail = await getAtsConnectionDetailForEmployer({
+      connectionId: connection.id,
+      employerId,
+      baseUrl: getBaseUrl(req),
+    });
+
+    res.json(detail);
   } catch (error) {
-    logger.error({ error }, "Delete ATS connection failed");
-    res.status(500).json({ error: "Failed to disconnect ATS connection" });
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Validation failed", details: error.issues });
+      return;
+    }
+
+    logger.error({ error }, "Update ATS connection failed");
+    res.status(500).json({ error: "Failed to update ATS connection" });
   }
 });
 
-router.post("/connections/:id/sync", authenticate, authorize(Role.EMPLOYER), async (req: Request, res: Response) => {
+router.get("/connections/:id/logs", async (req: Request, res: Response) => {
   try {
-    const employer = await prisma.employer.findUnique({
-      where: { userId: req.user!.userId },
-      select: { id: true },
+    const employerId = await getEmployerId(req.user!.userId);
+    if (!employerId) {
+      res.status(404).json({ error: "Employer profile not found" });
+      return;
+    }
+
+    const logs = await getAtsConnectionLogs({
+      connectionId: req.params.id,
+      employerId,
+      baseUrl: getBaseUrl(req),
     });
 
-    if (!employer) {
+    if (!logs) {
+      res.status(404).json({ error: "ATS connection not found" });
+      return;
+    }
+
+    res.json(logs);
+  } catch (error) {
+    logger.error({ error }, "ATS logs failed");
+    res.status(500).json({ error: "Failed to load ATS logs" });
+  }
+});
+
+router.post("/connections/:id/test", async (req: Request, res: Response) => {
+  try {
+    const employerId = await getEmployerId(req.user!.userId);
+    if (!employerId) {
       res.status(404).json({ error: "Employer profile not found" });
       return;
     }
 
     const connection = await prisma.aTSConnection.findFirst({
-      where: { id: req.params.id, employerId: employer.id },
+      where: { id: req.params.id, employerId },
+      select: { id: true },
     });
 
     if (!connection) {
@@ -189,133 +297,133 @@ router.post("/connections/:id/sync", authenticate, authorize(Role.EMPLOYER), asy
       return;
     }
 
-    const syncRun = await prisma.aTSSyncRun.create({
-      data: {
-        connectionId: connection.id,
-        status: ATSSyncStatus.RUNNING,
+    const result = await runAtsConnectionTest({
+      connectionId: connection.id,
+      actorUserId: req.user!.userId,
+      correlationId: req.requestId ?? null,
+    });
+
+    const detail = await getAtsConnectionDetailForEmployer({
+      connectionId: connection.id,
+      employerId,
+      baseUrl: getBaseUrl(req),
+    });
+
+    res.json({
+      ...result,
+      connection: detail,
+    });
+  } catch (error) {
+    logger.error({ error }, "ATS connection test failed");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Connection test failed" });
+  }
+});
+
+router.post("/connections/:id/sync", async (req: Request, res: Response) => {
+  try {
+    const employerId = await getEmployerId(req.user!.userId);
+    if (!employerId) {
+      res.status(404).json({ error: "Employer profile not found" });
+      return;
+    }
+
+    const connection = await prisma.aTSConnection.findFirst({
+      where: { id: req.params.id, employerId },
+      select: { id: true },
+    });
+
+    if (!connection) {
+      res.status(404).json({ error: "ATS connection not found" });
+      return;
+    }
+
+    const result = await runAtsConnectionSync({
+      connectionId: connection.id,
+      actorUserId: req.user!.userId,
+      correlationId: req.requestId ?? null,
+      trigger: "MANUAL",
+      direction: "IMPORT",
+      syncType: "JOB_IMPORT",
+    });
+
+    res.json(result);
+  } catch (error) {
+    logger.error({ error }, "ATS sync failed");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to run ATS sync" });
+  }
+});
+
+router.post("/connections/:id/retry", async (req: Request, res: Response) => {
+  try {
+    const employerId = await getEmployerId(req.user!.userId);
+    if (!employerId) {
+      res.status(404).json({ error: "Employer profile not found" });
+      return;
+    }
+
+    const connection = await prisma.aTSConnection.findFirst({
+      where: { id: req.params.id, employerId },
+      select: { id: true },
+    });
+
+    if (!connection) {
+      res.status(404).json({ error: "ATS connection not found" });
+      return;
+    }
+
+    const result = await retryAtsConnectionSync({
+      connectionId: connection.id,
+      actorUserId: req.user!.userId,
+      correlationId: req.requestId ?? null,
+    });
+
+    res.json(result);
+  } catch (error) {
+    logger.error({ error }, "ATS retry failed");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to retry ATS sync" });
+  }
+});
+
+router.delete("/connections/:id", async (req: Request, res: Response) => {
+  try {
+    const employerId = await getEmployerId(req.user!.userId);
+    if (!employerId) {
+      res.status(404).json({ error: "Employer profile not found" });
+      return;
+    }
+
+    const connection = await prisma.aTSConnection.findFirst({
+      where: {
+        id: req.params.id,
+        employerId,
       },
     });
 
-    try {
-      const jobs = await fetchAtsJobs({
-        provider: connection.provider,
-        externalOrgId: connection.externalOrgId,
-        accessToken: decryptString(connection.encryptedAccessToken),
-      });
-
-      let createdJobs = 0;
-      let updatedJobs = 0;
-      let dedupedJobs = 0;
-
-      for (const job of jobs) {
-        const sourceId = `${connection.provider.toLowerCase()}-${job.externalId}`;
-        const existing = await prisma.job.findFirst({
-          where: {
-            employerId: employer.id,
-            sourceId,
-          },
-          select: { id: true, slug: true },
-        });
-
-        const data = {
-          title: job.title,
-          description: job.description || "Imported from ATS",
-          location: job.location || "Remote",
-          type: job.type || "FULL_TIME",
-          seniority: job.seniority || "Mid-level",
-          salaryMin: job.salaryMin,
-          salaryMax: job.salaryMax,
-          currency: job.currency,
-          tags: job.tags,
-          status: JobStatus.PUBLISHED,
-          publishedAt: job.postedAt || new Date(),
-          visaSponsorship: job.visaSponsorship,
-          relocationAssistance: job.relocationAssistance,
-          eligibleCountries: job.eligibleCountries,
-          jobSource: "EMPLOYER_POSTED" as const,
-          sourceUrl: job.sourceUrl,
-          sourceId,
-          sourceName: connection.provider,
-          expiresAt: job.expiresAt || null,
-          lastCheckedAt: new Date(),
-          isExpired: false,
-          employerId: employer.id,
-        };
-
-        if (existing) {
-          await prisma.job.update({
-            where: { id: existing.id },
-            data,
-          });
-          updatedJobs += 1;
-          continue;
-        }
-
-        const baseSlug = slugify(`${job.title}-${connection.provider.toLowerCase()}`);
-        const slug = await ensureUniqueSlug(baseSlug);
-        try {
-          await prisma.job.create({
-            data: {
-              ...data,
-              slug,
-            },
-          });
-          createdJobs += 1;
-        } catch {
-          dedupedJobs += 1;
-        }
-      }
-
-      await prisma.aTSConnection.update({
-        where: { id: connection.id },
-        data: {
-          lastSyncedAt: new Date(),
-          status: ATSConnectionStatus.ACTIVE,
-        },
-      });
-
-      await prisma.aTSSyncRun.update({
-        where: { id: syncRun.id },
-        data: {
-          status: ATSSyncStatus.SUCCESS,
-          finishedAt: new Date(),
-          pulledJobs: jobs.length,
-          createdJobs,
-          updatedJobs,
-          dedupedJobs,
-        },
-      });
-
-      res.json({
-        syncRunId: syncRun.id,
-        pulledJobs: jobs.length,
-        createdJobs,
-        updatedJobs,
-        dedupedJobs,
-      });
-    } catch (syncError) {
-      await prisma.aTSConnection.update({
-        where: { id: connection.id },
-        data: { status: ATSConnectionStatus.ERROR },
-      });
-
-      await prisma.aTSSyncRun.update({
-        where: { id: syncRun.id },
-        data: {
-          status: ATSSyncStatus.FAILED,
-          finishedAt: new Date(),
-          errorCount: 1,
-          errors: [{ message: syncError instanceof Error ? syncError.message : "Sync failed" }],
-        },
-      });
-
-      res.status(500).json({
-        error: syncError instanceof Error ? syncError.message : "ATS sync failed",
-      });
+    if (!connection) {
+      res.status(404).json({ error: "ATS connection not found" });
+      return;
     }
+
+    await prisma.aTSConnection.update({
+      where: { id: connection.id },
+      data: {
+        status: ATSConnectionStatus.DISCONNECTED,
+        healthStatus: "NEEDS_ATTENTION",
+      },
+    });
+
+    await createAtsAuditLog({
+      connectionId: connection.id,
+      actorUserId: req.user!.userId,
+      actionType: "CONNECTION_DISCONNECTED",
+      reasonCode: "ats_connection_disconnected",
+      summary: `Disconnected ${connection.provider} integration.`,
+    });
+
+    res.json({ message: "ATS connection disconnected" });
   } catch (error) {
-    logger.error({ error }, "ATS sync failed");
-    res.status(500).json({ error: "Failed to run ATS sync" });
+    logger.error({ error }, "Delete ATS connection failed");
+    res.status(500).json({ error: "Failed to disconnect ATS connection" });
   }
 });
 

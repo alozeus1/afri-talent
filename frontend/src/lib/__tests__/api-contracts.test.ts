@@ -1,5 +1,7 @@
 import {
+  adminAts,
   analyticsEventsApi,
+  ats,
   auth,
   billing,
   pricing,
@@ -89,5 +91,40 @@ describe("Frontend API contract builders", () => {
     await publicStats.get();
     const [url] = (global.fetch as jest.Mock).mock.calls[0] as [string];
     expect(url).toBe("http://localhost:4000/api/public/stats");
+  });
+
+  it("builds ATS credential save requests for employers", async () => {
+    await ats.createConnection({
+      provider: "LEVER",
+      externalOrgId: "acme",
+      accessToken: "token-12345678",
+      webhookSecret: "secret-123456",
+      webhookSyncEnabled: true,
+      twoWaySyncEnabled: true,
+      metadata: {
+        performAsUserId: "member-1",
+      },
+    });
+
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0] as [
+      string,
+      RequestInit & { body: string },
+    ];
+    expect(url).toBe("http://localhost:4000/api/ats/connections");
+    expect(options.method).toBe("POST");
+    expect(JSON.parse(options.body)).toEqual(
+      expect.objectContaining({
+        provider: "LEVER",
+        externalOrgId: "acme",
+        webhookSyncEnabled: true,
+        twoWaySyncEnabled: true,
+      }),
+    );
+  });
+
+  it("loads ATS fleet operations for admins", async () => {
+    await adminAts.dashboard();
+    const [url] = (global.fetch as jest.Mock).mock.calls[0] as [string];
+    expect(url).toBe("http://localhost:4000/api/admin/ats/dashboard");
   });
 });

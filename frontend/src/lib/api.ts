@@ -541,31 +541,67 @@ export const adminPartners = {
 };
 
 export const ats = {
+  dashboard: () => fetchAPI<EmployerAtsDashboard>("/api/ats/dashboard"),
   listConnections: () => fetchAPI<ATSConnection[]>("/api/ats/connections"),
   createConnection: (data: {
     provider: "GREENHOUSE" | "LEVER" | "WORKABLE";
     externalOrgId: string;
+    displayName?: string;
     accessToken?: string;
     refreshToken?: string;
+    webhookSecret?: string;
+    webhookSyncEnabled?: boolean;
+    twoWaySyncEnabled?: boolean;
     metadata?: Record<string, unknown>;
   }) => fetchAPI<ATSConnection>("/api/ats/connections", {
     method: "POST",
     body: JSON.stringify(data),
   }),
+  updateConnection: (id: string, data: {
+    externalOrgId?: string;
+    displayName?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    webhookSecret?: string;
+    clearAccessToken?: boolean;
+    clearRefreshToken?: boolean;
+    clearWebhookSecret?: boolean;
+    webhookSyncEnabled?: boolean;
+    twoWaySyncEnabled?: boolean;
+    metadata?: Record<string, unknown>;
+  }) => fetchAPI<ATSConnection>(`/api/ats/connections/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  }),
+  testConnection: (id: string) =>
+    fetchAPI<{
+      ok: boolean;
+      healthStatus: ATSHealthStatus;
+      sampleJobCount: number;
+      warnings: string[];
+      capabilities: ATSCapabilityState;
+      connection: ATSConnection | null;
+    }>(`/api/ats/connections/${id}/test`, {
+      method: "POST",
+    }),
+  connectionLogs: (id: string) =>
+    fetchAPI<ATSConnectionLogs>(`/api/ats/connections/${id}/logs`),
   disconnectConnection: (id: string) =>
     fetchAPI<{ message: string }>(`/api/ats/connections/${id}`, {
       method: "DELETE",
     }),
   syncConnection: (id: string) =>
-    fetchAPI<{
-      syncRunId: string;
-      pulledJobs: number;
-      createdJobs: number;
-      updatedJobs: number;
-      dedupedJobs: number;
-    }>(`/api/ats/connections/${id}/sync`, {
+    fetchAPI<ATSSyncRunResult>(`/api/ats/connections/${id}/sync`, {
       method: "POST",
     }),
+  retryConnection: (id: string) =>
+    fetchAPI<ATSSyncRunResult>(`/api/ats/connections/${id}/retry`, {
+      method: "POST",
+    }),
+};
+
+export const adminAts = {
+  dashboard: () => fetchAPI<AdminAtsDashboard>("/api/admin/ats/dashboard"),
 };
 
 export const mockInterviews = {
@@ -1675,22 +1711,249 @@ export interface EmployerAdvancedAnalytics {
 export interface ATSConnection {
   id: string;
   provider: "GREENHOUSE" | "LEVER" | "WORKABLE";
+  providerLabel: string;
+  displayName: string | null;
   externalOrgId: string;
   status: "ACTIVE" | "ERROR" | "DISCONNECTED";
+  healthStatus: ATSHealthStatus;
   metadata: Record<string, unknown> | null;
+  credentials: {
+    hasAccessToken: boolean;
+    hasRefreshToken: boolean;
+    hasWebhookSecret: boolean;
+  };
+  webhookSyncEnabled: boolean;
+  twoWaySyncEnabled: boolean;
   lastSyncedAt: string | null;
+  lastSuccessfulSyncAt: string | null;
+  lastConnectionTestAt: string | null;
+  lastConnectionTestOk: boolean | null;
+  lastWebhookAt: string | null;
+  lastErrorAt: string | null;
+  lastErrorMessage: string | null;
+  consecutiveFailures: number;
+  capabilities: ATSCapabilityState;
+  recentLogSummary: {
+    failedSyncRuns: number;
+    failedWebhookEvents: number;
+    pendingApplicationLinks: number;
+  };
   lastSyncRun: {
     id: string;
     status: "QUEUED" | "RUNNING" | "SUCCESS" | "PARTIAL" | "FAILED";
+    syncType: string;
+    direction: string;
+    trigger: string;
+    correlationId: string | null;
     startedAt: string;
     finishedAt: string | null;
     pulledJobs: number;
     createdJobs: number;
     updatedJobs: number;
     dedupedJobs: number;
+    processedEvents: number;
+    pushedCandidates: number;
+    updatedStages: number;
+    retryCount: number;
     errorCount: number;
+    warnings?: unknown;
+    errors?: unknown;
   } | null;
+  webhookUrl: string;
   createdAt: string;
+  updatedAt: string;
+}
+
+export type ATSHealthStatus = "HEALTHY" | "DEGRADED" | "DOWN" | "NEEDS_ATTENTION";
+
+export interface ATSCapabilityState {
+  provider: "GREENHOUSE" | "LEVER" | "WORKABLE";
+  label: string;
+  jobImportSupported: boolean;
+  jobImportReady: boolean;
+  webhookSupported: boolean;
+  webhookReady: boolean;
+  stageWritebackSupported: boolean;
+  stageWritebackReady: boolean;
+  notes: string[];
+}
+
+export interface ATSSyncRunResult {
+  syncRunId: string;
+  pulledJobs: number;
+  createdJobs: number;
+  updatedJobs: number;
+  dedupedJobs: number;
+}
+
+export interface ATSSyncRunItem {
+  id: string;
+  connectionId: string;
+  status: "QUEUED" | "RUNNING" | "SUCCESS" | "PARTIAL" | "FAILED";
+  syncType: string;
+  direction: string;
+  trigger: string;
+  correlationId: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  pulledJobs: number;
+  createdJobs: number;
+  updatedJobs: number;
+  dedupedJobs: number;
+  processedEvents: number;
+  pushedCandidates: number;
+  updatedStages: number;
+  retryCount: number;
+  errorCount: number;
+  cursor: string | null;
+  errors: unknown;
+  warnings: unknown;
+  metadata: unknown;
+}
+
+export interface ATSWebhookEventItem {
+  id: string;
+  connectionId: string;
+  provider: "GREENHOUSE" | "LEVER" | "WORKABLE";
+  eventType: string;
+  eventKey: string | null;
+  status: "RECEIVED" | "PROCESSED" | "IGNORED" | "FAILED";
+  httpHeaders: Record<string, unknown> | null;
+  payload: unknown;
+  errorMessage: string | null;
+  metadata: Record<string, unknown> | null;
+  receivedAt: string;
+  processedAt: string | null;
+}
+
+export interface ATSAuditLogItem {
+  id: string;
+  connectionId: string;
+  actorUserId: string | null;
+  actionType: string;
+  reasonCode: string | null;
+  summary: string;
+  syncRunId: string | null;
+  webhookEventId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface ATSApplicationLinkItem {
+  id: string;
+  connectionId: string;
+  applicationId: string;
+  externalJobId: string | null;
+  externalApplicationId: string | null;
+  externalCandidateId: string | null;
+  externalStageId: string | null;
+  externalStageName: string | null;
+  status: "PENDING" | "SYNCED" | "FAILED" | "MANUAL_REVIEW";
+  lastOutboundSyncAt: string | null;
+  lastInboundSyncAt: string | null;
+  lastSyncError: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+  application: {
+    id: string;
+    status: string;
+    candidate: {
+      id: string;
+      name: string;
+      email: string;
+    };
+    job: {
+      id: string;
+      title: string;
+      slug: string;
+    };
+  };
+}
+
+export interface ATSConnectionLogs {
+  connection: ATSConnection;
+  syncRuns: ATSSyncRunItem[];
+  webhookEvents: ATSWebhookEventItem[];
+  auditLogs: ATSAuditLogItem[];
+  applicationLinks: {
+    stats: {
+      total: number;
+      synced: number;
+      pending: number;
+      manualReview: number;
+      failed: number;
+    };
+    recent: ATSApplicationLinkItem[];
+  };
+}
+
+export interface EmployerAtsDashboard {
+  summary: {
+    totalConnections: number;
+    healthyConnections: number;
+    degradedConnections: number;
+    downConnections: number;
+    needsAttentionConnections: number;
+    webhookEnabledConnections: number;
+    twoWayEnabledConnections: number;
+    failedSyncRuns: number;
+    failedWebhookEvents: number;
+  };
+  providerBreakdown: Array<{
+    provider: "GREENHOUSE" | "LEVER" | "WORKABLE";
+    label?: string;
+    total: number;
+    healthy: number;
+    degraded: number;
+    down: number;
+    needsAttention: number;
+  }>;
+  connections: ATSConnection[];
+}
+
+export interface AdminAtsDashboard extends EmployerAtsDashboard {
+  summary: EmployerAtsDashboard["summary"] & {
+    failedSyncRunsLast7Days: number;
+    failedWebhooksLast7Days: number;
+  };
+  connections: Array<ATSConnection & {
+    employer: {
+      id: string;
+      companyName: string;
+      user: {
+        id: string;
+        email: string;
+        name: string;
+      };
+    };
+  }>;
+  recentFailedSyncs: Array<ATSSyncRunItem & {
+    connection: {
+      id: string;
+      provider: "GREENHOUSE" | "LEVER" | "WORKABLE";
+      employer: {
+        companyName: string;
+        user: {
+          email: string;
+          name: string;
+        };
+      };
+    };
+  }>;
+  recentFailedWebhooks: Array<ATSWebhookEventItem & {
+    connection: {
+      id: string;
+      provider: "GREENHOUSE" | "LEVER" | "WORKABLE";
+      employer: {
+        companyName: string;
+        user: {
+          email: string;
+          name: string;
+        };
+      };
+    };
+  }>;
 }
 
 export interface MockInterviewArtifact {

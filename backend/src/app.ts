@@ -55,6 +55,7 @@ import resumeParserRoutes from "./routes/resume-parser.js";
 import pushRoutes from "./routes/push.js";
 import preferencesRoutes from "./routes/preferences.js";
 import atsRoutes from "./routes/ats.js";
+import atsWebhookRoutes from "./routes/ats-webhooks.js";
 import mockInterviewsRoutes from "./routes/mock-interviews.js";
 import analyticsEventsRoutes from "./routes/analytics-events.js";
 import socialRoutes from "./routes/social.js";
@@ -64,6 +65,7 @@ import employerAiRoutes from "./routes/employer-ai.js";
 import botsRoutes from "./routes/bots.js";
 import trustRoutes from "./routes/trust.js";
 import adminTrustRoutes from "./routes/admin-trust.js";
+import adminAtsRoutes from "./routes/admin-ats.js";
 import { swaggerSpec } from "./lib/swagger.js";
 
 dotenv.config({ quiet: true });
@@ -151,6 +153,7 @@ app.use(generalLimiter);
 // Stripe webhook — MUST be registered BEFORE express.json().
 // Stripe signature verification requires the raw request body bytes.
 app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoutes);
+app.use("/api/ats/webhooks", express.raw({ type: "application/json" }), atsWebhookRoutes);
 
 // Body parsing with size limits (all other routes)
 app.use(express.json({ limit: "10kb" }));
@@ -277,6 +280,7 @@ app.use("/api/jobs", jobsRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/resources", resourcesRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/admin/ats", adminAtsRoutes);
 app.use("/api/admin/billing", adminBillingRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/files", filesRoutes);
