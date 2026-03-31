@@ -13,6 +13,20 @@ jobs:
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: afritalent
+          POSTGRES_PASSWORD: afritalent_test
+          POSTGRES_DB: afritalent_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: ./backend
@@ -30,11 +44,16 @@ jobs:
       - name: Generate Prisma Client
         run: npx prisma generate
 
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://afritalent:afritalent_test@localhost:5432/afritalent_test
+
       - name: Run tests
         run: npx vitest run
         env:
           MOCK_AI: "1"
-          DATABASE_URL: postgresql://x:x@localhost:5432/x
+          DATABASE_URL: postgresql://afritalent:afritalent_test@localhost:5432/afritalent_test
 
   backend-typecheck:
     name: Backend Typecheck
