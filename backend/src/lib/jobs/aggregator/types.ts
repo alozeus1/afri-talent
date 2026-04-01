@@ -66,6 +66,9 @@ export type JobSource =
   | "TURING"
   | "TOPTAL"
   | "ANDELA"
+  | "GREENHOUSE"
+  | "LEVER"
+  | "WORKABLE"
   // Direct Company Feeds
   | "COMPANY_RSS"
   | "COMPANY_API"

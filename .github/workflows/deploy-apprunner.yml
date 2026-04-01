@@ -1,6 +1,8 @@
-name: Deploy App Runner (Cost-Effective)
+name: Deploy Shared Environment (App Runner)
 
 on:
+  push:
+    branches: [develop]
   workflow_dispatch:
     inputs:
       environment:
@@ -13,7 +15,7 @@ on:
           - prod
 
 concurrency:
-  group: deploy-${{ inputs.environment }}
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
   cancel-in-progress: true
 
 permissions:
@@ -23,6 +25,7 @@ permissions:
 env:
   AWS_REGION: us-east-1
   ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+  DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
 
 jobs:
   provision-infra:
@@ -43,8 +46,8 @@ jobs:
 
       - name: Bootstrap Terraform state backend
         env:
-          BUCKET: afritalent-${{ vars.AWS_ACCOUNT_ID }}-${{ inputs.environment }}-terraform-state
-          TABLE: afritalent-${{ vars.AWS_ACCOUNT_ID }}-${{ inputs.environment }}-terraform-locks
+          BUCKET: afritalent-${{ vars.AWS_ACCOUNT_ID }}-${{ env.DEPLOY_ENV }}-terraform-state
+          TABLE: afritalent-${{ vars.AWS_ACCOUNT_ID }}-${{ env.DEPLOY_ENV }}-terraform-locks
         run: |
           if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
             echo "Creating S3 state bucket: $BUCKET"
@@ -71,13 +74,13 @@ jobs:
 
       - name: Terraform Init
         working-directory: infra/terraform
-        run: terraform init -backend-config=envs/${{ inputs.environment }}/backend.config
+        run: terraform init -backend-config=envs/${{ env.DEPLOY_ENV }}/backend.config
 
       - name: Terraform Apply Base Infrastructure
         working-directory: infra/terraform
         run: |
           terraform apply -auto-approve \
-            -var-file=envs/${{ inputs.environment }}/terraform.tfvars \
+            -var-file=envs/${{ env.DEPLOY_ENV }}/terraform.tfvars \
             -target=random_password.db \
             -target=random_password.jwt \
             -target=module.network \
@@ -89,7 +92,7 @@ jobs:
 
       - name: Hydrate runtime secrets
         env:
-          SECRET_NAME: afritalent-${{ inputs.environment }}/app-secrets
+          SECRET_NAME: afritalent-${{ env.DEPLOY_ENV }}/app-secrets
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
           BACKEND_SENTRY_DSN: ${{ secrets.BACKEND_SENTRY_DSN }}
@@ -112,14 +115,18 @@ jobs:
             --arg stripeWebhook "$STRIPE_WEBHOOK_SECRET" \
             --arg adzunaId "$ADZUNA_APP_ID" \
             --arg adzunaKey "$ADZUNA_API_KEY" \
-            '$current + {
-              ANTHROPIC_API_KEY: $anthropic,
-              REDIS_URL: $redis,
-              SENTRY_DSN: $sentry,
-              STRIPE_SECRET_KEY: $stripe,
-              STRIPE_WEBHOOK_SECRET: $stripeWebhook,
-              ADZUNA_APP_ID: $adzunaId,
-              ADZUNA_API_KEY: $adzunaKey
+            '
+            def prefer_input($value; $key):
+              if ($value | length) > 0 then $value else ($current[$key] // "") end;
+
+            $current + {
+              ANTHROPIC_API_KEY: prefer_input($anthropic; "ANTHROPIC_API_KEY"),
+              REDIS_URL: prefer_input($redis; "REDIS_URL"),
+              SENTRY_DSN: prefer_input($sentry; "SENTRY_DSN"),
+              STRIPE_SECRET_KEY: prefer_input($stripe; "STRIPE_SECRET_KEY"),
+              STRIPE_WEBHOOK_SECRET: prefer_input($stripeWebhook; "STRIPE_WEBHOOK_SECRET"),
+              ADZUNA_APP_ID: prefer_input($adzunaId; "ADZUNA_APP_ID"),
+              ADZUNA_API_KEY: prefer_input($adzunaKey; "ADZUNA_API_KEY")
             }')
 
           aws secretsmanager put-secret-value \
@@ -148,7 +155,7 @@ jobs:
 
       - name: Build and push backend
         env:
-          ECR_REPOSITORY: afritalent-${{ inputs.environment }}-backend
+          ECR_REPOSITORY: afritalent-${{ env.DEPLOY_ENV }}-backend
           IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
@@ -158,21 +165,21 @@ jobs:
 
       - name: Build and push initial frontend
         env:
-          ECR_REPOSITORY: afritalent-${{ inputs.environment }}-frontend
+          ECR_REPOSITORY: afritalent-${{ env.DEPLOY_ENV }}-frontend
           IMAGE_TAG: ${{ github.sha }}
           NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: |
-          if [ "${{ inputs.environment }}" = "prod" ]; then
+          if [ "${{ env.DEPLOY_ENV }}" = "prod" ]; then
             FALLBACK_API_URL="https://api.afri-talent.com"
           else
-            FALLBACK_API_URL="https://api.${{ inputs.environment }}.afri-talent.com"
+            FALLBACK_API_URL="https://api.${{ env.DEPLOY_ENV }}.afri-talent.com"
           fi
 
           EXISTING_SERVICE_URL=$(aws apprunner list-services \
-            --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-appr-backend-managed'].ServiceUrl" \
+            --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-backend-managed'].ServiceUrl" \
             --output text)
 
           if [ -n "$EXISTING_SERVICE_URL" ] && [ "$EXISTING_SERVICE_URL" != "None" ]; then
@@ -220,11 +227,29 @@ jobs:
 
       - name: Terraform Init
         working-directory: infra/terraform
-        run: terraform init -backend-config=envs/${{ inputs.environment }}/backend.config
+        run: terraform init -backend-config=envs/${{ env.DEPLOY_ENV }}/backend.config
+
+      - name: Import existing App Runner services into Terraform state
+        working-directory: infra/terraform
+        run: |
+          BACKEND_ARN=$(aws apprunner list-services \
+            --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-backend-managed'].ServiceArn | [0]" \
+            --output text)
+          FRONTEND_ARN=$(aws apprunner list-services \
+            --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-frontend-managed'].ServiceArn | [0]" \
+            --output text)
+
+          if [ "$BACKEND_ARN" != "None" ] && ! terraform state show module.apprunner.aws_apprunner_service.backend >/dev/null 2>&1; then
+            terraform import -var-file=envs/${{ env.DEPLOY_ENV }}/terraform.tfvars module.apprunner.aws_apprunner_service.backend "$BACKEND_ARN"
+          fi
+
+          if [ "$FRONTEND_ARN" != "None" ] && ! terraform state show module.apprunner.aws_apprunner_service.frontend >/dev/null 2>&1; then
+            terraform import -var-file=envs/${{ env.DEPLOY_ENV }}/terraform.tfvars module.apprunner.aws_apprunner_service.frontend "$FRONTEND_ARN"
+          fi
 
       - name: Terraform Apply Full Stack
         working-directory: infra/terraform
-        run: terraform apply -auto-approve -var-file=envs/${{ inputs.environment }}/terraform.tfvars
+        run: terraform apply -auto-approve -var-file=envs/${{ env.DEPLOY_ENV }}/terraform.tfvars
 
       - name: Capture Terraform outputs
         id: outputs
@@ -237,7 +262,7 @@ jobs:
         working-directory: infra/terraform
         run: |
           terraform apply -auto-approve \
-            -var-file=envs/${{ inputs.environment }}/terraform.tfvars \
+            -var-file=envs/${{ env.DEPLOY_ENV }}/terraform.tfvars \
             -var="frontend_public_url_override=${{ steps.outputs.outputs.frontend_url }}"
 
   deploy-apprunner:
@@ -262,7 +287,7 @@ jobs:
 
       - name: Build and push final frontend
         env:
-          ECR_REPOSITORY: afritalent-${{ inputs.environment }}-frontend
+          ECR_REPOSITORY: afritalent-${{ env.DEPLOY_ENV }}-frontend
           IMAGE_TAG: ${{ github.sha }}
           NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -285,8 +310,8 @@ jobs:
       - name: Get App Runner service ARNs
         id: services
         run: |
-          BACKEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-appr-backend-managed'].ServiceArn" --output text)
-          FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ inputs.environment }}-appr-frontend-managed'].ServiceArn" --output text)
+          BACKEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-backend-managed'].ServiceArn" --output text)
+          FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-frontend-managed'].ServiceArn" --output text)
           echo "backend_arn=$BACKEND_ARN" >> "$GITHUB_OUTPUT"
           echo "frontend_arn=$FRONTEND_ARN" >> "$GITHUB_OUTPUT"
 
@@ -360,6 +385,6 @@ jobs:
         run: |
           echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ env.DEPLOY_ENV }}" >> $GITHUB_STEP_SUMMARY
           echo "**Backend URL:** ${{ needs.finalize-infra.outputs.backend_url }}" >> $GITHUB_STEP_SUMMARY
           echo "**Frontend URL:** ${{ needs.finalize-infra.outputs.frontend_url }}" >> $GITHUB_STEP_SUMMARY

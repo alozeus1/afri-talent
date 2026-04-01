@@ -14,13 +14,11 @@
 
 ## Environments
 
-- `dev`: continuous deployment from `develop`
-- `staging`: pre-production validation
+- `staging`: shared testing, QA, and UAT environment with deployment from `develop`
 - `prod`: production deployment
 
 Terraform environment files:
 
-- `infra/terraform/envs/dev`
 - `infra/terraform/envs/staging`
 - `infra/terraform/envs/prod`
 
@@ -82,7 +80,6 @@ Primary workflows:
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/terraform.yml`
-- `.github/workflows/deploy-dev.yml`
 - `.github/workflows/deploy-apprunner.yml`
 
 ## Required GitHub Settings

@@ -6,6 +6,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { authenticate, authorize } from "../middleware/auth.js";
 import prisma from "../lib/prisma.js";
+import { buildPreferenceContext, buildJobSearchWhere, fetchRankedJobs } from "../lib/jobs/search.js";
 
 const router = Router();
 
@@ -171,7 +172,7 @@ async function countMatchingJobs(search: {
   remoteOnly: boolean;
   visaSponsorship: boolean;
 }): Promise<number> {
-  const where = buildSearchWhere(search);
+  const where = buildJobSearchWhere(toJobSearchFilters(search));
   return prisma.job.count({ where });
 }
 
@@ -189,27 +190,16 @@ async function findMatchingJobs(
   page: number,
   limit: number
 ) {
-  const where = buildSearchWhere(search);
-
-  const [jobs, total] = await Promise.all([
-    prisma.job.findMany({
-      where,
-      orderBy: { publishedAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        employer: {
-          select: { companyName: true },
-        },
-      },
-    }),
-    prisma.job.count({ where }),
-  ]);
-
-  return { jobs, total };
+  const filters = toJobSearchFilters(search);
+  return fetchRankedJobs({
+    where: buildJobSearchWhere(filters),
+    page,
+    limit,
+    preferenceContext: buildPreferenceContext(filters),
+  });
 }
 
-function buildSearchWhere(search: {
+function toJobSearchFilters(search: {
   keywords: string[];
   locations: string[];
   jobTypes: string[];
@@ -219,58 +209,16 @@ function buildSearchWhere(search: {
   remoteOnly: boolean;
   visaSponsorship: boolean;
 }) {
-  const conditions: Record<string, unknown>[] = [{ status: "PUBLISHED" }];
-
-  if (search.keywords.length > 0) {
-    conditions.push({
-      OR: search.keywords.map((kw) => ({
-        OR: [
-          { title: { contains: kw, mode: "insensitive" } },
-          { description: { contains: kw, mode: "insensitive" } },
-          { tags: { has: kw.toLowerCase() } },
-        ],
-      })),
-    });
-  }
-
-  if (search.locations.length > 0) {
-    conditions.push({
-      OR: search.locations.map((loc) => ({
-        location: { contains: loc, mode: "insensitive" },
-      })),
-    });
-  }
-
-  if (search.jobTypes.length > 0) {
-    conditions.push({ type: { in: search.jobTypes } });
-  }
-
-  if (search.seniorities.length > 0) {
-    conditions.push({ seniority: { in: search.seniorities } });
-  }
-
-  if (search.salaryMin) {
-    conditions.push({ salaryMax: { gte: search.salaryMin } });
-  }
-
-  if (search.salaryMax) {
-    conditions.push({ salaryMin: { lte: search.salaryMax } });
-  }
-
-  if (search.remoteOnly) {
-    conditions.push({
-      OR: [
-        { location: { contains: "remote", mode: "insensitive" } },
-        { type: { contains: "remote", mode: "insensitive" } },
-      ],
-    });
-  }
-
-  if (search.visaSponsorship) {
-    conditions.push({ visaSponsorship: "YES" });
-  }
-
-  return { AND: conditions };
+  return {
+    search: search.keywords.join(" ").trim() || undefined,
+    location: search.locations[0] || undefined,
+    type: search.jobTypes[0] || undefined,
+    seniority: search.seniorities[0] || undefined,
+    salaryMin: search.salaryMin ?? null,
+    salaryMax: search.salaryMax ?? null,
+    remote: search.remoteOnly,
+    visaSponsorship: search.visaSponsorship ? "YES" : undefined,
+  };
 }
 
 export default router;

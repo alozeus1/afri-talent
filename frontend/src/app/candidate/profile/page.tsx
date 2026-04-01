@@ -3,7 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { profile } from "@/lib/api";
+import {
+  CandidateCertificationItem,
+  CandidateEducationItem,
+  CandidateWorkHistoryItem,
+  profile,
+} from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,6 +110,9 @@ export default function CandidateProfilePage() {
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [githubUrl, setGithubUrl] = useState("");
   const [portfolioUrl, setPortfolioUrl] = useState("");
+  const [workHistory, setWorkHistory] = useState<CandidateWorkHistoryItem[]>([]);
+  const [educationHistory, setEducationHistory] = useState<CandidateEducationItem[]>([]);
+  const [certifications, setCertifications] = useState<CandidateCertificationItem[]>([]);
   const [openToWork, setOpenToWork] = useState(false);
   const [completeness, setCompleteness] = useState(0);
 
@@ -130,6 +138,9 @@ export default function CandidateProfilePage() {
         setLinkedinUrl(data.linkedinUrl || "");
         setGithubUrl(data.githubUrl || "");
         setPortfolioUrl(data.portfolioUrl || "");
+        setWorkHistory(data.workHistory || []);
+        setEducationHistory(data.educationHistory || []);
+        setCertifications(data.certifications || []);
         setOpenToWork(data.openToWork);
         setCompleteness(data.profileCompleteness);
       }
@@ -168,6 +179,9 @@ export default function CandidateProfilePage() {
         linkedinUrl: linkedinUrl || null,
         githubUrl: githubUrl || null,
         portfolioUrl: portfolioUrl || null,
+        workHistory,
+        educationHistory,
+        certifications,
         openToWork,
       });
       setCompleteness(updated.profileCompleteness);
@@ -180,6 +194,30 @@ export default function CandidateProfilePage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateWorkHistory = (index: number, field: keyof CandidateWorkHistoryItem, value: string) => {
+    setWorkHistory((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    );
+  };
+
+  const updateEducationHistory = (index: number, field: keyof CandidateEducationItem, value: string) => {
+    setEducationHistory((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    );
+  };
+
+  const updateCertification = (index: number, field: keyof CandidateCertificationItem, value: string) => {
+    setCertifications((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    );
   };
 
   if (isLoading || !user) {
@@ -362,6 +400,220 @@ export default function CandidateProfilePage() {
               placeholder="e.g. EU Citizen, H1B, etc."
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Work History</h2>
+              <p className="text-sm text-gray-500">
+                Structured roles make your profile more credible and easier for employers to review.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setWorkHistory((current) => [
+                  ...current,
+                  { company: "", title: "", period: "", description: "" },
+                ])
+              }
+            >
+              Add role
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {workHistory.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+              No structured work history yet. Add recent roles with clear titles, employers, and dates.
+            </div>
+          ) : (
+            workHistory.map((item, index) => (
+              <div key={`work-${index}`} className="rounded-2xl border border-gray-200 p-4 space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-sm font-semibold text-gray-900">Role {index + 1}</p>
+                  <button
+                    type="button"
+                    onClick={() => setWorkHistory((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                    className="text-sm font-medium text-red-600 hover:text-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Input
+                    label="Job title"
+                    value={item.title || ""}
+                    onChange={(event) => updateWorkHistory(index, "title", event.target.value)}
+                    placeholder="Senior Product Designer"
+                  />
+                  <Input
+                    label="Company"
+                    value={item.company || ""}
+                    onChange={(event) => updateWorkHistory(index, "company", event.target.value)}
+                    placeholder="AfriTalent"
+                  />
+                  <Input
+                    label="Period"
+                    value={item.period || ""}
+                    onChange={(event) => updateWorkHistory(index, "period", event.target.value)}
+                    placeholder="2022 - Present"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Highlights
+                  </label>
+                  <textarea
+                    value={item.description || ""}
+                    onChange={(event) => updateWorkHistory(index, "description", event.target.value)}
+                    rows={3}
+                    placeholder="What did you ship, improve, or own in this role?"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors resize-none"
+                  />
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Education</h2>
+              <p className="text-sm text-gray-500">
+                Add universities, bootcamps, or formal training so partner and credential checks have context.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setEducationHistory((current) => [
+                  ...current,
+                  { institution: "", degree: "", period: "" },
+                ])
+              }
+            >
+              Add education
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {educationHistory.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+              No education history yet.
+            </div>
+          ) : (
+            educationHistory.map((item, index) => (
+              <div key={`education-${index}`} className="rounded-2xl border border-gray-200 p-4 space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-sm font-semibold text-gray-900">Education {index + 1}</p>
+                  <button
+                    type="button"
+                    onClick={() => setEducationHistory((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                    className="text-sm font-medium text-red-600 hover:text-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Input
+                    label="Institution"
+                    value={item.institution || ""}
+                    onChange={(event) => updateEducationHistory(index, "institution", event.target.value)}
+                    placeholder="University of Ghana"
+                  />
+                  <Input
+                    label="Degree or program"
+                    value={item.degree || ""}
+                    onChange={(event) => updateEducationHistory(index, "degree", event.target.value)}
+                    placeholder="BSc Computer Science"
+                  />
+                  <Input
+                    label="Period"
+                    value={item.period || ""}
+                    onChange={(event) => updateEducationHistory(index, "period", event.target.value)}
+                    placeholder="2018 - 2022"
+                  />
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Certifications</h2>
+              <p className="text-sm text-gray-500">
+                Add certifications here, then verify them from your trust profile with a document or credential link.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setCertifications((current) => [
+                  ...current,
+                  { name: "", issuer: "", credentialUrl: "" },
+                ])
+              }
+            >
+              Add certification
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {certifications.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+              No certifications added yet.
+            </div>
+          ) : (
+            certifications.map((item, index) => (
+              <div key={`certification-${index}`} className="rounded-2xl border border-gray-200 p-4 space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-sm font-semibold text-gray-900">Certification {index + 1}</p>
+                  <button
+                    type="button"
+                    onClick={() => setCertifications((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                    className="text-sm font-medium text-red-600 hover:text-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Input
+                    label="Certification"
+                    value={item.name || ""}
+                    onChange={(event) => updateCertification(index, "name", event.target.value)}
+                    placeholder="AWS Certified Developer"
+                  />
+                  <Input
+                    label="Issuer"
+                    value={item.issuer || ""}
+                    onChange={(event) => updateCertification(index, "issuer", event.target.value)}
+                    placeholder="Amazon Web Services"
+                  />
+                  <Input
+                    label="Credential URL"
+                    type="url"
+                    value={item.credentialUrl || ""}
+                    onChange={(event) => updateCertification(index, "credentialUrl", event.target.value)}
+                    placeholder="https://credential.example"
+                  />
+                </div>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
 

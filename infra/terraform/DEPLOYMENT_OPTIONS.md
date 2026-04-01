@@ -7,7 +7,7 @@ This infrastructure supports two deployment modes:
 | Mode | Monthly Cost | Best For |
 |------|-------------|----------|
 | **ECS Fargate** (default) | ~$150-200 | Production, high traffic |
-| **App Runner** | ~$30-50 | Staging, dev, low traffic |
+| **App Runner** | ~$30-50 | Staging, QA/UAT, low traffic |
 
 ## Current Configuration
 
@@ -31,8 +31,8 @@ mv main-apprunner.tf.disabled main-apprunner.tf
 
 # Re-initialize and apply
 terraform init
-terraform plan -var-file=envs/dev/terraform.tfvars
-terraform apply -var-file=envs/dev/terraform.tfvars
+terraform plan -var-file=envs/staging/terraform.tfvars
+terraform apply -var-file=envs/staging/terraform.tfvars
 ```
 
 ## Switching Back to ECS
@@ -47,8 +47,8 @@ mv main-apprunner.tf main-apprunner.tf.disabled
 mv main-ecs.tf.disabled main.tf
 
 terraform init
-terraform plan -var-file=envs/dev/terraform.tfvars
-terraform apply -var-file=envs/dev/terraform.tfvars
+terraform plan -var-file=envs/staging/terraform.tfvars
+terraform apply -var-file=envs/staging/terraform.tfvars
 ```
 
 ## Cost Breakdown

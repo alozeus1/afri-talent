@@ -2,6 +2,16 @@
 
 A full-stack MVP application connecting African tech talent with global opportunities.
 
+## Deployment State Start Here
+
+For the current live deployment state, staging URLs, AWS resource names, recovery steps, and troubleshooting workflow, read [STAGING_RUNBOOK.md](./STAGING_RUNBOOK.md) first.
+
+Agent-specific pointers:
+
+- Codex: reads [AGENTS.md](./AGENTS.md)
+- Claude: reads [CLAUDE.md](./CLAUDE.md)
+- Droid or other agents: start with [STAGING_RUNBOOK.md](./STAGING_RUNBOOK.md)
+
 ---
 
 ## MVP Scope (LOCKED)
@@ -252,11 +262,37 @@ afri-tech/
 | `JWT_SECRET` | Secret for signing JWTs |
 | `FRONTEND_URL` | Frontend origin for CORS |
 | `PORT` | Server port (default: 4000) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Enable Google OAuth |
+| `APPLE_CLIENT_ID` / `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` | Enable Apple OAuth |
+| `SES_FROM_EMAIL` | Sender used for email verification/reset emails |
+| `ENABLE_API_DOCS` | Set `true` to expose `/api/docs` in production |
+| `PHASE4_SOCIAL_ENABLED` | Enable social graph/profile endpoints (`/api/social/*`) |
+| `PHASE4_SALARY_NEGOTIATION_ENABLED` | Enable salary negotiation assistant (`/api/salary-negotiation/*`) |
+| `PHASE4_UNIVERSITY_API_ENABLED` | Enable university partner API (`/api/university-partners/*`) |
+| `PHASE4_EMPLOYER_AI_ENABLED` | Enable employer AI tools (`/api/employer/ai/*`) |
+| `PHASE4_BOTS_ENABLED` | Enable WhatsApp/Telegram bot integration routes (`/api/bots/*`) |
+| `BOT_WEBHOOK_SECRET` | Shared secret for inbound bot webhook calls |
 
 **Frontend (required):**
 | Variable | Description |
 |----------|-------------|
 | `NEXT_PUBLIC_API_URL` | Backend API URL |
+| `NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS` | Show seeded demo credentials in local/non-prod UI |
+
+## Additional Docs
+
+- OpenAPI/Swagger: `GET /api/docs` and raw spec at `GET /api/docs/spec.json`
+- Google for Jobs validation playbook: [docs/GOOGLE_FOR_JOBS_VALIDATION.md](./docs/GOOGLE_FOR_JOBS_VALIDATION.md)
+- Phase 3 technical design: [docs/PHASE3_TECHNICAL_DESIGN.md](./docs/PHASE3_TECHNICAL_DESIGN.md)
+- Phase 3 analytics event model: [docs/PHASE3_ANALYTICS_EVENT_MODEL.md](./docs/PHASE3_ANALYTICS_EVENT_MODEL.md)
+- Phase 3 billing localization plan: [docs/PHASE3_BILLING_LOCALIZATION_PLAN.md](./docs/PHASE3_BILLING_LOCALIZATION_PLAN.md)
+- Phase 3 phased rollout plan: [docs/PHASE3_ROLLOUT_PLAN.md](./docs/PHASE3_ROLLOUT_PLAN.md)
+- Phase 4 moat architecture and API contracts: [docs/PHASE4_MOAT_ARCHITECTURE.md](./docs/PHASE4_MOAT_ARCHITECTURE.md)
+- QA test matrix (Phase 1/2): [docs/qa/PHASE12_TEST_PLAN_MATRIX.md](./docs/qa/PHASE12_TEST_PLAN_MATRIX.md)
+- QA manual checklist (Phase 1/2): [docs/qa/PHASE12_MANUAL_QA_CHECKLIST.md](./docs/qa/PHASE12_MANUAL_QA_CHECKLIST.md)
+- QA bug severity rubric: [docs/qa/BUG_SEVERITY_RUBRIC.md](./docs/qa/BUG_SEVERITY_RUBRIC.md)
+- QA release readiness report: [docs/qa/PHASE12_RELEASE_READINESS_REPORT.md](./docs/qa/PHASE12_RELEASE_READINESS_REPORT.md)
+- QA go/no-go checklist: [docs/qa/GO_NO_GO_CHECKLIST.md](./docs/qa/GO_NO_GO_CHECKLIST.md)
 
 
    •  Frontend: http://localhost:3000

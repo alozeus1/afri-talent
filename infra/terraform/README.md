@@ -9,11 +9,11 @@ This Terraform stack provisions the active AWS deployment path for AfriTalent:
 - ECR repositories for application images
 - AWS Secrets Manager for application runtime secrets
 - S3 uploads bucket with KMS encryption
+- CloudWatch dashboards, alarms, log-derived operational metrics, and synthetic public journey monitoring
 - GitHub Actions OIDC role for CI/CD
 
 ### Environment Layout
 
-- `envs/dev`
 - `envs/staging`
 - `envs/prod`
 
@@ -58,8 +58,8 @@ terraform output -raw github_actions_role_arn
 
 ### CI/CD
 
-- `deploy-dev.yml` handles continuous deployment for `dev`
-- `deploy-apprunner.yml` handles manual `staging` and `prod` deployments
+- `deploy-apprunner.yml` auto-deploys `staging` from `develop`
+- `deploy-apprunner.yml` also supports manual `staging` and `prod` deployments
 - `terraform.yml` validates and plans Terraform changes
 
 ### GitHub Configuration
@@ -78,6 +78,8 @@ Required variables:
 ### Health Verification
 
 ```bash
+curl https://api.staging.afri-talent.com/health
+curl https://staging.afri-talent.com
 curl https://api.afri-talent.com/health
 curl https://api.afri-talent.com/api/health
 curl https://afri-talent.com
@@ -88,3 +90,5 @@ curl https://afri-talent.com
 - The frontend build bakes `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_BACKEND_URL`.
 - The backend supports both `/health` and `/api/health` for direct and path-prefixed probes.
 - If the backend needs both private RDS access and public internet egress, keep NAT enabled.
+- Monitoring resources are defined in `monitoring-apprunner.tf`.
+- Operational docs live in `docs/ops/` and `docs/runbooks/`.

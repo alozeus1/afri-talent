@@ -31,12 +31,14 @@ Seeded credentials (used by fixtures):
 ```bash
 # From the frontend/ directory:
 
-# All suites (backend must be running)
+# All suites (backend + frontend must be running)
 npm run test:e2e
 
 # Single suite
 npx playwright test gate-a-security
 npx playwright test gate-b-schema
+npx playwright test phase2-quality-api
+npx playwright test ui-phase2-regression
 
 # Interactive UI mode
 npm run test:e2e:ui
@@ -84,3 +86,21 @@ Verifies the Gate B domain schema routes:
 - `GET /api/billing/status` — FREE plan returned for seeded user
 - `POST /api/billing/checkout` — validation (missing/invalid plan)
 - Health (`/health`, `/live`) probes
+
+### `phase2-quality-api.spec.ts`
+
+Post-Phase 1/2 API journey validation:
+- candidate and employer lifecycle smoke journeys
+- pricing localization + analytics + hero stats
+- webhook signature and tamper-resilience checks
+- OpenAPI docs and OAuth provider discovery
+
+### `ui-phase2-regression.spec.ts`
+
+Desktop + mobile UX and visual resilience:
+- homepage skeleton + dark mode toggle
+- jobs list skeleton + JobPosting schema on detail pages
+- multilingual route behavior
+- custom 404 page behavior
+- keyboard focus and mobile drawer accessibility checks
+- low-bandwidth resilience smoke

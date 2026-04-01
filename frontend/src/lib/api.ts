@@ -32,6 +32,31 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
   return response.json();
 }
 
+async function fetchMultipartAPI<T>(endpoint: string, options: Omit<FetchOptions, "body"> & { body: FormData }): Promise<T> {
+  const { token, ...fetchOptions } = options;
+  const headers: HeadersInit = {
+    ...(options.headers || {}),
+  };
+
+  if (token) {
+    (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...fetchOptions,
+    headers,
+    body: options.body,
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Request failed" }));
+    throw new Error(error.error || "Request failed");
+  }
+
+  return response.json();
+}
+
 // Auth
 export const auth = {
   login: (email: string, password: string) =>
@@ -51,6 +76,24 @@ export const auth = {
 
   logout: () =>
     fetchAPI<{ message: string }>("/api/auth/logout", { method: "POST" }),
+};
+
+// Email verification
+export const emailVerification = {
+  status: () =>
+    fetchAPI<{ email: string; verified: boolean; verifiedAt: string | null }>("/api/auth/email/status"),
+  send: () =>
+    fetchAPI<{ message: string }>("/api/auth/email/send-verification", { method: "POST" }),
+  verify: (token: string) =>
+    fetchAPI<{ message: string }>("/api/auth/email/verify", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+};
+
+// Public marketing stats
+export const publicStats = {
+  get: () => fetchAPI<PublicStats>("/api/public/stats"),
 };
 
 // Jobs
@@ -156,12 +199,113 @@ export const admin = {
   },
 };
 
+export const adminTrust = {
+  dashboard: () => fetchAPI<AdminTrustDashboard>("/api/admin/trust/dashboard"),
+  verificationQueue: (params?: { subject?: "ALL" | "EMPLOYER" | "CANDIDATE"; status?: "ALL" | "PENDING" | "APPROVED" | "REJECTED" | "NEEDS_MORE_INFO" }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.subject) searchParams.set("subject", params.subject);
+    if (params?.status) searchParams.set("status", params.status);
+    const query = searchParams.toString();
+    return fetchAPI<{ queue: AdminVerificationQueueItem[] }>(`/api/admin/trust/verification-queue${query ? `?${query}` : ""}`);
+  },
+  reviewArtifact: (id: string, data: { status: "APPROVED" | "REJECTED" | "NEEDS_MORE_INFO"; reasonCode: string; reviewerNotes?: string }) =>
+    fetchAPI<{ artifact: VerificationArtifactItem; caseId: string }>(`/api/admin/trust/artifacts/${id}/review`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  riskQueue: (params?: { status?: "ALL" | "ACTIVE" }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set("status", params.status);
+    const query = searchParams.toString();
+    return fetchAPI<{ queue: AdminTrustCase[] }>(`/api/admin/trust/risk-queue${query ? `?${query}` : ""}`);
+  },
+  caseAction: (id: string, data: {
+    actionType: "NOTE" | "APPROVE" | "REJECT" | "HOLD" | "LIMIT" | "SUSPEND" | "REINSTATE" | "ESCALATE";
+    reasonCode: string;
+    notes?: string;
+    status?: "OPEN" | "IN_REVIEW" | "ACTIONED" | "DISMISSED";
+    priority?: TrustRiskLevel;
+  }) =>
+    fetchAPI<{ trustCase: AdminTrustCase; action: AdminTrustCaseAction }>(`/api/admin/trust/cases/${id}/actions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  reports: (params?: { status?: "ALL" | "ACTIVE" | "OPEN" | "TRIAGED" | "RESOLVED" | "DISMISSED" }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set("status", params.status);
+    const query = searchParams.toString();
+    return fetchAPI<{ reports: AdminAbuseReport[] }>(`/api/admin/trust/reports${query ? `?${query}` : ""}`);
+  },
+  reportAction: (id: string, data: {
+    status: "TRIAGED" | "RESOLVED" | "DISMISSED";
+    reasonCode: string;
+    notes?: string;
+    actionType?: "NOTE" | "APPROVE" | "REJECT" | "HOLD" | "LIMIT" | "SUSPEND" | "REINSTATE" | "ESCALATE";
+  }) =>
+    fetchAPI<{ report: AdminAbuseReport }>(`/api/admin/trust/reports/${id}/action`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
+export const adminBilling = {
+  dashboard: () => fetchAPI<AdminBillingDashboard>("/api/admin/billing/dashboard"),
+  discrepancies: (params?: { status?: "ALL" | "OPEN" | "ACKNOWLEDGED" | "RESOLVED"; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.limit) searchParams.set("limit", params.limit.toString());
+    const query = searchParams.toString();
+    return fetchAPI<{ discrepancies: AdminBillingDiscrepancy[] }>(`/api/admin/billing/discrepancies${query ? `?${query}` : ""}`);
+  },
+  reconciliationRuns: (limit = 20) =>
+    fetchAPI<{ runs: AdminBillingReconciliationRun[] }>(`/api/admin/billing/reconciliation-runs?limit=${limit}`),
+  triggerReconciliation: () =>
+    fetchAPI<{ result: AdminBillingReconciliationRun }>("/api/admin/billing/reconcile", {
+      method: "POST",
+    }),
+  searchCustomers: (query: string) =>
+    fetchAPI<{ customers: AdminBillingCustomerSearchResult[] }>(`/api/admin/billing/customers/search?query=${encodeURIComponent(query)}`),
+  customer: (userId: string) =>
+    fetchAPI<{ customer: AdminBillingCustomerDetail }>(`/api/admin/billing/customers/${userId}`),
+  resyncEntitlements: (userId: string) =>
+    fetchAPI<{
+      state: BillingEntitlementState;
+      validation: BillingEntitlementValidation;
+      action: BillingSupportActionRecord;
+    }>(`/api/admin/billing/customers/${userId}/resync-entitlements`, {
+      method: "POST",
+    }),
+  supportAction: (
+    userId: string,
+    data: {
+      actionType: "NOTE" | "RESYNC_ENTITLEMENTS" | "RESEND_RECEIPT" | "REFUND_REVIEW" | "CANCEL_SUBSCRIPTION" | "UPGRADE_DOWNGRADE_CORRECTION" | "GRANDFATHER_OVERRIDE";
+      reasonCode: string;
+      notes?: string;
+      billingEventId?: string;
+      discrepancyId?: string;
+      invoiceId?: string;
+      metadata?: Record<string, string | number | boolean | null>;
+    },
+  ) =>
+    fetchAPI<{
+      action: BillingSupportActionRecord;
+      receiptDelivery: {
+        attempted: boolean;
+        delivered: boolean;
+        message: string;
+      } | null;
+    }>(`/api/admin/billing/customers/${userId}/actions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
 // Billing
 export const billing = {
-  checkout: (plan: "BASIC" | "PROFESSIONAL") =>
-    fetchAPI<{ url: string; sessionId: string }>("/api/billing/checkout", {
+  checkout: (plan: string, interval: "MONTHLY" | "YEARLY" = "MONTHLY") =>
+    fetchAPI<{ url: string; sessionId: string; currency: string; amount: number | null }>("/api/billing/checkout", {
       method: "POST",
-      body: JSON.stringify({ plan }),
+      body: JSON.stringify({ plan, interval }),
     }),
 
   portal: () =>
@@ -171,29 +315,331 @@ export const billing = {
     fetchAPI<BillingStatus>("/api/billing/status"),
 };
 
+// Pricing (public + authenticated)
+export const pricing = {
+  get: (region?: string, currency?: string) => {
+    const params = new URLSearchParams();
+    if (region) params.set("region", region);
+    if (currency) params.set("currency", currency);
+    const query = params.toString();
+    return fetchAPI<PricingData>(`/api/pricing${query ? `?${query}` : ""}`);
+  },
+
+  me: () => fetchAPI<UserPricingData>("/api/pricing/me"),
+
+  setBillingCountry: (country: string, currency?: string, taxIdType?: string, taxIdValue?: string) =>
+    fetchAPI<{ region: string; country: string; currency: string }>("/api/pricing/billing-country", {
+      method: "POST",
+      body: JSON.stringify({ country, currency, taxIdType, taxIdValue }),
+    }),
+
+  regions: () => fetchAPI<RegionConfig[]>("/api/pricing/regions"),
+  paymentLocalization: () => fetchAPI<PaymentLocalizationResponse>("/api/pricing/payment-localization"),
+
+  entitlements: (plan: string) => fetchAPI<PlanEntitlements>(`/api/pricing/entitlements/${plan}`),
+};
+
+export const files = {
+  presign: (data: {
+    scope: "resume" | "candidate-verification" | "employer-verification";
+    contentType: "application/pdf" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    fileName: string;
+    fileSizeBytes: number;
+  }) =>
+    fetchAPI<{
+      presignedUrl: string;
+      s3Key: string;
+      expiresIn: number;
+      method: "PUT";
+      headers: {
+        "Content-Type": string;
+      };
+    }>("/api/files/presign", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
 // Talent
 export const talent = {
-  search: (params?: { skills?: string; location?: string; minExperience?: number; page?: number }) => {
+  search: (params?: {
+    skills?: string;
+    location?: string;
+    minExperience?: number;
+    page?: number;
+    verifiedOnly?: boolean;
+    verifiedSkillsOnly?: boolean;
+    fullyCompletedOnly?: boolean;
+    assessmentBackedOnly?: boolean;
+  }) => {
     const searchParams = new URLSearchParams();
     if (params?.skills) searchParams.set("skills", params.skills);
     if (params?.location) searchParams.set("location", params.location);
     if (params?.minExperience) searchParams.set("minExperience", params.minExperience.toString());
     if (params?.page) searchParams.set("page", params.page.toString());
+    if (params?.verifiedOnly) searchParams.set("verifiedOnly", "true");
+    if (params?.verifiedSkillsOnly) searchParams.set("verifiedSkillsOnly", "true");
+    if (params?.fullyCompletedOnly) searchParams.set("fullyCompletedOnly", "true");
+    if (params?.assessmentBackedOnly) searchParams.set("assessmentBackedOnly", "true");
     const query = searchParams.toString();
     return fetchAPI<TalentSearchResponse>(`/api/talent${query ? `?${query}` : ""}`);
   },
   get: (userId: string) => fetchAPI<TalentProfile>(`/api/talent/${userId}`),
 };
 
+export const trust = {
+  employerSummary: () => fetchAPI<EmployerTrustDashboard>("/api/trust/employer/summary"),
+  updateEmployerProfile: (data: { website?: string; linkedInCompanyUrl?: string }) =>
+    fetchAPI<{ trust: EmployerTrustSummary; linkedInCompanyUrl?: string | null }>("/api/trust/employer/profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  submitEmployerArtifact: (data: {
+    type: "BUSINESS_REGISTRATION" | "DOMAIN_OWNERSHIP" | "LINKEDIN_COMPANY";
+    fileKey?: string;
+    fileName?: string;
+    externalUrl?: string;
+    metadata?: Record<string, unknown>;
+  }) =>
+    fetchAPI<{ artifact: VerificationArtifactItem; trust: EmployerTrustSummary; caseId: string }>("/api/trust/employer/artifacts", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  candidateSummary: () => fetchAPI<CandidateTrustDashboard>("/api/trust/candidate/summary"),
+  requestPhoneOtp: (phoneNumber: string) =>
+    fetchAPI<{ message: string; expiresAt: string; previewCode?: string }>("/api/trust/candidate/phone/request-otp", {
+      method: "POST",
+      body: JSON.stringify({ phoneNumber }),
+    }),
+  verifyPhoneOtp: (phoneNumber: string, code: string) =>
+    fetchAPI<{ message: string; trust: CandidateTrustSummary }>("/api/trust/candidate/phone/verify-otp", {
+      method: "POST",
+      body: JSON.stringify({ phoneNumber, code }),
+    }),
+  submitCandidateArtifact: (data: {
+    type: "IDENTITY_DOCUMENT" | "CERTIFICATION" | "EMPLOYMENT_PROOF";
+    fileKey?: string;
+    fileName?: string;
+    externalUrl?: string;
+    metadata?: Record<string, unknown>;
+  }) =>
+    fetchAPI<{ artifact: VerificationArtifactItem; trust: CandidateTrustSummary; caseId: string }>("/api/trust/candidate/artifacts", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  submitCandidateSkillVerification: (data: {
+    skillName: string;
+    method: "CERTIFICATE" | "PORTFOLIO" | "ASSESSMENT";
+    evidenceLabel?: string;
+    fileKey?: string;
+    fileName?: string;
+    externalUrl?: string;
+    assessmentId?: string;
+    metadata?: Record<string, unknown>;
+  }) =>
+    fetchAPI<{
+      skillVerification: CandidateVerifiedSkillItem;
+      trust: CandidateTrustSummary;
+      caseId: string | null;
+    }>("/api/trust/candidate/skills", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  reportAbuse: (data: AbuseReportInput) =>
+    fetchAPI<{ reportId: string; caseId: string; message: string }>("/api/trust/reports", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  messagingGuidance: () =>
+    fetchAPI<{
+      headline: string;
+      tips: string[];
+      rulePreview: {
+        riskScore: number;
+        blockedPatterns: string[];
+      };
+    }>("/api/trust/messaging-guidance"),
+};
+
 // Employer Analytics
 export const employerAnalytics = {
   stats: () => fetchAPI<EmployerAnalytics>("/api/employer/analytics"),
+  advanced: () => fetchAPI<EmployerAdvancedAnalytics>("/api/employer/analytics/advanced"),
+  onboarding: () => fetchAPI<EmployerOnboarding>("/api/employer/onboarding"),
+  updateOnboarding: (data: EmployerOnboardingUpdateInput) =>
+    fetchAPI<{ message: string; onboardingState: EmployerOnboardingStateSnapshot }>("/api/employer/onboarding", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  jobPreview: (data: EmployerJobPreviewInput) =>
+    fetchAPI<EmployerJobPreview>("/api/employer/onboarding/job-preview", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   getBranding: () => fetchAPI<EmployerBranding>("/api/employer/branding"),
   updateBranding: (data: { companyName?: string; website?: string; location?: string; bio?: string }) =>
     fetchAPI<EmployerBranding>("/api/employer/branding", {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+};
+
+export const adminPartners = {
+  list: () => fetchAPI<{ partners: AdminPartnerSummary[] }>("/api/university-partners/admin/partners"),
+  create: (data: {
+    externalId: string;
+    name: string;
+    organizationType: PartnerOrganizationType;
+    country: string;
+    website?: string;
+    apiKey: string;
+  }) =>
+    fetchAPI<{
+      partner: AdminPartnerSummary;
+      keyAccepted: boolean;
+    }>("/api/university-partners/admin/partners", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  detail: (partnerId: string) =>
+    fetchAPI<AdminPartnerDetail>(`/api/university-partners/admin/partners/${partnerId}/records`),
+  issueMarker: (
+    partnerId: string,
+    data: {
+      userId: string;
+      markerType: CandidatePartnerMarkerType;
+      partnerRecordId?: string;
+      label?: string;
+      description?: string;
+      expiresAt?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ) =>
+    fetchAPI<{ marker: AdminIssuedPartnerMarker }>(`/api/university-partners/admin/partners/${partnerId}/markers`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  issueVerifiedSkill: (
+    partnerId: string,
+    data: {
+      userId: string;
+      skillName: string;
+      method: "PARTNER_ISSUED" | "MANUAL_REVIEW";
+      partnerRecordId?: string;
+      evidenceLabel?: string;
+      evidenceUrl?: string;
+      score?: number;
+      confidenceNote?: string;
+      expiresAt?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ) =>
+    fetchAPI<{ skill: AdminIssuedPartnerSkill }>(`/api/university-partners/admin/partners/${partnerId}/verified-skills`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
+export const ats = {
+  listConnections: () => fetchAPI<ATSConnection[]>("/api/ats/connections"),
+  createConnection: (data: {
+    provider: "GREENHOUSE" | "LEVER" | "WORKABLE";
+    externalOrgId: string;
+    accessToken?: string;
+    refreshToken?: string;
+    metadata?: Record<string, unknown>;
+  }) => fetchAPI<ATSConnection>("/api/ats/connections", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
+  disconnectConnection: (id: string) =>
+    fetchAPI<{ message: string }>(`/api/ats/connections/${id}`, {
+      method: "DELETE",
+    }),
+  syncConnection: (id: string) =>
+    fetchAPI<{
+      syncRunId: string;
+      pulledJobs: number;
+      createdJobs: number;
+      updatedJobs: number;
+      dedupedJobs: number;
+    }>(`/api/ats/connections/${id}/sync`, {
+      method: "POST",
+    }),
+};
+
+export const mockInterviews = {
+  list: () => fetchAPI<MockInterviewSession[]>("/api/mock-interviews"),
+  create: (data: {
+    title: string;
+    targetRole: string;
+    promptLanguage?: "EN" | "FR" | "PT" | "AR";
+    questionSet?: string[];
+    visibility?: "PRIVATE" | "TEAM_SHARED";
+    retentionDays?: number;
+  }) => fetchAPI<MockInterviewSession>("/api/mock-interviews", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
+  get: (id: string) => fetchAPI<MockInterviewSession>(`/api/mock-interviews/${id}`),
+  submitFeedback: (
+    id: string,
+    data: {
+      transcript: Array<{ speaker: "interviewer" | "candidate"; text: string; timestampMs?: number }>;
+      scoreCommunication?: number;
+      scoreTechnical?: number;
+      scoreProblemSolving?: number;
+      notes?: string[];
+    },
+  ) =>
+    fetchAPI<MockInterviewSession>(`/api/mock-interviews/${id}/feedback`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updatePrivacy: (
+    id: string,
+    data: {
+      visibility?: "PRIVATE" | "TEAM_SHARED";
+      retentionDays?: number;
+      piiRedacted?: boolean;
+      status?: "DRAFT" | "PROCESSING" | "READY" | "ARCHIVED";
+    },
+  ) =>
+    fetchAPI<MockInterviewSession>(`/api/mock-interviews/${id}/privacy`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  addArtifact: (
+    id: string,
+    data: {
+      type: "VIDEO" | "AUDIO" | "TRANSCRIPT" | "FEEDBACK_JSON";
+      storageKey: string;
+      contentType?: string;
+      sizeBytes?: number;
+      metadata?: Record<string, unknown>;
+    },
+  ) =>
+    fetchAPI<MockInterviewArtifact>(`/api/mock-interviews/${id}/artifacts`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
+export const analyticsEventsApi = {
+  ingest: (events: Array<{
+    category: "ACQUISITION" | "ACTIVATION" | "ENGAGEMENT" | "CONVERSION" | "RETENTION" | "MONETIZATION" | "EMPLOYER_PIPELINE" | "SYSTEM";
+    eventName: string;
+    sessionId?: string;
+    path?: string;
+    referrer?: string;
+    properties?: Record<string, unknown>;
+    occurredAt?: string;
+  }>) =>
+    fetchAPI<{ accepted: number }>("/api/analytics/events", {
+      method: "POST",
+      body: JSON.stringify({ events }),
+    }),
+  model: () => fetchAPI<Record<string, unknown>>("/api/analytics/model"),
 };
 
 // Messages
@@ -245,11 +691,413 @@ export const passwordReset = {
 };
 
 // Types
+export type TrustRiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type EmployerVerificationLevel =
+  | "UNVERIFIED"
+  | "EMAIL_DOMAIN_VERIFIED"
+  | "BUSINESS_DOC_VERIFIED"
+  | "MANUAL_REVIEW_APPROVED"
+  | "PREMIUM_TRUSTED";
+export type CandidateVerificationLevel =
+  | "UNVERIFIED"
+  | "EMAIL_VERIFIED"
+  | "PHONE_VERIFIED"
+  | "IDENTITY_DOCUMENT_VERIFIED"
+  | "SKILLS_VERIFIED"
+  | "EMPLOYMENT_HISTORY_PARTIALLY_VERIFIED";
+export type PartnerOrganizationType =
+  | "UNIVERSITY"
+  | "BOOTCAMP"
+  | "TRAINING_INSTITUTE"
+  | "SCHOLARSHIP_PARTNER";
+export type CandidateSkillVerificationMethod =
+  | "CERTIFICATE"
+  | "PORTFOLIO"
+  | "ASSESSMENT"
+  | "MANUAL_REVIEW"
+  | "PARTNER_ISSUED";
+export type CandidateSkillVerificationStatus =
+  | "PENDING"
+  | "VERIFIED"
+  | "REJECTED"
+  | "EXPIRED";
+export type CandidatePartnerMarkerType =
+  | "UNIVERSITY_VERIFIED"
+  | "BOOTCAMP_VERIFIED"
+  | "TRAINING_VERIFIED"
+  | "SCHOLARSHIP_ALUMNI"
+  | "SCHOLARSHIP_FELLOW"
+  | "PARTNER_RECOMMENDED";
+export type CandidatePartnerMarkerStatus =
+  | "PENDING"
+  | "ACTIVE"
+  | "REVOKED"
+  | "EXPIRED";
+
+export interface TrustChecklistItem {
+  key: string;
+  label: string;
+  done: boolean;
+}
+
+export interface EmployerTrustSummary {
+  badge: string;
+  verificationLevel: EmployerVerificationLevel;
+  authenticityScore: number;
+  riskScore: number;
+  riskLevel: TrustRiskLevel;
+  postingEligibility: boolean;
+  requiresEnhancedVerification: boolean;
+  verifiedDomain: string | null;
+  warnings: string[];
+  checklist: TrustChecklistItem[];
+}
+
+export interface CandidateTrustSummary {
+  badge: string;
+  verificationLevel: CandidateVerificationLevel;
+  authenticityScore: number;
+  riskScore: number;
+  riskLevel: TrustRiskLevel;
+  premiumFilterEligible: boolean;
+  verifiedSkillCount: number;
+  partnerSignalCount: number;
+  assessmentBacked: boolean;
+  fullyCompletedProfile: boolean;
+  explainability: CandidateTrustExplainabilityItem[];
+  maskedPhone: string | null;
+  warnings: string[];
+  checklist: TrustChecklistItem[];
+}
+
+export interface CandidateTrustExplainabilityItem {
+  key: string;
+  label: string;
+  status: "verified" | "strengthening" | "needs_attention";
+  detail: string;
+}
+
+export interface CandidateVerifiedSkillItem {
+  id: string;
+  skillName: string;
+  method: CandidateSkillVerificationMethod;
+  status: CandidateSkillVerificationStatus;
+  evidenceLabel: string | null;
+  evidenceUrl: string | null;
+  score: number | null;
+  confidenceNote: string | null;
+  verifiedAt: string | null;
+  createdAt: string;
+  partner: {
+    id: string;
+    name: string;
+    organizationType: PartnerOrganizationType;
+  } | null;
+}
+
+export interface CandidatePartnerMarkerItem {
+  id: string;
+  markerType: CandidatePartnerMarkerType;
+  status: CandidatePartnerMarkerStatus;
+  label: string;
+  description: string | null;
+  issuedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  partner: {
+    id: string;
+    name: string;
+    country: string;
+    organizationType: PartnerOrganizationType;
+  };
+}
+
+export interface CandidateWorkHistoryItem {
+  company: string | null;
+  title: string | null;
+  period: string | null;
+  description: string | null;
+}
+
+export interface CandidateEducationItem {
+  institution: string | null;
+  degree: string | null;
+  period: string | null;
+}
+
+export interface CandidateCertificationItem {
+  name: string | null;
+  issuer: string | null;
+  credentialUrl: string | null;
+}
+
+export interface JobTrustSummary {
+  riskLevel: TrustRiskLevel;
+  riskScore: number;
+  jobQualityChecked: boolean;
+  companyReviewed: boolean;
+  newEmployerCaution: boolean;
+  publishedRecently: boolean;
+  guidance: string;
+  employerMemberSince: string | null;
+  employer: EmployerTrustSummary | null;
+}
+
+export interface JobSourceLineageItem {
+  source: string | null;
+  sourceId: string | null;
+  sourceUrl: string | null;
+  applicationUrl: string | null;
+  company: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
+
+export interface JobRankingExplanation {
+  score: number;
+  summary: string;
+  reasons: string[];
+  matchedPreferences: string[];
+  components: {
+    relevance: number;
+    freshness: number;
+    applicationLikelihood: number;
+    employerTrust: number;
+    salaryTransparency: number;
+    mobilityRelevance: number;
+    candidatePreferenceMatch: number;
+    quality: number;
+  };
+}
+
+export interface JobDiscoverySummary {
+  qualityScore: number;
+  freshnessScore: number;
+  applicationLikelihoodScore: number;
+  trustedJob: boolean;
+  stale: boolean;
+  freshnessLabel: "FRESH" | "RECENT" | "ACTIVE" | "AGING" | "STALE" | "EXPIRED";
+  qualityLabel: "TRUSTED" | "SOLID" | "REVIEW" | "THIN";
+  salaryTransparent: boolean;
+  verifiedEmployer: boolean;
+  visaClear: boolean;
+  relocationClear: boolean;
+  validApplicationPath: boolean;
+  sourceCount: number;
+  sourceNames: string[];
+  lastSeenAt: string | null;
+}
+
+export interface VerificationArtifactItem {
+  id: string;
+  type: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "NEEDS_MORE_INFO";
+  fileName: string | null;
+  externalUrl: string | null;
+  reviewerNotes: string | null;
+  submittedAt: string;
+  reviewedAt: string | null;
+}
+
+export interface EmployerTrustDashboard {
+  employer: {
+    id: string;
+    companyName: string;
+    website: string | null;
+    location: string;
+    bio: string | null;
+    email: string;
+    emailVerified: boolean;
+  };
+  trust: EmployerTrustSummary;
+  linkedInCompanyUrl?: string | null;
+  artifacts: VerificationArtifactItem[];
+  recentJobs: Array<{
+    id: string;
+    title: string;
+    status: string;
+    riskLevel: TrustRiskLevel;
+    createdAt: string;
+  }>;
+}
+
+export interface CandidateTrustDashboard {
+  profile: {
+    headline: string | null;
+    bio: string | null;
+    skills: string[];
+    targetRoles: string[];
+    targetCountries: string[];
+    yearsExperience: number | null;
+    visaStatus: string | null;
+    openToWork: boolean;
+    profileCompleteness: number;
+    linkedinUrl: string | null;
+    githubUrl: string | null;
+    portfolioUrl: string | null;
+    workHistory: CandidateWorkHistoryItem[] | null;
+    educationHistory: CandidateEducationItem[] | null;
+    certifications: CandidateCertificationItem[] | null;
+  } | null;
+  trust: CandidateTrustSummary;
+  artifacts: VerificationArtifactItem[];
+  skillVerifications: CandidateVerifiedSkillItem[];
+  partnerMarkers: CandidatePartnerMarkerItem[];
+  assessments: SkillAssessmentItem[];
+}
+
+export interface AdminTrustDashboard {
+  pendingVerificationArtifacts: number;
+  openRiskCases: number;
+  openReports: number;
+  limitedAccounts: number;
+  suspendedAccounts: number;
+  heldJobs: number;
+}
+
+export interface AdminTrustCaseAction {
+  id: string;
+  actionType: string;
+  reasonCode: string | null;
+  notes: string | null;
+  createdAt: string;
+  actor?: { id: string; name: string } | null;
+}
+
+export interface AdminVerificationQueueItem extends VerificationArtifactItem {
+  user?: { id: string; name: string; email: string } | null;
+  employer?: { id: string; companyName: string; userId: string } | null;
+  reviewer?: { id: string; name: string } | null;
+  trustCase?: {
+    id: string;
+    actions: AdminTrustCaseAction[];
+  } | null;
+}
+
+export interface AdminTrustCase {
+  id: string;
+  entityType: string;
+  status: "OPEN" | "IN_REVIEW" | "ACTIONED" | "DISMISSED";
+  priority: TrustRiskLevel;
+  title: string;
+  reasonCode: string | null;
+  summary: string | null;
+  openedAt: string;
+  closedAt: string | null;
+  assignedAdmin?: { id: string; name: string } | null;
+  employerTrustProfile?: {
+    employer: { id: string; companyName: string; userId: string };
+  } | null;
+  candidateTrustProfile?: {
+    user: { id: string; name: string; email: string };
+  } | null;
+  job?: {
+    id: string;
+    title: string;
+    employer?: { id: string; companyName: string; userId: string };
+  } | null;
+  application?: {
+    id: string;
+    candidateId: string;
+    jobId: string;
+  } | null;
+  report?: {
+    id: string;
+    reason: string;
+    status: string;
+    reportedUserId: string | null;
+  } | null;
+  artifact?: {
+    id: string;
+    type: string;
+    status: string;
+  } | null;
+  actions: AdminTrustCaseAction[];
+}
+
+export interface AdminAbuseReport {
+  id: string;
+  reason: string;
+  details: string | null;
+  status: "OPEN" | "TRIAGED" | "RESOLVED" | "DISMISSED";
+  resolutionNotes: string | null;
+  createdAt: string;
+  reporter: { id: string; name: string; email: string };
+  reportedUser?: { id: string; name: string; email: string; role: string } | null;
+  employer?: { id: string; companyName: string; userId: string } | null;
+  targetJob?: { id: string; title: string; status: string } | null;
+  targetApplication?: { id: string; status: string } | null;
+  assignedAdmin?: { id: string; name: string } | null;
+  trustCase?: { id: string; actions: AdminTrustCaseAction[] } | null;
+}
+
+export interface AdminPartnerSummary {
+  id: string;
+  externalId: string;
+  name: string;
+  organizationType: PartnerOrganizationType;
+  country: string;
+  website: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+  updatedAt?: string;
+  _count?: {
+    records: number;
+    verifiedSkills: number;
+    partnerMarkers: number;
+  };
+}
+
+export interface AdminIssuedPartnerSkill extends CandidateVerifiedSkillItem {
+  user: { id: string; name: string; email: string };
+}
+
+export interface AdminIssuedPartnerMarker extends CandidatePartnerMarkerItem {
+  user: { id: string; name: string; email: string };
+}
+
+export interface AdminPartnerDetail {
+  partner: AdminPartnerSummary;
+  records: Array<{
+    id: string;
+    type: string;
+    externalRecordId: string;
+    status: string;
+    payload: Record<string, unknown>;
+    receivedAt: string;
+    processedAt: string | null;
+  }>;
+  issuedSkills: AdminIssuedPartnerSkill[];
+  issuedMarkers: AdminIssuedPartnerMarker[];
+}
+
+export interface AbuseReportInput {
+  reason:
+    | "SCAM"
+    | "FAKE_JOB"
+    | "IMPERSONATION"
+    | "SPAM"
+    | "OFF_PLATFORM_CONTACT"
+    | "ADVANCE_FEE_REQUEST"
+    | "HARASSMENT"
+    | "FAKE_PROFILE"
+    | "MISLEADING_SALARY"
+    | "OTHER";
+  details?: string;
+  reportedUserId?: string;
+  employerId?: string;
+  targetJobId?: string;
+  targetApplicationId?: string;
+  targetThreadId?: string;
+}
+
 export interface User {
   id: string;
   email: string;
   name: string;
   role: "ADMIN" | "CANDIDATE" | "EMPLOYER";
+  emailVerified?: boolean;
+  avatarUrl?: string | null;
   employer?: {
     id: string;
     companyName: string;
@@ -277,6 +1125,7 @@ export interface Job {
   salaryMin?: number;
   salaryMax?: number;
   currency?: string;
+  salaryPeriod?: string | null;
   tags: string[];
   visaSponsorship?: "YES" | "NO" | "UNKNOWN";
   relocationAssistance?: boolean;
@@ -284,14 +1133,22 @@ export interface Job {
   jobSource?: "EMPLOYER_POSTED" | "AGGREGATED";
   sourceName?: string;
   sourceUrl?: string;
+  isExpired?: boolean;
+  expiresAt?: string | null;
   status: string;
   publishedAt?: string;
   createdAt: string;
+  moderationRequired?: boolean;
+  trust?: JobTrustSummary;
+  discovery?: JobDiscoverySummary;
+  rankingExplanation?: JobRankingExplanation;
+  sourceLineage?: JobSourceLineageItem[];
   employer: {
     companyName: string;
     location: string;
-    website?: string;
-    bio?: string;
+    website?: string | null;
+    bio?: string | null;
+    trust?: EmployerTrustSummary | null;
   };
   _count?: {
     applications: number;
@@ -332,6 +1189,7 @@ export interface CreateJobData {
   salaryMin?: number;
   salaryMax?: number;
   currency?: string;
+  salaryPeriod?: string;
   tags?: string[];
 }
 
@@ -342,6 +1200,7 @@ export interface Application {
   coverLetter?: string;
   notes?: string;
   createdAt: string;
+  heldForReview?: boolean;
   job: {
     id: string;
     title: string;
@@ -388,6 +1247,14 @@ export interface AdminStats {
   totalResources: number;
 }
 
+export interface PublicStats {
+  activeCandidates: number;
+  partnerCompanies: number;
+  jobsPosted: number;
+  africanCountries: number;
+  lastUpdated: string;
+}
+
 export interface UserListResponse {
   users: Array<User & { createdAt: string; _count: { applications: number } }>;
   pagination: {
@@ -399,10 +1266,292 @@ export interface UserListResponse {
 }
 
 export interface BillingStatus {
-  plan: "FREE" | "BASIC" | "PROFESSIONAL";
+  plan: "FREE" | "BASIC" | "PROFESSIONAL" | "EMPLOYER_FREE" | "EMPLOYER_BASIC" | "EMPLOYER_PREMIUM";
   status: "ACTIVE" | "INACTIVE" | "PAST_DUE" | "CANCELLED";
   currentPeriodEnd: string | null;
   hasCustomer: boolean;
+}
+
+export interface BillingEntitlementState {
+  id: string;
+  effectivePlan: BillingStatus["plan"];
+  effectiveStatus: BillingStatus["status"];
+  billingRegion: "AFRICA" | "EUROPE" | "ROW" | null;
+  currency: string | null;
+  pricingVersion: number | null;
+  checksum: string;
+  isInSync: boolean;
+  source: string;
+  lastSyncedAt: string;
+  lastValidatedAt: string | null;
+}
+
+export interface BillingEntitlementValidation {
+  currentState: {
+    id: string;
+    effectivePlan: BillingStatus["plan"];
+    effectiveStatus: BillingStatus["status"];
+    checksum: string;
+    billingRegion: "AFRICA" | "EUROPE" | "ROW" | null;
+    currency: string | null;
+    pricingVersion: number | null;
+  } | null;
+  expected: {
+    subscriptionId: string | null;
+    subscriptionPlan: BillingStatus["plan"];
+    subscriptionStatus: BillingStatus["status"];
+    effectivePlan: BillingStatus["plan"];
+    effectiveStatus: BillingStatus["status"];
+    billingRegion: "AFRICA" | "EUROPE" | "ROW" | null;
+    currency: string | null;
+    pricingVersion: number | null;
+    checksum: string;
+    isGrandfathered: boolean;
+    profileCountry: string | null;
+    stripeCountry: string | null;
+  };
+  reasons: string[];
+  isStale: boolean;
+}
+
+export interface BillingAuditEventRecord {
+  id: string;
+  eventId: string | null;
+  source: string;
+  eventType: string;
+  outcome: "RECEIVED" | "PROCESSED" | "FAILED" | "DUPLICATE" | "RECONCILED";
+  plan: BillingStatus["plan"] | null;
+  status: BillingStatus["status"] | null;
+  billingRegion: "AFRICA" | "EUROPE" | "ROW" | null;
+  currency: string | null;
+  amountMinor: number | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripeInvoiceId: string | null;
+  stripePaymentIntentId: string | null;
+  stripeChargeId: string | null;
+  stripeRefundId: string | null;
+  reasonCode: string | null;
+  message: string | null;
+  metadata: Record<string, unknown> | null;
+  occurredAt: string;
+  processedAt: string | null;
+  createdAt: string;
+}
+
+export interface BillingSupportActionRecord {
+  id: string;
+  actionType: "NOTE" | "RESYNC_ENTITLEMENTS" | "RESEND_RECEIPT" | "REFUND_REVIEW" | "CANCEL_SUBSCRIPTION" | "UPGRADE_DOWNGRADE_CORRECTION" | "GRANDFATHER_OVERRIDE";
+  reasonCode: string;
+  notes: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  actor?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+export interface AdminBillingDiscrepancy {
+  id: string;
+  type: "WEBHOOK_FAILURE" | "SUBSCRIPTION_STATE_MISMATCH" | "PLAN_MISMATCH" | "UNPAID_BUT_ENTITLED" | "PAID_BUT_NOT_ENTITLED" | "PENDING_REFUND" | "REGION_MISMATCH" | "STALE_ENTITLEMENT" | "PAYMENT_FAILURE";
+  status: "OPEN" | "ACKNOWLEDGED" | "RESOLVED";
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  title: string;
+  reasonCode: string | null;
+  details: Record<string, unknown> | null;
+  dueAt: string | null;
+  detectedAt: string;
+  lastSeenAt: string;
+  resolvedAt: string | null;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  subscription?: {
+    id: string;
+    plan: BillingStatus["plan"];
+    status: BillingStatus["status"];
+  } | null;
+}
+
+export interface AdminBillingReconciliationRun {
+  id: string;
+  status: "SUCCESS" | "PARTIAL" | "FAILED";
+  triggeredBy: string;
+  checkedSubscriptions: number;
+  successPayments: number;
+  failedPayments: number;
+  webhookFailures: number;
+  subscriptionMismatches: number;
+  unpaidEntitlements: number;
+  paidNotEntitled: number;
+  pendingRefunds: number;
+  summary: Record<string, unknown> | null;
+  errorMessage: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminBillingDashboard {
+  metrics: {
+    successfulPayments: number;
+    failedPayments: number;
+    webhookFailures: number;
+    mismatchedSubscriptionStates: number;
+    unpaidButEntitled: number;
+    paidButNotEntitled: number;
+    pendingRefunds: number;
+  };
+  lastReconciliationRun: AdminBillingReconciliationRun | null;
+  recentDiscrepancies: AdminBillingDiscrepancy[];
+  windows: {
+    paymentsSince: string;
+  };
+}
+
+export interface AdminBillingCustomerSearchResult {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  subscription: {
+    id: string;
+    plan: BillingStatus["plan"];
+    status: BillingStatus["status"];
+    stripeCustomerId: string | null;
+    stripeSubId: string | null;
+  } | null;
+  billingProfile: {
+    region: "AFRICA" | "EUROPE" | "ROW";
+    country: string | null;
+    currency: string;
+    isGrandfathered: boolean;
+    pricingVersion: number;
+  } | null;
+}
+
+export interface AdminBillingCustomerDetail {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  createdAt: string;
+  subscription: {
+    id: string;
+    plan: BillingStatus["plan"];
+    status: BillingStatus["status"];
+    stripeCustomerId: string | null;
+    stripeSubId: string | null;
+    currentPeriodEnd: string | null;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+  billingProfile: {
+    region: "AFRICA" | "EUROPE" | "ROW";
+    country: string | null;
+    currency: string;
+    regionSource: string;
+    pricingVersion: number;
+    isGrandfathered: boolean;
+    grandfatheredAt: string | null;
+    taxIdType: string | null;
+    taxIdValue: string | null;
+    stripeCountry: string | null;
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+  billingEntitlementState: BillingEntitlementState | null;
+  billingEvents: BillingAuditEventRecord[];
+  billingDiscrepancies: AdminBillingDiscrepancy[];
+  billingSupportActions: BillingSupportActionRecord[];
+}
+
+export interface RegionalPriceInfo {
+  plan: string;
+  region: string;
+  interval: "MONTHLY" | "YEARLY";
+  currency: string;
+  amount: number;
+  stripePriceId: string | null;
+  displayAmount: string;
+}
+
+export interface PlanEntitlements {
+  plan: string;
+  applicationsPerMonth: number | null;
+  aiResumeReviews: number | null;
+  aiJobMatches: number | null;
+  aiApplyPacks: number | null;
+  savedSearches: number | null;
+  jobAlerts: boolean;
+  prioritySupport: boolean;
+  skillsAssessments: boolean;
+  chatAccess: boolean;
+  autopilot: boolean;
+  jobPostsPerMonth: number | null;
+  talentSearch: boolean;
+  analytics: boolean;
+  apiAccess: boolean;
+  atsIntegrations: number | null;
+  videoMockInterviews: number | null;
+  pipelineExports: boolean;
+  brandedCareerPage: boolean;
+  advancedFunnelMetrics: boolean;
+}
+
+export interface PricingData {
+  region: string;
+  currency: string;
+  availableCurrencies: string[];
+  taxBehavior: string;
+  taxLabel: string | null;
+  prices: RegionalPriceInfo[];
+  entitlements: Record<string, PlanEntitlements>;
+}
+
+export interface UserPricingData extends PricingData {
+  country: string | null;
+  confidence: "high" | "medium" | "low";
+  source: string;
+  isGrandfathered: boolean;
+  pricingVersion: number;
+  taxId: { type: string; value: string | null } | null;
+}
+
+export interface RegionConfig {
+  id: string;
+  region: string;
+  defaultCurrency: string;
+  currencies: string[];
+  countries: string[];
+  taxBehavior: string;
+  taxLabel: string | null;
+}
+
+export interface PaymentLocalizationResponse {
+  regions: Array<{
+    region: string;
+    defaultCurrency: string;
+    currencies: string[];
+    taxBehavior: string;
+    taxLabel: string | null;
+    paymentMethodsLive: string[];
+    paymentMethodsRoadmap: string[];
+    compliance: unknown;
+    taxMetadata: unknown;
+  }>;
+  europeSpecific: {
+    supportedTaxIds: string[];
+    invoiceRules: string[];
+  };
+  africaRoadmap: {
+    plannedMethods: string[];
+    status: string;
+  };
 }
 
 export interface MessageThread {
@@ -460,8 +1609,14 @@ export interface TalentProfile {
   linkedinUrl: string | null;
   githubUrl: string | null;
   portfolioUrl: string | null;
+  workHistory?: CandidateWorkHistoryItem[] | null;
+  educationHistory?: CandidateEducationItem[] | null;
+  certifications?: CandidateCertificationItem[] | null;
   user: { id: string; name: string; email: string };
   skillAssessments?: Array<{ skillName: string; score: number | null; level: string | null }>;
+  verifiedSkills?: CandidateVerifiedSkillItem[];
+  partnerMarkers?: CandidatePartnerMarkerItem[];
+  trust?: CandidateTrustSummary | null;
 }
 
 export interface TalentSearchResponse {
@@ -473,8 +1628,133 @@ export interface EmployerAnalytics {
   totalJobs: number;
   publishedJobs: number;
   totalApplications: number;
+  qualifiedApplicants: number;
+  shortlistRate: number;
   applicationsByStatus: Record<string, number>;
   recentApplications: Array<{ id: string; status: string; createdAt: string; candidate: { name: string }; job: { title: string } }>;
+  activationMilestones: EmployerActivationMilestones;
+  activationState: EmployerActivationState;
+  timeToFirstQualifiedApplicantHours: number | null;
+  verificationImpact: EmployerVerificationImpact;
+  viewsByDay: Array<{ date: string; views: number }>;
+}
+
+export interface EmployerAdvancedAnalytics {
+  funnel: Array<{
+    step: string;
+    count: number;
+    conversionFromPrevious: number | null;
+  }>;
+  postingPerformance: Array<{
+    jobId: string;
+    title: string;
+    status: string;
+    applicationCount: number;
+    qualifiedApplicants: number;
+    shortlistRate: number;
+    acceptanceRate: number;
+    impressions: number;
+    clicks: number;
+    ctr: number;
+    qualityScore: number;
+    timeToFirstApplicationHours: number | null;
+  }>;
+  candidatePipeline: {
+    total: number;
+    pending: number;
+    reviewing: number;
+    shortlisted: number;
+    accepted: number;
+    rejected: number;
+    avgReviewTimeHours: number | null;
+  };
+  roi: EmployerRoiSummary;
+  activationMilestones: EmployerActivationMilestones;
+}
+
+export interface ATSConnection {
+  id: string;
+  provider: "GREENHOUSE" | "LEVER" | "WORKABLE";
+  externalOrgId: string;
+  status: "ACTIVE" | "ERROR" | "DISCONNECTED";
+  metadata: Record<string, unknown> | null;
+  lastSyncedAt: string | null;
+  lastSyncRun: {
+    id: string;
+    status: "QUEUED" | "RUNNING" | "SUCCESS" | "PARTIAL" | "FAILED";
+    startedAt: string;
+    finishedAt: string | null;
+    pulledJobs: number;
+    createdJobs: number;
+    updatedJobs: number;
+    dedupedJobs: number;
+    errorCount: number;
+  } | null;
+  createdAt: string;
+}
+
+export interface MockInterviewArtifact {
+  id: string;
+  sessionId: string;
+  type: "VIDEO" | "AUDIO" | "TRANSCRIPT" | "FEEDBACK_JSON";
+  storageKey: string;
+  contentType: string | null;
+  sizeBytes: number | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface MockInterviewSession {
+  id: string;
+  userId: string;
+  title: string;
+  targetRole: string;
+  promptLanguage: "EN" | "FR" | "PT" | "AR";
+  questionSet: unknown;
+  transcript: unknown;
+  feedbackSummary: string | null;
+  scoreOverall: number | null;
+  scoreCommunication: number | null;
+  scoreTechnical: number | null;
+  scoreProblemSolving: number | null;
+  status: "DRAFT" | "PROCESSING" | "READY" | "ARCHIVED";
+  visibility: "PRIVATE" | "TEAM_SHARED";
+  retentionDays: number;
+  piiRedacted: boolean;
+  startedAt: string | null;
+  completedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  artifacts?: MockInterviewArtifact[];
+}
+
+export interface EmployerOnboarding {
+  currentStep: EmployerOnboardingStep;
+  checklist: EmployerOnboardingChecklistItem[];
+  completionPct: number;
+  stats: {
+    jobCount: number;
+    publishedJobs: number;
+    totalApplications: number;
+    qualifiedApplicants: number;
+  };
+  milestones: EmployerActivationMilestones;
+  activationState: EmployerActivationState;
+  candidateFilters: EmployerCandidateFilters;
+  teamMemberEmails: string[];
+  selectedPlan: BillingStatus["plan"];
+  trust: EmployerTrustSummary;
+  company: {
+    companyName: string;
+    website: string | null;
+    location: string;
+    bio: string | null;
+    email: string;
+  };
+  nextAction: EmployerNextAction;
+  recommendation: string;
+  upgradeJourney: EmployerUpgradeJourney;
 }
 
 export interface EmployerBranding {
@@ -485,6 +1765,122 @@ export interface EmployerBranding {
   bio: string | null;
 }
 
+export type EmployerOnboardingStep =
+  | "company_setup"
+  | "verification"
+  | "team_setup"
+  | "first_job_post"
+  | "candidate_filters"
+  | "subscription_choice"
+  | "trust_completion";
+
+export interface EmployerCandidateFilters {
+  skills: string[];
+  location: string | null;
+  minExperience: number | null;
+  verifiedOnly: boolean;
+  visaPreference: "ANY" | "SPONSORED_ONLY";
+}
+
+export interface EmployerActivationMilestones {
+  firstApprovedJobAt: string | null;
+  firstCandidateViewAt: string | null;
+  firstQualifiedShortlistAt: string | null;
+}
+
+export interface EmployerActivationState {
+  label: string;
+  state: "not_started" | "in_progress" | "activated";
+}
+
+export interface EmployerVerificationImpact {
+  verified: boolean;
+  qualifiedApplicantRate: number;
+  insight: string;
+}
+
+export interface EmployerUpgradeJourney {
+  targetPlan: BillingStatus["plan"] | null;
+  headline: string;
+  body: string;
+  ctaLabel: string;
+}
+
+export interface EmployerOnboardingChecklistItem {
+  key: EmployerOnboardingStep;
+  label: string;
+  description: string;
+  done: boolean;
+  href: string;
+}
+
+export interface EmployerNextAction {
+  key: EmployerOnboardingStep;
+  title: string;
+  body: string;
+  href: string;
+  ctaLabel: string;
+}
+
+export interface EmployerRoiSummary {
+  impressions: number;
+  clicks: number;
+  applies: number;
+  qualifiedApplicants: number;
+  shortlistRate: number;
+  clickToApplyRate: number;
+  timeToFirstQualifiedApplicantHours: number | null;
+  averageJobQuality: number;
+  verificationImpact: EmployerVerificationImpact;
+  upgradeJourney: EmployerUpgradeJourney;
+}
+
+export interface EmployerOnboardingUpdateInput {
+  currentStep?: EmployerOnboardingStep;
+  selectedPlan?: Extract<BillingStatus["plan"], "EMPLOYER_FREE" | "EMPLOYER_BASIC" | "EMPLOYER_PREMIUM"> | null;
+  teamMemberEmails?: string[];
+  candidateFilters?: EmployerCandidateFilters;
+  companyName?: string;
+  website?: string;
+  location?: string;
+  bio?: string;
+}
+
+export interface EmployerOnboardingStateSnapshot {
+  currentStep: EmployerOnboardingStep;
+  teamMemberEmails: string[];
+  candidateFilters: EmployerCandidateFilters;
+  selectedPlan: Extract<BillingStatus["plan"], "EMPLOYER_FREE" | "EMPLOYER_BASIC" | "EMPLOYER_PREMIUM"> | null;
+}
+
+export interface EmployerJobPreviewInput {
+  title: string;
+  description: string;
+  location: string;
+  type: string;
+  seniority: string;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+  currency?: string | null;
+  tags?: string[];
+}
+
+export interface EmployerJobPreview {
+  qualityScore: number;
+  qualityLabel: "TRUSTED" | "SOLID" | "REVIEW" | "THIN";
+  moderationRiskLevel: TrustRiskLevel;
+  moderationRequired: boolean;
+  guidance: string;
+  flags: string[];
+  strengths: string[];
+  tips: string[];
+  checklist: Array<{
+    key: string;
+    label: string;
+    done: boolean;
+  }>;
+}
+
 // Profile
 export const profile = {
   get: () => fetchAPI<CandidateProfile | null>("/api/profile"),
@@ -493,6 +1889,26 @@ export const profile = {
   resumes: () => fetchAPI<ResumeFile[]>("/api/profile/resumes"),
   uploadResume: (data: { s3Key: string; fileName: string; setActive?: boolean }) =>
     fetchAPI<ResumeFile>("/api/profile/resumes", { method: "POST", body: JSON.stringify(data) }),
+  parseResume: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return fetchMultipartAPI<ResumeParseResponse>("/api/profile/resume-parser/parse", {
+      method: "POST",
+      body: formData,
+    });
+  },
+  applyResumeDraft: (data: {
+    confirm: boolean;
+    overwriteExisting?: boolean;
+    draft: Partial<ResumeProfileDraft>;
+  }) =>
+    fetchAPI<{ profile: CandidateProfile; overwriteExisting: boolean; message: string }>(
+      "/api/profile/resume-parser/apply-draft",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+    ),
   analytics: () => fetchAPI<ProfileAnalytics>("/api/profile/analytics"),
 };
 
@@ -509,6 +1925,40 @@ export const notifications = {
   unreadCount: () => fetchAPI<{ count: number }>("/api/notifications/unread-count"),
   markRead: (id: string) => fetchAPI<{ notification: NotificationItem }>(`/api/notifications/${id}/read`, { method: "PUT" }),
   markAllRead: () => fetchAPI<{ updated: number }>("/api/notifications/read-all", { method: "PUT" }),
+};
+
+export const preferences = {
+  getLocale: () => fetchAPI<{ preferredLocale: "EN" | "FR" | "PT" | "AR" }>("/api/preferences/locale"),
+  setLocale: (preferredLocale: "EN" | "FR" | "PT" | "AR") =>
+    fetchAPI<{ preferredLocale: "EN" | "FR" | "PT" | "AR" }>("/api/preferences/locale", {
+      method: "PUT",
+      body: JSON.stringify({ preferredLocale }),
+    }),
+};
+
+export const pushNotifications = {
+  getVapidPublicKey: () => fetchAPI<{ publicKey: string }>("/api/push/vapid-public-key"),
+  getPreferences: () => fetchAPI<NotificationPreference>("/api/push/preferences"),
+  updatePreferences: (data: Partial<NotificationPreference>) =>
+    fetchAPI<NotificationPreference>("/api/push/preferences", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  subscribe: (subscription: PushSubscriptionRequest) =>
+    fetchAPI<{ id: string }>("/api/push/subscribe", {
+      method: "POST",
+      body: JSON.stringify(subscription),
+    }),
+  unsubscribe: (endpoint: string) =>
+    fetchAPI<{ message: string }>("/api/push/subscribe", {
+      method: "DELETE",
+      body: JSON.stringify({ endpoint }),
+    }),
+  sendTest: (type: "savedSearchAlerts" | "interviewReminders" | "applicationUpdates" | "subscriptionNotices") =>
+    fetchAPI<{ message: string; notificationId: string }>("/api/push/test", {
+      method: "POST",
+      body: JSON.stringify({ type }),
+    }),
 };
 
 // Saved Searches
@@ -665,6 +2115,9 @@ export interface CandidateProfile {
   linkedinUrl: string | null;
   githubUrl: string | null;
   portfolioUrl: string | null;
+  workHistory?: CandidateWorkHistoryItem[] | null;
+  educationHistory?: CandidateEducationItem[] | null;
+  certifications?: CandidateCertificationItem[] | null;
   openToWork: boolean;
   profileCompleteness: number;
   resumes?: ResumeFile[];
@@ -676,6 +2129,76 @@ export interface ResumeFile {
   fileName: string;
   isActive: boolean;
   uploadedAt: string;
+}
+
+export interface ResumeParsedWorkItem {
+  company?: string;
+  title?: string;
+  period?: string;
+  description?: string;
+}
+
+export interface ResumeParsedEducationItem {
+  institution?: string;
+  degree?: string;
+  period?: string;
+}
+
+export interface ResumeParsedData {
+  name?: string;
+  email?: string;
+  phone?: string;
+  linkedinUrl?: string;
+  githubUrl?: string;
+  portfolioUrl?: string;
+  summary?: string;
+  skills: string[];
+  workHistory: ResumeParsedWorkItem[];
+  education: ResumeParsedEducationItem[];
+  certifications: string[];
+  rawText: string;
+}
+
+export interface ResumeProfileDraft {
+  headline?: string;
+  bio?: string;
+  skills?: string[];
+  targetRoles?: string[];
+  yearsExperience?: number;
+  linkedinUrl?: string;
+  githubUrl?: string;
+  portfolioUrl?: string;
+  workHistory?: CandidateWorkHistoryItem[];
+  educationHistory?: CandidateEducationItem[];
+  certifications?: CandidateCertificationItem[];
+}
+
+export interface ResumeParseResponse {
+  file: { name: string; size: number; mimetype: string };
+  parsed: ResumeParsedData;
+  profileDraft: ResumeProfileDraft;
+  existingProfile: Partial<CandidateProfile> | null;
+  requiresConfirmation: boolean;
+}
+
+export interface NotificationPreference {
+  id: string;
+  userId: string;
+  savedSearchAlerts: boolean;
+  interviewReminders: boolean;
+  applicationUpdates: boolean;
+  subscriptionNotices: boolean;
+  marketing: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PushSubscriptionRequest {
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
 }
 
 export interface ProfileAnalytics {
@@ -843,7 +2366,10 @@ export interface SkillAssessmentItem {
   status: string;
   score: number | null;
   level: string | null;
+  percentile?: number | null;
+  resultUrl?: string | null;
   completedAt: string | null;
+  expiresAt?: string | null;
   createdAt: string;
 }
 
@@ -911,3 +2437,85 @@ export interface ApplicationFunnel {
   accepted: number;
   rejected: number;
 }
+
+// ── Chat Assistant ───────────────────────────────────────────────────────────
+
+export interface ChatConsentPolicy {
+  title: string;
+  summary: string;
+  version: string;
+}
+
+export interface ChatConsentStatus {
+  consent: {
+    privacyNotice: boolean;
+    termsOfUse: boolean;
+    dataStorage: boolean;
+    consentedAt: string | null;
+    revokedAt: string | null;
+  } | null;
+  hasFullConsent: boolean;
+  policies: {
+    privacyNotice: ChatConsentPolicy;
+    termsOfUse: ChatConsentPolicy;
+    dataStorage: ChatConsentPolicy;
+  };
+}
+
+export interface ChatMessageData {
+  id: string;
+  role: "USER" | "ASSISTANT";
+  content: string;
+  createdAt: string;
+}
+
+export interface ChatConversation {
+  id: string;
+  title: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { messages: number };
+}
+
+export interface ChatSendResponse {
+  message: ChatMessageData;
+  conversationId: string;
+  remaining: number;
+}
+
+export const chat = {
+  getConsent: () =>
+    fetchAPI<ChatConsentStatus>("/api/chat/consent"),
+
+  acceptConsent: () =>
+    fetchAPI<{ message: string }>("/api/chat/consent", {
+      method: "POST",
+      body: JSON.stringify({ privacyNotice: true, termsOfUse: true, dataStorage: true }),
+    }),
+
+  revokeConsent: () =>
+    fetchAPI<{ message: string; deletedConversations: number }>("/api/chat/consent", {
+      method: "DELETE",
+    }),
+
+  sendMessage: (message: string, conversationId?: string) =>
+    fetchAPI<ChatSendResponse>("/api/chat/message", {
+      method: "POST",
+      body: JSON.stringify({ message, conversationId }),
+    }),
+
+  getHistory: (conversationId?: string, page = 1) =>
+    fetchAPI<{
+      messages?: ChatMessageData[];
+      conversations?: ChatConversation[];
+      conversation?: ChatConversation;
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/api/chat/history?${conversationId ? `conversationId=${conversationId}&` : ""}page=${page}`),
+
+  newConversation: () =>
+    fetchAPI<{ conversation: ChatConversation }>("/api/chat/conversations", { method: "POST" }),
+
+  deleteConversation: (id: string) =>
+    fetchAPI<{ message: string }>(`/api/chat/conversations/${id}`, { method: "DELETE" }),
+};

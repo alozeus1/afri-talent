@@ -3,8 +3,29 @@ import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { Role } from "@prisma/client";
+import { computeProfileCompleteness } from "../lib/profile-completeness.js";
+import { refreshCandidateTrustProfile } from "../lib/trust/service.js";
 
 const router = Router();
+
+const structuredWorkHistoryItemSchema = z.object({
+  company: z.string().max(160).trim().optional().or(z.literal("")),
+  title: z.string().max(160).trim().optional().or(z.literal("")),
+  period: z.string().max(120).trim().optional().or(z.literal("")),
+  description: z.string().max(1200).trim().optional().or(z.literal("")),
+});
+
+const structuredEducationItemSchema = z.object({
+  institution: z.string().max(160).trim().optional().or(z.literal("")),
+  degree: z.string().max(160).trim().optional().or(z.literal("")),
+  period: z.string().max(120).trim().optional().or(z.literal("")),
+});
+
+const structuredCertificationItemSchema = z.object({
+  name: z.string().max(160).trim().optional().or(z.literal("")),
+  issuer: z.string().max(160).trim().optional().or(z.literal("")),
+  credentialUrl: z.string().url().max(500).optional().or(z.literal("")),
+});
 
 const upsertProfileSchema = z.object({
   headline: z.string().max(200).trim().optional(),
@@ -17,42 +38,59 @@ const upsertProfileSchema = z.object({
   linkedinUrl: z.string().url().max(500).optional().or(z.literal("")),
   githubUrl: z.string().url().max(500).optional().or(z.literal("")),
   portfolioUrl: z.string().url().max(500).optional().or(z.literal("")),
+  workHistory: z.array(structuredWorkHistoryItemSchema).max(20).optional(),
+  educationHistory: z.array(structuredEducationItemSchema).max(12).optional(),
+  certifications: z.array(structuredCertificationItemSchema).max(20).optional(),
   openToWork: z.boolean().optional(),
 });
-
-interface ProfileForCompleteness {
-  headline?: string | null;
-  bio?: string | null;
-  skills: string[];
-  targetRoles: string[];
-  targetCountries: string[];
-  yearsExperience?: number | null;
-  visaStatus?: string | null;
-  linkedinUrl?: string | null;
-  githubUrl?: string | null;
-  portfolioUrl?: string | null;
-  resumes?: { id: string }[];
-}
-
-function computeCompleteness(profile: ProfileForCompleteness): number {
-  let score = 0;
-  if (profile.headline) score += 15;
-  if (profile.bio) score += 15;
-  if (profile.skills.length > 0) score += 15;
-  if (profile.targetRoles.length > 0) score += 10;
-  if (profile.targetCountries.length > 0) score += 10;
-  if (profile.yearsExperience != null) score += 10;
-  if (profile.visaStatus) score += 10;
-  if (profile.linkedinUrl || profile.githubUrl || profile.portfolioUrl) score += 10;
-  if (profile.resumes && profile.resumes.length > 0) score += 5;
-  return score;
-}
 
 const resumeMetadataSchema = z.object({
   s3Key: z.string().min(1).max(500),
   fileName: z.string().min(1).max(255),
   setActive: z.boolean().default(false),
 });
+
+function normalizeOptionalText(value?: string | null) {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
+}
+
+function normalizeWorkHistory(
+  items?: Array<z.infer<typeof structuredWorkHistoryItemSchema>>,
+) {
+  return (items ?? [])
+    .map((item) => ({
+      company: normalizeOptionalText(item.company),
+      title: normalizeOptionalText(item.title),
+      period: normalizeOptionalText(item.period),
+      description: normalizeOptionalText(item.description),
+    }))
+    .filter((item) => Object.values(item).some(Boolean));
+}
+
+function normalizeEducationHistory(
+  items?: Array<z.infer<typeof structuredEducationItemSchema>>,
+) {
+  return (items ?? [])
+    .map((item) => ({
+      institution: normalizeOptionalText(item.institution),
+      degree: normalizeOptionalText(item.degree),
+      period: normalizeOptionalText(item.period),
+    }))
+    .filter((item) => Object.values(item).some(Boolean));
+}
+
+function normalizeCertifications(
+  items?: Array<z.infer<typeof structuredCertificationItemSchema>>,
+) {
+  return (items ?? [])
+    .map((item) => ({
+      name: normalizeOptionalText(item.name),
+      issuer: normalizeOptionalText(item.issuer),
+      credentialUrl: normalizeOptionalText(item.credentialUrl),
+    }))
+    .filter((item) => Object.values(item).some(Boolean));
+}
 
 // GET /api/profile — get own candidate profile
 router.get("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response) => {
@@ -85,9 +123,18 @@ router.put("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, re
     const data = upsertProfileSchema.parse(req.body);
 
     // Normalise empty strings to null for URL fields
-    const linkedinUrl = data.linkedinUrl || null;
-    const githubUrl = data.githubUrl || null;
-    const portfolioUrl = data.portfolioUrl || null;
+    const linkedinUrl = normalizeOptionalText(data.linkedinUrl);
+    const githubUrl = normalizeOptionalText(data.githubUrl);
+    const portfolioUrl = normalizeOptionalText(data.portfolioUrl);
+    const workHistory = data.workHistory !== undefined
+      ? normalizeWorkHistory(data.workHistory)
+      : undefined;
+    const educationHistory = data.educationHistory !== undefined
+      ? normalizeEducationHistory(data.educationHistory)
+      : undefined;
+    const certifications = data.certifications !== undefined
+      ? normalizeCertifications(data.certifications)
+      : undefined;
 
     const profile = await prisma.candidateProfile.upsert({
       where: { userId: req.user!.userId },
@@ -100,6 +147,9 @@ router.put("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, re
         skills: data.skills ?? [],
         targetRoles: data.targetRoles ?? [],
         targetCountries: data.targetCountries ?? [],
+        workHistory: workHistory ?? [],
+        educationHistory: educationHistory ?? [],
+        certifications: certifications ?? [],
       },
       update: {
         ...data,
@@ -109,6 +159,9 @@ router.put("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, re
         ...(data.skills !== undefined && { skills: data.skills }),
         ...(data.targetRoles !== undefined && { targetRoles: data.targetRoles }),
         ...(data.targetCountries !== undefined && { targetCountries: data.targetCountries }),
+        ...(workHistory !== undefined && { workHistory }),
+        ...(educationHistory !== undefined && { educationHistory }),
+        ...(certifications !== undefined && { certifications }),
       },
       include: {
         resumes: {
@@ -117,7 +170,7 @@ router.put("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, re
       },
     });
 
-    const completeness = computeCompleteness(profile);
+    const completeness = computeProfileCompleteness(profile);
     const updated = await prisma.candidateProfile.update({
       where: { id: profile.id },
       data: { profileCompleteness: completeness },
@@ -127,6 +180,8 @@ router.put("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, re
         },
       },
     });
+
+    await refreshCandidateTrustProfile(req.user!.userId).catch(() => undefined);
 
     res.json(updated);
   } catch (error) {
@@ -207,6 +262,24 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
         isActive: data.setActive,
       },
     });
+
+    const refreshedProfile = await prisma.candidateProfile.findUnique({
+      where: { id: profile.id },
+      include: {
+        resumes: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (refreshedProfile) {
+      const completeness = computeProfileCompleteness(refreshedProfile);
+      await prisma.candidateProfile.update({
+        where: { id: profile.id },
+        data: { profileCompleteness: completeness },
+      });
+      await refreshCandidateTrustProfile(req.user!.userId).catch(() => undefined);
+    }
 
     res.status(201).json(resume);
   } catch (error) {

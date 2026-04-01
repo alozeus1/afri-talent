@@ -35,7 +35,11 @@ import referralsRoutes from "./routes/referrals.js";
 import learningRoutes from "./routes/learning.js";
 import calendarRoutes from "./routes/calendar.js";
 import candidateAnalyticsRoutes from "./routes/candidate-analytics.js";
-dotenv.config();
+import jobExtractRoutes from "./routes/job-extract.js";
+import autopilotRoutes from "./routes/autopilot.js";
+import chatRoutes from "./routes/chat.js";
+import chatConsentRoutes from "./routes/chat-consent.js";
+dotenv.config({ quiet: true });
 initSentry();
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
@@ -67,7 +71,8 @@ const allowedOriginRegex = process.env.ALLOWED_ORIGIN_REGEX
     : null;
 const isAllowedOrigin = (origin) => {
     if (!origin) {
-        return !isProduction;
+        // Non-browser callers such as App Runner health checks won't send Origin.
+        return true;
     }
     if (allowedOrigins.includes(origin)) {
         return true;
@@ -195,6 +200,10 @@ app.use("/api/referrals", referralsRoutes);
 app.use("/api/learning", learningRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/candidate-analytics", candidateAnalyticsRoutes);
+app.use("/api/job-extract", jobExtractRoutes);
+app.use("/api/autopilot", autopilotRoutes);
+app.use("/api/chat", chatRoutes);
+app.use("/api/chat/consent", chatConsentRoutes);
 // Orchestrator route needs a larger body limit (resume + raw job texts can be ~200 KB combined)
 app.use("/api/orchestrator", express.json({ limit: "250kb" }), orchestratorLimiter, orchestratorRoutes);
 // Sentry error handler (must be before any other error middleware and after all controllers)

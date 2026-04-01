@@ -3,9 +3,11 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Playwright configuration for AfriTalent E2E tests.
  *
- * Tests are split into two suites:
- *   gate-a-security  — auth cookie, logout, token blocklist, CORS, rate-limit edge cases
- *   gate-b-schema    — profile CRUD, resumes, notifications
+ * Tests are split into API and UI suites:
+ *   gate-a-security / gate-b-schema / phase*-api* / phase*-security*
+ *      -> API project (request + API-centric flows)
+ *   ui-*.spec.ts
+ *      -> desktop-web + mobile-web projects
  *
  * The backend must be running on http://localhost:4000 (or API_BASE_URL).
  * The frontend (Next.js) must be running on http://localhost:3000.
@@ -38,8 +40,18 @@ export default defineConfig({
   projects: [
     {
       name: "api",
-      testMatch: /\.spec\.ts$/,
+      testMatch: /(gate-.*|phase1-foundation-smoke|phase2-.*api.*|phase2-.*security.*)\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"], baseURL: API_URL },
+    },
+    {
+      name: "desktop-web",
+      testMatch: /ui-.*\.spec\.ts$/,
+      use: { ...devices["Desktop Chrome"], baseURL: APP_URL },
+    },
+    {
+      name: "mobile-web",
+      testMatch: /ui-.*\.spec\.ts$/,
+      use: { ...devices["iPhone 13"], baseURL: APP_URL },
     },
   ],
 });

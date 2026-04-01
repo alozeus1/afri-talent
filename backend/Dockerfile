@@ -25,6 +25,9 @@ RUN npm run build
 # Prune dev deps for runtime
 RUN npm prune --production
 
+# Re-add Prisma CLI so the runtime container can apply migrations on startup.
+RUN npm install --no-save prisma@5.22.0
+
 # Production image
 FROM base AS runner
 WORKDIR /app
@@ -39,12 +42,14 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/docker ./docker
 
+RUN chmod +x ./docker/entrypoint.sh
 RUN chown -R expressjs:nodejs /app
 USER expressjs
 
 EXPOSE 4000
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 CMD curl -fsS http://localhost:4000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 CMD curl -fsS http://localhost:4000/health || exit 1
 
-CMD ["node", "--import", "./dist/instrument.js", "dist/server.js"]
+CMD ["./docker/entrypoint.sh"]

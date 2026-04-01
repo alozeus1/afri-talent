@@ -9,8 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { QuickApplyModal } from "@/components/jobs/quick-apply-modal";
+import { JobJsonLd } from "@/components/jobs/job-jsonld";
+import { JobDetailSkeleton } from "@/components/ui/skeleton";
+import { TrustBadge } from "@/components/trust/trust-badge";
+import { formatSalaryRange } from "@/lib/salary";
+import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { jobDiscoveryEvents } from "@/lib/analytics";
 
 export default function JobDetailPage() {
+  const locale = useLocale();
+  const t = useT();
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
@@ -36,9 +44,21 @@ export default function JobDetailPage() {
     fetchJob();
   }, [params.slug]);
 
+  useEffect(() => {
+    if (job?.rankingExplanation) {
+      jobDiscoveryEvents.explanationViewed({
+        job_id: job.id,
+        ranking_score: job.rankingExplanation.score,
+        quality_score: job.discovery?.qualityScore ?? 0,
+        freshness_score: job.discovery?.freshnessScore ?? 0,
+        source_count: job.discovery?.sourceCount ?? 1,
+      });
+    }
+  }, [job]);
+
   const handleApply = async () => {
     if (!user) {
-      router.push(`/login?redirect=/jobs/${params.slug}`);
+      router.push(localizePath(`/login?redirect=/jobs/${params.slug}`, locale));
       return;
     }
 
@@ -60,21 +80,8 @@ export default function JobDetailPage() {
     }
   };
 
-  const formatSalary = () => {
-    if (!job?.salaryMin && !job?.salaryMax) return null;
-    const currency = job.currency || "USD";
-    const min = job.salaryMin ? `${currency} ${job.salaryMin.toLocaleString()}` : "";
-    const max = job.salaryMax ? `${currency} ${job.salaryMax.toLocaleString()}` : "";
-    if (min && max) return `${min} - ${max}`;
-    return min || max;
-  };
-
   if (loading) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+    return <JobDetailSkeleton />;
   }
 
   if (error || !job) {
@@ -83,22 +90,29 @@ export default function JobDetailPage() {
         <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
           {error || "Job not found"}
         </div>
-        <Link href="/jobs">
-          <Button variant="outline">Back to Jobs</Button>
+        <Link href={localizePath("/jobs", locale)}>
+          <Button variant="outline">{t("common.backToJobs")}</Button>
         </Link>
       </div>
     );
   }
 
-  const salary = formatSalary();
+  const salary = formatSalaryRange({
+    salaryMin: job.salaryMin,
+    salaryMax: job.salaryMax,
+    currency: job.currency,
+    salaryPeriod: job.salaryPeriod,
+  });
 
   return (
+    <>
+    <JobJsonLd job={job} />
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <Link href="/jobs" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
+      <Link href={localizePath("/jobs", locale)} className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
         <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
-        Back to Jobs
+        {t("common.backToJobs")}
       </Link>
 
       <div className="grid lg:grid-cols-3 gap-8">
@@ -108,9 +122,49 @@ export default function JobDetailPage() {
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{job.title}</h1>
                 <p className="text-emerald-600 font-semibold text-lg">{job.employer?.companyName || job.sourceName || "Company"}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {job.employer?.trust && (
+                    <TrustBadge
+                      label={job.employer.trust.badge}
+                      riskLevel={job.employer.trust.riskLevel}
+                      variant="success"
+                    />
+                  )}
+                  {job.trust?.companyReviewed && (
+                    <TrustBadge label="Company reviewed" variant="info" />
+                  )}
+                  {job.trust?.jobQualityChecked && (
+                    <TrustBadge label="Job quality checked" variant="success" />
+                  )}
+                  {job.trust?.newEmployerCaution && (
+                    <TrustBadge label="New employer" riskLevel="MEDIUM" variant="warning" />
+                  )}
+                  {job.discovery?.trustedJob && (
+                    <TrustBadge label="Trusted job" variant="success" />
+                  )}
+                  {job.discovery?.sourceCount && job.discovery.sourceCount > 1 && (
+                    <TrustBadge label={`Cross-checked x${job.discovery.sourceCount}`} variant="info" />
+                  )}
+                </div>
               </div>
               <Badge variant="success" className="text-sm">{job.type}</Badge>
             </div>
+
+            {job.discovery?.stale && (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
+                <p className="font-semibold text-amber-900">Aging listing</p>
+                <p className="mt-2 text-sm text-amber-900">
+                  This job has not been refreshed recently, so AfriTalent downranks it and recommends extra caution before applying.
+                </p>
+              </div>
+            )}
+
+            {job.trust && (job.trust.newEmployerCaution || job.trust.riskLevel === "MEDIUM" || job.trust.riskLevel === "HIGH") && (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
+                <p className="font-semibold text-amber-900">Trust guidance</p>
+                <p className="mt-2 text-sm text-amber-900">{job.trust.guidance}</p>
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-4 mb-6 text-gray-600">
               <span className="inline-flex items-center">
@@ -131,7 +185,7 @@ export default function JobDetailPage() {
                   <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  {salary}/year
+                  {salary}
                 </span>
               )}
             </div>
@@ -183,6 +237,40 @@ export default function JobDetailPage() {
               </div>
             )}
 
+            {job.discovery && (
+              <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
+                <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Signal quality</h3>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-white px-4 py-3">
+                    <p className="text-xs font-medium text-slate-500">Freshness</p>
+                    <p className="mt-1 text-base font-semibold text-slate-900">{job.discovery.freshnessLabel}</p>
+                  </div>
+                  <div className="rounded-xl bg-white px-4 py-3">
+                    <p className="text-xs font-medium text-slate-500">Quality</p>
+                    <p className="mt-1 text-base font-semibold text-slate-900">{job.discovery.qualityLabel}</p>
+                  </div>
+                  <div className="rounded-xl bg-white px-4 py-3">
+                    <p className="text-xs font-medium text-slate-500">Salary clarity</p>
+                    <p className="mt-1 text-base font-semibold text-slate-900">{job.discovery.salaryTransparent ? "Disclosed" : "Not disclosed"}</p>
+                  </div>
+                  <div className="rounded-xl bg-white px-4 py-3">
+                    <p className="text-xs font-medium text-slate-500">Application path</p>
+                    <p className="mt-1 text-base font-semibold text-slate-900">{job.discovery.validApplicationPath ? "Verified" : "Needs caution"}</p>
+                  </div>
+                </div>
+                {job.rankingExplanation?.summary && (
+                  <p className="mt-4 text-sm text-slate-700">
+                    Why this ranks well: {job.rankingExplanation.summary}
+                  </p>
+                )}
+                {job.discovery.sourceCount > 1 && (
+                  <p className="mt-2 text-sm text-slate-600">
+                    AfriTalent merged this listing from {job.discovery.sourceCount} sources to reduce duplicates and preserve the strongest application path.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="prose max-w-none">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Job Description</h2>
               <div className="text-gray-600 whitespace-pre-wrap">{job.description}</div>
@@ -194,6 +282,19 @@ export default function JobDetailPage() {
           <Card className="sticky top-24">
             <CardContent className="p-6">
               <h3 className="font-semibold text-gray-900 mb-4">Apply for this position</h3>
+
+              <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4">
+                <p className="text-sm font-semibold text-blue-900">Stay safe while applying</p>
+                <p className="mt-2 text-sm text-blue-900">
+                  Keep interviews and file sharing on AfriTalent when possible, and never pay application or processing fees.
+                </p>
+                <Link
+                  href={localizePath(`/trust/report?targetJobId=${job.id}`, locale)}
+                  className="mt-3 inline-flex text-sm font-medium text-blue-900 underline-offset-2 hover:underline"
+                >
+                  Report this job
+                </Link>
+              </div>
               
               {applied ? (
                 <div className="bg-emerald-50 text-emerald-700 p-4 rounded-lg mb-4">
@@ -227,7 +328,7 @@ export default function JobDetailPage() {
                     onClick={handleApply}
                     disabled={applying}
                   >
-                    {applying ? "Applying..." : user ? "Apply Now" : "Sign in to Apply"}
+                    {applying ? "Applying..." : user ? t("common.applyNow") : t("common.signInToApply")}
                   </Button>
                   {user && user.role === "CANDIDATE" && (
                     <Button
@@ -239,7 +340,7 @@ export default function JobDetailPage() {
                       <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      Quick Apply
+                      {t("common.quickApply")}
                     </Button>
                   )}
                   {!user && (
@@ -255,6 +356,18 @@ export default function JobDetailPage() {
 
               <div className="border-t border-gray-200 pt-4">
                 <h4 className="font-medium text-gray-900 mb-3">About {job.employer?.companyName || job.sourceName || "Company"}</h4>
+                {job.employer?.trust && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <TrustBadge
+                      label={job.employer.trust.badge}
+                      riskLevel={job.employer.trust.riskLevel}
+                      variant="success"
+                    />
+                    {job.trust?.companyReviewed && (
+                      <TrustBadge label="Company reviewed" variant="info" />
+                    )}
+                  </div>
+                )}
                 <p className="text-gray-600 text-sm mb-2">{job.employer?.location}</p>
                 {job.employer?.bio && (
                   <p className="text-gray-600 text-sm mb-3">{job.employer.bio}</p>
@@ -331,5 +444,6 @@ export default function JobDetailPage() {
         />
       )}
     </div>
+    </>
   );
 }

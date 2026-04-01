@@ -7,7 +7,7 @@ resource "aws_secretsmanager_secret_version" "app" {
   secret_id = aws_secretsmanager_secret.app.id
 
   secret_string = jsonencode({
-    DATABASE_URL          = "postgresql://${var.db_username}:${var.db_password}@${var.db_endpoint}:${var.db_port}/${var.db_name}"
+    DATABASE_URL          = "postgresql://${urlencode(var.db_username)}:${urlencode(var.db_password)}@${var.db_endpoint}:${var.db_port}/${var.db_name}"
     JWT_SECRET            = var.jwt_secret
     ANTHROPIC_API_KEY     = var.anthropic_api_key
     STRIPE_SECRET_KEY     = var.stripe_secret_key

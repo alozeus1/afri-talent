@@ -3,7 +3,7 @@
 # Usage: ./bootstrap.sh <environment>
 set -euo pipefail
 
-ENV=${1:-dev}
+ENV=${1:-staging}
 ACCOUNT_ID=260820061731
 REGION=us-east-1
 BUCKET="afritalent-${ACCOUNT_ID}-${ENV}-terraform-state"

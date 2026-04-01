@@ -86,7 +86,7 @@ resource "aws_apprunner_vpc_connector" "main" {
 # ── Backend Service ──────────────────────────────────────────────────────────
 
 resource "aws_apprunner_service" "backend" {
-  service_name = "${var.name_prefix}-appr-backend-managed"
+  service_name = var.backend_service_name != "" ? var.backend_service_name : "${var.name_prefix}-appr-backend-managed"
 
   source_configuration {
     authentication_configuration {
@@ -98,11 +98,13 @@ resource "aws_apprunner_service" "backend" {
       image_repository_type = "ECR"
       image_configuration {
         port = tostring(var.backend_port)
-        runtime_environment_variables = merge({
-          NODE_ENV     = "production"
-          PORT         = tostring(var.backend_port)
-          FRONTEND_URL = var.frontend_url
-        }, var.backend_environment_variables)
+        runtime_environment_variables = {
+          for key, value in merge({
+            NODE_ENV     = "production"
+            PORT         = tostring(var.backend_port)
+            FRONTEND_URL = var.frontend_url
+          }, var.backend_environment_variables) : key => value if value != null
+        }
         runtime_environment_secrets = {
           for name in var.backend_secret_names : name => "${var.secret_arn}:${name}::"
         }
@@ -137,8 +139,7 @@ resource "aws_apprunner_service" "backend" {
   auto_scaling_configuration_arn = aws_apprunner_auto_scaling_configuration_version.backend.arn
 
   tags = {
-    Name        = "${var.name_prefix}-backend"
-    Environment = var.environment
+    Name = "${var.name_prefix}-backend"
   }
 }
 
@@ -152,7 +153,7 @@ resource "aws_apprunner_auto_scaling_configuration_version" "backend" {
 # ── Frontend Service ─────────────────────────────────────────────────────────
 
 resource "aws_apprunner_service" "frontend" {
-  service_name = "${var.name_prefix}-appr-frontend-managed"
+  service_name = var.frontend_service_name != "" ? var.frontend_service_name : "${var.name_prefix}-appr-frontend-managed"
 
   source_configuration {
     authentication_configuration {
@@ -164,11 +165,13 @@ resource "aws_apprunner_service" "frontend" {
       image_repository_type = "ECR"
       image_configuration {
         port = tostring(var.frontend_port)
-        runtime_environment_variables = merge({
-          NODE_ENV                = "production"
-          NEXT_PUBLIC_API_URL     = var.backend_url != "" ? var.backend_url : "https://${aws_apprunner_service.backend.service_url}"
-          NEXT_PUBLIC_BACKEND_URL = var.backend_url != "" ? var.backend_url : "https://${aws_apprunner_service.backend.service_url}"
-        }, var.frontend_environment_variables)
+        runtime_environment_variables = {
+          for key, value in merge({
+            NODE_ENV                = "production"
+            NEXT_PUBLIC_API_URL     = var.backend_url != "" ? var.backend_url : "https://${aws_apprunner_service.backend.service_url}"
+            NEXT_PUBLIC_BACKEND_URL = var.backend_url != "" ? var.backend_url : "https://${aws_apprunner_service.backend.service_url}"
+          }, var.frontend_environment_variables) : key => value if value != null
+        }
       }
     }
 
@@ -192,8 +195,7 @@ resource "aws_apprunner_service" "frontend" {
   auto_scaling_configuration_arn = aws_apprunner_auto_scaling_configuration_version.frontend.arn
 
   tags = {
-    Name        = "${var.name_prefix}-frontend"
-    Environment = var.environment
+    Name = "${var.name_prefix}-frontend"
   }
 }
 

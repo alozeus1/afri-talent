@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { messages, MessageThread } from "@/lib/api";
+import { messages, MessageThread, trust } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 
 function timeAgo(dateStr: string): string {
   const now = new Date();
@@ -24,22 +25,32 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function MessagesPage() {
+  const locale = useLocale();
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [threads, setThreads] = useState<MessageThread[]>([]);
+  const [guidance, setGuidance] = useState<{
+    headline: string;
+    tips: string[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, locale, router]);
 
   useEffect(() => {
     if (user) {
-      messages
-        .threads()
-        .then((res) => setThreads(res.threads))
+      Promise.all([
+        messages.threads(),
+        trust.messagingGuidance().catch(() => null),
+      ])
+        .then(([threadData, guidanceData]) => {
+          setThreads(threadData.threads);
+          setGuidance(guidanceData);
+        })
         .catch(console.error)
         .finally(() => setLoading(false));
     }
@@ -59,6 +70,28 @@ export default function MessagesPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Messages</h1>
         <p className="text-gray-600">Your conversations</p>
       </div>
+
+      {guidance && (
+        <Card className="mb-8 border-blue-200 bg-blue-50/60">
+          <CardContent className="p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-blue-900">{guidance.headline}</h2>
+                <ul className="mt-3 space-y-2 text-sm text-blue-900">
+                  {guidance.tips.slice(0, 3).map((tip) => (
+                    <li key={tip}>• {tip}</li>
+                  ))}
+                </ul>
+              </div>
+              <Link href={localizePath("/trust/report", locale)}>
+                <span className="inline-flex min-h-10 items-center rounded-lg border border-blue-300 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-100">
+                  Report suspicious behavior
+                </span>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -101,7 +134,7 @@ export default function MessagesPage() {
                 return (
                   <Link
                     key={thread.id}
-                    href={`/messages/${thread.id}`}
+                    href={localizePath(`/messages/${thread.id}`, locale)}
                     className="block py-4 hover:bg-gray-50 -mx-6 px-6 transition-colors"
                   >
                     <div className="flex justify-between items-start gap-4">

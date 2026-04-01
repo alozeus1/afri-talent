@@ -7,11 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test:unit": "jest",
-    "test:unit:watch": "jest --watch",
+    "test:unit": "NODE_OPTIONS='--max-old-space-size=4096' NEXT_UNHANDLED_REJECTION_FILTER=disabled jest --runInBand",
+    "test:unit:watch": "NODE_OPTIONS='--max-old-space-size=4096' NEXT_UNHANDLED_REJECTION_FILTER=disabled jest --watch",
+    "test:unit:shard:1": "NODE_OPTIONS='--max-old-space-size=4096' NEXT_UNHANDLED_REJECTION_FILTER=disabled jest --runInBand --shard=1/2",
+    "test:unit:shard:2": "NODE_OPTIONS='--max-old-space-size=4096' NEXT_UNHANDLED_REJECTION_FILTER=disabled jest --runInBand --shard=2/2",
+    "test:unit:ci": "npm run test:unit:shard:1 && npm run test:unit:shard:2",
+    "test:e2e": "playwright test",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "test:perf:lighthouse": "npx @lhci/cli@0.14.x autorun --config=./lighthouserc.json"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.43.0",

@@ -7,8 +7,14 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
+import { getPasswordStrength } from "@/lib/password-strength";
+import { Skeleton } from "@/components/ui/skeleton";
+import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 
 function RegisterForm() {
+  const locale = useLocale();
+  const t = useT();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { register } = useAuth();
@@ -26,6 +32,7 @@ function RegisterForm() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const passwordStrength = getPasswordStrength(formData.password);
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
@@ -64,7 +71,7 @@ function RegisterForm() {
 
     try {
       await register(formData);
-      router.push(formData.role === "EMPLOYER" ? "/employer" : "/candidate");
+      router.push(localizePath(formData.role === "EMPLOYER" ? "/employer" : "/candidate", locale));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -80,43 +87,43 @@ function RegisterForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Create Your Account</h1>
-        <p className="text-gray-600">Join the AfriTalent community</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create Your Account</h1>
+        <p className="text-gray-600 dark:text-gray-300">Join the AfriTalent community</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+            <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 p-3 rounded-lg text-sm">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">I am a</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">I am a</label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 className={`p-3 rounded-lg border-2 text-center transition-colors ${
                   formData.role === "CANDIDATE"
-                    ? "border-emerald-600 bg-emerald-50 text-emerald-700"
-                    : "border-gray-200 hover:border-gray-300"
+                    ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
+                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
                 }`}
                 onClick={() => updateField("role", "CANDIDATE")}
               >
                 <span className="font-medium">Candidate</span>
-                <p className="text-xs text-gray-500 mt-1">Looking for jobs</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Looking for jobs</p>
               </button>
               <button
                 type="button"
                 className={`p-3 rounded-lg border-2 text-center transition-colors ${
                   formData.role === "EMPLOYER"
-                    ? "border-emerald-600 bg-emerald-50 text-emerald-700"
-                    : "border-gray-200 hover:border-gray-300"
+                    ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
+                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
                 }`}
                 onClick={() => updateField("role", "EMPLOYER")}
               >
                 <span className="font-medium">Employer</span>
-                <p className="text-xs text-gray-500 mt-1">Hiring talent</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Hiring talent</p>
               </button>
             </div>
           </div>
@@ -150,6 +157,38 @@ function RegisterForm() {
             onChange={(e) => updateField("password", e.target.value)}
             error={fieldErrors.password}
           />
+          {formData.password && (
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Password strength</span>
+                <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">{passwordStrength.level}</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-800 mb-2 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    passwordStrength.score <= 1
+                      ? "bg-red-500"
+                      : passwordStrength.score === 2
+                        ? "bg-amber-500"
+                        : passwordStrength.score === 3
+                          ? "bg-emerald-500"
+                          : "bg-emerald-600"
+                  }`}
+                  style={{ width: `${passwordStrength.percentage}%` }}
+                  role="progressbar"
+                  aria-valuenow={passwordStrength.percentage}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Password strength"
+                />
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-300">
+                {passwordStrength.score >= 3
+                  ? "Great password. You're in good shape."
+                  : passwordStrength.feedback.slice(0, 2).join(" ")}
+              </p>
+            </div>
+          )}
 
           {formData.role === "EMPLOYER" && (
             <>
@@ -174,14 +213,16 @@ function RegisterForm() {
           )}
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Creating account..." : "Create Account"}
+            {loading ? "Creating account..." : t("auth.createAccount")}
           </Button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-gray-600">
-          Already have an account?{" "}
-          <Link href="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
-            Sign in
+        <OAuthButtons mode="register" onError={(oauthError) => setError(oauthError)} />
+
+        <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
+          {t("auth.alreadyHaveAccount")}{" "}
+          <Link href={localizePath("/login", locale)} className="text-emerald-600 hover:text-emerald-700 font-medium">
+            {t("auth.signIn")}
           </Link>
         </div>
       </CardContent>
@@ -192,7 +233,11 @@ function RegisterForm() {
 export default function RegisterPage() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
-      <Suspense fallback={<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>}>
+      <Suspense fallback={
+        <div className="w-full max-w-md space-y-3">
+          <Skeleton className="h-72 w-full rounded-xl" />
+        </div>
+      }>
         <RegisterForm />
       </Suspense>
     </div>

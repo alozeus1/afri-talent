@@ -12,9 +12,10 @@ public_subnet_cidrs        = ["10.22.0.0/24", "10.22.1.0/24"]
 private_subnet_cidrs       = ["10.22.10.0/24", "10.22.11.0/24"]
 az_count                   = 2
 
-frontend_image = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-prod-frontend:latest"
-backend_image  = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-prod-backend:latest"
-create_ecr     = true
+frontend_image         = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-prod-frontend:latest"
+backend_image          = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-prod-backend:latest"
+create_ecr             = true
+s3_uploads_bucket_name = "afritalent-260820061731-prod-uploads"
 
 frontend_container_cpu    = 1024
 frontend_container_memory = 2048

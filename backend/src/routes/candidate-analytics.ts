@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { ApplicationStatus, JobStatus, Role } from "@prisma/client";
+import { buildJobSearchWhere, fetchRankedJobs } from "../lib/jobs/search.js";
 
 const router = Router();
 
@@ -105,7 +106,7 @@ router.get("/recommendations", authenticate, authorize(Role.CANDIDATE), async (r
 
     const { skills, targetRoles, targetCountries } = profile;
 
-    // Build OR conditions for matching
+    const baseWhere = buildJobSearchWhere({});
     const orConditions: any[] = [];
 
     if (skills.length > 0) {
@@ -126,70 +127,37 @@ router.get("/recommendations", authenticate, authorize(Role.CANDIDATE), async (r
     }
 
     if (orConditions.length === 0) {
-      // No profile data to match against — return recent published jobs
-      const jobs = await prisma.job.findMany({
-        where: { status: JobStatus.PUBLISHED },
-        include: {
-          employer: { select: { companyName: true, location: true } },
+      const { jobs } = await fetchRankedJobs({
+        where: baseWhere,
+        page: 1,
+        limit: 20,
+        preferenceContext: {
+          skills,
+          targetRoles,
+          targetCountries,
         },
-        orderBy: { publishedAt: "desc" },
-        take: 20,
       });
       res.json(jobs);
       return;
     }
 
-    const jobs = await prisma.job.findMany({
+    const { jobs } = await fetchRankedJobs({
       where: {
-        status: JobStatus.PUBLISHED,
-        OR: orConditions,
+        AND: [
+          baseWhere,
+          { OR: orConditions },
+        ],
       },
-      include: {
-        employer: { select: { companyName: true, location: true } },
+      page: 1,
+      limit: 20,
+      take: 200,
+      preferenceContext: {
+        skills,
+        targetRoles,
+        targetCountries,
       },
-      orderBy: { publishedAt: "desc" },
-      take: 100, // fetch more so we can sort by match score
     });
-
-    // Compute match score: count of overlapping fields
-    const scoredJobs = jobs.map((job) => {
-      let score = 0;
-
-      // Skill overlap (tags vs candidate skills)
-      if (skills.length > 0) {
-        const skillsLower = skills.map((s) => s.toLowerCase());
-        const tagsLower = job.tags.map((t) => t.toLowerCase());
-        score += tagsLower.filter((t) => skillsLower.includes(t)).length;
-      }
-
-      // Target role overlap (title contains target role)
-      if (targetRoles.length > 0) {
-        const titleLower = job.title.toLowerCase();
-        score += targetRoles.filter((r) => titleLower.includes(r.toLowerCase())).length;
-      }
-
-      // Target country overlap (eligibleCountries or location)
-      if (targetCountries.length > 0) {
-        const countriesLower = targetCountries.map((c) => c.toLowerCase());
-        const eligibleLower = job.eligibleCountries.map((c) => c.toLowerCase());
-        score += eligibleLower.filter((c) => countriesLower.includes(c)).length;
-        if (countriesLower.some((c) => job.location.toLowerCase().includes(c))) {
-          score += 1;
-        }
-      }
-
-      return { ...job, matchScore: score };
-    });
-
-    // Sort by match score descending, then by publishedAt descending
-    scoredJobs.sort((a, b) => {
-      if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
-      const aDate = a.publishedAt?.getTime() ?? 0;
-      const bDate = b.publishedAt?.getTime() ?? 0;
-      return bDate - aDate;
-    });
-
-    res.json(scoredJobs.slice(0, 20));
+    res.json(jobs);
   } catch (error) {
     console.error("Job recommendations error:", error);
     res.status(500).json({ error: "Internal server error" });

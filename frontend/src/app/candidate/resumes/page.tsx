@@ -4,13 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { profile, ResumeFile } from "@/lib/api";
+import { profile, ResumeFile, ResumeProfileDraft } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 
 export default function ResumesPage() {
+  const locale = useLocale();
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [resumes, setResumes] = useState<ResumeFile[]>([]);
@@ -20,12 +22,18 @@ export default function ResumesPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [settingActive, setSettingActive] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const [applyingDraft, setApplyingDraft] = useState(false);
+  const [overwriteExisting, setOverwriteExisting] = useState(false);
+  const [parsedName, setParsedName] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ResumeProfileDraft | null>(null);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "CANDIDATE")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
 
   useEffect(() => {
     if (user?.role === "CANDIDATE") {
@@ -97,6 +105,59 @@ export default function ResumesPage() {
     }
   };
 
+  const handleParseResume = async () => {
+    if (!selectedFile) {
+      setError("Please choose a PDF or DOCX file first.");
+      return;
+    }
+
+    setParsing(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await profile.parseResume(selectedFile);
+      setDraft(response.profileDraft || {});
+      setParsedName(response.parsed.name || null);
+      setSuccessMessage("Resume parsed successfully. Review the draft fields before applying.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to parse resume");
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const updateDraftField = (field: keyof ResumeProfileDraft, value: string) => {
+    setDraft((prev) => ({
+      ...(prev || {}),
+      [field]: value || undefined,
+    }));
+  };
+
+  const handleApplyDraft = async () => {
+    if (!draft) return;
+    setApplyingDraft(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      await profile.applyResumeDraft({
+        confirm: true,
+        overwriteExisting,
+        draft: {
+          ...draft,
+          skills: draft.skills?.map((item) => item.trim()).filter(Boolean),
+          targetRoles: draft.targetRoles?.map((item) => item.trim()).filter(Boolean),
+        },
+      });
+      setSuccessMessage("Resume draft applied to your profile.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to apply parsed draft");
+    } finally {
+      setApplyingDraft(false);
+    }
+  };
+
   if (isLoading || !user) {
     return (
       <div className="flex justify-center py-24">
@@ -110,7 +171,7 @@ export default function ResumesPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="mb-8">
-        <Link href="/candidate" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-4">
+        <Link href={localizePath("/candidate", locale)} className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-4">
           <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -198,7 +259,119 @@ export default function ResumesPage() {
         </CardContent>
       </Card>
 
-      {/* Section 3: All Resumes */}
+      {/* Section 3: Parse Resume to Profile Draft */}
+      <Card className="mb-6">
+        <CardHeader>
+          <h2 className="text-xl font-semibold text-gray-900">AI Resume Parsing</h2>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500 mb-4">
+            Upload a PDF or DOCX to extract profile data. We never auto-overwrite your profile. Review and confirm first.
+          </p>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
+              className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
+            />
+            <Button onClick={handleParseResume} disabled={!selectedFile || parsing}>
+              {parsing ? "Parsing..." : "Parse Resume"}
+            </Button>
+          </div>
+
+          {draft && (
+            <div className="mt-6 rounded-lg border border-gray-200 p-4">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Profile Draft Review</h3>
+                  {parsedName && <p className="text-xs text-gray-500 mt-1">Detected name: {parsedName}</p>}
+                </div>
+                <label className="inline-flex items-center gap-2 text-xs text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={overwriteExisting}
+                    onChange={(event) => setOverwriteExisting(event.target.checked)}
+                  />
+                  Overwrite existing profile fields
+                </label>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-3">
+                <Input
+                  id="draftHeadline"
+                  label="Headline"
+                  value={draft.headline || ""}
+                  onChange={(event) => updateDraftField("headline", event.target.value)}
+                />
+                <Input
+                  id="draftYears"
+                  type="number"
+                  label="Years of experience"
+                  value={draft.yearsExperience?.toString() || ""}
+                  onChange={(event) => setDraft((prev) => ({
+                    ...(prev || {}),
+                    yearsExperience: event.target.value ? Number(event.target.value) : undefined,
+                  }))}
+                />
+                <Input
+                  id="draftSkills"
+                  label="Skills (comma-separated)"
+                  value={(draft.skills || []).join(", ")}
+                  onChange={(event) =>
+                    setDraft((prev) => ({
+                      ...(prev || {}),
+                      skills: event.target.value.split(",").map((item) => item.trim()).filter(Boolean),
+                    }))
+                  }
+                />
+                <Input
+                  id="draftRoles"
+                  label="Target roles (comma-separated)"
+                  value={(draft.targetRoles || []).join(", ")}
+                  onChange={(event) =>
+                    setDraft((prev) => ({
+                      ...(prev || {}),
+                      targetRoles: event.target.value.split(",").map((item) => item.trim()).filter(Boolean),
+                    }))
+                  }
+                />
+                <Input
+                  id="draftLinkedIn"
+                  label="LinkedIn URL"
+                  value={draft.linkedinUrl || ""}
+                  onChange={(event) => updateDraftField("linkedinUrl", event.target.value)}
+                />
+                <Input
+                  id="draftGithub"
+                  label="GitHub URL"
+                  value={draft.githubUrl || ""}
+                  onChange={(event) => updateDraftField("githubUrl", event.target.value)}
+                />
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Summary / Bio</label>
+                <textarea
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  rows={5}
+                  value={draft.bio || ""}
+                  onChange={(event) => updateDraftField("bio", event.target.value)}
+                />
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <Button onClick={handleApplyDraft} disabled={applyingDraft}>
+                  {applyingDraft ? "Applying..." : "Apply Draft to Profile"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Section 4: All Resumes */}
       <Card>
         <CardHeader>
           <h2 className="text-xl font-semibold text-gray-900">All Resumes</h2>

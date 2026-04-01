@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate } from "../middleware/auth.js";
-import { getStripe, STRIPE_PRICES } from "../lib/stripe.js";
+import { getStripe, isStripeConfigured, STRIPE_PRICES } from "../lib/stripe.js";
 import { SubscriptionPlan } from "@prisma/client";
 const router = Router();
 const checkoutSchema = z.object({
@@ -11,6 +11,10 @@ const checkoutSchema = z.object({
 // POST /api/billing/checkout — create Stripe checkout session
 router.post("/checkout", authenticate, async (req, res) => {
     try {
+        if (!isStripeConfigured()) {
+            res.status(503).json({ error: "Billing is not configured for this environment" });
+            return;
+        }
         const stripe = getStripe();
         const { plan } = checkoutSchema.parse(req.body);
         const priceId = STRIPE_PRICES[plan];
@@ -69,6 +73,10 @@ router.post("/checkout", authenticate, async (req, res) => {
 // POST /api/billing/portal — create Stripe customer portal session
 router.post("/portal", authenticate, async (req, res) => {
     try {
+        if (!isStripeConfigured()) {
+            res.status(503).json({ error: "Billing is not configured for this environment" });
+            return;
+        }
         const stripe = getStripe();
         const subscription = await prisma.subscription.findUnique({
             where: { userId: req.user.userId },

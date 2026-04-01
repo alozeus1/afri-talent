@@ -5,12 +5,16 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { talent, TalentSearchResponse } from "@/lib/api";
+import { employerOnboardingEvents } from "@/lib/analytics";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TrustBadge } from "@/components/trust/trust-badge";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 
 export default function TalentMarketplacePage() {
+  const locale = useLocale();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -21,31 +25,53 @@ export default function TalentMarketplacePage() {
   const [skills, setSkills] = useState("");
   const [location, setLocation] = useState("");
   const [minExperience, setMinExperience] = useState("");
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [verifiedSkillsOnly, setVerifiedSkillsOnly] = useState(false);
+  const [fullyCompletedOnly, setFullyCompletedOnly] = useState(false);
+  const [assessmentBackedOnly, setAssessmentBackedOnly] = useState(false);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "EMPLOYER")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
 
   const fetchTalent = useCallback(async () => {
     if (!user || user.role !== "EMPLOYER") return;
     setLoading(true);
     setError(null);
     try {
-      const params: Record<string, string | number> = { page, limit: 12 };
-      if (skills) params.skills = skills;
-      if (location) params.location = location;
-      if (minExperience) params.minExperience = parseInt(minExperience);
-      const response = await talent.search(params) as TalentSearchResponse;
+      const response = await talent.search({
+        skills: skills || undefined,
+        location: location || undefined,
+        minExperience: minExperience ? parseInt(minExperience) : undefined,
+        page,
+        verifiedOnly,
+        verifiedSkillsOnly,
+        fullyCompletedOnly,
+        assessmentBackedOnly,
+      }) as TalentSearchResponse;
       setData(response);
+      employerOnboardingEvents.talentResultsLoaded({
+        results_count: response.pagination.total,
+        page,
+        verified_only: verifiedOnly,
+        verified_skills_only: verifiedSkillsOnly,
+        fully_completed_only: fullyCompletedOnly,
+        assessment_backed_only: assessmentBackedOnly,
+        skills_count: skills
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean).length,
+        location: location || null,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load candidates");
     } finally {
       setLoading(false);
     }
-  }, [user, skills, location, minExperience, page]);
+  }, [user, skills, location, minExperience, page, verifiedOnly, verifiedSkillsOnly, fullyCompletedOnly, assessmentBackedOnly]);
 
   useEffect(() => {
     if (user?.role === "EMPLOYER") {
@@ -71,6 +97,11 @@ export default function TalentMarketplacePage() {
         <p className="text-gray-600">
           Discover skilled African professionals for your team
         </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link href={localizePath("/employer/trust", locale)}>
+            <Button variant="outline" size="sm">Employer Trust Profile</Button>
+          </Link>
+        </div>
       </div>
 
       {/* Search Filters */}
@@ -117,11 +148,59 @@ export default function TalentMarketplacePage() {
                 setSkills("");
                 setLocation("");
                 setMinExperience("");
+                setVerifiedOnly(false);
+                setVerifiedSkillsOnly(false);
+                setFullyCompletedOnly(false);
+                setAssessmentBackedOnly(false);
                 setPage(1);
               }}
             >
               Clear Filters
             </Button>
+          </div>
+          <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 space-y-3">
+            {[
+              {
+                checked: verifiedOnly,
+                onChange: (checked: boolean) => setVerifiedOnly(checked),
+                title: "Show verified candidates only",
+                body: "Premium employers can filter for candidates with stronger verification and authenticity signals.",
+              },
+              {
+                checked: verifiedSkillsOnly,
+                onChange: (checked: boolean) => setVerifiedSkillsOnly(checked),
+                title: "Require verified skills",
+                body: "Only show candidates with at least one employer-facing verified skill badge.",
+              },
+              {
+                checked: assessmentBackedOnly,
+                onChange: (checked: boolean) => setAssessmentBackedOnly(checked),
+                title: "Assessment-backed candidates",
+                body: "Prioritize candidates whose trust profile includes verified assessment signals.",
+              },
+              {
+                checked: fullyCompletedOnly,
+                onChange: (checked: boolean) => setFullyCompletedOnly(checked),
+                title: "Fully completed profiles",
+                body: "Show candidates with complete employer-facing trust and profile data.",
+              },
+            ].map((filter) => (
+              <label key={filter.title} className="flex items-start gap-3 text-sm text-blue-900">
+                <input
+                  type="checkbox"
+                  checked={filter.checked}
+                  onChange={(event) => {
+                    filter.onChange(event.target.checked);
+                    setPage(1);
+                  }}
+                  className="mt-0.5 h-4 w-4 rounded border-blue-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>
+                  <span className="block font-semibold">{filter.title}</span>
+                  <span className="block text-blue-800">{filter.body}</span>
+                </span>
+              </label>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -158,9 +237,18 @@ export default function TalentMarketplacePage() {
                 <Card key={candidate.user.id} className="h-full">
                   <CardContent className="p-6">
                     <div className="mb-3">
-                      <h3 className="font-semibold text-gray-900 text-lg">
-                        {candidate.user.name}
-                      </h3>
+                      <div className="flex flex-wrap items-start gap-2">
+                        <h3 className="font-semibold text-gray-900 text-lg">
+                          {candidate.user.name}
+                        </h3>
+                        {candidate.trust && (
+                          <TrustBadge
+                            label={candidate.trust.badge}
+                            riskLevel={candidate.trust.riskLevel}
+                            variant="success"
+                          />
+                        )}
+                      </div>
                       {candidate.headline && (
                         <p className="text-sm text-gray-600 mt-1">{candidate.headline}</p>
                       )}
@@ -209,6 +297,48 @@ export default function TalentMarketplacePage() {
                             style={{ width: `${candidate.profileCompleteness}%` }}
                           />
                         </div>
+                      </div>
+                    )}
+
+                    {candidate.trust && (
+                      <div className="mb-4 space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          {candidate.trust.premiumFilterEligible && (
+                            <TrustBadge label="Premium filter eligible" variant="success" />
+                          )}
+                          {candidate.trust.maskedPhone && (
+                            <TrustBadge label={`Phone verified`} variant="info" />
+                          )}
+                          {candidate.trust.assessmentBacked && (
+                            <TrustBadge label="Assessment-backed" variant="success" />
+                          )}
+                          {candidate.trust.fullyCompletedProfile && (
+                            <TrustBadge label="Fully completed" variant="success" />
+                          )}
+                        </div>
+                        {candidate.verifiedSkills && candidate.verifiedSkills.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {candidate.verifiedSkills.slice(0, 3).map((skill) => (
+                              <TrustBadge
+                                key={skill.id}
+                                label={`${skill.skillName} verified`}
+                                variant="success"
+                              />
+                            ))}
+                          </div>
+                        )}
+                        {candidate.partnerMarkers && candidate.partnerMarkers.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {candidate.partnerMarkers.slice(0, 2).map((marker) => (
+                              <TrustBadge key={marker.id} label={marker.label} variant="info" />
+                            ))}
+                          </div>
+                        )}
+                        {candidate.trust.warnings.length > 0 && (
+                          <p className="text-xs text-amber-700">
+                            {candidate.trust.warnings[0]}
+                          </p>
+                        )}
                       </div>
                     )}
 

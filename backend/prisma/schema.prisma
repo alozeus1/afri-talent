@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
@@ -17,6 +17,13 @@ enum Role {
   ADMIN
   CANDIDATE
   EMPLOYER
+}
+
+enum SupportedLocale {
+  EN
+  FR
+  PT
+  AR
 }
 
 enum JobStatus {
@@ -89,43 +96,528 @@ enum SubscriptionPlan {
   FREE
   BASIC
   PROFESSIONAL
+  EMPLOYER_FREE
+  EMPLOYER_BASIC
+  EMPLOYER_PREMIUM
+}
+
+enum ATSProvider {
+  GREENHOUSE
+  LEVER
+  WORKABLE
+}
+
+enum ATSConnectionStatus {
+  ACTIVE
+  ERROR
+  DISCONNECTED
+}
+
+enum ATSSyncStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum MockInterviewStatus {
+  DRAFT
+  PROCESSING
+  READY
+  ARCHIVED
+}
+
+enum MockInterviewVisibility {
+  PRIVATE
+  TEAM_SHARED
+}
+
+enum MockInterviewArtifactType {
+  VIDEO
+  AUDIO
+  TRANSCRIPT
+  FEEDBACK_JSON
+}
+
+enum AnalyticsEventCategory {
+  ACQUISITION
+  ACTIVATION
+  ENGAGEMENT
+  CONVERSION
+  RETENTION
+  MONETIZATION
+  EMPLOYER_PIPELINE
+  SYSTEM
+}
+
+enum SocialConnectionStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  BLOCKED
+}
+
+enum SalaryNegotiationStatus {
+  DRAFT
+  READY
+  ARCHIVED
+}
+
+enum UniversityPartnerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PartnerOrganizationType {
+  UNIVERSITY
+  BOOTCAMP
+  TRAINING_INSTITUTE
+  SCHOLARSHIP_PARTNER
+}
+
+enum UniversityRecordType {
+  INTERNSHIP
+  GRADUATE_PIPELINE
+  SKILLS_VERIFICATION
+}
+
+enum UniversityRecordStatus {
+  RECEIVED
+  VALIDATED
+  REJECTED
+}
+
+enum EmployerAiTaskType {
+  CANDIDATE_RANKING
+  JOB_DESCRIPTION_GENERATION
+}
+
+enum EmployerAiTaskStatus {
+  GENERATED
+  APPROVED
+  REJECTED
+}
+
+enum BotChannel {
+  WHATSAPP
+  TELEGRAM
+}
+
+enum BotSubscriptionStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  PAUSED
+  REVOKED
+}
+
+enum EmployerVerificationLevel {
+  UNVERIFIED
+  EMAIL_DOMAIN_VERIFIED
+  BUSINESS_DOC_VERIFIED
+  MANUAL_REVIEW_APPROVED
+  PREMIUM_TRUSTED
+}
+
+enum CandidateVerificationLevel {
+  UNVERIFIED
+  EMAIL_VERIFIED
+  PHONE_VERIFIED
+  IDENTITY_DOCUMENT_VERIFIED
+  SKILLS_VERIFIED
+  EMPLOYMENT_HISTORY_PARTIALLY_VERIFIED
+}
+
+enum CandidateSkillVerificationMethod {
+  CERTIFICATE
+  PORTFOLIO
+  ASSESSMENT
+  MANUAL_REVIEW
+  PARTNER_ISSUED
+}
+
+enum CandidateSkillVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum CandidatePartnerMarkerType {
+  UNIVERSITY_VERIFIED
+  BOOTCAMP_VERIFIED
+  TRAINING_VERIFIED
+  SCHOLARSHIP_ALUMNI
+  SCHOLARSHIP_FELLOW
+  PARTNER_RECOMMENDED
+}
+
+enum CandidatePartnerMarkerStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum VerificationArtifactType {
+  BUSINESS_REGISTRATION
+  DOMAIN_OWNERSHIP
+  LINKEDIN_COMPANY
+  IDENTITY_DOCUMENT
+  CERTIFICATION
+  EMPLOYMENT_PROOF
+}
+
+enum VerificationArtifactStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NEEDS_MORE_INFO
+}
+
+enum TrustEntityType {
+  USER
+  EMPLOYER
+  CANDIDATE
+  JOB
+  APPLICATION
+  MESSAGE
+  REPORT
+}
+
+enum TrustRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TrustCaseStatus {
+  OPEN
+  IN_REVIEW
+  ACTIONED
+  DISMISSED
+}
+
+enum ModerationActionType {
+  NOTE
+  APPROVE
+  REJECT
+  HOLD
+  LIMIT
+  SUSPEND
+  REINSTATE
+  ESCALATE
+}
+
+enum AbuseReportReason {
+  SCAM
+  FAKE_JOB
+  IMPERSONATION
+  SPAM
+  OFF_PLATFORM_CONTACT
+  ADVANCE_FEE_REQUEST
+  HARASSMENT
+  FAKE_PROFILE
+  MISLEADING_SALARY
+  OTHER
+}
+
+enum AbuseReportStatus {
+  OPEN
+  TRIAGED
+  RESOLVED
+  DISMISSED
+}
+
+enum AccountRestrictionStatus {
+  ACTIVE
+  LIMITED
+  SUSPENDED
+}
+
+enum PhoneVerificationStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+}
+
+// ──────────────── OAuth & Email Verification ────────────────
+
+enum OAuthProvider {
+  GOOGLE
+  APPLE
+}
+
+model OAuthAccount {
+  id             String        @id @default(uuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider       OAuthProvider
+  providerUserId String
+  email          String?       @db.VarChar(255)
+  displayName    String?       @db.VarChar(200)
+  avatarUrl      String?       @db.VarChar(500)
+  accessToken    String?       @db.Text
+  refreshToken   String?       @db.Text
+  tokenExpiresAt DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@index([provider, email])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+// ──────────────── Regional Pricing ────────────────
+
+enum BillingRegion {
+  AFRICA
+  EUROPE
+  ROW // Rest of World
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+enum RegionChangeSource {
+  USER_SELECTED
+  STRIPE_PAYMENT
+  IP_GEOLOCATION
+  ADMIN_OVERRIDE
+}
+
+enum BillingEventOutcome {
+  RECEIVED
+  PROCESSED
+  FAILED
+  DUPLICATE
+  RECONCILED
+}
+
+enum BillingDiscrepancyType {
+  WEBHOOK_FAILURE
+  SUBSCRIPTION_STATE_MISMATCH
+  PLAN_MISMATCH
+  UNPAID_BUT_ENTITLED
+  PAID_BUT_NOT_ENTITLED
+  PENDING_REFUND
+  REGION_MISMATCH
+  STALE_ENTITLEMENT
+  PAYMENT_FAILURE
+}
+
+enum BillingDiscrepancyStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum BillingSupportActionType {
+  NOTE
+  RESYNC_ENTITLEMENTS
+  RESEND_RECEIPT
+  REFUND_REVIEW
+  CANCEL_SUBSCRIPTION
+  UPGRADE_DOWNGRADE_CORRECTION
+  GRANDFATHER_OVERRIDE
+}
+
+enum BillingReconciliationStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+model RegionalPrice {
+  id            String           @id @default(uuid())
+  plan          SubscriptionPlan
+  region        BillingRegion
+  interval      BillingInterval
+  currency      String           @db.VarChar(3) // ISO 4217
+  amount        Int // minor units (cents, kobo, etc.)
+  stripePriceId String?          @db.VarChar(255) // Stripe Price object ID
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([plan, region, interval, currency])
+  @@index([plan, region, isActive])
+  @@index([stripePriceId])
+}
+
+model PlanEntitlement {
+  id                    String           @id @default(uuid())
+  plan                  SubscriptionPlan @unique
+  applicationsPerMonth  Int? // null = unlimited
+  aiResumeReviews       Int?
+  aiJobMatches          Int?
+  aiApplyPacks          Int?
+  savedSearches         Int?
+  jobAlerts             Boolean          @default(true)
+  prioritySupport       Boolean          @default(false)
+  skillsAssessments     Boolean          @default(false)
+  chatAccess            Boolean          @default(false)
+  autopilot             Boolean          @default(false)
+  jobPostsPerMonth      Int? // employer plans
+  talentSearch          Boolean          @default(false) // employer
+  analytics             Boolean          @default(false) // employer
+  apiAccess             Boolean          @default(false) // employer premium
+  atsIntegrations       Int? // employer integrations quota
+  videoMockInterviews   Int? // monthly seat quota
+  pipelineExports       Boolean          @default(false)
+  brandedCareerPage     Boolean          @default(false)
+  advancedFunnelMetrics Boolean          @default(false)
+  customFeatures        Json? // extensible
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+}
+
+model UserBillingProfile {
+  id              String             @id @default(uuid())
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  country         String?            @db.VarChar(2) // ISO 3166-1 alpha-2
+  region          BillingRegion      @default(ROW)
+  currency        String             @default("USD") @db.VarChar(3)
+  pricingVersion  Int                @default(1)
+  isGrandfathered Boolean            @default(false)
+  grandfatheredAt DateTime?
+  regionSource    RegionChangeSource @default(USER_SELECTED)
+  taxIdType       String?            @db.VarChar(50) // e.g. eu_vat
+  taxIdValue      String?            @db.VarChar(100)
+  stripeCountry   String?            @db.VarChar(2) // from payment method
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  regionChanges BillingRegionAudit[]
+
+  @@index([userId])
+  @@index([region])
+}
+
+model BillingRegionAudit {
+  id              String             @id @default(uuid())
+  profileId       String
+  profile         UserBillingProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  previousRegion  BillingRegion?
+  newRegion       BillingRegion
+  previousCountry String?            @db.VarChar(2)
+  newCountry      String?            @db.VarChar(2)
+  source          RegionChangeSource
+  ipAddress       String?            @db.VarChar(45)
+  metadata        Json?
+  createdAt       DateTime           @default(now())
+
+  @@index([profileId, createdAt(sort: Desc)])
+}
+
+model RegionConfig {
+  id              String        @id @default(uuid())
+  region          BillingRegion @unique
+  defaultCurrency String        @db.VarChar(3)
+  currencies      String[] // supported currencies for this region
+  countries       String[] // ISO 3166-1 alpha-2 codes
+  taxBehavior     String        @default("unspecified") @db.VarChar(20) // inclusive, exclusive, unspecified
+  taxLabel        String?       @db.VarChar(50) // e.g. "VAT", "GST"
+  isActive        Boolean       @default(true)
+  metadata        Json? // e.g. { vatRates: { standard: 20 } }
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 // ──────────────── Existing Models ────────────────
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                       String                   @id @default(uuid())
+  email                    String                   @unique
+  password                 String                   @default("")
+  name                     String
+  role                     Role
+  preferredLocale          SupportedLocale          @default(EN)
+  emailVerified            Boolean                  @default(false)
+  emailVerifiedAt          DateTime?
+  avatarUrl                String?                  @db.VarChar(500)
+  accountRestrictionStatus AccountRestrictionStatus @default(ACTIVE)
+  accountRestrictionReason String?                  @db.VarChar(160)
+  accountRestrictedAt      DateTime?
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
 
-  employer           Employer?
-  applications       Application[]
-  adminReviews       AdminReview[]       @relation("AdminReviewer")
-  candidateProfile   CandidateProfile?
-  subscription       Subscription?
-  notifications      Notification[]
-  threadParticipants ThreadParticipant[]
-  sentMessages       Message[]           @relation("MessageSender")
-  aiRuns             AiRun[]
-  savedSearches      SavedSearch[]
-  jobAlerts          JobAlert[]
-  companyReviews     CompanyReview[]
-  skillAssessments   SkillAssessment[]
-  assessmentInvites  AssessmentInvite[]
-  passwordResets          PasswordResetToken[]
-  interviewExperiences   InterviewExperience[]
-  salaryReports          SalaryReport[]
-  immigrationProcesses   ImmigrationProcess[]
-  referralsMade          Referral[]         @relation("ReferralsMade")
-  referralsReceived      Referral[]         @relation("ReferralsReceived")
-  calendarEvents         CalendarEvent[]
+  employer                      Employer?
+  applications                  Application[]
+  adminReviews                  AdminReview[]              @relation("AdminReviewer")
+  candidateProfile              CandidateProfile?
+  subscription                  Subscription?
+  notifications                 Notification[]
+  threadParticipants            ThreadParticipant[]
+  sentMessages                  Message[]                  @relation("MessageSender")
+  aiRuns                        AiRun[]
+  savedSearches                 SavedSearch[]
+  jobAlerts                     JobAlert[]
+  companyReviews                CompanyReview[]
+  skillAssessments              SkillAssessment[]
+  assessmentInvites             AssessmentInvite[]
+  passwordResets                PasswordResetToken[]
+  interviewExperiences          InterviewExperience[]
+  salaryReports                 SalaryReport[]
+  immigrationProcesses          ImmigrationProcess[]
+  referralsMade                 Referral[]                 @relation("ReferralsMade")
+  referralsReceived             Referral[]                 @relation("ReferralsReceived")
+  calendarEvents                CalendarEvent[]
+  chatConsent                   ChatConsent?
+  chatConversations             ChatConversation[]
+  billingProfile                UserBillingProfile?
+  oauthAccounts                 OAuthAccount[]
+  emailVerificationTokens       EmailVerificationToken[]
+  notificationPreferences       NotificationPreference?
+  pushSubscriptions             PushSubscription[]
+  analyticsEvents               AnalyticsEvent[]
+  mockInterviewSessions         MockInterviewSession[]
+  socialProfile                 SocialProfile?
+  socialConnectionsSent         SocialConnection[]         @relation("SocialConnectionRequester")
+  socialConnectionsRecv         SocialConnection[]         @relation("SocialConnectionRecipient")
+  salaryNegotiations            SalaryNegotiationSession[]
+  botSubscriptions              BotSubscription[]
+  employerAiTasksCreated        EmployerAiTask[]           @relation("EmployerAiTaskCreator")
+  employerAiTasksReviewed       EmployerAiTask[]           @relation("EmployerAiTaskReviewer")
+  billingEvents                 BillingEventAudit[]
+  billingDiscrepancies          BillingDiscrepancy[]
+  billingEntitlementState       BillingEntitlementState?
+  candidateTrustProfile         CandidateTrustProfile?
+  billingSupportActions         BillingSupportAction[]     @relation("BillingSupportTarget")
+  billingSupportActionsTaken    BillingSupportAction[]     @relation("BillingSupportActor")
+  verificationArtifacts         VerificationArtifact[]     @relation("UserVerificationArtifacts")
+  reviewedVerificationArtifacts VerificationArtifact[]     @relation("VerificationArtifactReviewer")
+  verifiedSkills                CandidateVerifiedSkill[]   @relation("CandidateVerifiedSkillOwner")
+  reviewedCandidateSkills       CandidateVerifiedSkill[]   @relation("CandidateVerifiedSkillReviewer")
+  partnerMarkers                CandidatePartnerMarker[]   @relation("CandidatePartnerMarkerOwner")
+  reviewedPartnerMarkers        CandidatePartnerMarker[]   @relation("CandidatePartnerMarkerReviewer")
+  trustRiskEvents               TrustRiskEvent[]
+  abuseReportsFiled             AbuseReport[]              @relation("AbuseReportReporter")
+  abuseReportsAgainst           AbuseReport[]              @relation("AbuseReportTargetUser")
+  abuseReportsAssigned          AbuseReport[]              @relation("AbuseReportAssignee")
+  trustCasesAssigned            TrustCase[]                @relation("TrustCaseAssignee")
+  trustCaseActions              TrustCaseAction[]          @relation("TrustCaseActionActor")
 
   @@index([role])
   @@index([createdAt])
+  @@index([accountRestrictionStatus])
 }
 
 model Employer {
@@ -140,7 +632,29 @@ model Employer {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id])
 
-  jobs Job[]
+  jobs                  Job[]
+  atsConnections        ATSConnection[]
+  aiTasks               EmployerAiTask[]
+  onboardingState       EmployerOnboardingState?
+  trustProfile          EmployerTrustProfile?
+  verificationArtifacts VerificationArtifact[]   @relation("EmployerVerificationArtifacts")
+  trustRiskEvents       TrustRiskEvent[]
+  abuseReports          AbuseReport[]
+}
+
+model EmployerOnboardingState {
+  id               String            @id @default(uuid())
+  employerId       String            @unique
+  employer         Employer          @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  currentStep      String            @default("company_setup") @db.VarChar(80)
+  teamMemberEmails String[]
+  candidateFilters Json?
+  selectedPlan     SubscriptionPlan?
+  helperState      Json?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([currentStep, updatedAt(sort: Desc)])
 }
 
 model Job {
@@ -161,23 +675,47 @@ model Job {
   updatedAt   DateTime  @updatedAt
 
   // Phase A — AfriTalent differentiators
-  visaSponsorship      VisaSponsorshipStatus @default(UNKNOWN)
-  relocationAssistance Boolean               @default(false)
-  eligibleCountries    String[]
-  jobSource            JobSource             @default(EMPLOYER_POSTED)
-  sourceUrl            String?
-  sourceId             String?               // external ATS/job board ID (for dedup)
-  sourceName           String?               // company name for aggregated jobs
+  visaSponsorship            VisaSponsorshipStatus @default(UNKNOWN)
+  relocationAssistance       Boolean               @default(false)
+  eligibleCountries          String[]
+  jobSource                  JobSource             @default(EMPLOYER_POSTED)
+  sourceUrl                  String?
+  sourceId                   String? // external ATS/job board ID (for dedup)
+  sourceName                 String? // company name for aggregated jobs
+  applicationUrl             String?
+  sourceFingerprint          String?               @db.VarChar(80)
+  sourceLineage              Json?
+  sourceFirstSeenAt          DateTime?
+  sourceLastSeenAt           DateTime?
+  freshnessScore             Int                   @default(0)
+  qualityScore               Int                   @default(0)
+  applicationLikelihoodScore Int                   @default(0)
+  freshnessSignals           Json?
+  qualitySignals             Json?
+  staleAt                    DateTime?
+
+  // Job expiry tracking
+  expiresAt        DateTime? // when the listing expires (from source or heuristic)
+  lastCheckedAt    DateTime? // last time we verified the listing is still live
+  isExpired        Boolean        @default(false)
+  riskScore        Int            @default(0)
+  riskLevel        TrustRiskLevel @default(LOW)
+  trustFlags       Json?
+  qualityCheckedAt DateTime?
 
   // Nullable for aggregated jobs (no Employer profile in DB)
   employerId String?
   employer   Employer? @relation(fields: [employerId], references: [id])
 
-  applications      Application[]
-  adminReviews      AdminReview[]       @relation("JobReviews")
-  threads           MessageThread[]
-  jobAlerts         JobAlert[]
-  assessmentInvites AssessmentInvite[]
+  applications              Application[]
+  adminReviews              AdminReview[]              @relation("JobReviews")
+  threads                   MessageThread[]
+  jobAlerts                 JobAlert[]
+  assessmentInvites         AssessmentInvite[]
+  salaryNegotiationSessions SalaryNegotiationSession[]
+  trustRiskEvents           TrustRiskEvent[]
+  abuseReports              AbuseReport[]
+  trustCases                TrustCase[]
 
   @@index([status])
   @@index([status, publishedAt(sort: Desc)])
@@ -188,6 +726,13 @@ model Job {
   @@index([visaSponsorship])
   @@index([jobSource])
   @@index([sourceId])
+  @@index([sourceFingerprint])
+  @@index([isExpired, status])
+  @@index([expiresAt])
+  @@index([staleAt])
+  @@index([sourceLastSeenAt])
+  @@index([freshnessScore, qualityScore])
+  @@index([riskLevel, riskScore])
 }
 
 model Application {
@@ -196,23 +741,30 @@ model Application {
   cvUrl       String?
   coverLetter String?
   notes       String?
+  riskScore   Int               @default(0)
+  riskLevel   TrustRiskLevel    @default(LOW)
+  trustFlags  Json?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  jobId       String
-  job         Job               @relation(fields: [jobId], references: [id])
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id])
 
   candidateId String
-  candidate   User              @relation(fields: [candidateId], references: [id])
+  candidate   User   @relation(fields: [candidateId], references: [id])
 
-  adminReviews AdminReview[]  @relation("ApplicationReviews")
-  thread       MessageThread?
+  adminReviews    AdminReview[]    @relation("ApplicationReviews")
+  thread          MessageThread?
+  trustRiskEvents TrustRiskEvent[]
+  abuseReports    AbuseReport[]
+  trustCases      TrustCase[]
 
   @@unique([jobId, candidateId])
   @@index([jobId])
   @@index([candidateId])
   @@index([status])
   @@index([createdAt(sort: Desc)])
+  @@index([riskLevel, riskScore])
 }
 
 model Resource {
@@ -236,24 +788,24 @@ model Resource {
 }
 
 model AdminReview {
-  id        String           @id @default(uuid())
+  id        String       @id @default(uuid())
   status    ReviewStatus
   notes     String?
-  createdAt DateTime         @default(now())
+  createdAt DateTime     @default(now())
 
   reviewerId String
-  reviewer   User @relation("AdminReviewer", fields: [reviewerId], references: [id])
+  reviewer   User   @relation("AdminReviewer", fields: [reviewerId], references: [id])
 
   targetType ReviewTargetType
 
-  targetJobId         String?
-  targetJob           Job?         @relation("JobReviews", fields: [targetJobId], references: [id])
+  targetJobId String?
+  targetJob   Job?    @relation("JobReviews", fields: [targetJobId], references: [id])
 
   targetApplicationId String?
   targetApplication   Application? @relation("ApplicationReviews", fields: [targetApplicationId], references: [id])
 
-  targetResourceId    String?
-  targetResource      Resource?    @relation("ResourceReviews", fields: [targetResourceId], references: [id])
+  targetResourceId String?
+  targetResource   Resource? @relation("ResourceReviews", fields: [targetResourceId], references: [id])
 
   @@index([reviewerId])
   @@index([targetType])
@@ -276,6 +828,9 @@ model CandidateProfile {
   linkedinUrl         String?  @db.VarChar(500)
   githubUrl           String?  @db.VarChar(500)
   portfolioUrl        String?  @db.VarChar(500)
+  workHistory         Json?
+  educationHistory    Json?
+  certifications      Json?
   openToWork          Boolean  @default(false)
   profileCompleteness Int      @default(0)
   createdAt           DateTime @default(now())
@@ -286,6 +841,221 @@ model CandidateProfile {
   @@index([userId])
   @@index([openToWork])
   @@index([skills])
+}
+
+model EmployerTrustProfile {
+  id                           String                    @id @default(uuid())
+  employerId                   String                    @unique
+  employer                     Employer                  @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  verificationLevel            EmployerVerificationLevel @default(UNVERIFIED)
+  authenticityScore            Int                       @default(0)
+  riskScore                    Int                       @default(0)
+  riskLevel                    TrustRiskLevel            @default(LOW)
+  postingEligibility           Boolean                   @default(false)
+  requiresEnhancedVerification Boolean                   @default(false)
+  verifiedDomain               String?                   @db.VarChar(255)
+  websiteMatchesEmail          Boolean                   @default(false)
+  throwawayDomainDetected      Boolean                   @default(false)
+  linkedInCompanyUrl           String?                   @db.VarChar(500)
+  domainVerifiedAt             DateTime?
+  businessDocVerifiedAt        DateTime?
+  manualApprovedAt             DateTime?
+  premiumTrustedAt             DateTime?
+  suspiciousSignals            Json?
+  internalNotes                String?                   @db.Text
+  createdAt                    DateTime                  @default(now())
+  updatedAt                    DateTime                  @updatedAt
+
+  trustCases TrustCase[]
+
+  @@index([verificationLevel])
+  @@index([riskLevel, riskScore])
+  @@index([postingEligibility])
+}
+
+model CandidateTrustProfile {
+  id                    String                     @id @default(uuid())
+  userId                String                     @unique
+  user                  User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verificationLevel     CandidateVerificationLevel @default(UNVERIFIED)
+  authenticityScore     Int                        @default(0)
+  riskScore             Int                        @default(0)
+  riskLevel             TrustRiskLevel             @default(LOW)
+  phoneNumber           String?                    @db.VarChar(30)
+  phoneVerifiedAt       DateTime?
+  identityVerifiedAt    DateTime?
+  skillsVerifiedAt      DateTime?
+  employmentVerifiedAt  DateTime?
+  linkedinVerified      Boolean                    @default(false)
+  githubVerified        Boolean                    @default(false)
+  portfolioVerified     Boolean                    @default(false)
+  premiumFilterEligible Boolean                    @default(false)
+  verifiedSkillCount    Int                        @default(0)
+  partnerSignalCount    Int                        @default(0)
+  assessmentBacked      Boolean                    @default(false)
+  fullyCompletedProfile Boolean                    @default(false)
+  explainabilitySignals Json?
+  suspiciousSignals     Json?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+
+  phoneChallenges PhoneVerificationChallenge[]
+  trustCases      TrustCase[]
+
+  @@index([verificationLevel])
+  @@index([riskLevel, riskScore])
+  @@index([premiumFilterEligible])
+}
+
+model PhoneVerificationChallenge {
+  id                      String                  @id @default(uuid())
+  candidateTrustProfileId String
+  candidateTrustProfile   CandidateTrustProfile   @relation(fields: [candidateTrustProfileId], references: [id], onDelete: Cascade)
+  phoneNumber             String                  @db.VarChar(30)
+  otpHash                 String                  @db.VarChar(128)
+  expiresAt               DateTime
+  attempts                Int                     @default(0)
+  verifiedAt              DateTime?
+  status                  PhoneVerificationStatus @default(PENDING)
+  createdAt               DateTime                @default(now())
+
+  @@index([candidateTrustProfileId, createdAt(sort: Desc)])
+  @@index([phoneNumber, status])
+}
+
+model VerificationArtifact {
+  id             String                     @id @default(uuid())
+  type           VerificationArtifactType
+  status         VerificationArtifactStatus @default(PENDING)
+  userId         String?
+  user           User?                      @relation("UserVerificationArtifacts", fields: [userId], references: [id], onDelete: SetNull)
+  employerId     String?
+  employer       Employer?                  @relation("EmployerVerificationArtifacts", fields: [employerId], references: [id], onDelete: SetNull)
+  reviewerId     String?
+  reviewer       User?                      @relation("VerificationArtifactReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  fileKey        String?                    @db.VarChar(500)
+  fileName       String?                    @db.VarChar(255)
+  externalUrl    String?                    @db.VarChar(500)
+  metadata       Json?
+  submittedAt    DateTime                   @default(now())
+  reviewedAt     DateTime?
+  reviewerNotes  String?                    @db.Text
+  trustCase      TrustCase?
+  verifiedSkills CandidateVerifiedSkill[]   @relation("CandidateVerifiedSkillArtifact")
+
+  @@index([type, status])
+  @@index([userId, submittedAt(sort: Desc)])
+  @@index([employerId, submittedAt(sort: Desc)])
+}
+
+model TrustRiskEvent {
+  id             String          @id @default(uuid())
+  entityType     TrustEntityType
+  reasonCode     String          @db.VarChar(100)
+  summary        String          @db.VarChar(255)
+  evidence       Json?
+  scoreDelta     Int
+  resultingScore Int
+  riskLevel      TrustRiskLevel
+  autoHeld       Boolean         @default(false)
+  userId         String?
+  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  employerId     String?
+  employer       Employer?       @relation(fields: [employerId], references: [id], onDelete: SetNull)
+  jobId          String?
+  job            Job?            @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  applicationId  String?
+  application    Application?    @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  threadId       String?
+  thread         MessageThread?  @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  createdAt      DateTime        @default(now())
+
+  @@index([entityType, createdAt(sort: Desc)])
+  @@index([riskLevel, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([employerId, createdAt(sort: Desc)])
+}
+
+model AbuseReport {
+  id                  String            @id @default(uuid())
+  reporterUserId      String
+  reporter            User              @relation("AbuseReportReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  reportedUserId      String?
+  reportedUser        User?             @relation("AbuseReportTargetUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+  employerId          String?
+  employer            Employer?         @relation(fields: [employerId], references: [id], onDelete: SetNull)
+  targetJobId         String?
+  targetJob           Job?              @relation(fields: [targetJobId], references: [id], onDelete: SetNull)
+  targetApplicationId String?
+  targetApplication   Application?      @relation(fields: [targetApplicationId], references: [id], onDelete: SetNull)
+  targetThreadId      String?
+  targetThread        MessageThread?    @relation(fields: [targetThreadId], references: [id], onDelete: SetNull)
+  assignedAdminId     String?
+  assignedAdmin       User?             @relation("AbuseReportAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  reason              AbuseReportReason
+  details             String?           @db.Text
+  status              AbuseReportStatus @default(OPEN)
+  resolutionNotes     String?           @db.Text
+  triagedAt           DateTime?
+  resolvedAt          DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  trustCase           TrustCase?
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([reason, createdAt(sort: Desc)])
+  @@index([reporterUserId, createdAt(sort: Desc)])
+}
+
+model TrustCase {
+  id                      String                 @id @default(uuid())
+  entityType              TrustEntityType
+  status                  TrustCaseStatus        @default(OPEN)
+  priority                TrustRiskLevel         @default(MEDIUM)
+  title                   String                 @db.VarChar(200)
+  reasonCode              String?                @db.VarChar(100)
+  summary                 String?                @db.Text
+  employerTrustProfileId  String?
+  employerTrustProfile    EmployerTrustProfile?  @relation(fields: [employerTrustProfileId], references: [id], onDelete: SetNull)
+  candidateTrustProfileId String?
+  candidateTrustProfile   CandidateTrustProfile? @relation(fields: [candidateTrustProfileId], references: [id], onDelete: SetNull)
+  jobId                   String?
+  job                     Job?                   @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  applicationId           String?
+  application             Application?           @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  threadId                String?
+  thread                  MessageThread?         @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  reportId                String?                @unique
+  report                  AbuseReport?           @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  artifactId              String?                @unique
+  artifact                VerificationArtifact?  @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  assignedAdminId         String?
+  assignedAdmin           User?                  @relation("TrustCaseAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  openedAt                DateTime               @default(now())
+  closedAt                DateTime?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+
+  actions TrustCaseAction[]
+
+  @@index([status, priority, createdAt(sort: Desc)])
+  @@index([assignedAdminId, status])
+}
+
+model TrustCaseAction {
+  id         String               @id @default(uuid())
+  caseId     String
+  trustCase  TrustCase            @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      User?                @relation("TrustCaseActionActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actionType ModerationActionType
+  reasonCode String?              @db.VarChar(100)
+  notes      String?              @db.Text
+  metadata   Json?
+  createdAt  DateTime             @default(now())
+
+  @@index([caseId, createdAt(sort: Desc)])
+  @@index([actionType, createdAt(sort: Desc)])
 }
 
 model Resume {
@@ -340,8 +1110,11 @@ model MessageThread {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  participants ThreadParticipant[]
-  messages     Message[]
+  participants    ThreadParticipant[]
+  messages        Message[]
+  trustRiskEvents TrustRiskEvent[]
+  abuseReports    AbuseReport[]
+  trustCases      TrustCase[]
 
   @@index([jobId])
 }
@@ -386,6 +1159,344 @@ model Notification {
   @@index([userId, createdAt(sort: Desc)])
 }
 
+model NotificationPreference {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  savedSearchAlerts   Boolean  @default(true)
+  interviewReminders  Boolean  @default(true)
+  applicationUpdates  Boolean  @default(true)
+  subscriptionNotices Boolean  @default(true)
+  marketing           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model PushSubscription {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint   String
+  p256dh     String
+  auth       String
+  userAgent  String?  @db.VarChar(500)
+  isActive   Boolean  @default(true)
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, endpoint])
+  @@index([userId, isActive])
+}
+
+model ATSConnection {
+  id                    String              @id @default(uuid())
+  employerId            String
+  employer              Employer            @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  provider              ATSProvider
+  externalOrgId         String              @db.VarChar(255)
+  encryptedAccessToken  String?             @db.Text
+  encryptedRefreshToken String?             @db.Text
+  metadata              Json?
+  status                ATSConnectionStatus @default(ACTIVE)
+  lastSyncedAt          DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  syncRuns ATSSyncRun[]
+
+  @@unique([employerId, provider, externalOrgId])
+  @@index([employerId])
+  @@index([provider])
+}
+
+model ATSSyncRun {
+  id           String        @id @default(uuid())
+  connectionId String
+  connection   ATSConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  status       ATSSyncStatus @default(QUEUED)
+  startedAt    DateTime      @default(now())
+  finishedAt   DateTime?
+  pulledJobs   Int           @default(0)
+  createdJobs  Int           @default(0)
+  updatedJobs  Int           @default(0)
+  dedupedJobs  Int           @default(0)
+  errorCount   Int           @default(0)
+  cursor       String?       @db.VarChar(255)
+  errors       Json?
+  metadata     Json?
+
+  @@index([connectionId, startedAt(sort: Desc)])
+  @@index([status, startedAt(sort: Desc)])
+}
+
+model MockInterviewSession {
+  id                  String                  @id @default(uuid())
+  userId              String
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title               String                  @db.VarChar(200)
+  targetRole          String                  @db.VarChar(120)
+  promptLanguage      SupportedLocale         @default(EN)
+  questionSet         Json?
+  transcript          Json?
+  feedbackSummary     String?                 @db.Text
+  scoreOverall        Int?
+  scoreCommunication  Int?
+  scoreTechnical      Int?
+  scoreProblemSolving Int?
+  status              MockInterviewStatus     @default(DRAFT)
+  visibility          MockInterviewVisibility @default(PRIVATE)
+  retentionDays       Int                     @default(30)
+  piiRedacted         Boolean                 @default(true)
+  startedAt           DateTime?
+  completedAt         DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  artifacts MockInterviewArtifact[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([expiresAt])
+}
+
+model MockInterviewArtifact {
+  id          String                    @id @default(uuid())
+  sessionId   String
+  session     MockInterviewSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  type        MockInterviewArtifactType
+  storageKey  String                    @db.VarChar(500)
+  contentType String?                   @db.VarChar(120)
+  sizeBytes   Int?
+  metadata    Json?
+  createdAt   DateTime                  @default(now())
+
+  @@index([sessionId, createdAt(sort: Desc)])
+  @@index([type])
+}
+
+model AnalyticsEvent {
+  id         String                 @id @default(uuid())
+  userId     String?
+  user       User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  category   AnalyticsEventCategory
+  eventName  String                 @db.VarChar(120)
+  sessionId  String?                @db.VarChar(120)
+  path       String?                @db.VarChar(500)
+  referrer   String?                @db.VarChar(500)
+  properties Json?
+  ipHash     String?                @db.VarChar(128)
+  userAgent  String?                @db.VarChar(500)
+  occurredAt DateTime               @default(now())
+  receivedAt DateTime               @default(now())
+
+  @@index([category, occurredAt(sort: Desc)])
+  @@index([eventName, occurredAt(sort: Desc)])
+  @@index([userId, occurredAt(sort: Desc)])
+}
+
+model SocialProfile {
+  id                      String   @id @default(uuid())
+  userId                  String   @unique
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline                String?  @db.VarChar(160)
+  bio                     String?  @db.VarChar(1000)
+  location                String?  @db.VarChar(120)
+  discoverable            Boolean  @default(false)
+  collaborationOpen       Boolean  @default(false)
+  allowConnectionRequests Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([discoverable])
+}
+
+model SocialConnection {
+  id          String                 @id @default(uuid())
+  requesterId String
+  requester   User                   @relation("SocialConnectionRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   User                   @relation("SocialConnectionRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  status      SocialConnectionStatus @default(PENDING)
+  note        String?                @db.VarChar(300)
+  respondedAt DateTime?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@unique([requesterId, recipientId])
+  @@index([requesterId, status])
+  @@index([recipientId, status])
+}
+
+model SalaryNegotiationSession {
+  id                  String                  @id @default(uuid())
+  userId              String
+  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId               String?
+  job                 Job?                    @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  jobTitle            String                  @db.VarChar(200)
+  country             String?                 @db.VarChar(100)
+  region              BillingRegion?
+  currency            String                  @default("USD") @db.VarChar(3)
+  currentCompensation Int?
+  targetCompensation  Int?
+  marketMin           Int?
+  marketMedian        Int?
+  marketMax           Int?
+  strategySummary     String?                 @db.Text
+  talkingPoints       Json?
+  riskFlags           Json?
+  status              SalaryNegotiationStatus @default(DRAFT)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([jobId])
+}
+
+model UniversityPartner {
+  id               String                  @id @default(uuid())
+  externalId       String                  @unique @db.VarChar(120)
+  name             String                  @db.VarChar(200)
+  organizationType PartnerOrganizationType @default(UNIVERSITY)
+  country          String                  @db.VarChar(2)
+  website          String?                 @db.VarChar(500)
+  status           UniversityPartnerStatus @default(ACTIVE)
+  apiKeyHash       String                  @unique @db.VarChar(128)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  records        UniversityPartnerRecord[]
+  verifiedSkills CandidateVerifiedSkill[]
+  partnerMarkers CandidatePartnerMarker[]
+
+  @@index([status])
+}
+
+model UniversityPartnerRecord {
+  id               String                 @id @default(uuid())
+  partnerId        String
+  partner          UniversityPartner      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  type             UniversityRecordType
+  externalRecordId String                 @db.VarChar(120)
+  payload          Json
+  status           UniversityRecordStatus @default(RECEIVED)
+  receivedAt       DateTime               @default(now())
+  processedAt      DateTime?
+
+  verifiedSkills CandidateVerifiedSkill[]
+  partnerMarkers CandidatePartnerMarker[]
+
+  @@unique([partnerId, type, externalRecordId])
+  @@index([type, status])
+}
+
+model CandidateVerifiedSkill {
+  id              String                           @id @default(uuid())
+  userId          String
+  user            User                             @relation("CandidateVerifiedSkillOwner", fields: [userId], references: [id], onDelete: Cascade)
+  skillName       String                           @db.VarChar(120)
+  method          CandidateSkillVerificationMethod
+  status          CandidateSkillVerificationStatus @default(PENDING)
+  evidenceLabel   String?                          @db.VarChar(200)
+  evidenceUrl     String?                          @db.VarChar(500)
+  artifactId      String?
+  artifact        VerificationArtifact?            @relation("CandidateVerifiedSkillArtifact", fields: [artifactId], references: [id], onDelete: SetNull)
+  assessmentId    String?
+  assessment      SkillAssessment?                 @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  partnerId       String?
+  partner         UniversityPartner?               @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  partnerRecordId String?
+  partnerRecord   UniversityPartnerRecord?         @relation(fields: [partnerRecordId], references: [id], onDelete: SetNull)
+  reviewerId      String?
+  reviewer        User?                            @relation("CandidateVerifiedSkillReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  score           Int?
+  confidenceNote  String?                          @db.VarChar(255)
+  metadata        Json?
+  verifiedAt      DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime                         @default(now())
+  updatedAt       DateTime                         @updatedAt
+
+  @@index([userId, status, verifiedAt(sort: Desc)])
+  @@index([skillName, status])
+  @@index([method, status])
+}
+
+model CandidatePartnerMarker {
+  id              String                       @id @default(uuid())
+  userId          String
+  user            User                         @relation("CandidatePartnerMarkerOwner", fields: [userId], references: [id], onDelete: Cascade)
+  partnerId       String
+  partner         UniversityPartner            @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  partnerRecordId String?
+  partnerRecord   UniversityPartnerRecord?     @relation(fields: [partnerRecordId], references: [id], onDelete: SetNull)
+  markerType      CandidatePartnerMarkerType
+  status          CandidatePartnerMarkerStatus @default(PENDING)
+  label           String                       @db.VarChar(160)
+  description     String?                      @db.Text
+  reviewerId      String?
+  reviewer        User?                        @relation("CandidatePartnerMarkerReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  issuedAt        DateTime?
+  expiresAt       DateTime?
+  metadata        Json?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  @@index([userId, status, issuedAt(sort: Desc)])
+  @@index([partnerId, status])
+  @@index([markerType, status])
+}
+
+model EmployerAiTask {
+  id               String               @id @default(uuid())
+  employerId       String
+  employer         Employer             @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  createdByUserId  String
+  createdByUser    User                 @relation("EmployerAiTaskCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  reviewedByUserId String?
+  reviewedByUser   User?                @relation("EmployerAiTaskReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  type             EmployerAiTaskType
+  status           EmployerAiTaskStatus @default(GENERATED)
+  title            String?              @db.VarChar(200)
+  input            Json
+  output           Json?
+  reviewNotes      String?              @db.Text
+  humanApproved    Boolean              @default(false)
+  reviewedAt       DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([employerId, type, status])
+  @@index([createdByUserId, createdAt(sort: Desc)])
+}
+
+model BotSubscription {
+  id                         String                @id @default(uuid())
+  userId                     String
+  user                       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel                    BotChannel
+  chatHandle                 String                @db.VarChar(120)
+  status                     BotSubscriptionStatus @default(PENDING_VERIFICATION)
+  verificationCodeHash       String?               @db.VarChar(128)
+  isAlertsEnabled            Boolean               @default(true)
+  isJobMatchesEnabled        Boolean               @default(true)
+  isRemindersEnabled         Boolean               @default(true)
+  isApplicationStatusEnabled Boolean               @default(true)
+  locale                     SupportedLocale       @default(EN)
+  metadata                   Json?
+  verifiedAt                 DateTime?
+  lastNotifiedAt             DateTime?
+  createdAt                  DateTime              @default(now())
+  updatedAt                  DateTime              @updatedAt
+
+  @@unique([channel, chatHandle])
+  @@index([userId, status])
+}
+
 model Subscription {
   id               String             @id @default(uuid())
   userId           String             @unique
@@ -398,9 +1509,157 @@ model Subscription {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
+  billingEvents         BillingEventAudit[]
+  billingDiscrepancies  BillingDiscrepancy[]
+  billingSupportActions BillingSupportAction[]
+  entitlementState      BillingEntitlementState?
+
   @@index([userId])
   @@index([stripeCustomerId])
   @@index([stripeSubId])
+}
+
+model BillingEntitlementState {
+  id              String             @id @default(uuid())
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionId  String?            @unique
+  subscription    Subscription?      @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  effectivePlan   SubscriptionPlan
+  effectiveStatus SubscriptionStatus
+  billingRegion   BillingRegion?
+  currency        String?            @db.VarChar(3)
+  pricingVersion  Int?
+  entitlements    Json
+  checksum        String             @db.VarChar(64)
+  isInSync        Boolean            @default(true)
+  mismatchReason  String?            @db.VarChar(160)
+  source          String             @default("system") @db.VarChar(50)
+  lastSyncedAt    DateTime           @default(now())
+  lastValidatedAt DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([userId, lastSyncedAt(sort: Desc)])
+  @@index([isInSync, lastValidatedAt(sort: Desc)])
+}
+
+model BillingEventAudit {
+  id                    String              @id @default(uuid())
+  userId                String?
+  user                  User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  subscriptionId        String?
+  subscription          Subscription?       @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  eventId               String?             @db.VarChar(255)
+  source                String              @db.VarChar(40)
+  eventType             String              @db.VarChar(120)
+  outcome               BillingEventOutcome @default(RECEIVED)
+  plan                  SubscriptionPlan?
+  status                SubscriptionStatus?
+  billingRegion         BillingRegion?
+  currency              String?             @db.VarChar(3)
+  amountMinor           Int?
+  stripeCustomerId      String?             @db.VarChar(255)
+  stripeSubscriptionId  String?             @db.VarChar(255)
+  stripeInvoiceId       String?             @db.VarChar(255)
+  stripePaymentIntentId String?             @db.VarChar(255)
+  stripeChargeId        String?             @db.VarChar(255)
+  stripeRefundId        String?             @db.VarChar(255)
+  reasonCode            String?             @db.VarChar(120)
+  message               String?             @db.VarChar(500)
+  metadata              Json?
+  rawPayload            Json?
+  occurredAt            DateTime            @default(now())
+  processedAt           DateTime?
+  createdAt             DateTime            @default(now())
+
+  supportActions BillingSupportAction[]
+  discrepancies  BillingDiscrepancy[]
+
+  @@index([eventId])
+  @@index([source, eventType, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([subscriptionId, createdAt(sort: Desc)])
+  @@index([outcome, createdAt(sort: Desc)])
+  @@index([stripeInvoiceId])
+  @@index([stripePaymentIntentId])
+  @@index([stripeRefundId])
+}
+
+model BillingReconciliationRun {
+  id                     String                      @id @default(uuid())
+  status                 BillingReconciliationStatus @default(SUCCESS)
+  triggeredBy            String                      @default("scheduler") @db.VarChar(50)
+  checkedSubscriptions   Int                         @default(0)
+  successPayments        Int                         @default(0)
+  failedPayments         Int                         @default(0)
+  webhookFailures        Int                         @default(0)
+  subscriptionMismatches Int                         @default(0)
+  unpaidEntitlements     Int                         @default(0)
+  paidNotEntitled        Int                         @default(0)
+  pendingRefunds         Int                         @default(0)
+  summary                Json?
+  errorMessage           String?                     @db.VarChar(500)
+  startedAt              DateTime                    @default(now())
+  completedAt            DateTime?
+  createdAt              DateTime                    @default(now())
+
+  discrepancies BillingDiscrepancy[]
+
+  @@index([status, startedAt(sort: Desc)])
+}
+
+model BillingDiscrepancy {
+  id                  String                    @id @default(uuid())
+  userId              String?
+  user                User?                     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  subscriptionId      String?
+  subscription        Subscription?             @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  billingEventId      String?
+  billingEvent        BillingEventAudit?        @relation(fields: [billingEventId], references: [id], onDelete: SetNull)
+  reconciliationRunId String?
+  reconciliationRun   BillingReconciliationRun? @relation(fields: [reconciliationRunId], references: [id], onDelete: SetNull)
+  type                BillingDiscrepancyType
+  status              BillingDiscrepancyStatus  @default(OPEN)
+  severity            String                    @default("MEDIUM") @db.VarChar(20)
+  title               String                    @db.VarChar(160)
+  reasonCode          String?                   @db.VarChar(120)
+  details             Json?
+  dueAt               DateTime?
+  detectedAt          DateTime                  @default(now())
+  lastSeenAt          DateTime                  @default(now())
+  acknowledgedAt      DateTime?
+  resolvedAt          DateTime?
+  updatedAt           DateTime                  @updatedAt
+
+  supportActions BillingSupportAction[]
+
+  @@index([status, type, detectedAt(sort: Desc)])
+  @@index([userId, status, detectedAt(sort: Desc)])
+  @@index([subscriptionId, status, detectedAt(sort: Desc)])
+}
+
+model BillingSupportAction {
+  id             String                   @id @default(uuid())
+  actorId        String
+  actor          User                     @relation("BillingSupportActor", fields: [actorId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                     @relation("BillingSupportTarget", fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionId String?
+  subscription   Subscription?            @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  billingEventId String?
+  billingEvent   BillingEventAudit?       @relation(fields: [billingEventId], references: [id], onDelete: SetNull)
+  discrepancyId  String?
+  discrepancy    BillingDiscrepancy?      @relation(fields: [discrepancyId], references: [id], onDelete: SetNull)
+  actionType     BillingSupportActionType
+  reasonCode     String                   @db.VarChar(120)
+  notes          String?                  @db.VarChar(2000)
+  metadata       Json?
+  createdAt      DateTime                 @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([actionType, createdAt(sort: Desc)])
 }
 
 // ──────────────── AI Run Persistence ────────────────
@@ -491,16 +1750,16 @@ model SavedSearch {
 }
 
 model JobAlert {
-  id           String   @id @default(uuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobId        String
-  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  searchId     String?
-  matchScore   Int?
-  sentAt       DateTime?
-  clickedAt    DateTime?
-  createdAt    DateTime @default(now())
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId      String
+  job        Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  searchId   String?
+  matchScore Int?
+  sentAt     DateTime?
+  clickedAt  DateTime?
+  createdAt  DateTime  @default(now())
 
   @@unique([userId, jobId])
   @@index([userId, sentAt])
@@ -515,12 +1774,12 @@ model CompanyReview {
   company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   userId            String
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  overallRating     Int      // 1-5
-  cultureRating     Int?     // 1-5
-  salaryRating      Int?     // 1-5
-  workLifeRating    Int?     // 1-5
-  managementRating  Int?     // 1-5
-  growthRating      Int?     // 1-5
+  overallRating     Int // 1-5
+  cultureRating     Int? // 1-5
+  salaryRating      Int? // 1-5
+  workLifeRating    Int? // 1-5
+  managementRating  Int? // 1-5
+  growthRating      Int? // 1-5
   title             String   @db.VarChar(200)
   pros              String   @db.Text
   cons              String   @db.Text
@@ -541,18 +1800,18 @@ model CompanyReview {
 }
 
 model CompanyRatingAggregate {
-  id                    String   @id @default(uuid())
-  companyId             String   @unique
-  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  totalReviews          Int      @default(0)
-  averageOverall        Float?
-  averageCulture        Float?
-  averageSalary         Float?
-  averageWorkLife       Float?
-  averageManagement     Float?
-  averageGrowth         Float?
-  recommendationPct     Float?   // % who would recommend
-  updatedAt             DateTime @updatedAt
+  id                String   @id @default(uuid())
+  companyId         String   @unique
+  company           Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  totalReviews      Int      @default(0)
+  averageOverall    Float?
+  averageCulture    Float?
+  averageSalary     Float?
+  averageWorkLife   Float?
+  averageManagement Float?
+  averageGrowth     Float?
+  recommendationPct Float? // % who would recommend
+  updatedAt         DateTime @updatedAt
 }
 
 // ──────────────── Skills Assessment Integration ────────────────
@@ -574,21 +1833,23 @@ enum AssessmentStatus {
 }
 
 model SkillAssessment {
-  id              String             @id @default(uuid())
-  userId          String
-  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  skillName       String             @db.VarChar(100)
-  provider        AssessmentProvider
-  externalId      String?            @db.VarChar(255)
-  status          AssessmentStatus   @default(PENDING)
-  score           Int?               // 0-100
-  percentile      Int?               // 0-100
-  level           String?            @db.VarChar(50) // beginner, intermediate, advanced, expert
-  resultUrl       String?            @db.VarChar(500)
-  metadata        Json?
-  completedAt     DateTime?
-  expiresAt       DateTime?
-  createdAt       DateTime           @default(now())
+  id          String             @id @default(uuid())
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skillName   String             @db.VarChar(100)
+  provider    AssessmentProvider
+  externalId  String?            @db.VarChar(255)
+  status      AssessmentStatus   @default(PENDING)
+  score       Int? // 0-100
+  percentile  Int? // 0-100
+  level       String?            @db.VarChar(50) // beginner, intermediate, advanced, expert
+  resultUrl   String?            @db.VarChar(500)
+  metadata    Json?
+  completedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime           @default(now())
+
+  verifiedSkills CandidateVerifiedSkill[]
 
   @@index([userId, skillName])
   @@index([status])
@@ -614,22 +1875,22 @@ model AssessmentInvite {
 // ──────────────── Interview Experiences ────────────────
 
 model InterviewExperience {
-  id              String   @id @default(uuid())
-  companyId       String
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobTitle        String   @db.VarChar(200)
-  difficulty      String   @db.VarChar(20) // easy, medium, hard
-  outcome         String   @db.VarChar(20) // offered, rejected, no_response, withdrew
-  interviewType   String   @db.VarChar(50) // phone, video, onsite, take_home, panel
-  process         String   @db.Text
-  questions       String[] // array of interview questions
-  tips            String?  @db.Text
-  duration        String?  @db.VarChar(50) // e.g., "2 weeks", "1 month"
-  isApproved      Boolean  @default(false)
-  helpfulCount    Int      @default(0)
-  createdAt       DateTime @default(now())
+  id            String   @id @default(uuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobTitle      String   @db.VarChar(200)
+  difficulty    String   @db.VarChar(20) // easy, medium, hard
+  outcome       String   @db.VarChar(20) // offered, rejected, no_response, withdrew
+  interviewType String   @db.VarChar(50) // phone, video, onsite, take_home, panel
+  process       String   @db.Text
+  questions     String[] // array of interview questions
+  tips          String?  @db.Text
+  duration      String?  @db.VarChar(50) // e.g., "2 weeks", "1 month"
+  isApproved    Boolean  @default(false)
+  helpfulCount  Int      @default(0)
+  createdAt     DateTime @default(now())
 
   @@index([companyId, isApproved])
   @@index([userId])
@@ -647,9 +1908,9 @@ model SalaryReport {
   jobTitle        String   @db.VarChar(200)
   location        String   @db.VarChar(200)
   country         String   @db.VarChar(100)
-  salaryCurrency  String   @db.VarChar(10) @default("USD")
+  salaryCurrency  String   @default("USD") @db.VarChar(10)
   salaryAmount    Int
-  salaryPeriod    String   @db.VarChar(20) @default("yearly") // yearly, monthly
+  salaryPeriod    String   @default("yearly") @db.VarChar(20) // yearly, monthly
   yearsExperience Int?
   employmentType  String?  @db.VarChar(50) // full-time, contract, part-time
   isVerified      Boolean  @default(false)
@@ -692,17 +1953,17 @@ model ImmigrationProcess {
 }
 
 model ImmigrationStep {
-  id                  String              @id @default(uuid())
-  processId           String
-  process             ImmigrationProcess  @relation(fields: [processId], references: [id], onDelete: Cascade)
-  name                String              @db.VarChar(200)
-  description         String?             @db.Text
-  status              ImmigrationStatus   @default(NOT_STARTED)
-  dueDate             DateTime?
-  completedAt         DateTime?
-  documents           String[]
-  sortOrder           Int                 @default(0)
-  createdAt           DateTime            @default(now())
+  id          String             @id @default(uuid())
+  processId   String
+  process     ImmigrationProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+  name        String             @db.VarChar(200)
+  description String?            @db.Text
+  status      ImmigrationStatus  @default(NOT_STARTED)
+  dueDate     DateTime?
+  completedAt DateTime?
+  documents   String[]
+  sortOrder   Int                @default(0)
+  createdAt   DateTime           @default(now())
 
   @@index([processId])
 }
@@ -717,18 +1978,18 @@ enum ReferralStatus {
 }
 
 model Referral {
-  id              String         @id @default(uuid())
-  referrerId      String
-  referrer        User           @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
-  refereeEmail    String         @db.VarChar(255)
-  refereeId       String?
-  referee         User?          @relation("ReferralsReceived", fields: [refereeId], references: [id], onDelete: SetNull)
-  jobId           String?
-  companyName     String?        @db.VarChar(200)
-  message         String?        @db.Text
-  status          ReferralStatus @default(PENDING)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id           String         @id @default(uuid())
+  referrerId   String
+  referrer     User           @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
+  refereeEmail String         @db.VarChar(255)
+  refereeId    String?
+  referee      User?          @relation("ReferralsReceived", fields: [refereeId], references: [id], onDelete: SetNull)
+  jobId        String?
+  companyName  String?        @db.VarChar(200)
+  message      String?        @db.Text
+  status       ReferralStatus @default(PENDING)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@index([referrerId])
   @@index([refereeEmail])
@@ -738,19 +1999,19 @@ model Referral {
 // ──────────────── Learning Resources ────────────────
 
 model LearningResource {
-  id              String   @id @default(uuid())
-  title           String   @db.VarChar(300)
-  description     String?  @db.Text
-  url             String   @db.VarChar(500)
-  provider        String   @db.VarChar(100) // Coursera, Udemy, YouTube, etc.
-  category        String   @db.VarChar(100) // programming, design, data-science, etc.
-  skills          String[]
-  difficulty      String   @db.VarChar(20) // beginner, intermediate, advanced
-  durationHours   Float?
-  isFree          Boolean  @default(false)
-  imageUrl        String?  @db.VarChar(500)
-  featured        Boolean  @default(false)
-  createdAt       DateTime @default(now())
+  id            String   @id @default(uuid())
+  title         String   @db.VarChar(300)
+  description   String?  @db.Text
+  url           String   @db.VarChar(500)
+  provider      String   @db.VarChar(100) // Coursera, Udemy, YouTube, etc.
+  category      String   @db.VarChar(100) // programming, design, data-science, etc.
+  skills        String[]
+  difficulty    String   @db.VarChar(20) // beginner, intermediate, advanced
+  durationHours Float?
+  isFree        Boolean  @default(false)
+  imageUrl      String?  @db.VarChar(500)
+  featured      Boolean  @default(false)
+  createdAt     DateTime @default(now())
 
   @@index([category])
   @@index([skills])
@@ -790,11 +2051,11 @@ model CalendarEvent {
 // ──────────────── Job Views / Profile Analytics ────────────────
 
 model ProfileView {
-  id          String   @id @default(uuid())
-  profileId   String
-  viewerId    String?
-  viewerRole  String?  @db.VarChar(20)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  profileId  String
+  viewerId   String?
+  viewerRole String?  @db.VarChar(20)
+  createdAt  DateTime @default(now())
 
   @@index([profileId, createdAt(sort: Desc)])
   @@index([viewerId])
@@ -803,14 +2064,74 @@ model ProfileView {
 // ──────────────── Password Reset ────────────────
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([token])
   @@index([userId])
+}
+
+// ──────────────── AI Chat Assistant ────────────────
+
+enum ChatConsentType {
+  PRIVACY_NOTICE
+  TERMS_OF_USE
+  DATA_STORAGE
+}
+
+model ChatConsent {
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  privacyNotice Boolean   @default(false)
+  termsOfUse    Boolean   @default(false)
+  dataStorage   Boolean   @default(false)
+  consentedAt   DateTime?
+  revokedAt     DateTime?
+  ipAddress     String?   @db.VarChar(45)
+  userAgent     String?   @db.VarChar(500)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model ChatConversation {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?  @db.VarChar(200)
+  summary   String?  @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages ChatMessage[]
+
+  @@index([userId, isActive])
+  @@index([userId, updatedAt(sort: Desc)])
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model ChatMessage {
+  id             String           @id @default(uuid())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           ChatMessageRole
+  content        String           @db.Text
+  metadata       Json?
+  tokenCount     Int?
+  createdAt      DateTime         @default(now())
+
+  @@index([conversationId, createdAt])
 }

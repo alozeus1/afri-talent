@@ -7,6 +7,9 @@ import { RemoteOKSource } from "./sources/remoteok.js";
 import { WeWorkRemotelySource } from "./sources/weworkremotely.js";
 import { AdzunaSource } from "./sources/adzuna.js";
 import { JobbermanSource } from "./sources/jobberman.js";
+import { HimalayasSource } from "./sources/himalayas.js";
+import { ArbeitnowSource } from "./sources/arbeitnow.js";
+import { RemotiveSource } from "./sources/jobsincyprus.js";
 export class JobAggregator {
     sources = [];
     prisma;
@@ -15,10 +18,13 @@ export class JobAggregator {
         this.initializeSources();
     }
     initializeSources() {
-        // Always-on free sources
+        // Always-on free sources (no API key required)
         this.sources.push(new RemoteOKSource());
         this.sources.push(new WeWorkRemotelySource());
         this.sources.push(new JobbermanSource());
+        this.sources.push(new HimalayasSource());
+        this.sources.push(new ArbeitnowSource());
+        this.sources.push(new RemotiveSource());
         // API-based sources (require keys)
         const adzunaAppId = process.env.ADZUNA_APP_ID;
         const adzunaApiKey = process.env.ADZUNA_API_KEY;
@@ -158,6 +164,9 @@ export class JobAggregator {
             sourceUrl: job.sourceUrl,
             sourceId: job.externalId,
             sourceName: job.company,
+            expiresAt: job.expiresAt || null,
+            lastCheckedAt: new Date(),
+            isExpired: false,
         };
         if (existing) {
             await this.prisma.job.update({

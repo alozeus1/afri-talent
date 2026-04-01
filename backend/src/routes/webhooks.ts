@@ -1,22 +1,92 @@
 import { Router, Request, Response } from "express";
-import { getStripe, getPlanFromPriceId } from "../lib/stripe.js";
+import { BillingDiscrepancyType, BillingEventOutcome, Prisma, SubscriptionPlan } from "@prisma/client";
+import { getStripe, getPlanFromPriceId, isStripeConfigured } from "../lib/stripe.js";
 import prisma from "../lib/prisma.js";
-import { SubscriptionStatus, SubscriptionPlan } from "@prisma/client";
+import { updateStripeCountry } from "../lib/billing/region-resolver.js";
+import { createUserNotification } from "../lib/notifications.js";
+import { redisClient } from "../lib/redis.js";
+import { recordOpsEvent } from "../lib/ops/events.js";
+import { pushDeadLetter } from "../lib/ops/resilience.js";
+import {
+  mapStripeSubscriptionStatus,
+  recordBillingEvent,
+  syncBillingEntitlementState,
+  upsertBillingDiscrepancy,
+} from "../lib/billing/index.js";
 
 const router = Router();
 
 // Processed event IDs for idempotency (resets on restart; use Redis for production)
 const processedEvents = new Set<string>();
+const WEBHOOK_IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+async function reserveEventId(eventId: string): Promise<boolean> {
+  if (redisClient) {
+    try {
+      const result = await redisClient.set(
+        `idempotency:stripe:${eventId}`,
+        new Date().toISOString(),
+        "EX",
+        WEBHOOK_IDEMPOTENCY_TTL_SECONDS,
+        "NX",
+      );
+      return result === "OK";
+    } catch {
+      // Fall back to in-memory duplicate protection.
+    }
+  }
+
+  if (processedEvents.has(eventId)) {
+    return false;
+  }
+
+  processedEvents.add(eventId);
+  if (processedEvents.size > 10000) {
+    const first = processedEvents.values().next().value;
+    if (first) {
+      processedEvents.delete(first);
+    }
+  }
+
+  return true;
+}
 
 // POST /api/webhooks/stripe
 // IMPORTANT: This route MUST be registered BEFORE express.json() in server.ts
 // because Stripe signature verification requires the raw request body.
 router.post("/stripe", async (req: Request, res: Response) => {
+  const startedAt = Date.now();
   const sig = req.headers["stripe-signature"] as string;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+  if (!isStripeConfigured()) {
+    console.error("[webhook] STRIPE_SECRET_KEY not set");
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "warning",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "stripe_not_configured",
+      },
+    });
+    res.status(503).json({ error: "Stripe is not configured" });
+    return;
+  }
+
   if (!webhookSecret) {
     console.error("[webhook] STRIPE_WEBHOOK_SECRET not set");
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "critical",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "webhook_secret_missing",
+      },
+    });
     res.status(500).json({ error: "Webhook secret not configured" });
     return;
   }
@@ -26,20 +96,44 @@ router.post("/stripe", async (req: Request, res: Response) => {
     event = getStripe().webhooks.constructEvent(req.body, sig, webhookSecret);
   } catch (err) {
     console.error("[webhook] Signature verification failed:", err);
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "warning",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "invalid_signature",
+      },
+    });
     res.status(400).json({ error: "Invalid webhook signature" });
     return;
   }
 
   // Idempotency guard
-  if (processedEvents.has(event.id)) {
+  const reserved = await reserveEventId(event.id);
+  if (!reserved) {
+    await recordBillingEvent({
+      source: "STRIPE_WEBHOOK",
+      eventId: event.id,
+      eventType: event.type,
+      outcome: BillingEventOutcome.DUPLICATE,
+      rawPayload: event as unknown as Prisma.InputJsonValue,
+      occurredAt: new Date(event.created * 1000),
+      processedAt: new Date(),
+      reasonCode: "duplicate_webhook_event",
+    }).catch(() => undefined);
+    recordOpsEvent({
+      metricName: "billing_checkout_duplicate",
+      category: "billing",
+      outcome: "duplicate",
+      durationMs: Date.now() - startedAt,
+      details: {
+        event_type: event.type,
+      },
+    });
     res.json({ received: true, duplicate: true });
     return;
-  }
-  processedEvents.add(event.id);
-  // Keep set bounded (prevent unbounded memory growth in long-running processes)
-  if (processedEvents.size > 10000) {
-    const first = processedEvents.values().next().value;
-    if (first) processedEvents.delete(first);
   }
 
   try {
@@ -48,28 +142,137 @@ router.post("/stripe", async (req: Request, res: Response) => {
         const session = event.data.object as unknown as {
           customer: string;
           subscription: string;
-          metadata: { userId: string; plan: string };
+          invoice?: string | null;
+          payment_intent?: string | null;
+          amount_total?: number | null;
+          currency?: string | null;
+          customer_details?: {
+            address?: { country?: string | null };
+            tax_ids?: Array<{ type?: string | null; value?: string | null }>;
+          };
+          metadata: { userId: string; plan: string; billingRegion?: "AFRICA" | "EUROPE" | "ROW" };
         };
         const userId = session.metadata?.userId;
-        const plan = session.metadata?.plan as SubscriptionPlan;
+        const plan = session.metadata?.plan as SubscriptionPlan | undefined;
 
         if (userId && plan) {
-          await prisma.subscription.upsert({
+          const subscription = await prisma.subscription.upsert({
             where: { userId },
             create: {
               userId,
               stripeCustomerId: session.customer,
               stripeSubId: session.subscription,
               plan,
-              status: SubscriptionStatus.ACTIVE,
+              status: "ACTIVE",
             },
             update: {
               stripeCustomerId: session.customer,
               stripeSubId: session.subscription,
               plan,
-              status: SubscriptionStatus.ACTIVE,
+              status: "ACTIVE",
             },
           });
+
+          const taxId = session.customer_details?.tax_ids?.[0];
+          if (taxId?.type || taxId?.value || session.customer_details?.address?.country) {
+            await prisma.userBillingProfile.upsert({
+              where: { userId },
+              create: {
+                userId,
+                country: session.customer_details?.address?.country?.toUpperCase() ?? null,
+                region: session.metadata?.billingRegion ?? "ROW",
+                currency: session.currency?.toUpperCase() ?? "USD",
+                taxIdType: taxId?.type ?? null,
+                taxIdValue: taxId?.value ?? null,
+              },
+              update: {
+                ...(session.customer_details?.address?.country && {
+                  country: session.customer_details.address.country.toUpperCase(),
+                }),
+                ...(session.currency && { currency: session.currency.toUpperCase() }),
+                ...(taxId?.type && { taxIdType: taxId.type }),
+                ...(taxId?.value && { taxIdValue: taxId.value }),
+              },
+            });
+          }
+
+          await syncBillingEntitlementState(userId, "webhook_checkout_completed");
+          await recordBillingEvent({
+            userId,
+            subscriptionId: subscription.id,
+            source: "STRIPE_WEBHOOK",
+            eventId: event.id,
+            eventType: event.type,
+            outcome: BillingEventOutcome.PROCESSED,
+            plan,
+            status: "ACTIVE",
+            billingRegion: session.metadata?.billingRegion ?? null,
+            currency: session.currency ?? null,
+            amountMinor: session.amount_total ?? null,
+            stripeCustomerId: session.customer,
+            stripeSubscriptionId: session.subscription,
+            stripeInvoiceId: session.invoice ?? null,
+            stripePaymentIntentId: session.payment_intent ?? null,
+            metadata: {
+              billingCountry: session.customer_details?.address?.country ?? null,
+              taxIdType: taxId?.type ?? null,
+            },
+            rawPayload: event as unknown as Prisma.InputJsonValue,
+            occurredAt: new Date(event.created * 1000),
+            processedAt: new Date(),
+          });
+
+          await createUserNotification({
+            userId,
+            type: "VERIFICATION",
+            title: "Subscription activated",
+            body: `Your ${plan.toLowerCase().replaceAll("_", " ")} plan is now active.`,
+            channel: "subscriptionNotices",
+            metadata: { event: event.type, plan },
+          });
+          recordOpsEvent({
+            metricName: "billing_checkout_success",
+            category: "billing",
+            durationMs: Date.now() - startedAt,
+            details: {
+              event_type: event.type,
+              plan,
+            },
+          });
+        }
+        break;
+      }
+
+      case "payment_method.attached": {
+        // Capture payment country from payment method
+        const pm = event.data.object as unknown as {
+          customer: string;
+          card?: { country: string };
+        };
+        if (pm.customer && pm.card?.country) {
+          const sub = await prisma.subscription.findFirst({
+            where: { stripeCustomerId: pm.customer as string },
+            select: { userId: true },
+          });
+          if (sub) {
+            await updateStripeCountry(sub.userId, pm.card.country).catch((err) =>
+              console.error("[webhook] Failed to update Stripe country:", err),
+            );
+            await recordBillingEvent({
+              userId: sub.userId,
+              source: "STRIPE_WEBHOOK",
+              eventId: event.id,
+              eventType: event.type,
+              outcome: BillingEventOutcome.PROCESSED,
+              stripeCustomerId: pm.customer,
+              metadata: {
+                stripeCountry: pm.card.country,
+              },
+              rawPayload: event as unknown as Prisma.InputJsonValue,
+              occurredAt: new Date(event.created * 1000),
+              processedAt: new Date(),
+            });
+          }
         }
         break;
       }
@@ -83,7 +286,11 @@ router.post("/stripe", async (req: Request, res: Response) => {
         };
         const priceId = sub.items.data[0]?.price.id;
         const plan = priceId ? getPlanFromPriceId(priceId) : undefined;
-        const status = mapStripeStatus(sub.status);
+        const status = mapStripeSubscriptionStatus(sub.status);
+        const existing = await prisma.subscription.findFirst({
+          where: { stripeSubId: sub.id },
+          select: { userId: true, id: true },
+        });
 
         await prisma.subscription.updateMany({
           where: { stripeSubId: sub.id },
@@ -93,31 +300,339 @@ router.post("/stripe", async (req: Request, res: Response) => {
             currentPeriodEnd: new Date(sub.current_period_end * 1000),
           },
         });
+
+        if (existing?.userId) {
+          await syncBillingEntitlementState(existing.userId, "webhook_subscription_updated");
+          await recordBillingEvent({
+            userId: existing.userId,
+            subscriptionId: existing.id,
+            source: "STRIPE_WEBHOOK",
+            eventId: event.id,
+            eventType: event.type,
+            outcome: BillingEventOutcome.PROCESSED,
+            plan: plan ?? null,
+            status,
+            stripeSubscriptionId: sub.id,
+            metadata: {
+              stripePriceId: priceId ?? null,
+            },
+            rawPayload: event as unknown as Prisma.InputJsonValue,
+            occurredAt: new Date(event.created * 1000),
+            processedAt: new Date(),
+          });
+          await createUserNotification({
+            userId: existing.userId,
+            type: "VERIFICATION",
+            title: "Subscription updated",
+            body: `Your subscription status is now ${status.toLowerCase()}.`,
+            channel: "subscriptionNotices",
+            metadata: { event: event.type, status, plan },
+          });
+        }
         break;
       }
 
       case "customer.subscription.deleted": {
         const sub = event.data.object as { id: string };
+        const existing = await prisma.subscription.findFirst({
+          where: { stripeSubId: sub.id },
+          select: { userId: true, id: true },
+        });
         await prisma.subscription.updateMany({
           where: { stripeSubId: sub.id },
           data: {
-            status: SubscriptionStatus.CANCELLED,
-            plan: SubscriptionPlan.FREE,
+            status: "CANCELLED",
+            plan: "FREE",
+          },
+        });
+
+        if (existing?.userId) {
+          await syncBillingEntitlementState(existing.userId, "webhook_subscription_deleted");
+          await recordBillingEvent({
+            userId: existing.userId,
+            subscriptionId: existing.id,
+            source: "STRIPE_WEBHOOK",
+            eventId: event.id,
+            eventType: event.type,
+            outcome: BillingEventOutcome.PROCESSED,
+            plan: "FREE",
+            status: "CANCELLED",
+            stripeSubscriptionId: sub.id,
+            rawPayload: event as unknown as Prisma.InputJsonValue,
+            occurredAt: new Date(event.created * 1000),
+            processedAt: new Date(),
+          });
+          await createUserNotification({
+            userId: existing.userId,
+            type: "VERIFICATION",
+            title: "Subscription cancelled",
+            body: "Your paid subscription was cancelled and moved to Free.",
+            channel: "subscriptionNotices",
+            metadata: { event: event.type },
+          });
+        }
+        break;
+      }
+
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as unknown as {
+          id: string;
+          customer?: string | null;
+          subscription: string;
+          payment_intent?: string | null;
+          amount_due?: number | null;
+          currency?: string | null;
+          attempt_count?: number | null;
+          next_payment_attempt?: number | null;
+        };
+        const existing = await prisma.subscription.findFirst({
+          where: { stripeSubId: invoice.subscription },
+          select: { userId: true, id: true, plan: true },
+        });
+        await prisma.subscription.updateMany({
+          where: { stripeSubId: invoice.subscription },
+          data: { status: "PAST_DUE" },
+        });
+
+        if (existing?.userId) {
+          await syncBillingEntitlementState(existing.userId, "webhook_invoice_payment_failed");
+          const auditEvent = await recordBillingEvent({
+            userId: existing.userId,
+            subscriptionId: existing.id,
+            source: "STRIPE_WEBHOOK",
+            eventId: event.id,
+            eventType: event.type,
+            outcome: BillingEventOutcome.PROCESSED,
+            plan: existing.plan,
+            status: "PAST_DUE",
+            currency: invoice.currency ?? null,
+            amountMinor: invoice.amount_due ?? null,
+            stripeCustomerId: invoice.customer ?? null,
+            stripeSubscriptionId: invoice.subscription,
+            stripeInvoiceId: invoice.id,
+            stripePaymentIntentId: invoice.payment_intent ?? null,
+            reasonCode: "invoice_payment_failed",
+            metadata: {
+              attemptCount: invoice.attempt_count ?? null,
+              nextPaymentAttempt: invoice.next_payment_attempt ?? null,
+            },
+            rawPayload: event as unknown as Prisma.InputJsonValue,
+            occurredAt: new Date(event.created * 1000),
+            processedAt: new Date(),
+          });
+          await upsertBillingDiscrepancy({
+            userId: existing.userId,
+            subscriptionId: existing.id,
+            billingEventId: auditEvent.id,
+            type: BillingDiscrepancyType.PAYMENT_FAILURE,
+            severity: "HIGH",
+            title: "Payment retry is required for a past-due subscription",
+            reasonCode: "invoice_payment_failed",
+            dueAt: invoice.next_payment_attempt
+              ? new Date(invoice.next_payment_attempt * 1000)
+              : null,
+            details: {
+              attemptCount: invoice.attempt_count ?? null,
+              nextPaymentAttempt: invoice.next_payment_attempt ?? null,
+              amountDue: invoice.amount_due ?? null,
+              currency: invoice.currency ?? null,
+            },
+          });
+          await createUserNotification({
+            userId: existing.userId,
+            type: "VERIFICATION",
+            title: "Payment issue detected",
+            body: "We could not process your payment. Please update your billing details.",
+            channel: "subscriptionNotices",
+            metadata: { event: event.type },
+          });
+        }
+        recordOpsEvent({
+          metricName: "billing_checkout_failure",
+          category: "billing",
+          outcome: "failure",
+          severity: "warning",
+          durationMs: Date.now() - startedAt,
+          details: {
+            event_type: event.type,
+            reason: "invoice_payment_failed",
           },
         });
         break;
       }
 
-      case "invoice.payment_failed": {
-        const invoice = event.data.object as unknown as { subscription: string };
-        await prisma.subscription.updateMany({
-          where: { stripeSubId: invoice.subscription },
-          data: { status: SubscriptionStatus.PAST_DUE },
+      case "invoice.paid":
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object as unknown as {
+          id: string;
+          customer?: string | null;
+          subscription?: string | null;
+          payment_intent?: string | null;
+          amount_paid?: number | null;
+          currency?: string | null;
+        };
+
+        if (invoice.subscription) {
+          const existing = await prisma.subscription.findFirst({
+            where: { stripeSubId: invoice.subscription },
+            select: { userId: true, id: true, plan: true },
+          });
+
+          await prisma.subscription.updateMany({
+            where: { stripeSubId: invoice.subscription },
+            data: { status: "ACTIVE" },
+          });
+
+          if (existing?.userId) {
+            await syncBillingEntitlementState(existing.userId, "webhook_invoice_paid");
+            const auditEvent = await recordBillingEvent({
+              userId: existing.userId,
+              subscriptionId: existing.id,
+              source: "STRIPE_WEBHOOK",
+              eventId: event.id,
+              eventType: event.type,
+              outcome: BillingEventOutcome.PROCESSED,
+              plan: existing.plan,
+              status: "ACTIVE",
+              currency: invoice.currency ?? null,
+              amountMinor: invoice.amount_paid ?? null,
+              stripeCustomerId: invoice.customer ?? null,
+              stripeSubscriptionId: invoice.subscription,
+              stripeInvoiceId: invoice.id,
+              stripePaymentIntentId: invoice.payment_intent ?? null,
+              rawPayload: event as unknown as Prisma.InputJsonValue,
+              occurredAt: new Date(event.created * 1000),
+              processedAt: new Date(),
+            });
+
+            await prisma.billingDiscrepancy.updateMany({
+              where: {
+                userId: existing.userId,
+                type: {
+                  in: [BillingDiscrepancyType.PAYMENT_FAILURE, BillingDiscrepancyType.UNPAID_BUT_ENTITLED],
+                },
+                status: {
+                  in: ["OPEN", "ACKNOWLEDGED"],
+                },
+              },
+              data: {
+                status: "RESOLVED",
+                resolvedAt: new Date(),
+                lastSeenAt: new Date(),
+              },
+            });
+
+            await recordBillingEvent({
+              userId: existing.userId,
+              subscriptionId: existing.id,
+              source: "SYSTEM",
+              eventType: "billing.payment_recovered",
+              outcome: BillingEventOutcome.RECONCILED,
+              plan: existing.plan,
+              status: "ACTIVE",
+              stripeInvoiceId: invoice.id,
+              billingRegion: null,
+              rawPayload: {
+                recoveredFromEventId: auditEvent.id,
+              },
+              processedAt: new Date(),
+            });
+          }
+        }
+
+        break;
+      }
+
+      case "charge.refunded":
+      case "refund.created":
+      case "refund.updated": {
+        const refund = event.data.object as unknown as {
+          id: string;
+          charge?: string | null;
+          payment_intent?: string | null;
+          metadata?: { userId?: string; subscriptionId?: string };
+          amount?: number | null;
+          currency?: string | null;
+          status?: string | null;
+        };
+
+        const existing = refund.metadata?.subscriptionId
+          ? await prisma.subscription.findUnique({
+              where: { id: refund.metadata.subscriptionId },
+              select: { id: true, userId: true, plan: true },
+            })
+          : refund.metadata?.userId
+            ? await prisma.subscription.findUnique({
+                where: { userId: refund.metadata.userId },
+                select: { id: true, userId: true, plan: true },
+              })
+            : null;
+
+        const auditEvent = await recordBillingEvent({
+          userId: existing?.userId ?? refund.metadata?.userId ?? null,
+          subscriptionId: existing?.id ?? refund.metadata?.subscriptionId ?? null,
+          source: "STRIPE_WEBHOOK",
+          eventId: event.id,
+          eventType: event.type,
+          outcome: BillingEventOutcome.PROCESSED,
+          plan: existing?.plan ?? null,
+          currency: refund.currency ?? null,
+          amountMinor: refund.amount ?? null,
+          stripeRefundId: refund.id,
+          stripePaymentIntentId: refund.payment_intent ?? null,
+          stripeChargeId: refund.charge ?? null,
+          reasonCode: refund.status ?? null,
+          rawPayload: event as unknown as Prisma.InputJsonValue,
+          occurredAt: new Date(event.created * 1000),
+          processedAt: new Date(),
         });
+
+        if (refund.status === "pending" || refund.status === "requires_action") {
+          await upsertBillingDiscrepancy({
+            userId: existing?.userId ?? refund.metadata?.userId ?? null,
+            subscriptionId: existing?.id ?? refund.metadata?.subscriptionId ?? null,
+            billingEventId: auditEvent.id,
+            type: BillingDiscrepancyType.PENDING_REFUND,
+            severity: "MEDIUM",
+            title: "Refund is pending completion",
+            reasonCode: refund.status ?? "refund_pending",
+            details: {
+              stripeRefundId: refund.id,
+              amount: refund.amount ?? null,
+              currency: refund.currency ?? null,
+            },
+          });
+        }
+
+        if (refund.status === "succeeded" && (existing?.userId || refund.metadata?.userId)) {
+          await prisma.billingDiscrepancy.updateMany({
+            where: {
+              userId: existing?.userId ?? refund.metadata?.userId ?? undefined,
+              type: BillingDiscrepancyType.PENDING_REFUND,
+              status: {
+                in: ["OPEN", "ACKNOWLEDGED"],
+              },
+            },
+            data: {
+              status: "RESOLVED",
+              resolvedAt: new Date(),
+              lastSeenAt: new Date(),
+            },
+          });
+        }
         break;
       }
 
       default:
+        await recordBillingEvent({
+          source: "STRIPE_WEBHOOK",
+          eventId: event.id,
+          eventType: event.type,
+          outcome: BillingEventOutcome.RECEIVED,
+          rawPayload: event as unknown as Prisma.InputJsonValue,
+          occurredAt: new Date(event.created * 1000),
+          processedAt: new Date(),
+        });
         // Unhandled event types are fine — log and acknowledge
         console.info(`[webhook] Unhandled event type: ${event.type}`);
     }
@@ -125,24 +640,54 @@ router.post("/stripe", async (req: Request, res: Response) => {
     res.json({ received: true });
   } catch (error) {
     console.error("[webhook] Handler error:", error);
+    const failedAudit = await recordBillingEvent({
+      source: "STRIPE_WEBHOOK",
+      eventId: event.id,
+      eventType: event.type,
+      outcome: BillingEventOutcome.FAILED,
+      reasonCode: "stripe_webhook_handler_failed",
+      message: error instanceof Error ? error.message : "Unknown webhook handler error",
+      rawPayload: event as unknown as Prisma.InputJsonValue,
+      occurredAt: new Date(event.created * 1000),
+      processedAt: new Date(),
+    }).catch(() => null);
+    if (failedAudit) {
+      await upsertBillingDiscrepancy({
+        billingEventId: failedAudit.id,
+        type: BillingDiscrepancyType.WEBHOOK_FAILURE,
+        severity: "HIGH",
+        title: "Stripe webhook handler failed",
+        reasonCode: "stripe_webhook_handler_failed",
+        details: {
+          eventId: event.id,
+          eventType: event.type,
+        },
+      }).catch(() => undefined);
+    }
+    await pushDeadLetter({
+      category: "webhook",
+      source: "stripe",
+      reasonCode: "stripe_webhook_handler_failed",
+      error,
+      payload: {
+        eventId: event.id,
+        eventType: event.type,
+      },
+    });
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "critical",
+      durationMs: Date.now() - startedAt,
+      details: {
+        event_type: event.type,
+        reason: "handler_error",
+      },
+    });
     // Return 200 to prevent Stripe from retrying (state may be partially applied)
     res.json({ received: true, error: "Handler error — check server logs" });
   }
 });
-
-function mapStripeStatus(stripeStatus: string): SubscriptionStatus {
-  switch (stripeStatus) {
-    case "active":
-    case "trialing":
-      return SubscriptionStatus.ACTIVE;
-    case "past_due":
-      return SubscriptionStatus.PAST_DUE;
-    case "canceled":
-    case "unpaid":
-      return SubscriptionStatus.CANCELLED;
-    default:
-      return SubscriptionStatus.INACTIVE;
-  }
-}
 
 export default router;

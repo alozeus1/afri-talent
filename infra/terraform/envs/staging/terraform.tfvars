@@ -51,6 +51,6 @@ github_ref  = "refs/heads/develop"
 
 create_oidc_provider                 = false
 existing_oidc_provider_arn           = "arn:aws:iam::260820061731:oidc-provider/token.actions.githubusercontent.com"
-github_actions_additional_policy_arn = ""
+github_actions_additional_policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 
 alerts_email = "alozeus1@gmail.com"
