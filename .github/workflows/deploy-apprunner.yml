@@ -28,9 +28,20 @@ env:
   DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
 
 jobs:
+  prod-gate:
+    name: Production Approval Gate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod'
+    environment: production
+    steps:
+      - name: Approved for production
+        run: echo "Production deployment approved by required reviewer."
+
   provision-infra:
     name: Provision Base Infrastructure
     runs-on: ubuntu-latest
+    needs: [prod-gate]
+    if: always() && (needs.prod-gate.result == 'success' || needs.prod-gate.result == 'skipped')
     permissions:
       id-token: write
       contents: read
