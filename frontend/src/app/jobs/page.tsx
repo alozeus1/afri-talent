@@ -18,13 +18,19 @@ type JobsPageProps = {
 export default async function JobsPage({ searchParams }: JobsPageProps) {
   const filters = parseJobSearchState(await searchParams);
   const { data, error } = await getJobsListServer(toJobListParams(filters));
+  const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
+  const pagination = data?.pagination ?? {
+    page: filters.page,
+    limit: filters.limit,
+    total: jobs.length,
+    totalPages: 1,
+  };
 
-  const trustedResults = data?.jobs.filter((job) => job.discovery?.trustedJob).length ?? 0;
-  const freshResults =
-    data?.jobs.filter((job) => {
-      const label = job.discovery?.freshnessLabel;
-      return label === "FRESH" || label === "RECENT";
-    }).length ?? 0;
+  const trustedResults = jobs.filter((job) => job.discovery?.trustedJob).length;
+  const freshResults = jobs.filter((job) => {
+    const label = job.discovery?.freshnessLabel;
+    return label === "FRESH" || label === "RECENT";
+  }).length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -40,8 +46,8 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
         resultMetrics={
           data
             ? {
-                totalResults: data.pagination.total,
-                visibleResults: data.jobs.length,
+                totalResults: pagination.total,
+                visibleResults: jobs.length,
                 trustedResults,
                 freshResults,
               }
@@ -63,20 +69,20 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
         <>
           <div className="mb-4 flex flex-col gap-2 text-gray-600 dark:text-gray-300 sm:flex-row sm:items-center sm:justify-between">
             <p>
-              {data.pagination.total} job{data.pagination.total !== 1 ? "s" : ""} found
+              {pagination.total} job{pagination.total !== 1 ? "s" : ""} found
             </p>
             <p className="text-sm">
               Server-rendered results improve load time on slower devices and unstable networks.
             </p>
           </div>
 
-          {data.jobs.length > 0 && (
+          {jobs.length > 0 && (
             <div className="mb-6 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-4 text-sm text-emerald-900">
               Search ranking prioritizes relevance, recent refreshes, verified employers, salary transparency, and visa or relocation fit when it matters.
             </div>
           )}
 
-          {data.jobs.length === 0 ? (
+          {jobs.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-600 dark:text-gray-300 mb-4">No jobs found matching your criteria</p>
               {hasActiveJobFilters(filters) ? (
@@ -89,13 +95,13 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {data.jobs.map((job) => (
+              {jobs.map((job) => (
                 <JobCard key={job.id} job={job} />
               ))}
             </div>
           )}
 
-          {data.pagination.totalPages > 1 && (
+          {pagination.totalPages > 1 && (
             <div className="flex justify-center gap-2">
               {filters.page > 1 ? (
                 <Link href={buildJobsHref({ ...filters, page: filters.page - 1 })} prefetch={false}>
@@ -107,9 +113,9 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
                 </Button>
               )}
               <span className="flex items-center px-4 text-gray-600 dark:text-gray-300">
-                Page {filters.page} of {data.pagination.totalPages}
+                Page {filters.page} of {pagination.totalPages}
               </span>
-              {filters.page < data.pagination.totalPages ? (
+              {filters.page < pagination.totalPages ? (
                 <Link href={buildJobsHref({ ...filters, page: filters.page + 1 })} prefetch={false}>
                   <Button variant="outline">Next</Button>
                 </Link>

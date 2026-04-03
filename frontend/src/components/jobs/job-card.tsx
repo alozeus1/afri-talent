@@ -11,13 +11,14 @@ interface JobCardProps {
 }
 
 export function JobCard({ job }: JobCardProps) {
+  const tags = Array.isArray(job.tags) ? job.tags : [];
   const salary = formatSalaryRange({
     salaryMin: job.salaryMin,
     salaryMax: job.salaryMax,
     currency: job.currency,
     salaryPeriod: job.salaryPeriod,
   });
-  const freshnessLabel = job.discovery?.freshnessLabel.toLowerCase();
+  const freshnessLabel = job.discovery?.freshnessLabel?.toLowerCase() ?? null;
   const discoverySummary = job.rankingExplanation?.summary || job.trust?.guidance;
   const lastSeenText = job.discovery?.lastSeenAt
     ? new Date(job.discovery.lastSeenAt).toLocaleDateString()
@@ -107,7 +108,7 @@ export function JobCard({ job }: JobCardProps) {
 
           {job.discovery && (
             <div className="mb-4 flex flex-wrap gap-2">
-              {job.discovery.freshnessLabel !== "ACTIVE" && (
+              {job.discovery.freshnessLabel && job.discovery.freshnessLabel !== "ACTIVE" && freshnessLabel && (
                 <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
                   {freshnessLabel}
                 </span>
@@ -154,15 +155,15 @@ export function JobCard({ job }: JobCardProps) {
             </div>
           )}
 
-          {job.tags.length > 0 && (
+          {tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {job.tags.slice(0, 3).map((tag) => (
+              {tags.slice(0, 3).map((tag) => (
                 <Badge key={tag} variant="default">
                   {tag}
                 </Badge>
               ))}
-              {job.tags.length > 3 && (
-                <Badge variant="default">+{job.tags.length - 3}</Badge>
+              {tags.length > 3 && (
+                <Badge variant="default">+{tags.length - 3}</Badge>
               )}
             </div>
           )}

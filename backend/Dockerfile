@@ -23,10 +23,7 @@ COPY . .
 RUN npm run build
 
 # Prune dev deps for runtime
-RUN npm prune --production
-
-# Re-add Prisma CLI so the runtime container can apply migrations on startup.
-RUN npm install --no-save prisma@5.22.0
+RUN npm prune --omit=dev
 
 # Production image
 FROM base AS runner

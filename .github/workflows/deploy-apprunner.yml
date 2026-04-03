@@ -153,6 +153,7 @@ jobs:
     name: Build & Push Images
     runs-on: ubuntu-latest
     needs: [provision-infra]
+    if: always() && needs.provision-infra.result == 'success'
     permissions:
       id-token: write
       contents: read
@@ -228,6 +229,7 @@ jobs:
     name: Finalize Infrastructure
     runs-on: ubuntu-latest
     needs: [provision-infra, build-and-push]
+    if: always() && needs.provision-infra.result == 'success' && needs.build-and-push.result == 'success'
     permissions:
       id-token: write
       contents: read
@@ -299,6 +301,7 @@ jobs:
     name: Deploy to App Runner
     runs-on: ubuntu-latest
     needs: [finalize-infra]
+    if: always() && needs.finalize-infra.result == 'success'
     permissions:
       id-token: write
       contents: read
@@ -392,6 +395,7 @@ jobs:
     name: Post-Deploy Health Check
     runs-on: ubuntu-latest
     needs: [deploy-apprunner, finalize-infra]
+    if: always() && needs.deploy-apprunner.result == 'success' && needs.finalize-infra.result == 'success'
 
     steps:
       - name: Check backend health
