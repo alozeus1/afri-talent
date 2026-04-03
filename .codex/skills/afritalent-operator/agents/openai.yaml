@@ -1,0 +1,3 @@
+interface:
+  display_name: "Afritalent Operator"
+  short_description: "Operate AfriTalent delivery, staging, and roadmap work with project-specific context"

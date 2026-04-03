@@ -36,6 +36,15 @@ export async function checkDailyQuota(
     return;
   }
 
+  const aiRunModel = (prisma as typeof prisma & {
+    aiRun?: { count?: (args: unknown) => Promise<number> };
+  }).aiRun;
+
+  if (!aiRunModel?.count) {
+    next();
+    return;
+  }
+
   try {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -46,7 +55,7 @@ export async function checkDailyQuota(
       resume_review: AiRunType.RESUME_REVIEW,
     };
 
-    const count = await prisma.aiRun.count({
+    const count = await aiRunModel.count({
       where: {
         userId,
         runType: typeMap[run_type],

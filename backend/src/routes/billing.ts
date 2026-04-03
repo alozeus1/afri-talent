@@ -105,7 +105,7 @@ router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Reque
     }
 
     // Get or create Stripe customer
-    let subscription = await prisma.subscription.findUnique({
+    const subscription = await prisma.subscription.findUnique({
       where: { userId: req.user!.userId },
     });
 

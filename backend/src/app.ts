@@ -66,6 +66,7 @@ import botsRoutes from "./routes/bots.js";
 import trustRoutes from "./routes/trust.js";
 import adminTrustRoutes from "./routes/admin-trust.js";
 import adminAtsRoutes from "./routes/admin-ats.js";
+import adminRagRoutes from "./routes/admin-rag.js";
 import { swaggerSpec } from "./lib/swagger.js";
 
 dotenv.config({ quiet: true });
@@ -321,6 +322,7 @@ app.use("/api/university-partners", universityPartnersRoutes);
 app.use("/api/employer/ai", employerAiRoutes);
 app.use("/api/trust", trustRoutes);
 app.use("/api/admin/trust", adminTrustRoutes);
+app.use("/api/admin/rag", adminRagRoutes);
 app.use("/api/bots", botsRoutes);
 
 // OpenAPI/Swagger docs

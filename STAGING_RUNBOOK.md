@@ -1,6 +1,6 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: March 26, 2026 10:19 PM (America/Chicago)
+Last updated: April 3, 2026 5:12 PM (America/Chicago)
 
 This is the first file a future Codex run should read for staging, deployment, ops, and recovery work.
 It captures the current live state, the last known deployment progress, where to look in AWS, and the fastest safe troubleshooting paths.
@@ -62,46 +62,59 @@ For incidents, readiness work, or monitoring changes, use these docs after this 
 - Backend service name: `afritalent-staging-appr-backend-managed`
 - Backend service ARN: `arn:aws:apprunner:us-east-1:260820061731:service/afritalent-staging-appr-backend-managed/c768443a22d2415a9d182079a8ff639d`
 - Backend public URL: `https://ed4nsj3sgv.us-east-1.awsapprunner.com`
-- Backend status at handoff: healthy and returning `200` on `/health` and `/api/health`
+- Backend status at handoff: `RUNNING` and returning `200` on `/health` and `/api/health`
+- Backend live health payload is currently `ok` with `database=connected` and `redis=connected`
 
 - Frontend live service name: `afritalent-stg-fe-livefix`
 - Frontend live service ARN: `arn:aws:apprunner:us-east-1:260820061731:service/afritalent-stg-fe-livefix/3cfcc7543c0746c582000ae3d4a529b4`
 - Frontend live URL: `https://3mwn2b4e5t.us-east-1.awsapprunner.com`
 - Frontend live status at handoff: `RUNNING`
 
-- Frontend managed service name: `afritalent-staging-appr-frontend-managed`
-- Frontend managed service ARN: `arn:aws:apprunner:us-east-1:260820061731:service/afritalent-staging-appr-frontend-managed/188b078ce30a4439954995135ddfa299`
-- Frontend managed URL: `https://rrmkvb99ca.us-east-1.awsapprunner.com`
-- Frontend managed status at handoff: still stuck in `OPERATION_IN_PROGRESS` from an older partial fix attempt
+- The dead managed frontend App Runner service has been deleted from AWS after the live frontend service was imported into Terraform state
 
 ## Last Known Deployment State
 
-The backend deployment path was repaired and is working.
+The current shared staging deployment path is working on AWS App Runner.
 
-Completed:
+Completed on April 3, 2026:
 
-- Staging GitHub role and repo variables were aligned to staging
-- Backend image was built and pushed successfully
-- Backend App Runner service was updated to image tag `1910dfc-live`
-- Prisma migrations now run at container startup through `backend/docker/entrypoint.sh`
-- Staging `DATABASE_URL` in Secrets Manager was repaired so the password is URL-encoded
-- Backend startup logs confirmed migrations applied and health checks succeeded
-- Frontend Docker runtime was repaired so App Runner cannot override the bind target
-- Frontend image healthcheck was repaired to probe IPv4 loopback instead of `localhost`
-- Frontend live recovery service reached `RUNNING` and serves the site successfully
+- Verified the active non-prod runtime is AWS App Runner + ECR + RDS PostgreSQL, not Railway
+- Confirmed frontend live service `afritalent-stg-fe-livefix` is healthy on image tag `apprunnerfix-20260326-221310`
+- Patched `.github/workflows/deploy-apprunner.yml` and `infra/terraform/envs/staging/terraform.tfvars` so staging points at the recovered live frontend service instead of the dead managed frontend service
+- Repaired the broken Prisma migration chain:
+  - `20260329003000_add_candidate_authenticity_layer` now bootstraps the missing trust schema safely
+  - `20260329020000_add_candidate_retention_lifecycle` now checks `NotificationType` correctly
+- Rebuilt and pushed the backend image to the existing ECR tag `1910dfc-live`
+- Backend App Runner deployment `e865b93c94a74454acb47799c5c7b584` succeeded
+- Backend application logs confirmed the previously failed trust migration, ATS migration, and candidate retention migration all applied successfully in staging
+- Backend startup now auto-clears the previously failed trust migration ledger entry before running `prisma migrate deploy`
+- Imported the live frontend App Runner service `afritalent-stg-fe-livefix` into Terraform state
+- Updated staging Terraform config so backend redirects and S3/CORS public URL resolution use the live frontend App Runner URL
+- Applied a targeted Terraform update so backend `FRONTEND_URL` now points at `https://3mwn2b4e5t.us-east-1.awsapprunner.com`
+- Provisioned AWS ElastiCache Serverless Redis:
+  - cache name: `afritalent-staging-redis`
+  - endpoint: `afritalent-staging-redis-w72h9g.serverless.use1.cache.amazonaws.com:6379`
+  - security group: `sg-02077c3484d361b0e`
+- Updated staging `REDIS_URL` in Secrets Manager and the GitHub Actions repo secret to the new AWS Redis endpoint
+- Restarted the backend App Runner service and verified `/health` now returns `status=ok` with `redis=connected`
+- Deleted the dead frontend App Runner service `afritalent-staging-appr-frontend-managed`
 
 Open:
 
-- The original managed frontend service is still stuck in `OPERATION_IN_PROGRESS` from a pre-fix create attempt and should be cleaned up later
-- Terraform and workflows still need to be reconciled to the now-working frontend service path
+- `STRIPE_SECRET_KEY` is still empty in `afritalent-staging/app-secrets`
+- A full local `terraform plan` from the `admin` IAM user is still blocked by an explicit deny on `ec2:DescribeInstances` from `arn:aws:iam::260820061731:policy/demo-policy`
+- Full Terraform apply is still pending for monitoring, alerting, and other non-App-Runner resources outside the targeted repairs above
+- A semantic retrieval foundation now exists in the backend codebase, but it has not been deployed or indexed in staging yet
 
 ## Last Known Image Digests
 
 - Backend tag: `1910dfc-live`
-- Backend digest: `sha256:323ab65dc4acc9279a05bbdcb1ad1a2f6727c4458ee12e5554d6643b3c02b7da`
+- Backend digest: `sha256:157eebefaa3db7ab605176a9dd68a6b0b19e5cf0ee53a102f27db799a9830ed9`
+- Backend image pushed at: `2026-04-03 14:53:43 America/Chicago`
 
 - Frontend tag: `apprunnerfix-20260326-221310`
-- Frontend digest: `sha256:7a4f71f6b3fd218f01c9a581b531a6c77b7e322f71e30e33c3b2e531dcb34987`
+- Frontend digest: `sha256:13c51e87e91671834c6bf170a6968684ee325a1147c3cfe433af507f0d2a13b8`
+- Frontend image pushed at: `2026-04-03 14:21:31 America/Chicago`
 
 ## Current Repo State
 
@@ -128,21 +141,36 @@ Do not reset or discard those unless the user explicitly asks.
 
 ## Known Issues At Handoff
 
-1. Backend `FRONTEND_URL` still points at `https://staging.afri-talent.com`
-   The backend is working, but password reset links and any frontend redirect behavior should be updated after a stable frontend URL is chosen.
+1. Backend `FRONTEND_URL` previously pointed at `https://staging.afri-talent.com`
+   Resolved on April 3, 2026.
+   - backend runtime env now points at `https://3mwn2b4e5t.us-east-1.awsapprunner.com`
+   - password reset links and frontend redirects now target the live staging frontend service
 
-2. Frontend App Runner service creation is failing in AWS
-   Root cause was in the frontend container itself:
-   - the image healthcheck was probing `localhost`, which hit IPv6 loopback and failed
-   - Next.js standalone reads `process.env.HOSTNAME`, and App Runner can override that value
-   - fix was to force `HOSTNAME=0.0.0.0` in the runtime `CMD` and use an IPv4 loopback health probe
-   The latest recovery service is running with that fix.
+2. Staging Redis is degraded
+   Resolved on April 3, 2026.
+   - `/health` and `/api/health` now return `redis=connected`
+   - staging now uses AWS ElastiCache Serverless instead of the previous external Upstash URL
 
-3. Uploads bucket CORS was manually widened for App Runner testing
+3. The original managed frontend App Runner service is dead
+   Resolved on April 3, 2026.
+   - live traffic remains on `afritalent-stg-fe-livefix`
+   - the live frontend service is now in Terraform state
+   - the dead managed service has been deleted from AWS
+
+4. Backend migrations now depend on a targeted ledger repair at startup
+   - `backend/docker/entrypoint.sh` clears the old failed `20260329003000_add_candidate_authenticity_layer` row in `_prisma_migrations`
+   - leave that in place until the staging database history has been normalized and a cleanup pass is planned
+
+5. Uploads bucket CORS was manually widened for App Runner testing
    Current allowed origins include:
    - `https://staging.afri-talent.com`
    - `https://rrmkvb99ca.us-east-1.awsapprunner.com`
    - `https://3mwn2b4e5t.us-east-1.awsapprunner.com`
+
+6. Stripe is still the main remaining pre-prod blocker
+   - `STRIPE_SECRET_KEY` is still empty
+   - no usable Stripe test credential is present in the local shell, GitHub repo secrets, or the staging app secret
+   - billing flows should be treated as incomplete until a real test-mode Stripe key is provided
 
 ## Where To Look First
 

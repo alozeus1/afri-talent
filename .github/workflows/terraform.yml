@@ -36,13 +36,6 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Debug Terraform fmt inputs
-        run: |
-          pwd
-          terraform -version
-          ls -l locals.tf envs/staging
-          sed -n '1,160p' locals.tf
-
       - name: Terraform fmt
         run: terraform fmt -check -recursive
 
@@ -60,21 +53,23 @@ jobs:
       - name: Terraform validate
         run: terraform validate
 
-      - name: tfsec
-        uses: aquasecurity/tfsec-action@v1.0.3
-        with:
-          working_directory: infra/terraform
+  checkov:
+    name: Checkov
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Checkov
+      - name: Run Checkov
         uses: bridgecrewio/checkov-action@v12
         with:
-          directory: infra/terraform
-          framework: terraform
+          config_file: .checkov.yml
 
   plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [validate, checkov]
+    if: vars.AWS_ROLE_ARN != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     env:
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
     defaults:
@@ -109,5 +104,15 @@ jobs:
         run: |
           terraform plan \
             -input=false \
+            -no-color \
             -var-file=envs/staging/terraform.tfvars \
             -out=tfplan
+
+      - name: Export plan text
+        run: terraform show -no-color tfplan > tfplan.txt
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: infra/terraform/tfplan.txt

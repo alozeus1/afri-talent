@@ -31,8 +31,9 @@ Frontend:
 
 ## Testing Guidelines
 
-- No dedicated test suite yet; rely on linting and typechecks.
-- CI runs `eslint`, `tsc`, and Terraform validation.
+- Backend uses ESLint, TypeScript typecheck, Vitest, and build verification.
+- Frontend uses ESLint, TypeScript typecheck, Jest unit tests, Playwright, Lighthouse, and build verification.
+- Terraform CI runs fmt, validate, TFLint, Checkov, and a staging plan when credentials are available.
 
 ## Architecture Overview
 
@@ -50,6 +51,7 @@ Frontend:
 
 ## Deployment Handoff
 
+- For any fresh Codex session, read `AGENT_BOOTSTRAP.md` before exploring the codebase.
 - For any deployment, staging, infrastructure, or incident task, read `STAGING_RUNBOOK.md` first.
 - Treat `STAGING_RUNBOOK.md` as the current source of truth for live environment state, URLs, AWS resource names, last known blockers, and recovery steps.
 - After any material live change, update `STAGING_RUNBOOK.md` in the same session so future agents inherit the latest state immediately.

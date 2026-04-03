@@ -17,6 +17,12 @@ vi.mock("../lib/prisma.js", () => ({
         employer: {
             create: vi.fn(),
         },
+        candidateTrustProfile: {
+            upsert: vi.fn(),
+        },
+        employerTrustProfile: {
+            upsert: vi.fn(),
+        },
         $queryRaw: vi.fn().mockResolvedValue([]),
         $disconnect: vi.fn().mockResolvedValue(undefined),
     }

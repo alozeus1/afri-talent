@@ -3,6 +3,11 @@ name: Deploy Shared Environment (App Runner)
 on:
   push:
     branches: [develop]
+    paths:
+      - ".github/workflows/deploy-apprunner.yml"
+      - "backend/**"
+      - "frontend/**"
+      - "infra/terraform/**"
   workflow_dispatch:
     inputs:
       environment:
@@ -164,15 +169,21 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push backend
         env:
           ECR_REPOSITORY: afritalent-${{ env.DEPLOY_ENV }}-backend
           IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
-          docker build -t $IMAGE:$IMAGE_TAG -t $IMAGE:latest ./backend
-          docker push $IMAGE:$IMAGE_TAG
-          docker push $IMAGE:latest
+          docker buildx build \
+            --platform linux/amd64 \
+            --push \
+            -t "$IMAGE:$IMAGE_TAG" \
+            -t "$IMAGE:latest" \
+            ./backend
 
       - name: Build and push initial frontend
         env:
@@ -200,16 +211,18 @@ jobs:
           fi
 
           IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
-          docker build \
+          docker buildx build \
+            --platform linux/amd64 \
+            --push \
             --build-arg NEXT_PUBLIC_API_URL="$PUBLIC_API_URL" \
             --build-arg NEXT_PUBLIC_BACKEND_URL="$PUBLIC_API_URL" \
             --build-arg NEXT_PUBLIC_SENTRY_DSN="$NEXT_PUBLIC_SENTRY_DSN" \
             --build-arg SENTRY_ORG="$SENTRY_ORG" \
             --build-arg SENTRY_PROJECT="$SENTRY_PROJECT" \
             --secret id=sentry_auth_token,env=SENTRY_AUTH_TOKEN \
-            -t $IMAGE:$IMAGE_TAG -t $IMAGE:latest ./frontend
-          docker push $IMAGE:$IMAGE_TAG
-          docker push $IMAGE:latest
+            -t "$IMAGE:$IMAGE_TAG" \
+            -t "$IMAGE:latest" \
+            ./frontend
 
   finalize-infra:
     name: Finalize Infrastructure
@@ -243,11 +256,17 @@ jobs:
       - name: Import existing App Runner services into Terraform state
         working-directory: infra/terraform
         run: |
+          if [ "${{ env.DEPLOY_ENV }}" = "staging" ]; then
+            FRONTEND_SERVICE_NAME="afritalent-stg-fe-livefix"
+          else
+            FRONTEND_SERVICE_NAME="afritalent-${{ env.DEPLOY_ENV }}-appr-frontend-managed"
+          fi
+
           BACKEND_ARN=$(aws apprunner list-services \
             --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-backend-managed'].ServiceArn | [0]" \
             --output text)
           FRONTEND_ARN=$(aws apprunner list-services \
-            --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-frontend-managed'].ServiceArn | [0]" \
+            --query "ServiceSummaryList[?ServiceName=='$FRONTEND_SERVICE_NAME'].ServiceArn | [0]" \
             --output text)
 
           if [ "$BACKEND_ARN" != "None" ] && ! terraform state show module.apprunner.aws_apprunner_service.backend >/dev/null 2>&1; then
@@ -296,6 +315,9 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push final frontend
         env:
           ECR_REPOSITORY: afritalent-${{ env.DEPLOY_ENV }}-frontend
@@ -307,37 +329,45 @@ jobs:
           PUBLIC_API_URL: ${{ needs.finalize-infra.outputs.backend_url }}
         run: |
           IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
-          docker build \
+          docker buildx build \
+            --platform linux/amd64 \
+            --push \
             --build-arg NEXT_PUBLIC_API_URL="$PUBLIC_API_URL" \
             --build-arg NEXT_PUBLIC_BACKEND_URL="$PUBLIC_API_URL" \
             --build-arg NEXT_PUBLIC_SENTRY_DSN="$NEXT_PUBLIC_SENTRY_DSN" \
             --build-arg SENTRY_ORG="$SENTRY_ORG" \
             --build-arg SENTRY_PROJECT="$SENTRY_PROJECT" \
             --secret id=sentry_auth_token,env=SENTRY_AUTH_TOKEN \
-            -t $IMAGE:$IMAGE_TAG -t $IMAGE:latest ./frontend
-          docker push $IMAGE:$IMAGE_TAG
-          docker push $IMAGE:latest
+            -t "$IMAGE:$IMAGE_TAG" \
+            -t "$IMAGE:latest" \
+            ./frontend
 
       - name: Get App Runner service ARNs
         id: services
         run: |
+          if [ "${{ env.DEPLOY_ENV }}" = "staging" ]; then
+            FRONTEND_SERVICE_NAME="afritalent-stg-fe-livefix"
+          else
+            FRONTEND_SERVICE_NAME="afritalent-${{ env.DEPLOY_ENV }}-appr-frontend-managed"
+          fi
+
           BACKEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-backend-managed'].ServiceArn" --output text)
-          FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-frontend-managed'].ServiceArn" --output text)
+          FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='$FRONTEND_SERVICE_NAME'].ServiceArn" --output text)
           echo "backend_arn=$BACKEND_ARN" >> "$GITHUB_OUTPUT"
           echo "frontend_arn=$FRONTEND_ARN" >> "$GITHUB_OUTPUT"
 
       - name: Deploy backend
-        run: aws apprunner start-deployment --service-arn ${{ steps.services.outputs.backend_arn }}
+        run: aws apprunner start-deployment --service-arn "${{ steps.services.outputs.backend_arn }}"
 
       - name: Deploy frontend
-        run: aws apprunner start-deployment --service-arn ${{ steps.services.outputs.frontend_arn }}
+        run: aws apprunner start-deployment --service-arn "${{ steps.services.outputs.frontend_arn }}"
 
       - name: Wait for backend deployment
         run: |
           echo "Waiting for backend service to become running..."
-          for i in {1..30}; do
-            STATUS=$(aws apprunner describe-service --service-arn ${{ steps.services.outputs.backend_arn }} --query 'Service.Status' --output text)
-            echo "Backend status: $STATUS"
+          for attempt in $(seq 1 30); do
+            STATUS=$(aws apprunner describe-service --service-arn "${{ steps.services.outputs.backend_arn }}" --query 'Service.Status' --output text)
+            echo "Backend status on attempt $attempt: $STATUS"
             if [ "$STATUS" = "RUNNING" ]; then
               echo "Backend is running!"
               break
@@ -348,9 +378,9 @@ jobs:
       - name: Wait for frontend deployment
         run: |
           echo "Waiting for frontend service to become running..."
-          for i in {1..30}; do
-            STATUS=$(aws apprunner describe-service --service-arn ${{ steps.services.outputs.frontend_arn }} --query 'Service.Status' --output text)
-            echo "Frontend status: $STATUS"
+          for attempt in $(seq 1 30); do
+            STATUS=$(aws apprunner describe-service --service-arn "${{ steps.services.outputs.frontend_arn }}" --query 'Service.Status' --output text)
+            echo "Frontend status on attempt $attempt: $STATUS"
             if [ "$STATUS" = "RUNNING" ]; then
               echo "Frontend is running!"
               break
@@ -368,7 +398,7 @@ jobs:
         run: |
           echo "Checking backend health at ${{ needs.finalize-infra.outputs.backend_url }}/health"
           for i in {1..5}; do
-            if curl -sf "${{ needs.finalize-infra.outputs.backend_url }}/health" | grep -q "ok"; then
+            if curl -fsS "${{ needs.finalize-infra.outputs.backend_url }}/health" | jq -e '.status == "ok" or .status == "degraded"' >/dev/null; then
               echo "Backend health check passed!"
               exit 0
             fi
@@ -382,7 +412,7 @@ jobs:
         run: |
           echo "Checking frontend at ${{ needs.finalize-infra.outputs.frontend_url }}"
           for i in {1..5}; do
-            if curl -sf "${{ needs.finalize-infra.outputs.frontend_url }}" | grep -q "AfriTalent"; then
+            if curl -fsSL "${{ needs.finalize-infra.outputs.frontend_url }}" | grep -q "AfriTalent"; then
               echo "Frontend health check passed!"
               exit 0
             fi
@@ -394,8 +424,10 @@ jobs:
 
       - name: Deployment Summary
         run: |
-          echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ env.DEPLOY_ENV }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Backend URL:** ${{ needs.finalize-infra.outputs.backend_url }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Frontend URL:** ${{ needs.finalize-infra.outputs.frontend_url }}" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Deployment Complete"
+            echo
+            echo "**Environment:** ${{ env.DEPLOY_ENV }}"
+            echo "**Backend URL:** ${{ needs.finalize-infra.outputs.backend_url }}"
+            echo "**Frontend URL:** ${{ needs.finalize-infra.outputs.frontend_url }}"
+          } >> "$GITHUB_STEP_SUMMARY"

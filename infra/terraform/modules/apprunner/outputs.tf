@@ -5,7 +5,7 @@ output "backend_service_arn" {
 
 output "backend_service_url" {
   description = "URL of the backend App Runner service"
-  value       = "https://${aws_apprunner_service.backend.service_url}"
+  value       = try(aws_apprunner_service.backend.service_url, null) != null ? "https://${aws_apprunner_service.backend.service_url}" : null
 }
 
 output "backend_service_id" {
@@ -20,7 +20,7 @@ output "frontend_service_arn" {
 
 output "frontend_service_url" {
   description = "URL of the frontend App Runner service"
-  value       = "https://${aws_apprunner_service.frontend.service_url}"
+  value       = try(aws_apprunner_service.frontend.service_url, null) != null ? "https://${aws_apprunner_service.frontend.service_url}" : null
 }
 
 output "frontend_service_id" {

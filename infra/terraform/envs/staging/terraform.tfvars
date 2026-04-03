@@ -16,6 +16,11 @@ frontend_image = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-stagin
 backend_image  = "260820061731.dkr.ecr.us-east-1.amazonaws.com/afritalent-staging-backend:latest"
 create_ecr     = true
 
+# The original managed frontend service failed during creation.
+# Staging currently serves traffic from the recovered App Runner service below,
+# so Terraform and CI must target that service until a named replacement exists.
+apprunner_frontend_service_name = "afritalent-stg-fe-livefix"
+
 frontend_container_cpu    = 512
 frontend_container_memory = 1024
 backend_container_cpu     = 512
@@ -41,10 +46,11 @@ db_username              = "afritalent"
 log_retention_in_days     = 30
 enable_container_insights = false
 
-enable_route53       = false
-route53_zone_id      = ""
-frontend_domain_name = "staging.afri-talent.com"
-api_domain_name      = "api.staging.afri-talent.com"
+enable_route53               = false
+route53_zone_id              = ""
+frontend_domain_name         = "staging.afri-talent.com"
+api_domain_name              = "api.staging.afri-talent.com"
+frontend_public_url_override = "https://3mwn2b4e5t.us-east-1.awsapprunner.com"
 
 github_repo = "alozeus1/afri-talent"
 github_ref  = "refs/heads/develop"

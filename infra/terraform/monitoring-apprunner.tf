@@ -2,8 +2,11 @@ locals {
   backend_apprunner_service_name  = var.apprunner_backend_service_name != "" ? var.apprunner_backend_service_name : "${local.name_prefix}-appr-backend-managed"
   frontend_apprunner_service_name = var.apprunner_frontend_service_name != "" ? var.apprunner_frontend_service_name : "${local.name_prefix}-appr-frontend-managed"
 
-  backend_application_log_group  = "/aws/apprunner/${local.backend_apprunner_service_name}/${module.apprunner.backend_service_id}/application"
-  frontend_application_log_group = "/aws/apprunner/${local.frontend_apprunner_service_name}/${module.apprunner.frontend_service_id}/application"
+  backend_service_id  = coalesce(try(module.apprunner.backend_service_id, null), "pending-backend-service")
+  frontend_service_id = coalesce(try(module.apprunner.frontend_service_id, null), "pending-frontend-service")
+
+  backend_application_log_group  = "/aws/apprunner/${local.backend_apprunner_service_name}/${local.backend_service_id}/application"
+  frontend_application_log_group = "/aws/apprunner/${local.frontend_apprunner_service_name}/${local.frontend_service_id}/application"
 
   ops_metric_namespace = "${var.project_name}/${var.environment}/platform"
 

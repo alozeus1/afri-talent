@@ -1,9 +1,21 @@
 DO $$
 BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'NotificationType') THEN
+    CREATE TYPE "NotificationType" AS ENUM (
+      'NEW_MESSAGE',
+      'APPLICATION_STATUS',
+      'JOB_MATCH',
+      'VERIFICATION'
+    );
+  END IF;
+END $$;
+
+DO $$
+BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_enum
     WHERE enumlabel = 'RETENTION_NUDGE'
-      AND enumtypid = 'NotificationType'::regtype
+      AND enumtypid = to_regtype('"NotificationType"')
   ) THEN
     ALTER TYPE "NotificationType" ADD VALUE 'RETENTION_NUDGE';
   END IF;
@@ -14,7 +26,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_enum
     WHERE enumlabel = 'WEEKLY_DIGEST'
-      AND enumtypid = 'NotificationType'::regtype
+      AND enumtypid = to_regtype('"NotificationType"')
   ) THEN
     ALTER TYPE "NotificationType" ADD VALUE 'WEEKLY_DIGEST';
   END IF;
@@ -25,7 +37,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_enum
     WHERE enumlabel = 'SALARY_INSIGHT'
-      AND enumtypid = 'NotificationType'::regtype
+      AND enumtypid = to_regtype('"NotificationType"')
   ) THEN
     ALTER TYPE "NotificationType" ADD VALUE 'SALARY_INSIGHT';
   END IF;
@@ -36,7 +48,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_enum
     WHERE enumlabel = 'INTERVIEW_PREP'
-      AND enumtypid = 'NotificationType'::regtype
+      AND enumtypid = to_regtype('"NotificationType"')
   ) THEN
     ALTER TYPE "NotificationType" ADD VALUE 'INTERVIEW_PREP';
   END IF;
