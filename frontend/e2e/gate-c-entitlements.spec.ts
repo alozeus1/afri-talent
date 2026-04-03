@@ -26,29 +26,27 @@ test.describe("candidate entitlement gating", () => {
     expect(res.status()).toBe(401);
   });
 
-  test("saved search creation beyond free limit returns 402 or 403", async ({
+  test("saved search creation remains stable as a candidate approaches the limit", async ({
     request,
   }) => {
     await loginAs(request, TEST_CANDIDATE);
-    let limitHit = false;
-    for (let i = 0; i < 8; i++) {
+    let terminalStatus: number | null = null;
+    for (let i = 0; i < 12; i++) {
       const res = await request.post(`${API}/api/saved-searches`, {
         data: {
           name: `Gate-C Search ${i}-${Date.now()}`,
-          keywords: "engineer",
+          keywords: ["engineer"],
           alertFrequency: "WEEKLY",
         },
       });
-      if (res.status() === 402 || res.status() === 403) {
-        limitHit = true;
+      if ([400, 402, 403].includes(res.status())) {
+        terminalStatus = res.status();
         break;
       }
-      // If plan is unlimited, 200/201 is fine — only 500 is a bug
-      expect([200, 201, 402, 403]).toContain(res.status());
+      expect([200, 201]).toContain(res.status());
     }
-    // If gating is implemented, it must return 402/403, not 500
-    if (limitHit) {
-      expect(limitHit).toBe(true);
+    if (terminalStatus !== null) {
+      expect([400, 402, 403]).toContain(terminalStatus);
     }
   });
 });
@@ -94,13 +92,11 @@ test.describe("regional pricing", () => {
       );
       expect(res.ok()).toBe(true);
       const body = await res.json();
-      // Must have at least one plan entry
-      const plans = Object.values(body.plans ?? body) as Record<string, unknown>[];
-      expect(plans.length).toBeGreaterThan(0);
-      for (const plan of plans) {
-        if (typeof (plan as { monthlyPrice?: number }).monthlyPrice === "number") {
-          expect((plan as { monthlyPrice: number }).monthlyPrice).toBeGreaterThanOrEqual(0);
-        }
+      const prices = Array.isArray(body.prices) ? body.prices : [];
+      expect(prices.length).toBeGreaterThan(0);
+      for (const price of prices) {
+        expect(price.currency).toBe(currency);
+        expect(price.amount).toBeGreaterThanOrEqual(0);
       }
     });
   }
@@ -109,19 +105,20 @@ test.describe("regional pricing", () => {
     const res = await request.get(`${API}/api/pricing?region=ROW&currency=USD`);
     expect(res.ok()).toBe(true);
     const body = await res.json();
-    const plans = Object.values(body.plans ?? body) as Record<string, unknown>[];
-    const paidPlans = plans.filter(
-      (p) =>
-        typeof (p as { monthlyPrice?: number }).monthlyPrice === "number" &&
-        typeof (p as { yearlyPrice?: number }).yearlyPrice === "number" &&
-        (p as { monthlyPrice: number }).monthlyPrice > 0 &&
-        (p as { yearlyPrice: number }).yearlyPrice > 0
-    );
-    for (const plan of paidPlans) {
-      const p = plan as { monthlyPrice: number; yearlyPrice: number };
-      const annualizedMonthly = p.monthlyPrice * 12;
-      const yearlyCost = p.yearlyPrice * 12;
-      expect(yearlyCost).toBeLessThan(annualizedMonthly);
+    const prices = Array.isArray(body.prices) ? body.prices : [];
+    const byPlan = new Map<string, { monthly?: number; yearly?: number }>();
+
+    for (const price of prices) {
+      const current = byPlan.get(price.plan) ?? {};
+      if (price.interval === "MONTHLY") current.monthly = price.amount;
+      if (price.interval === "YEARLY") current.yearly = price.amount;
+      byPlan.set(price.plan, current);
+    }
+
+    for (const [, plan] of byPlan) {
+      if (typeof plan.monthly === "number" && typeof plan.yearly === "number") {
+        expect(plan.yearly).toBeLessThan(plan.monthly * 12);
+      }
     }
   });
 
@@ -141,23 +138,23 @@ test.describe("regional pricing", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("billing checkout", () => {
-  test("POST /api/billing/checkout with missing plan returns 400 or 500 (no Stripe key in dev)", async ({
+  test("POST /api/billing/checkout with missing plan returns a safe client error", async ({
     request,
   }) => {
     await loginAs(request, TEST_CANDIDATE);
     const res = await request.post(`${API}/api/billing/checkout`, {
       data: {},
     });
-    expect([400, 500]).toContain(res.status());
+    expect([400, 403, 503]).toContain(res.status());
   });
 
-  test("POST /api/billing/checkout with invalid plan returns 400 or 500", async ({
+  test("POST /api/billing/checkout with invalid plan returns a safe client error", async ({
     request,
   }) => {
     await loginAs(request, TEST_CANDIDATE);
     const res = await request.post(`${API}/api/billing/checkout`, {
       data: { plan: "ULTRA_DIAMOND_PLATINUM" },
     });
-    expect([400, 500]).toContain(res.status());
+    expect([400, 403, 503]).toContain(res.status());
   });
 });

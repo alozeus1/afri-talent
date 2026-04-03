@@ -33,9 +33,38 @@ env:
   DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
 
 jobs:
+  validate-ref:
+    name: Validate Deployment Ref
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce protected deployment refs
+        run: |
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "Push-triggered staging deployment from protected branch is allowed."
+            exit 0
+          fi
+
+          TARGET_ENV="${{ inputs.environment }}"
+          CURRENT_REF="${{ github.ref_name }}"
+
+          if [ "$TARGET_ENV" = "staging" ] && [ "$CURRENT_REF" != "develop" ]; then
+            echo "Staging deployments may only be dispatched from the develop branch."
+            echo "Current ref: $CURRENT_REF"
+            exit 1
+          fi
+
+          if [ "$TARGET_ENV" = "prod" ] && [ "$CURRENT_REF" != "main" ]; then
+            echo "Production deployments may only be dispatched from the main branch."
+            echo "Current ref: $CURRENT_REF"
+            exit 1
+          fi
+
+          echo "Deployment ref policy passed for $TARGET_ENV from $CURRENT_REF."
+
   prod-gate:
     name: Production Approval Gate
     runs-on: ubuntu-latest
+    needs: [validate-ref]
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod'
     environment: production
     steps:
@@ -45,8 +74,8 @@ jobs:
   provision-infra:
     name: Provision Base Infrastructure
     runs-on: ubuntu-latest
-    needs: [prod-gate]
-    if: always() && (needs.prod-gate.result == 'success' || needs.prod-gate.result == 'skipped')
+    needs: [validate-ref, prod-gate]
+    if: always() && needs.validate-ref.result == 'success' && (needs.prod-gate.result == 'success' || needs.prod-gate.result == 'skipped')
     permissions:
       id-token: write
       contents: read

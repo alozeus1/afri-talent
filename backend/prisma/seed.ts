@@ -10,6 +10,8 @@ import {
   JobSource,
   SubscriptionPlan,
   SubscriptionStatus,
+  BillingInterval,
+  BillingRegion,
 } from "@prisma/client";
 import bcrypt from "bcrypt";
 
@@ -23,6 +25,11 @@ async function main() {
   await prisma.threadParticipant.deleteMany();
   await prisma.messageThread.deleteMany();
   await prisma.notification.deleteMany();
+  await prisma.billingRegionAudit.deleteMany();
+  await prisma.userBillingProfile.deleteMany();
+  await prisma.planEntitlement.deleteMany();
+  await prisma.regionalPrice.deleteMany();
+  await prisma.regionConfig.deleteMany();
   await prisma.subscription.deleteMany();
   await prisma.resume.deleteMany();
   await prisma.candidateProfile.deleteMany();
@@ -52,6 +59,8 @@ async function main() {
       password: passwordHash,
       role: Role.CANDIDATE,
       name: "Candidate One",
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
     },
   });
 
@@ -61,6 +70,8 @@ async function main() {
       password: passwordHash,
       role: Role.EMPLOYER,
       name: "Employer Owner",
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
     },
   });
 
@@ -108,6 +119,189 @@ async function main() {
       plan: SubscriptionPlan.FREE,
       status: SubscriptionStatus.ACTIVE,
     },
+  });
+
+  await prisma.subscription.create({
+    data: {
+      userId: employerUser.id,
+      plan: SubscriptionPlan.EMPLOYER_FREE,
+      status: SubscriptionStatus.ACTIVE,
+    },
+  });
+
+  // ── Regional pricing + billing fixtures ───────────────
+
+  await prisma.regionConfig.createMany({
+    data: [
+      {
+        region: BillingRegion.AFRICA,
+        defaultCurrency: "NGN",
+        currencies: ["NGN", "KES"],
+        countries: ["NG", "KE", "GH", "ZA", "EG"],
+        taxBehavior: "unspecified",
+        taxLabel: "VAT",
+      },
+      {
+        region: BillingRegion.EUROPE,
+        defaultCurrency: "EUR",
+        currencies: ["EUR", "GBP"],
+        countries: ["DE", "FR", "NL", "IE", "ES"],
+        taxBehavior: "exclusive",
+        taxLabel: "VAT",
+      },
+      {
+        region: BillingRegion.ROW,
+        defaultCurrency: "USD",
+        currencies: ["USD", "GBP"],
+        countries: ["US", "CA", "GB"],
+        taxBehavior: "unspecified",
+        taxLabel: null,
+      },
+    ],
+  });
+
+  await prisma.planEntitlement.createMany({
+    data: [
+      {
+        plan: SubscriptionPlan.FREE,
+        applicationsPerMonth: 10,
+        aiResumeReviews: 1,
+        aiJobMatches: 5,
+        aiApplyPacks: 0,
+        savedSearches: 10,
+        jobAlerts: true,
+      },
+      {
+        plan: SubscriptionPlan.BASIC,
+        applicationsPerMonth: 40,
+        aiResumeReviews: 10,
+        aiJobMatches: 30,
+        aiApplyPacks: 5,
+        savedSearches: 25,
+        jobAlerts: true,
+        skillsAssessments: true,
+        chatAccess: true,
+      },
+      {
+        plan: SubscriptionPlan.PROFESSIONAL,
+        applicationsPerMonth: null,
+        aiResumeReviews: null,
+        aiJobMatches: null,
+        aiApplyPacks: null,
+        savedSearches: null,
+        jobAlerts: true,
+        prioritySupport: true,
+        skillsAssessments: true,
+        chatAccess: true,
+        autopilot: true,
+      },
+      {
+        plan: SubscriptionPlan.EMPLOYER_FREE,
+        jobPostsPerMonth: 1,
+        talentSearch: false,
+      },
+      {
+        plan: SubscriptionPlan.EMPLOYER_BASIC,
+        jobPostsPerMonth: 5,
+        talentSearch: true,
+        analytics: true,
+        atsIntegrations: 1,
+      },
+      {
+        plan: SubscriptionPlan.EMPLOYER_PREMIUM,
+        jobPostsPerMonth: null,
+        talentSearch: true,
+        analytics: true,
+        apiAccess: true,
+        atsIntegrations: 5,
+        pipelineExports: true,
+        brandedCareerPage: true,
+        advancedFunnelMetrics: true,
+      },
+    ],
+  });
+
+  const pricingMatrix = [
+    {
+      region: BillingRegion.AFRICA,
+      currency: "NGN",
+      prices: {
+        [SubscriptionPlan.BASIC]: { monthly: 1500000, yearly: 15000000 },
+        [SubscriptionPlan.PROFESSIONAL]: { monthly: 3500000, yearly: 33600000 },
+        [SubscriptionPlan.EMPLOYER_BASIC]: { monthly: 6000000, yearly: 64800000 },
+        [SubscriptionPlan.EMPLOYER_PREMIUM]: { monthly: 12000000, yearly: 126000000 },
+      },
+    },
+    {
+      region: BillingRegion.AFRICA,
+      currency: "KES",
+      prices: {
+        [SubscriptionPlan.BASIC]: { monthly: 12500, yearly: 126000 },
+        [SubscriptionPlan.PROFESSIONAL]: { monthly: 29000, yearly: 300000 },
+        [SubscriptionPlan.EMPLOYER_BASIC]: { monthly: 52000, yearly: 540000 },
+        [SubscriptionPlan.EMPLOYER_PREMIUM]: { monthly: 105000, yearly: 1080000 },
+      },
+    },
+    {
+      region: BillingRegion.ROW,
+      currency: "USD",
+      prices: {
+        [SubscriptionPlan.BASIC]: { monthly: 1500, yearly: 14400 },
+        [SubscriptionPlan.PROFESSIONAL]: { monthly: 3900, yearly: 37200 },
+        [SubscriptionPlan.EMPLOYER_BASIC]: { monthly: 9900, yearly: 95040 },
+        [SubscriptionPlan.EMPLOYER_PREMIUM]: { monthly: 19900, yearly: 190800 },
+      },
+    },
+    {
+      region: BillingRegion.ROW,
+      currency: "GBP",
+      prices: {
+        [SubscriptionPlan.BASIC]: { monthly: 1200, yearly: 11520 },
+        [SubscriptionPlan.PROFESSIONAL]: { monthly: 3200, yearly: 30720 },
+        [SubscriptionPlan.EMPLOYER_BASIC]: { monthly: 8500, yearly: 81600 },
+        [SubscriptionPlan.EMPLOYER_PREMIUM]: { monthly: 17500, yearly: 168000 },
+      },
+    },
+  ] as const;
+
+  await prisma.regionalPrice.createMany({
+    data: pricingMatrix.flatMap(({ region, currency, prices }) =>
+      Object.entries(prices).flatMap(([plan, amounts]) => ([
+        {
+          plan: plan as SubscriptionPlan,
+          region,
+          interval: BillingInterval.MONTHLY,
+          currency,
+          amount: amounts.monthly,
+          stripePriceId: null,
+        },
+        {
+          plan: plan as SubscriptionPlan,
+          region,
+          interval: BillingInterval.YEARLY,
+          currency,
+          amount: amounts.yearly,
+          stripePriceId: null,
+        },
+      ])),
+    ),
+  });
+
+  await prisma.userBillingProfile.createMany({
+    data: [
+      {
+        userId: candidateUser.id,
+        country: "NG",
+        region: BillingRegion.AFRICA,
+        currency: "NGN",
+      },
+      {
+        userId: employerUser.id,
+        country: "US",
+        region: BillingRegion.ROW,
+        currency: "USD",
+      },
+    ],
   });
 
   // ── Jobs ───────────────────────────────────────────────

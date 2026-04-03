@@ -107,7 +107,11 @@ test("employer journey API smoke: signup -> post job -> upgrade", async ({ reque
       currency: "USD",
     },
   });
-  expect([201, 400]).toContain(createJobRes.status());
+  expect([201, 400, 403]).toContain(createJobRes.status());
+  if (createJobRes.status() === 403) {
+    const body = await createJobRes.json();
+    expect(body.code).toBe("EMAIL_VERIFICATION_REQUIRED");
+  }
 
   const checkoutRes = await request.post(`${API}/api/billing/checkout`, {
     data: { plan: "EMPLOYER_BASIC", interval: "MONTHLY" },
