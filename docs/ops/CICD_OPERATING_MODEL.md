@@ -61,6 +61,7 @@ Current note:
 
 - `.checkov.yml` intentionally skips a set of known legacy and non-prod AWS controls so the pipeline can enforce a stable baseline today while the deeper infrastructure hardening backlog is completed in follow-on work
 - `CKV_AWS_2` is currently skipped because the dormant ECS rollback module retains an HTTP ALB listener; the live shared environment runs on App Runner, not that ALB path
+- `infra/terraform/.tflint.hcl` disables `terraform_unused_declarations` for the root stack because a small set of ECS rollback inputs are intentionally retained while App Runner is the live delivery path
 
 ### `deploy-apprunner.yml`
 
@@ -122,15 +123,16 @@ Recommended settings:
 
 - staging Stripe secret is missing
 - full local Terraform reconciliation is still blocked from the `admin` IAM user by an explicit deny on `ec2:DescribeInstances`
-- a vector or semantic retrieval foundation has not been implemented yet
+- the semantic retrieval foundation is in the repo, but it still needs staged indexing and a stronger production-grade embedding provider
 
 ## End-To-End Validation Checklist
 
 Before merging delivery changes:
 
 1. Run backend lint, typecheck, tests, and build
-2. Run frontend lint, typecheck, unit tests, and build
-3. Run Terraform fmt, init without backend, validate, TFLint, and Checkov
-4. Run Gitleaks locally or verify it in Actions
-5. Confirm the deploy workflow syntax with `actionlint`
-6. After merge to `develop`, confirm GitHub Actions completed and staging health endpoints return success
+2. Verify a clean Postgres database can apply all Prisma migrations and complete `prisma db seed`
+3. Run frontend lint, typecheck, unit tests, and build
+4. Run Terraform fmt, init without backend, validate, TFLint, and Checkov
+5. Run Gitleaks locally or verify it in Actions
+6. Confirm the deploy workflow syntax with `actionlint`
+7. After merge to `develop`, confirm GitHub Actions completed and staging health endpoints return success

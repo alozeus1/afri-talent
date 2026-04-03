@@ -57,6 +57,7 @@ Canonical live details are in `STAGING_RUNBOOK.md`. At the time of writing:
 
 - The broken staging deployment path was restored on AWS App Runner
 - Prisma migration failures blocking backend startup were repaired
+- The clean-database Prisma migration chain was reconciled so CI can migrate and seed from zero without schema drift
 - Staging now points at the working live frontend service instead of the dead managed one
 - Repo-level delivery controls were upgraded with backend linting, workflow linting, security scans, Terraform checks, CODEOWNERS, Dependabot, and a PR template
 
