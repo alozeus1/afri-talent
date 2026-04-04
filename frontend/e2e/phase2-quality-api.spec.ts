@@ -110,7 +110,7 @@ test("employer journey API smoke: signup -> post job -> upgrade", async ({ reque
   expect([201, 400, 403]).toContain(createJobRes.status());
   if (createJobRes.status() === 403) {
     const body = await createJobRes.json();
-    expect(body.code).toBe("EMAIL_VERIFICATION_REQUIRED");
+    expect(["EMAIL_VERIFICATION_REQUIRED", "EMPLOYER_TRUST_REQUIRED"]).toContain(body.code);
   }
 
   const checkoutRes = await request.post(`${API}/api/billing/checkout`, {
