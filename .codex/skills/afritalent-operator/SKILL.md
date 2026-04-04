@@ -70,12 +70,9 @@ For delivery changes, also validate:
 
 These are the current cleanup targets:
 
-- staging Redis is degraded
 - staging Stripe secret is missing
-- backend `FRONTEND_URL` points at the wrong staging host
-- frontend App Runner state still needs Terraform reconciliation
-- the dead managed frontend service should be retired after reconciliation
-- vector retrieval and RAG foundations are not built yet
+- broader Terraform reconciliation is still incomplete outside the targeted App Runner recovery work
+- semantic retrieval exists, but still needs staged rollout validation and a stronger embedding provider for production-quality retrieval
 
 ## Product Direction Notes
 

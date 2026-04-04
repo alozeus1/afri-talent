@@ -28,6 +28,9 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
     billingPendingRefundsOpen,
     billingWebhookFailuresOpen,
     billingSuccessfulPayments24h,
+    semanticDocumentsTotal,
+    semanticJobDocumentsTotal,
+    latestSemanticIndex,
   ] = await Promise.all([
     getLastSyncTime(),
     prisma.job.count({ where: { status: JobStatus.PENDING_REVIEW } }),
@@ -95,12 +98,26 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
         },
       },
     }),
+    prisma.semanticDocument.count(),
+    prisma.semanticDocument.count({
+      where: {
+        namespace: "jobs",
+        sourceType: "JOB",
+      },
+    }),
+    prisma.semanticDocument.findFirst({
+      orderBy: { lastIndexedAt: "desc" },
+      select: { lastIndexedAt: true },
+    }),
   ]);
 
   const minutesSinceLastSync = lastSyncAt
     ? Math.max(0, Math.round((Date.now() - lastSyncAt.getTime()) / 60000))
     : AGGREGATOR_STALENESS_MINUTES + 1;
   const totalDeadLetters = Object.values(deadLettersBySource).reduce((sum, count) => sum + count, 0);
+  const semanticIndexFreshnessMinutes = latestSemanticIndex?.lastIndexedAt
+    ? Math.max(0, Math.round((Date.now() - latestSemanticIndex.lastIndexedAt.getTime()) / 60000))
+    : -1;
 
   recordOpsSnapshotMetric({
     metricName: "job_ingestion_freshness_minutes",
@@ -160,6 +177,25 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
     value: totalDeadLetters,
   });
 
+  recordOpsSnapshotMetric({
+    metricName: "semantic_documents_total",
+    value: semanticDocumentsTotal,
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "semantic_job_documents_total",
+    value: semanticJobDocumentsTotal,
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "semantic_index_freshness_minutes",
+    value: semanticIndexFreshnessMinutes,
+    details: {
+      last_indexed_at: latestSemanticIndex?.lastIndexedAt?.toISOString() ?? "never",
+      indexed: semanticIndexFreshnessMinutes >= 0,
+    },
+  });
+
   logger.info(
     {
       lastSyncAt: lastSyncAt?.toISOString() ?? null,
@@ -174,6 +210,9 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
       billingWebhookFailuresOpen,
       billingSuccessfulPayments24h,
       totalDeadLetters,
+      semanticDocumentsTotal,
+      semanticJobDocumentsTotal,
+      semanticIndexFreshnessMinutes,
     },
     "[ops] operational snapshot emitted",
   );

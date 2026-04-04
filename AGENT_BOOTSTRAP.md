@@ -60,12 +60,13 @@ Canonical live details are in `STAGING_RUNBOOK.md`. At the time of writing:
 - The clean-database Prisma migration chain was reconciled so CI can migrate and seed from zero without schema drift
 - Staging now points at the working live frontend service instead of the dead managed one
 - Repo-level delivery controls were upgraded with backend linting, workflow linting, security scans, Terraform checks, CODEOWNERS, Dependabot, and a PR template
+- Semantic retrieval now has a scheduled indexing path and snapshot metrics in the backend worker system
 
 ## What Still Needs To Be Closed Before Pre-Prod Is Clean
 
 - Populate `STRIPE_SECRET_KEY` for staging with a real test-mode key
 - Complete the broader Terraform reconciliation beyond the targeted App Runner repairs that are already in state
-- Deploy and operationalize the new semantic retrieval foundation with job indexing plus a stronger embedding provider if we want production-grade retrieval quality
+- Deploy and validate the new semantic retrieval foundation in staging, then upgrade from the hash-embedding baseline to a stronger provider if we want production-grade retrieval quality
 
 ## Product And Platform Gaps
 
