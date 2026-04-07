@@ -16,6 +16,8 @@ AfriTalent now has a real semantic retrieval base in the backend codebase:
   - `POST /api/admin/rag/search`
   - `POST /api/admin/rag/index/jobs`
 - lightweight semantic-intent boosting in job search ranking
+- scheduled semantic job reindexing through the background worker scheduler
+- operational snapshot metrics for semantic document count and index freshness
 
 This is intentionally a deployable foundation, not the final moat.
 
@@ -34,7 +36,6 @@ The current design keeps the storage contract and indexing workflow stable while
 
 - embeddings are deterministic hash vectors, not model-quality semantic embeddings
 - similarity is computed in application code after candidate document fetch, not inside a vector index
-- there is no continuous job reindex scheduler yet
 - candidate, resume, recruiter-query, and employer-brief indexing have not been added yet
 - there is no recruiter-facing semantic search UX yet
 
@@ -54,7 +55,6 @@ The current design keeps the storage contract and indexing workflow stable while
 
 ### Platform robustness
 
-- add a scheduled job reindex worker
 - track index freshness, doc counts, and query latency in ops metrics
 - add eval fixtures for relevance and false-positive review
 
@@ -77,5 +77,5 @@ The current design keeps the storage contract and indexing workflow stable while
 
 - read `AGENT_BOOTSTRAP.md` first
 - read `STAGING_RUNBOOK.md` before deploying this layer
-- deploy the migration before calling the admin indexing endpoints in staging
+- deploy the migration before relying on scheduled or manual indexing in staging
 - treat the hash-embedding provider as a staging-safe baseline, not the final production retrieval stack

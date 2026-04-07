@@ -56,6 +56,8 @@ Runs infrastructure checks:
 - `tflint`
 - `checkov`
 - staging `terraform plan` when AWS OIDC variables are available and the PR is from the same repository
+- always reports `Terraform Validate` and `Checkov` so required branch-protection checks do not disappear on commits that only touch app or docs files
+- no-ops cleanly when a revision contains no `infra/terraform/**` changes
 
 Current note:
 

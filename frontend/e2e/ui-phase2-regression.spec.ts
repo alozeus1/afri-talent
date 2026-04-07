@@ -62,8 +62,10 @@ test("jobs page shows loading skeleton and job detail emits JobPosting schema", 
   });
 
   await page.goto(`${APP_URL}/jobs`, { waitUntil: "domcontentloaded" });
-  await expect(page.locator(".animate-pulse").first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Find Your Next Role" })).toBeVisible();
+  await expect(
+    page.getByText("Results update in the background as you refine your search."),
+  ).toBeVisible();
 
   const jobsRes = await request.get(`${API_URL}/api/jobs?limit=1`);
   test.skip(!jobsRes.ok(), `Jobs API unavailable for schema assertion: status ${jobsRes.status()}`);

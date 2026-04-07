@@ -13,6 +13,7 @@
  * Requires the backend running on API_BASE_URL (default http://localhost:4000).
  */
 import { test, expect } from "@playwright/test";
+import crypto from "crypto";
 import { API, TEST_CANDIDATE, TEST_EMPLOYER, loginAs } from "./fixtures/auth";
 
 // ---------------------------------------------------------------------------
@@ -20,63 +21,76 @@ import { API, TEST_CANDIDATE, TEST_EMPLOYER, loginAs } from "./fixtures/auth";
 // ---------------------------------------------------------------------------
 
 test.describe("abuse reporting", () => {
-  test("POST /api/trust/report requires authentication", async ({ request }) => {
-    const res = await request.post(`${API}/api/trust/report`, {
-      data: { reason: "SCAM", details: "unauthenticated attempt" },
+  async function firstPublishedJobId(request: import("@playwright/test").APIRequestContext) {
+    const jobsRes = await request.get(`${API}/api/jobs?limit=1`);
+    expect(jobsRes.ok()).toBe(true);
+    const jobsBody = await jobsRes.json();
+    const job = jobsBody.jobs?.[0];
+    expect(job?.id).toBeTruthy();
+    return job.id as string;
+  }
+
+  test("POST /api/trust/reports requires authentication", async ({ request }) => {
+    const res = await request.post(`${API}/api/trust/reports`, {
+      data: { reason: "SCAM", details: "unauthenticated attempt", targetJobId: crypto.randomUUID() },
     });
     expect(res.status()).toBe(401);
   });
 
-  test("POST /api/trust/report with valid reason returns 200/201/404", async ({
+  test("POST /api/trust/reports with valid reason returns 201", async ({
     request,
   }) => {
     await loginAs(request, TEST_CANDIDATE);
-    const res = await request.post(`${API}/api/trust/report`, {
+    const targetJobId = await firstPublishedJobId(request);
+    const res = await request.post(`${API}/api/trust/reports`, {
       data: {
         reason: "FAKE_JOB",
-        targetJobId: "nonexistent-job-id-for-gate-d",
+        targetJobId,
         details: "This job is clearly a scam — requests upfront payment.",
       },
     });
-    // 200/201: report accepted; 404: job not found (both valid responses)
-    expect([200, 201, 404]).toContain(res.status());
+    expect(res.status()).toBe(201);
   });
 
-  test("POST /api/trust/report with unknown reason code returns 400", async ({
+  test("POST /api/trust/reports with unknown reason code returns 400", async ({
     request,
   }) => {
     await loginAs(request, TEST_CANDIDATE);
-    const res = await request.post(`${API}/api/trust/report`, {
+    const targetJobId = await firstPublishedJobId(request);
+    const res = await request.post(`${API}/api/trust/reports`, {
       data: {
         reason: "INVENTED_REASON_XYZ_999",
+        targetJobId,
         details: "Testing unknown reason code.",
       },
     });
     expect(res.status()).toBe(400);
   });
 
-  test("POST /api/trust/report with empty body returns 400", async ({
+  test("POST /api/trust/reports with empty body returns 400", async ({
     request,
   }) => {
     await loginAs(request, TEST_CANDIDATE);
-    const res = await request.post(`${API}/api/trust/report`, {
+    const res = await request.post(`${API}/api/trust/reports`, {
       data: {},
     });
     expect(res.status()).toBe(400);
   });
 
-  test("POST /api/trust/report with ADVANCE_FEE_REQUEST accepted", async ({
+  test("POST /api/trust/reports with ADVANCE_FEE_REQUEST accepted", async ({
     request,
   }) => {
     await loginAs(request, TEST_CANDIDATE);
-    const res = await request.post(`${API}/api/trust/report`, {
+    const targetJobId = await firstPublishedJobId(request);
+    const res = await request.post(`${API}/api/trust/reports`, {
       data: {
         reason: "ADVANCE_FEE_REQUEST",
+        targetJobId,
         details:
           "Employer asked me to send $200 as an application processing fee.",
       },
     });
-    expect([200, 201, 404]).toContain(res.status());
+    expect(res.status()).toBe(201);
   });
 });
 
@@ -146,7 +160,7 @@ test.describe("access control adversarial cases", () => {
 
 test.describe("phone OTP abuse prevention", () => {
   test("phone OTP request requires authentication", async ({ request }) => {
-    const res = await request.post(`${API}/api/trust/phone-otp-request`, {
+    const res = await request.post(`${API}/api/trust/candidate/phone/request-otp`, {
       data: { phoneNumber: "+2348012345678" },
     });
     expect(res.status()).toBe(401);
@@ -156,10 +170,10 @@ test.describe("phone OTP abuse prevention", () => {
     request,
   }) => {
     await loginAs(request, TEST_CANDIDATE);
-    const res = await request.post(`${API}/api/trust/phone-otp-verify`, {
-      data: { code: "000000" },
+    const res = await request.post(`${API}/api/trust/candidate/phone/verify-otp`, {
+      data: { phoneNumber: "+2348012345678", code: "000000" },
     });
-    expect([400, 404, 429]).toContain(res.status());
+    expect([400, 404]).toContain(res.status());
   });
 });
 

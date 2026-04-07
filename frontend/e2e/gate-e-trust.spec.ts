@@ -22,32 +22,32 @@ import { API, TEST_CANDIDATE, TEST_EMPLOYER, loginAs } from "./fixtures/auth";
 // ---------------------------------------------------------------------------
 
 test.describe("candidate trust profile", () => {
-  test("GET /api/trust/candidate-profile returns valid shape for candidate", async ({
+  test("GET /api/trust/candidate/summary returns valid shape for candidate", async ({
     request,
   }) => {
     await loginAs(request, TEST_CANDIDATE);
-    const res = await request.get(`${API}/api/trust/candidate-profile`);
+    const res = await request.get(`${API}/api/trust/candidate/summary`);
     expect(res.ok()).toBe(true);
     const body = await res.json();
-    expect(typeof body.authenticityScore).toBe("number");
-    expect(body.authenticityScore).toBeGreaterThanOrEqual(0);
-    expect(body.authenticityScore).toBeLessThanOrEqual(100);
-    expect(typeof body.fraudRiskScore).toBe("number");
-    expect(body).toHaveProperty("verificationLevel");
+    expect(typeof body.trust?.authenticityScore).toBe("number");
+    expect(body.trust.authenticityScore).toBeGreaterThanOrEqual(0);
+    expect(body.trust.authenticityScore).toBeLessThanOrEqual(100);
+    expect(typeof body.trust?.riskScore).toBe("number");
+    expect(body.trust).toHaveProperty("verificationLevel");
   });
 
   test("employer cannot access candidate trust profile endpoint", async ({
     request,
   }) => {
     await loginAs(request, TEST_EMPLOYER);
-    const res = await request.get(`${API}/api/trust/candidate-profile`);
-    expect([401, 403]).toContain(res.status());
+    const res = await request.get(`${API}/api/trust/candidate/summary`);
+    expect(res.status()).toBe(403);
   });
 
   test("unauthenticated user cannot access candidate trust profile", async ({
     request,
   }) => {
-    const res = await request.get(`${API}/api/trust/candidate-profile`);
+    const res = await request.get(`${API}/api/trust/candidate/summary`);
     expect(res.status()).toBe(401);
   });
 });
@@ -57,29 +57,29 @@ test.describe("candidate trust profile", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("employer trust profile", () => {
-  test("GET /api/trust/employer-profile returns valid shape for employer", async ({
+  test("GET /api/trust/employer/summary returns valid shape for employer", async ({
     request,
   }) => {
     await loginAs(request, TEST_EMPLOYER);
-    const res = await request.get(`${API}/api/trust/employer-profile`);
+    const res = await request.get(`${API}/api/trust/employer/summary`);
     expect(res.ok()).toBe(true);
     const body = await res.json();
-    expect(body).toHaveProperty("verificationTier");
-    expect(body).toHaveProperty("badgeStatus");
+    expect(body.trust).toHaveProperty("verificationLevel");
+    expect(body.trust).toHaveProperty("badge");
   });
 
   test("candidate cannot access employer trust profile endpoint", async ({
     request,
   }) => {
     await loginAs(request, TEST_CANDIDATE);
-    const res = await request.get(`${API}/api/trust/employer-profile`);
-    expect([401, 403]).toContain(res.status());
+    const res = await request.get(`${API}/api/trust/employer/summary`);
+    expect(res.status()).toBe(403);
   });
 
   test("unauthenticated user cannot access employer trust profile", async ({
     request,
   }) => {
-    const res = await request.get(`${API}/api/trust/employer-profile`);
+    const res = await request.get(`${API}/api/trust/employer/summary`);
     expect(res.status()).toBe(401);
   });
 });
@@ -93,10 +93,10 @@ test.describe("artifact submission", () => {
     request,
   }) => {
     await loginAs(request, TEST_CANDIDATE);
-    const res = await request.post(`${API}/api/trust/candidate-artifact`, {
+    const res = await request.post(`${API}/api/trust/candidate/artifacts`, {
       data: {
-        artifactType: "INVENTED_TYPE_XYZ",
-        evidenceUrl: "https://example.com/doc.pdf",
+        type: "INVENTED_TYPE_XYZ",
+        externalUrl: "https://example.com/doc.pdf",
       },
     });
     expect(res.status()).toBe(400);
@@ -106,8 +106,8 @@ test.describe("artifact submission", () => {
     request,
   }) => {
     await loginAs(request, TEST_EMPLOYER);
-    const res = await request.post(`${API}/api/trust/employer-artifact`, {
-      data: { artifactType: "DOMAIN_OWNERSHIP" },
+    const res = await request.post(`${API}/api/trust/employer/artifacts`, {
+      data: { type: "DOMAIN_OWNERSHIP" },
     });
     expect(res.status()).toBe(400);
   });
@@ -116,10 +116,10 @@ test.describe("artifact submission", () => {
     request,
   }) => {
     await loginAs(request, TEST_EMPLOYER);
-    const res = await request.post(`${API}/api/trust/employer-artifact`, {
+    const res = await request.post(`${API}/api/trust/employer/artifacts`, {
       data: {
-        artifactType: "DOMAIN_OWNERSHIP",
-        evidenceUrl: "http://insecure.example.com/doc.pdf",
+        type: "DOMAIN_OWNERSHIP",
+        externalUrl: "http://insecure.example.com/doc.pdf",
       },
     });
     // 400 (URL scheme validation) or 200 (if HTTPS not enforced at artifact level)
@@ -128,10 +128,10 @@ test.describe("artifact submission", () => {
   });
 
   test("candidate artifact requires authentication", async ({ request }) => {
-    const res = await request.post(`${API}/api/trust/candidate-artifact`, {
+    const res = await request.post(`${API}/api/trust/candidate/artifacts`, {
       data: {
-        artifactType: "EMAIL_VERIFICATION",
-        evidenceUrl: "https://example.com/proof.pdf",
+        type: "IDENTITY_DOCUMENT",
+        externalUrl: "https://example.com/proof.pdf",
       },
     });
     expect(res.status()).toBe(401);
@@ -143,47 +143,29 @@ test.describe("artifact submission", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("messaging guidance", () => {
-  test("POST /api/trust/messaging-guidance requires authentication", async ({
+  test("GET /api/trust/messaging-guidance requires authentication", async ({
     request,
   }) => {
-    const res = await request.post(`${API}/api/trust/messaging-guidance`, {
-      data: {
-        messageContent: "Please send $50 to activate your application.",
-      },
-    });
+    const res = await request.get(`${API}/api/trust/messaging-guidance`);
     expect(res.status()).toBe(401);
   });
 
-  test("messaging guidance flags advance-fee language", async ({ request }) => {
+  test("messaging guidance returns trust-safe rule preview", async ({ request }) => {
     await loginAs(request, TEST_EMPLOYER);
-    const res = await request.post(`${API}/api/trust/messaging-guidance`, {
-      data: {
-        messageContent:
-          "To proceed with your application, please send $200 as a processing fee before we can review your CV.",
-      },
-    });
+    const res = await request.get(`${API}/api/trust/messaging-guidance`);
     expect(res.ok()).toBe(true);
     const body = await res.json();
-    // At least one of these fields must be truthy to indicate the flag
-    const isFlagged =
-      body.flagged === true ||
-      body.riskLevel === "HIGH" ||
-      body.riskLevel === "MEDIUM" ||
-      typeof body.warning === "string";
-    expect(isFlagged).toBe(true);
+    expect(typeof body.headline).toBe("string");
+    expect(Array.isArray(body.tips)).toBe(true);
+    expect(typeof body.rulePreview?.riskScore).toBe("number");
+    expect(Array.isArray(body.rulePreview?.blockedPatterns)).toBe(true);
   });
 
-  test("messaging guidance passes clean professional message", async ({
+  test("messaging guidance responds for authenticated employers without error", async ({
     request,
   }) => {
     await loginAs(request, TEST_EMPLOYER);
-    const res = await request.post(`${API}/api/trust/messaging-guidance`, {
-      data: {
-        messageContent:
-          "Hi, we reviewed your application and would like to schedule a 30-minute interview next week. Please confirm your availability.",
-      },
-    });
+    const res = await request.get(`${API}/api/trust/messaging-guidance`);
     expect(res.ok()).toBe(true);
-    // Must not 500 on legitimate content
   });
 });

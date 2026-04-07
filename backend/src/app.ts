@@ -7,6 +7,7 @@ import prisma from "./lib/prisma.js";
 import logger from "./lib/logger.js";
 import { initSentry, setupExpressErrorHandler } from "./lib/sentry.js";
 import { redisHealthStatus } from "./lib/redis.js";
+import { isStripeConfigured } from "./lib/stripe.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import {
   securityHeaders,
@@ -173,7 +174,9 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
       checks: {
         database: "skipped-in-test",
         redis: "skipped-in-test",
+        billing: "skipped-in-test",
       },
+      degraded: false,
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
@@ -183,27 +186,32 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     const redis = await redisHealthStatus();
+    const billing = isStripeConfigured() ? "configured" : "not_configured";
+    const degraded = redis === "degraded" || billing !== "configured";
     res.json({
-      status: redis === "connected" || redis === "not_configured" ? "ok" : "degraded",
+      status: degraded ? "degraded" : "ok",
       ...serviceMetadata,
       checks: {
         database: "connected",
         redis,
+        billing,
       },
-      degraded: redis === "degraded",
+      degraded,
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
   } catch {
     const redis = await redisHealthStatus();
+    const billing = isStripeConfigured() ? "configured" : "not_configured";
     res.status(500).json({
       status: "error",
       ...serviceMetadata,
       checks: {
         database: "disconnected",
         redis,
+        billing,
       },
-      degraded: redis === "degraded",
+      degraded: redis === "degraded" || billing !== "configured",
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
@@ -223,6 +231,7 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
       checks: {
         database: "skipped-in-test",
         redis: "skipped-in-test",
+        billing: "skipped-in-test",
       },
       degraded: false,
       timestamp: new Date().toISOString(),
@@ -232,27 +241,31 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     const redis = await redisHealthStatus();
+    const billing = isStripeConfigured() ? "configured" : "not_configured";
     res.json({
       status: "ready",
       ...serviceMetadata,
       checks: {
         database: "ok",
         redis,
+        billing,
       },
-      degraded: redis === "degraded",
+      degraded: redis === "degraded" || billing !== "configured",
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
     logger.error({ error }, "Readiness check failed");
     const redis = await redisHealthStatus();
+    const billing = isStripeConfigured() ? "configured" : "not_configured";
     res.status(503).json({
       status: "not_ready",
       ...serviceMetadata,
       checks: {
         database: "failed",
         redis,
+        billing,
       },
-      degraded: redis === "degraded",
+      degraded: redis === "degraded" || billing !== "configured",
       timestamp: new Date().toISOString(),
     });
   }
