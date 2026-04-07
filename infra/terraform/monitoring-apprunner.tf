@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 locals {
   backend_apprunner_service_name  = var.apprunner_backend_service_name != "" ? var.apprunner_backend_service_name : "${local.name_prefix}-appr-backend-managed"
   frontend_apprunner_service_name = var.apprunner_frontend_service_name != "" ? var.apprunner_frontend_service_name : "${local.name_prefix}-appr-frontend-managed"
@@ -224,14 +226,56 @@ resource "aws_iam_role_policy" "synthetics_artifacts" {
         Effect = "Allow"
         Action = [
           "s3:PutObject",
-          "s3:GetObject",
-          "s3:ListBucket",
-          "s3:GetBucketLocation"
+          "s3:GetObject"
         ]
         Resource = [
-          module.s3.bucket_arn,
-          "${module.s3.bucket_arn}/synthetics/*"
+          "${module.s3.bucket_arn}/synthetics/${local.name_prefix}/public-journey/*"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetBucketLocation",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          module.s3.bucket_arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = [
+          "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/cwsyn-${local.name_prefix}-public-journey*",
+          "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/cwsyn-${local.name_prefix}-public-journey*:*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListAllMyBuckets",
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords"
+        ]
+        Resource = [
+          "*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricData"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "cloudwatch:namespace" = "CloudWatchSynthetics"
+          }
+        }
       }
     ]
   })
@@ -263,8 +307,12 @@ resource "aws_synthetics_canary" "public_journey" {
     }
   }
 
-  depends_on = [module.apprunner]
-  tags       = local.tags
+  depends_on = [
+    module.apprunner,
+    aws_iam_role_policy_attachment.synthetics_basic,
+    aws_iam_role_policy.synthetics_artifacts
+  ]
+  tags = local.tags
 }
 
 resource "aws_cloudwatch_metric_alarm" "backend_5xx" {
