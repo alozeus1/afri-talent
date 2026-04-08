@@ -33,13 +33,13 @@ export async function HeroStats() {
   ];
 
   return (
-    <section className="py-16 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+    <section className="section-shell py-14">
+      <div className="page-frame">
+        <div className="surface-panel-strong gloss-card grid grid-cols-2 gap-6 rounded-[2rem] px-5 py-8 md:grid-cols-4 md:gap-8 md:px-10">
           {items.map((item) => (
             <div key={item.label} className="text-center">
-              <div className="text-4xl font-bold text-emerald-600 mb-2">{item.value}</div>
-              <div className="text-gray-600 dark:text-gray-300">{item.label}</div>
+              <div className="font-display mb-2 text-4xl font-bold text-emerald-700 dark:text-emerald-300">{item.value}</div>
+              <div className="text-sm uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{item.label}</div>
             </div>
           ))}
         </div>

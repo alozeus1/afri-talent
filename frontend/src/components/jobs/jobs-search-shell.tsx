@@ -126,7 +126,7 @@ export function JobsSearchShell({ filters, resultMetrics }: JobsSearchShellProps
             ? "Search is pacing requests more gently to save data on slower connections."
             : "Results update in the background as you refine your search."}
         </p>
-        {isPending && <p className="font-medium text-emerald-700">Refreshing results...</p>}
+        {isPending && <p className="font-semibold text-emerald-700 dark:text-emerald-300">Refreshing results...</p>}
       </div>
     </div>
   );

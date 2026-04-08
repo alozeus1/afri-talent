@@ -7,7 +7,8 @@ import prisma from "./lib/prisma.js";
 import logger from "./lib/logger.js";
 import { initSentry, setupExpressErrorHandler } from "./lib/sentry.js";
 import { redisHealthStatus } from "./lib/redis.js";
-import { isStripeConfigured } from "./lib/stripe.js";
+import { buildDegradedState } from "./lib/platform/health.js";
+import { isAnyBillingProviderConfigured } from "./lib/billing/index.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import {
   securityHeaders,
@@ -186,8 +187,8 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     const redis = await redisHealthStatus();
-    const billing = isStripeConfigured() ? "configured" : "not_configured";
-    const degraded = redis === "degraded" || billing !== "configured";
+    const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
+    const degraded = buildDegradedState({ redis, billing });
     res.json({
       status: degraded ? "degraded" : "ok",
       ...serviceMetadata,
@@ -202,7 +203,7 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
     });
   } catch {
     const redis = await redisHealthStatus();
-    const billing = isStripeConfigured() ? "configured" : "not_configured";
+    const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
     res.status(500).json({
       status: "error",
       ...serviceMetadata,
@@ -211,7 +212,7 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
         redis,
         billing,
       },
-      degraded: redis === "degraded" || billing !== "configured",
+      degraded: buildDegradedState({ redis, billing }),
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
@@ -241,7 +242,7 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     const redis = await redisHealthStatus();
-    const billing = isStripeConfigured() ? "configured" : "not_configured";
+    const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
     res.json({
       status: "ready",
       ...serviceMetadata,
@@ -250,13 +251,13 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
         redis,
         billing,
       },
-      degraded: redis === "degraded" || billing !== "configured",
+      degraded: buildDegradedState({ redis, billing }),
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
     logger.error({ error }, "Readiness check failed");
     const redis = await redisHealthStatus();
-    const billing = isStripeConfigured() ? "configured" : "not_configured";
+    const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
     res.status(503).json({
       status: "not_ready",
       ...serviceMetadata,
@@ -265,7 +266,7 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
         redis,
         billing,
       },
-      degraded: redis === "degraded" || billing !== "configured",
+      degraded: buildDegradedState({ redis, billing }),
       timestamp: new Date().toISOString(),
     });
   }

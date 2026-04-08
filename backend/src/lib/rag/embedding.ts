@@ -3,11 +3,15 @@ import type { SemanticConfig } from "./types.js";
 
 const DEFAULT_DIMENSIONS = clampDimensions(parseInt(process.env.SEMANTIC_EMBEDDING_DIMENSIONS || "256", 10));
 const DEFAULT_PROVIDER = (process.env.SEMANTIC_EMBEDDING_PROVIDER || "hash").trim().toLowerCase();
-const DEFAULT_MODEL = (process.env.SEMANTIC_EMBEDDING_MODEL || "hash-v1").trim();
+const DEFAULT_MODEL = (
+  process.env.SEMANTIC_EMBEDDING_MODEL
+  || (DEFAULT_PROVIDER === "openai" ? "text-embedding-3-small" : "hash-v1")
+).trim();
+const OPENAI_EMBEDDING_ENDPOINT = process.env.OPENAI_EMBEDDING_ENDPOINT || "https://api.openai.com/v1/embeddings";
 
 function clampDimensions(value: number): number {
   if (!Number.isFinite(value) || value < 32) return 256;
-  return Math.min(1024, Math.max(32, Math.round(value)));
+  return Math.min(3072, Math.max(32, Math.round(value)));
 }
 
 function normalizeText(value: string): string {
@@ -82,12 +86,47 @@ export function generateHashEmbedding(text: string, dimensions = DEFAULT_DIMENSI
   return l2Normalize(vector);
 }
 
-export function resolveEmbedding(text: string, manualEmbedding?: number[]): {
+async function generateOpenAIEmbedding(text: string, model: string, dimensions: number): Promise<number[]> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is required when SEMANTIC_EMBEDDING_PROVIDER=openai");
+  }
+
+  const response = await fetch(OPENAI_EMBEDDING_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      input: text,
+      model,
+      dimensions,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`OpenAI embedding request failed (${response.status}): ${body}`);
+  }
+
+  const payload = await response.json() as {
+    data?: Array<{ embedding?: number[] }>;
+  };
+  const embedding = payload.data?.[0]?.embedding;
+  if (!embedding || embedding.length === 0) {
+    throw new Error("OpenAI embedding response was missing embedding data");
+  }
+
+  return l2Normalize(embedding);
+}
+
+export async function resolveEmbedding(text: string, manualEmbedding?: number[]): Promise<{
   embedding: number[];
   provider: string;
   model: string;
   dimensions: number;
-} {
+}> {
   if (manualEmbedding && manualEmbedding.length > 0) {
     const dimensions = clampDimensions(manualEmbedding.length);
     const normalized = l2Normalize(manualEmbedding.slice(0, dimensions));
@@ -102,6 +141,16 @@ export function resolveEmbedding(text: string, manualEmbedding?: number[]): {
   const config = getSemanticConfig();
   if (!config.enabled) {
     throw new Error("Semantic embeddings are disabled for this environment");
+  }
+
+  if (config.provider === "openai") {
+    const embedding = await generateOpenAIEmbedding(text, config.model, config.dimensions);
+    return {
+      embedding,
+      provider: config.provider,
+      model: config.model,
+      dimensions: embedding.length,
+    };
   }
 
   return {

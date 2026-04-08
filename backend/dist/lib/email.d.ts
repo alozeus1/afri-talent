@@ -20,6 +20,18 @@ export declare function jobMatchEmail(opts: {
     visaSponsored: boolean;
     jobUrl: string;
 }): Promise<void>;
+export declare function candidateWeeklyDigestEmail(opts: {
+    to: string;
+    candidateName: string;
+    digestUrl: string;
+    jobs: Array<{
+        title: string;
+        companyName: string;
+        location: string;
+        summary: string;
+        url: string;
+    }>;
+}): Promise<void>;
 export declare function passwordResetEmail(opts: {
     to: string;
     userName: string;
@@ -31,5 +43,11 @@ export declare function verificationEmail(opts: {
     companyName: string;
     status: "VERIFIED" | "PENDING" | "UNVERIFIED";
     portalUrl: string;
+}): Promise<void>;
+export declare function accountEmailVerificationEmail(opts: {
+    to: string;
+    candidateName: string;
+    verifyUrl: string;
+    expiresInHours: number;
 }): Promise<void>;
 //# sourceMappingURL=email.d.ts.map

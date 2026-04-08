@@ -15,8 +15,9 @@ export declare class JobAggregator {
         byRegion: Record<JobRegion, number>;
         bySource: Record<JobSource, number>;
     }>;
-    private deduplicateJobs;
+    private groupDuplicateJobs;
     private jobCompleteness;
+    private toJobDocument;
     private upsertJob;
     private generateSlug;
     private ensureUniqueSlug;

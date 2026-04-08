@@ -1,5 +1,7 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import logger from "./logger.js";
+import { recordOpsEvent } from "./ops/events.js";
+import { pushDeadLetter, withRetry } from "./ops/resilience.js";
 const SES_REGION = process.env.SES_REGION || process.env.AWS_REGION || "us-east-1";
 const FROM_EMAIL = process.env.SES_FROM_EMAIL;
 const IS_DEV = !FROM_EMAIL;
@@ -11,10 +13,21 @@ function getSES() {
     return _ses;
 }
 async function sendEmail(opts) {
+    const recipientDomain = opts.to.includes("@") ? opts.to.split("@")[1] : "unknown";
     // Dev mode: log instead of send if SES_FROM_EMAIL is not configured
     if (IS_DEV) {
         logger.info({ to: opts.to, subject: opts.subject }, "[email] dev mode — email not sent");
         logger.debug({ text: opts.text }, "[email] body");
+        recordOpsEvent({
+            metricName: "notification_delivery_success",
+            category: "notifications",
+            details: {
+                channel: "email",
+                mode: "dev",
+                template: opts.templateName ?? "generic",
+                recipient_domain: recipientDomain,
+            },
+        });
         return;
     }
     const command = new SendEmailCommand({
@@ -28,14 +41,54 @@ async function sendEmail(opts) {
             },
         },
     });
-    await getSES().send(command);
-    logger.info({ to: opts.to, subject: opts.subject }, "[email] sent");
+    try {
+        await withRetry(() => getSES().send(command), {
+            operationName: `email_${opts.templateName ?? "generic"}`,
+            attempts: 3,
+            initialDelayMs: 500,
+        });
+        logger.info({ to: opts.to, subject: opts.subject }, "[email] sent");
+        recordOpsEvent({
+            metricName: "notification_delivery_success",
+            category: "notifications",
+            details: {
+                channel: "email",
+                template: opts.templateName ?? "generic",
+                recipient_domain: recipientDomain,
+            },
+        });
+    }
+    catch (error) {
+        await pushDeadLetter({
+            category: "email",
+            source: opts.templateName ?? "generic",
+            reasonCode: "email_send_failed",
+            error,
+            payload: {
+                subject: opts.subject,
+                recipient_domain: recipientDomain,
+            },
+        });
+        recordOpsEvent({
+            metricName: "notification_delivery_failure",
+            category: "notifications",
+            outcome: "failure",
+            severity: "warning",
+            details: {
+                channel: "email",
+                template: opts.templateName ?? "generic",
+                recipient_domain: recipientDomain,
+            },
+        });
+        throw error;
+    }
 }
 // ── Email templates ──────────────────────────────────────────────────────────
 export async function newMessageEmail(opts) {
     await sendEmail({
         to: opts.to,
         subject: `New message from ${opts.senderName} on AfriTalent`,
+        templateName: "new_message",
         html: `
       <h2>Hi ${opts.recipientName},</h2>
       <p>You have a new message from <strong>${opts.senderName}</strong> on AfriTalent.</p>
@@ -56,6 +109,7 @@ export async function applicationStatusEmail(opts) {
     await sendEmail({
         to: opts.to,
         subject: `Application update: ${opts.jobTitle} at ${opts.companyName}`,
+        templateName: "application_status",
         html: `
       <h2>Hi ${opts.candidateName},</h2>
       <p>Your application for <strong>${opts.jobTitle}</strong> at <strong>${opts.companyName}</strong> ${label}.</p>
@@ -70,6 +124,7 @@ export async function jobMatchEmail(opts) {
     await sendEmail({
         to: opts.to,
         subject: `New job match: ${opts.jobTitle}${sponsorBadge}`,
+        templateName: "job_match",
         html: `
       <h2>Hi ${opts.candidateName},</h2>
       <p>A new job matches your profile on AfriTalent:</p>
@@ -81,10 +136,51 @@ export async function jobMatchEmail(opts) {
         text: `Hi ${opts.candidateName},\n\nNew job match: ${opts.jobTitle} at ${opts.companyName}.\n${opts.visaSponsored ? "Visa Sponsorship: YES\n" : ""}\nView it: ${opts.jobUrl}`,
     });
 }
+export async function candidateWeeklyDigestEmail(opts) {
+    const topJobs = opts.jobs.slice(0, 5);
+    if (topJobs.length === 0) {
+        return;
+    }
+    await sendEmail({
+        to: opts.to,
+        subject: "Your AfriTalent weekly digest is ready",
+        templateName: "candidate_weekly_digest",
+        html: `
+      <div style="font-family: sans-serif; max-width: 640px; margin: 0 auto;">
+        <h2>Hi ${opts.candidateName},</h2>
+        <p>Here are the strongest fresh opportunities we found for you this week.</p>
+        <ul style="padding-left: 18px;">
+          ${topJobs
+            .map((job) => `
+                <li style="margin-bottom: 16px;">
+                  <strong>${job.title}</strong> at <strong>${job.companyName}</strong><br/>
+                  <span style="color: #4b5563;">${job.location}</span><br/>
+                  <span style="color: #6b7280;">${job.summary}</span><br/>
+                  <a href="${job.url}" style="color: #059669;">View role</a>
+                </li>
+              `)
+            .join("")}
+        </ul>
+        <p><a href="${opts.digestUrl}" style="background:#059669;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Manage digest preferences</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+        text: [
+            `Hi ${opts.candidateName},`,
+            "",
+            "Here are the strongest fresh opportunities we found for you this week:",
+            "",
+            ...topJobs.map((job) => `- ${job.title} at ${job.companyName} (${job.location})\n  ${job.summary}\n  ${job.url}`),
+            "",
+            `Manage digest preferences: ${opts.digestUrl}`,
+        ].join("\n"),
+    });
+}
 export async function passwordResetEmail(opts) {
     await sendEmail({
         to: opts.to,
         subject: "Reset your AfriTalent password",
+        templateName: "password_reset",
         html: `
       <h2>Hi ${opts.userName},</h2>
       <p>We received a request to reset your password. Click the button below to choose a new password:</p>
@@ -105,6 +201,7 @@ export async function verificationEmail(opts) {
     await sendEmail({
         to: opts.to,
         subject: `AfriTalent employer verification: ${opts.status}`,
+        templateName: "employer_verification_status",
         html: `
       <h2>Hi ${opts.companyName},</h2>
       <p>${statusMessages[opts.status]}</p>
@@ -112,6 +209,25 @@ export async function verificationEmail(opts) {
       <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
     `,
         text: `Hi ${opts.companyName},\n\n${statusMessages[opts.status]}\n\nPortal: ${opts.portalUrl}`,
+    });
+}
+export async function accountEmailVerificationEmail(opts) {
+    await sendEmail({
+        to: opts.to,
+        subject: "Verify your AfriTalent email",
+        templateName: "account_email_verification",
+        html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Welcome to AfriTalent, ${opts.candidateName}!</h2>
+        <p>Please verify your email address by clicking the button below:</p>
+        <a href="${opts.verifyUrl}" style="display: inline-block; background: #059669; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+          Verify Email
+        </a>
+        <p style="margin-top: 16px; color: #666;">This link expires in ${opts.expiresInHours} hours.</p>
+        <p style="color: #999; font-size: 12px;">If you didn't create an account, you can safely ignore this email.</p>
+      </div>
+    `,
+        text: `Welcome to AfriTalent, ${opts.candidateName}!\n\nVerify your email here: ${opts.verifyUrl}\n\nThis link expires in ${opts.expiresInHours} hours.`,
     });
 }
 //# sourceMappingURL=email.js.map

@@ -488,3 +488,92 @@ variable "stripe_price_professional_monthly" {
   description = "Stripe price ID for the Professional monthly plan"
   default     = ""
 }
+
+variable "anthropic_api_key" {
+  type        = string
+  description = "Anthropic API key for Claude AI"
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_secret_key" {
+  type        = string
+  description = "Stripe secret key for payments"
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_webhook_secret" {
+  type        = string
+  description = "Stripe webhook signing secret"
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_price_catalog_json" {
+  type        = string
+  description = "Stripe regional price catalog JSON"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_public_key" {
+  type        = string
+  description = "Flutterwave public key"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_secret_key" {
+  type        = string
+  description = "Flutterwave secret key"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_secret_hash" {
+  type        = string
+  description = "Flutterwave webhook verification hash"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_plan_catalog_json" {
+  type        = string
+  description = "Flutterwave regional plan catalog JSON"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_payment_options" {
+  type        = string
+  description = "Flutterwave enabled payment options"
+  default     = "card,banktransfer,ussd"
+}
+
+variable "adzuna_app_id" {
+  type        = string
+  description = "Adzuna API app ID for job aggregation"
+  default     = ""
+}
+
+variable "adzuna_api_key" {
+  type        = string
+  description = "Adzuna API key for job aggregation"
+  sensitive   = true
+  default     = ""
+}
+
+variable "redis_url" {
+  type        = string
+  description = "Optional Redis connection string"
+  sensitive   = true
+  default     = ""
+}
+
+variable "sentry_dsn" {
+  type        = string
+  description = "Optional backend Sentry DSN"
+  sensitive   = true
+  default     = ""
+}

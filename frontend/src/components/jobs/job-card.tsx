@@ -50,14 +50,14 @@ export function JobCard({ job }: JobCardProps) {
         });
       }}
     >
-      <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+      <Card className="h-full cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_28px_72px_rgba(15,23,32,0.12)]">
         <CardContent className="p-6">
           <div className="flex justify-between items-start mb-3">
             <div className="flex-1">
-              <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 mb-1 line-clamp-1">
+              <h3 className="font-display text-lg font-bold text-gray-900 dark:text-gray-100 mb-1 line-clamp-2">
                 {job.title}
               </h3>
-              <p className="text-emerald-600 font-medium">
+              <p className="font-medium text-emerald-700 dark:text-emerald-300">
                 {job.employer?.companyName || job.sourceName || "Unknown"}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -105,23 +105,23 @@ export function JobCard({ job }: JobCardProps) {
           </div>
 
           {salary && (
-            <p className="text-gray-900 dark:text-gray-100 font-semibold mb-4">{salary}</p>
+            <p className="mb-4 font-display text-lg font-bold text-gray-900 dark:text-gray-100">{salary}</p>
           )}
 
           {job.discovery && (
             <div className="mb-4 flex flex-wrap gap-2">
               {job.discovery.freshnessLabel && job.discovery.freshnessLabel !== "ACTIVE" && freshnessLabel && (
-                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/30 dark:text-emerald-300">
                   {freshnessLabel}
                 </span>
               )}
               {job.discovery.salaryTransparent && (
-                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                   Salary disclosed
                 </span>
               )}
               {job.discovery.visaClear && job.visaSponsorship === "YES" && (
-                <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:border-blue-500/20 dark:bg-blue-900/30 dark:text-blue-300">
                   Visa clarified
                 </span>
               )}
@@ -129,7 +129,7 @@ export function JobCard({ job }: JobCardProps) {
           )}
 
           {discoverySummary && (
-            <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+            <p className="mb-4 text-sm leading-6 text-gray-600 dark:text-gray-300">
               {discoverySummary}
             </p>
           )}

@@ -1,6 +1,6 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: April 3, 2026 5:12 PM (America/Chicago)
+Last updated: April 8, 2026 12:12 AM (America/Chicago)
 
 This is the first file a future Codex run should read for staging, deployment, ops, and recovery work.
 It captures the current live state, the last known deployment progress, where to look in AWS, and the fastest safe troubleshooting paths.
@@ -76,6 +76,23 @@ For incidents, readiness work, or monitoring changes, use these docs after this 
 
 The current shared staging deployment path is working on AWS App Runner.
 
+Update on April 7, 2026:
+
+- Commit `9fa48da` (`Fix Synthetics canary execution role`) was pushed to `develop` to repair the failing shared staging CI/CD pipeline.
+- GitHub Actions run `24104076134` is the validating deploy run for this fix.
+- Root cause of the prior pipeline failure in run `24102816072`:
+  - `Finalize Infrastructure` failed while creating `aws_synthetics_canary.public_journey[0]`
+  - AWS returned `CREATE_FAILED: The role defined for the function cannot be assumed by Lambda`
+  - the execution role in `infra/terraform/monitoring-apprunner.tf` only had a minimal Lambda basic setup and an incomplete inline policy for CloudWatch Synthetics
+- Fix applied:
+  - expanded the Synthetics execution role policy to match AWS-documented canary requirements for S3 artifact access, CloudWatch Logs, X-Ray, and `cloudwatch:PutMetricData`
+  - added explicit Terraform dependency ordering so the canary waits on the execution role policy setup
+- Validation already confirmed in AWS during run `24104076134`:
+  - CloudWatch Synthetics canary `afritalent-staging-public-journey` is now `RUNNING`
+  - backend health is still `ok` at `https://ed4nsj3sgv.us-east-1.awsapprunner.com/health`
+  - frontend still responds from `https://3mwn2b4e5t.us-east-1.awsapprunner.com` with the expected `307` redirect to `/en`
+- At this handoff moment, the later App Runner `START_DEPLOYMENT` operations triggered by run `24104076134` are still `IN_PROGRESS` for both backend and frontend, so check the run and App Runner operation status before assuming the deploy leg is fully complete.
+
 Completed on April 3, 2026:
 
 - Verified the active non-prod runtime is AWS App Runner + ECR + RDS PostgreSQL, not Railway
@@ -101,10 +118,126 @@ Completed on April 3, 2026:
 
 Open:
 
-- `STRIPE_SECRET_KEY` is still empty in `afritalent-staging/app-secrets`
+- Stripe and Flutterwave billing code paths are now implemented locally, but the provider secrets and catalogs still need to be populated in GitHub repo secrets and then hydrated into `afritalent-staging/app-secrets`
+- The Stripe credentials supplied during the April 8 billing setup are live-mode credentials; do not commit them to the repo, and do not wire them into shared staging casually unless the team explicitly accepts live-mode checkout against a non-prod environment
+- Flutterwave account `Godwill Ocheme` is still in `TEST MODE` with account activation incomplete, so live Flutterwave charging is still blocked by provider KYC/activation
 - A full local `terraform plan` from the `admin` IAM user is still blocked by an explicit deny on `ec2:DescribeInstances` from `arn:aws:iam::260820061731:policy/demo-policy`
 - Full Terraform apply is still pending for monitoring, alerting, and other non-App-Runner resources outside the targeted repairs above
 - A semantic retrieval foundation now exists in the backend codebase, but it has not been deployed or indexed in staging yet
+
+## Billing Integration Snapshot
+
+Updated on April 8, 2026:
+
+- The backend and frontend now support provider-aware checkout routing:
+  - Nigeria defaults to Flutterwave
+  - all other countries default to Stripe
+  - Google Pay rides on eligible Stripe Checkout flows automatically
+  - PayPal is intentionally deferred
+- Terraform and the App Runner deploy workflow were extended so the following runtime secrets can be hydrated into Secrets Manager without manual container edits:
+  - `STRIPE_SECRET_KEY`
+  - `STRIPE_WEBHOOK_SECRET`
+  - `STRIPE_PRICE_CATALOG_JSON`
+  - `FLUTTERWAVE_PUBLIC_KEY`
+  - `FLUTTERWAVE_SECRET_KEY`
+  - `FLUTTERWAVE_SECRET_HASH`
+  - `FLUTTERWAVE_PLAN_CATALOG_JSON`
+  - `FLUTTERWAVE_PAYMENT_OPTIONS`
+- Note: some external notes may call the Flutterwave webhook verifier `FLW_WEBHOOK_HASH`; the AfriTalent codebase expects `FLUTTERWAVE_SECRET_HASH`
+
+### Stripe State
+
+- Stripe account id: `acct_1PnvMGIVndXzaBq6`
+- Webhook endpoint id: `we_1TJo78IVndXzaBq61TwP9Xma`
+- Stripe webhook URL is confirmed as:
+  - `https://ed4nsj3sgv.us-east-1.awsapprunner.com/api/webhooks/stripe`
+- Required webhook events are confirmed:
+  - `checkout.session.completed`
+  - `customer.subscription.created`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
+  - `invoice.paid`
+  - `invoice.payment_failed`
+- Google Pay status:
+  - enabled through Stripe payment method configurations and available automatically to eligible Checkout users
+- PayPal status:
+  - native beta only
+  - limited to EU/UK
+  - zero Africa coverage
+  - do not add PayPal in the same release as Stripe + Flutterwave
+
+Stripe non-secret catalog payload for `STRIPE_PRICE_CATALOG_JSON`:
+
+```json
+{
+  "BASIC:AFRICA:MONTHLY:USD": "price_1TJmHyIVndXzaBq6zL81AHtU",
+  "BASIC:AFRICA:YEARLY:USD": "price_1TJmHzIVndXzaBq6clpeEsa9",
+  "BASIC:EUROPE:MONTHLY:EUR": "price_1TJmI0IVndXzaBq63NLldsi1",
+  "BASIC:EUROPE:YEARLY:EUR": "price_1TJmI1IVndXzaBq6QdI2PKH1",
+  "BASIC:ROW:MONTHLY:USD": "price_1TJmIIIVndXzaBq6pRSPhlmH",
+  "BASIC:ROW:YEARLY:USD": "price_1TJmIJIVndXzaBq6jNqLUYMr",
+  "PROFESSIONAL:AFRICA:MONTHLY:USD": "price_1TJmI2IVndXzaBq6sBL5YZni",
+  "PROFESSIONAL:AFRICA:YEARLY:USD": "price_1TJmI3IVndXzaBq6aBiKSL2E",
+  "PROFESSIONAL:EUROPE:MONTHLY:EUR": "price_1TJmI4IVndXzaBq6Uncr7417",
+  "PROFESSIONAL:EUROPE:YEARLY:EUR": "price_1TJmI5IVndXzaBq6jvXoJveq",
+  "PROFESSIONAL:ROW:MONTHLY:USD": "price_1TJmIXIVndXzaBq6Rj5oyRai",
+  "PROFESSIONAL:ROW:YEARLY:USD": "price_1TJmIZIVndXzaBq6FpV54E7o",
+  "EMPLOYER_BASIC:AFRICA:MONTHLY:USD": "price_1TJmIKIVndXzaBq6zszokqoy",
+  "EMPLOYER_BASIC:AFRICA:YEARLY:USD": "price_1TJmILIVndXzaBq6cFFXkR0J",
+  "EMPLOYER_BASIC:EUROPE:MONTHLY:EUR": "price_1TJmIMIVndXzaBq6WpAvsKoK",
+  "EMPLOYER_BASIC:EUROPE:YEARLY:EUR": "price_1TJmINIVndXzaBq6vSNXgEN6",
+  "EMPLOYER_BASIC:ROW:MONTHLY:USD": "price_1TJmIOIVndXzaBq66VbAF1Ri",
+  "EMPLOYER_BASIC:ROW:YEARLY:USD": "price_1TJmIPIVndXzaBq6PVcP65gg",
+  "EMPLOYER_PREMIUM:AFRICA:MONTHLY:USD": "price_1TJmIZIVndXzaBq6fqYtIgE7",
+  "EMPLOYER_PREMIUM:AFRICA:YEARLY:USD": "price_1TJmIaIVndXzaBq6FVcQtwFV",
+  "EMPLOYER_PREMIUM:EUROPE:MONTHLY:EUR": "price_1TJmIbIVndXzaBq6dWDK66P8",
+  "EMPLOYER_PREMIUM:EUROPE:YEARLY:EUR": "price_1TJmIcIVndXzaBq6rEaA4Kjm",
+  "EMPLOYER_PREMIUM:ROW:MONTHLY:USD": "price_1TJmIdIVndXzaBq6QPFKFwSI",
+  "EMPLOYER_PREMIUM:ROW:YEARLY:USD": "price_1TJmIeIVndXzaBq6O8qd2V27"
+}
+```
+
+### Flutterwave State
+
+- Flutterwave merchant: `Godwill Ocheme`
+- Current mode:
+  - `TEST MODE`
+- Live charging blocker:
+  - account activation / KYC incomplete
+- Test webhook was configured directly in the dashboard to:
+  - `https://ed4nsj3sgv.us-east-1.awsapprunner.com/api/webhooks/flutterwave`
+- Test webhook preferences enabled:
+  - retries on
+  - v3 webhooks on
+  - resend from dashboard on
+
+Flutterwave non-secret catalog payload for `FLUTTERWAVE_PLAN_CATALOG_JSON`:
+
+```json
+{
+  "BASIC:AFRICA:MONTHLY:NGN": "231469",
+  "BASIC:AFRICA:YEARLY:NGN": "231470",
+  "PROFESSIONAL:AFRICA:MONTHLY:NGN": "231471",
+  "PROFESSIONAL:AFRICA:YEARLY:NGN": "231472",
+  "EMPLOYER_BASIC:AFRICA:MONTHLY:NGN": "231473",
+  "EMPLOYER_BASIC:AFRICA:YEARLY:NGN": "231474",
+  "EMPLOYER_PREMIUM:AFRICA:MONTHLY:NGN": "231475",
+  "EMPLOYER_PREMIUM:AFRICA:YEARLY:NGN": "231476"
+}
+```
+
+Recommended default for `FLUTTERWAVE_PAYMENT_OPTIONS`:
+
+```text
+card,banktransfer,ussd
+```
+
+### Safe Next Step
+
+1. Populate the provider secrets in GitHub repo secrets, not in the repo
+2. Let the deploy workflow hydrate them into `afritalent-staging/app-secrets`
+3. Run a staging deploy only if the team accepts live Stripe against staging, otherwise use Stripe test credentials for staging first
+4. Do not treat Flutterwave as live-ready until the merchant account exits test mode
 
 ## Last Known Image Digests
 
@@ -167,10 +300,10 @@ Do not reset or discard those unless the user explicitly asks.
    - `https://rrmkvb99ca.us-east-1.awsapprunner.com`
    - `https://3mwn2b4e5t.us-east-1.awsapprunner.com`
 
-6. Stripe is still the main remaining pre-prod blocker
-   - `STRIPE_SECRET_KEY` is still empty
-   - no usable Stripe test credential is present in the local shell, GitHub repo secrets, or the staging app secret
-   - billing flows should be treated as incomplete until a real test-mode Stripe key is provided
+6. Billing is now a controlled release item, not a code gap
+   - Stripe account setup is complete enough for integration, but secrets must still be populated out of band
+   - Flutterwave recurring plan IDs exist in test mode, but live charging is blocked by provider activation
+   - staging should not be assumed safe for live Stripe keys unless the user explicitly approves that risk
 
 ## Where To Look First
 

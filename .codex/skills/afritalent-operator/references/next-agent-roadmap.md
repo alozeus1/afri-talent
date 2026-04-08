@@ -2,11 +2,11 @@
 
 ## Pre-Prod Cleanup
 
-- provision staging Redis
 - populate staging Stripe test credentials
-- correct backend `FRONTEND_URL`
-- reconcile Terraform to the real frontend App Runner service
-- retire the dead frontend managed App Runner service
+- complete one clean fully-settled staging deploy after the April 7 Synthetics canary repair
+- reduce GitHub Actions Node 20 deprecation warnings
+- complete full Terraform reconciliation under the intended AWS path
+- validate semantic retrieval rollout and indexing in staging
 
 ## Product Platform Buildout
 

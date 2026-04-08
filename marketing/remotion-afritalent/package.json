@@ -1,0 +1,20 @@
+{
+  "name": "remotion-afritalent",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts AfriTalentLaunch out/afritalent-launch.mp4"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "remotion": "^4.0.250"
+  },
+  "devDependencies": {
+    "@remotion/cli": "^4.0.250",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "typescript": "^5.8.3"
+  }
+}

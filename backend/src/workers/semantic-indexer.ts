@@ -3,7 +3,7 @@ import logger from "../lib/logger.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
 import prisma from "../lib/prisma.js";
 import { getSemanticConfig } from "../lib/rag/embedding.js";
-import { indexPublishedJobs } from "../lib/rag/store.js";
+import { indexOpenCandidates, indexPublishedJobs } from "../lib/rag/store.js";
 
 const DEFAULT_BATCH_SIZE = 100;
 const DEFAULT_MAX_BATCHES = 10;
@@ -47,17 +47,33 @@ export async function runSemanticIndexWorker(): Promise<void> {
       isExpired: false,
     },
   });
+  const totalOpenCandidates = await prisma.candidateProfile.count({
+    where: {
+      openToWork: true,
+      user: {
+        accountRestrictionStatus: {
+          not: "SUSPENDED",
+        },
+      },
+    },
+  });
 
   let scanned = 0;
   let indexed = 0;
   let created = 0;
   let updated = 0;
   let unchanged = 0;
+  let candidateScanned = 0;
+  let candidateIndexed = 0;
+  let candidateCreated = 0;
+  let candidateUpdated = 0;
+  let candidateUnchanged = 0;
   let batches = 0;
 
   for (let batchIndex = 0; batchIndex < config.maxBatches; batchIndex += 1) {
     const offset = batchIndex * config.batchSize;
     const result = await indexPublishedJobs(config.batchSize, offset);
+    const candidateResult = await indexOpenCandidates(config.batchSize, offset);
 
     batches += 1;
     scanned += result.scanned;
@@ -65,13 +81,18 @@ export async function runSemanticIndexWorker(): Promise<void> {
     created += result.created;
     updated += result.updated;
     unchanged += result.unchanged;
+    candidateScanned += candidateResult.scanned;
+    candidateIndexed += candidateResult.indexed;
+    candidateCreated += candidateResult.created;
+    candidateUpdated += candidateResult.updated;
+    candidateUnchanged += candidateResult.unchanged;
 
-    if (result.scanned < config.batchSize) {
+    if (result.scanned < config.batchSize && candidateResult.scanned < config.batchSize) {
       break;
     }
   }
 
-  const fullyCovered = scanned >= totalPublishedJobs;
+  const fullyCovered = scanned >= totalPublishedJobs && candidateScanned >= totalOpenCandidates;
 
   recordOpsEvent({
     metricName: fullyCovered ? "semantic_index_cycle_success" : "semantic_index_cycle_partial",
@@ -83,11 +104,17 @@ export async function runSemanticIndexWorker(): Promise<void> {
       model: semantic.model,
       dimensions: semantic.dimensions,
       total_published_jobs: totalPublishedJobs,
+      total_open_candidates: totalOpenCandidates,
       scanned,
       indexed,
       created,
       updated,
       unchanged,
+      candidate_scanned: candidateScanned,
+      candidate_indexed: candidateIndexed,
+      candidate_created: candidateCreated,
+      candidate_updated: candidateUpdated,
+      candidate_unchanged: candidateUnchanged,
       batches,
       batch_size: config.batchSize,
       max_batches: config.maxBatches,
@@ -100,11 +127,17 @@ export async function runSemanticIndexWorker(): Promise<void> {
       model: semantic.model,
       dimensions: semantic.dimensions,
       totalPublishedJobs,
+      totalOpenCandidates,
       scanned,
       indexed,
       created,
       updated,
       unchanged,
+      candidateScanned,
+      candidateIndexed,
+      candidateCreated,
+      candidateUpdated,
+      candidateUnchanged,
       batches,
       batchSize: config.batchSize,
       maxBatches: config.maxBatches,

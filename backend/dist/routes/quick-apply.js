@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
-import { authenticate, authorize } from "../middleware/auth.js";
+import { authenticate, authorize, requireVerifiedEmail } from "../middleware/auth.js";
 import { ApplicationStatus, JobStatus, Role } from "@prisma/client";
 import { generateQuickCoverLetter } from "../lib/ai/cover-letter.js";
 const router = Router();
@@ -10,7 +10,7 @@ const quickApplySchema = z.object({
     jobId: z.string().uuid(),
 });
 // POST /api/quick-apply — Quick apply to a job using profile data
-router.post("/", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+router.post("/", authenticate, authorize(Role.CANDIDATE), requireVerifiedEmail({ roles: [Role.CANDIDATE] }), async (req, res) => {
     try {
         const data = quickApplySchema.parse(req.body);
         // Check job exists and is published

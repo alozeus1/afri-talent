@@ -56,6 +56,47 @@ variable "stripe_webhook_secret" {
   default     = ""
 }
 
+variable "stripe_price_catalog_json" {
+  type        = string
+  description = "Stripe regional price catalog JSON"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_public_key" {
+  type        = string
+  description = "Flutterwave public key"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_secret_key" {
+  type        = string
+  description = "Flutterwave secret key"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_secret_hash" {
+  type        = string
+  description = "Flutterwave webhook verification hash"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_plan_catalog_json" {
+  type        = string
+  description = "Flutterwave regional plan catalog JSON"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_payment_options" {
+  type        = string
+  description = "Flutterwave enabled payment options"
+  default     = "card,banktransfer,ussd"
+}
+
 variable "adzuna_app_id" {
   type        = string
   description = "Adzuna API app ID for job aggregation"

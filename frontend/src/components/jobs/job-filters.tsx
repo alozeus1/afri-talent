@@ -44,7 +44,18 @@ export function JobFilters({
   const hasFilters = search || location || type || seniority || visaSponsorship || relocationAssistance || remote;
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 mb-8">
+    <div className="surface-panel-strong gloss-card mb-8 rounded-[2rem] p-6">
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-700 dark:text-emerald-300">Search the market</p>
+          <h2 className="font-display mt-2 text-2xl font-bold text-gray-950 dark:text-white">Find roles that match your trust, mobility, and work style.</h2>
+        </div>
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={onClear}>
+            Clear filters
+          </Button>
+        )}
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Input
           type="search"
@@ -64,7 +75,7 @@ export function JobFilters({
           onChange={(e) => onLocationChange(e.target.value)}
         />
         <select
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by job type"
           value={type}
           onChange={(e) => onTypeChange(e.target.value)}
@@ -77,7 +88,7 @@ export function JobFilters({
           ))}
         </select>
         <select
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by seniority"
           value={seniority}
           onChange={(e) => onSeniorityChange(e.target.value)}
@@ -90,14 +101,14 @@ export function JobFilters({
           ))}
         </select>
       </div>
-      <div className="flex flex-wrap gap-2 mt-4">
+      <div className="mt-5 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => onRemoteChange(remote ? "" : "true")}
           aria-pressed={Boolean(remote)}
           aria-label="Toggle remote only jobs"
-          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-            remote ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:border-emerald-500"
+          className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
+            remote ? "border-emerald-600 bg-emerald-600 text-white shadow-[0_12px_30px_rgba(15,143,120,0.24)]" : "bg-white/70 text-gray-700 border-[rgba(15,23,32,0.12)] hover:border-emerald-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
           }`}
         >
           Remote
@@ -107,8 +118,8 @@ export function JobFilters({
           onClick={() => onVisaSponsorshipChange(visaSponsorship ? "" : "YES")}
           aria-pressed={Boolean(visaSponsorship)}
           aria-label="Toggle visa sponsored jobs"
-          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-            visaSponsorship ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:border-blue-500"
+          className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
+            visaSponsorship ? "border-blue-600 bg-blue-600 text-white shadow-[0_12px_30px_rgba(37,99,235,0.22)]" : "bg-white/70 text-gray-700 border-[rgba(15,23,32,0.12)] hover:border-blue-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
           }`}
         >
           Visa Sponsored
@@ -118,20 +129,13 @@ export function JobFilters({
           onClick={() => onRelocationChange(relocationAssistance ? "" : "true")}
           aria-pressed={Boolean(relocationAssistance)}
           aria-label="Toggle relocation support jobs"
-          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-            relocationAssistance ? "bg-purple-600 text-white border-purple-600" : "bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:border-purple-500"
+          className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
+            relocationAssistance ? "border-purple-600 bg-purple-600 text-white shadow-[0_12px_30px_rgba(147,51,234,0.22)]" : "bg-white/70 text-gray-700 border-[rgba(15,23,32,0.12)] hover:border-purple-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
           }`}
         >
           Relocation Support
         </button>
       </div>
-      {hasFilters && (
-        <div className="mt-4 flex justify-end">
-          <Button variant="ghost" size="sm" onClick={onClear}>
-            Clear filters
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

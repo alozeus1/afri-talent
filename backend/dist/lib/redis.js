@@ -56,5 +56,26 @@ export async function isTokenBlocked(token) {
         return false; // fail-open on Redis error
     }
 }
+export function isRedisConfigured() {
+    return Boolean(REDIS_URL);
+}
+export function isRedisAvailable() {
+    return available;
+}
+export async function redisHealthStatus() {
+    if (!REDIS_URL) {
+        return "not_configured";
+    }
+    if (!client || !available) {
+        return "degraded";
+    }
+    try {
+        await client.ping();
+        return "connected";
+    }
+    catch {
+        return "degraded";
+    }
+}
 export { client as redisClient };
 //# sourceMappingURL=redis.js.map

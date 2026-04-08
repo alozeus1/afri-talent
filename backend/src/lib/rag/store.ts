@@ -2,12 +2,20 @@ import crypto from "crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma.js";
 import {
-  buildJobSemanticContent,
-  buildJobSemanticMetadata,
-  isSemanticJobIndexable,
-  JOB_SEMANTIC_NAMESPACE,
-  JOB_SEMANTIC_SOURCE_TYPE,
-  semanticJobSelect,
+  buildCandidateSemanticContent,
+  buildCandidateSemanticMetadata,
+  CANDIDATE_SEMANTIC_NAMESPACE,
+  CANDIDATE_SEMANTIC_SOURCE_TYPE,
+  isSemanticCandidateIndexable,
+  semanticCandidateSelect,
+} from "./candidate-documents.js";
+import {
+  buildJobSemanticContent as buildJobSemanticContentForJobs,
+  buildJobSemanticMetadata as buildJobSemanticMetadataForJobs,
+  isSemanticJobIndexable as isSemanticJobIndexableForJobs,
+  JOB_SEMANTIC_NAMESPACE as JOB_SEMANTIC_NAMESPACE_FOR_JOBS,
+  JOB_SEMANTIC_SOURCE_TYPE as JOB_SEMANTIC_SOURCE_TYPE_FOR_JOBS,
+  semanticJobSelect as semanticJobSelectForJobs,
 } from "./job-documents.js";
 import { cosineSimilarity, getSemanticConfig, resolveEmbedding } from "./embedding.js";
 import type {
@@ -84,7 +92,7 @@ export async function upsertSemanticDocument(input: SemanticDocumentInput): Prom
     };
   }
 
-  const embeddingInfo = resolveEmbedding(input.content, input.embedding);
+  const embeddingInfo = await resolveEmbedding(input.content, input.embedding);
 
   const payload: Prisma.SemanticDocumentUncheckedCreateInput = {
     namespace: input.namespace,
@@ -127,7 +135,7 @@ export async function upsertSemanticDocument(input: SemanticDocumentInput): Prom
 }
 
 export async function searchSemanticDocuments(input: SemanticSearchInput): Promise<SemanticSearchHit[]> {
-  const queryEmbedding = resolveEmbedding(input.query).embedding;
+  const queryEmbedding = (await resolveEmbedding(input.query)).embedding;
   const limit = clampLimit(input.limit, 10, 50);
   const candidateLimit = clampLimit(input.candidateLimit, Math.max(limit * 8, 50), 500);
   const minScore = typeof input.minScore === "number" ? input.minScore : 0.2;
@@ -168,7 +176,7 @@ export async function indexPublishedJobs(limit = 100, offset = 0) {
       status: "PUBLISHED",
       isExpired: false,
     },
-    select: semanticJobSelect,
+    select: semanticJobSelectForJobs,
     orderBy: [
       { publishedAt: "desc" },
       { updatedAt: "desc" },
@@ -177,18 +185,56 @@ export async function indexPublishedJobs(limit = 100, offset = 0) {
     skip,
   });
 
-  const indexableJobs = jobs.filter(isSemanticJobIndexable);
+  const indexableJobs = jobs.filter(isSemanticJobIndexableForJobs);
   const results = await Promise.all(indexableJobs.map((job) => upsertSemanticDocument({
-    namespace: JOB_SEMANTIC_NAMESPACE,
-    sourceType: JOB_SEMANTIC_SOURCE_TYPE,
+    namespace: JOB_SEMANTIC_NAMESPACE_FOR_JOBS,
+    sourceType: JOB_SEMANTIC_SOURCE_TYPE_FOR_JOBS,
     sourceId: job.id,
     title: job.title,
-    content: buildJobSemanticContent(job),
-    metadata: buildJobSemanticMetadata(job),
+    content: buildJobSemanticContentForJobs(job),
+    metadata: buildJobSemanticMetadataForJobs(job),
   })));
 
   return {
     scanned: jobs.length,
+    indexed: results.length,
+    created: results.filter((result) => result.status === "created").length,
+    updated: results.filter((result) => result.status === "updated").length,
+    unchanged: results.filter((result) => result.status === "unchanged").length,
+  };
+}
+
+export async function indexOpenCandidates(limit = 100, offset = 0) {
+  const take = clampLimit(limit, 100, 500);
+  const skip = Math.max(0, Math.round(offset));
+
+  const candidates = await prisma.candidateProfile.findMany({
+    where: {
+      openToWork: true,
+      user: {
+        accountRestrictionStatus: {
+          not: "SUSPENDED",
+        },
+      },
+    },
+    select: semanticCandidateSelect,
+    orderBy: { updatedAt: "desc" },
+    take,
+    skip,
+  });
+
+  const indexableCandidates = candidates.filter(isSemanticCandidateIndexable);
+  const results = await Promise.all(indexableCandidates.map((candidate) => upsertSemanticDocument({
+    namespace: CANDIDATE_SEMANTIC_NAMESPACE,
+    sourceType: CANDIDATE_SEMANTIC_SOURCE_TYPE,
+    sourceId: candidate.userId,
+    title: candidate.headline || candidate.user.name,
+    content: buildCandidateSemanticContent(candidate),
+    metadata: buildCandidateSemanticMetadata(candidate),
+  })));
+
+  return {
+    scanned: candidates.length,
     indexed: results.length,
     created: results.filter((result) => result.status === "created").length,
     updated: results.filter((result) => result.status === "updated").length,

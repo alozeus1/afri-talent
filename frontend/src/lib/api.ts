@@ -303,9 +303,32 @@ export const adminBilling = {
 // Billing
 export const billing = {
   checkout: (plan: string, interval: "MONTHLY" | "YEARLY" = "MONTHLY") =>
-    fetchAPI<{ url: string; sessionId: string; currency: string; amount: number | null }>("/api/billing/checkout", {
+    fetchAPI<{
+      provider: "STRIPE" | "FLUTTERWAVE";
+      url: string;
+      sessionId: string;
+      reference?: string;
+      currency: string;
+      amount: number | null;
+    }>("/api/billing/checkout", {
       method: "POST",
       body: JSON.stringify({ plan, interval }),
+    }),
+
+  verifyCheckout: (payload: {
+    provider: "STRIPE" | "FLUTTERWAVE";
+    sessionId?: string;
+    transactionId?: number;
+    txRef?: string;
+  }) =>
+    fetchAPI<{
+      verified: boolean;
+      provider: "STRIPE" | "FLUTTERWAVE";
+      plan: BillingStatus["plan"];
+      status: BillingStatus["status"];
+    }>("/api/billing/verify-checkout", {
+      method: "POST",
+      body: JSON.stringify(payload),
     }),
 
   portal: () =>
@@ -363,6 +386,7 @@ export const files = {
 // Talent
 export const talent = {
   search: (params?: {
+    query?: string;
     skills?: string;
     location?: string;
     minExperience?: number;
@@ -373,6 +397,7 @@ export const talent = {
     assessmentBackedOnly?: boolean;
   }) => {
     const searchParams = new URLSearchParams();
+    if (params?.query) searchParams.set("query", params.query);
     if (params?.skills) searchParams.set("skills", params.skills);
     if (params?.location) searchParams.set("location", params.location);
     if (params?.minExperience) searchParams.set("minExperience", params.minExperience.toString());
@@ -384,6 +409,42 @@ export const talent = {
     const query = searchParams.toString();
     return fetchAPI<TalentSearchResponse>(`/api/talent${query ? `?${query}` : ""}`);
   },
+  compare: (params: { candidateIds: string[]; query?: string; location?: string; minExperience?: number; skills?: string }) => {
+    const searchParams = new URLSearchParams();
+    searchParams.set("candidateIds", params.candidateIds.join(","));
+    if (params.query) searchParams.set("query", params.query);
+    if (params.location) searchParams.set("location", params.location);
+    if (params.minExperience != null) searchParams.set("minExperience", params.minExperience.toString());
+    if (params.skills) searchParams.set("skills", params.skills);
+    return fetchAPI<TalentComparisonResponse>(`/api/talent/compare?${searchParams.toString()}`);
+  },
+  listPools: () => fetchAPI<{ pools: TalentPool[] }>("/api/talent/pools"),
+  createPool: (data: { name: string; description?: string }) =>
+    fetchAPI<{ pool: TalentPool }>("/api/talent/pools", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  addCandidateToPool: (poolId: string, data: {
+    candidateUserId: string;
+    stage?: string;
+    notes?: string;
+    semanticScore?: number;
+    trustScoreSnapshot?: number;
+    mobilityScoreSnapshot?: number;
+  }) =>
+    fetchAPI<{ membership: TalentPoolMembership & { pool: { id: string; name: string } } }>(`/api/talent/pools/${poolId}/candidates`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updatePoolCandidate: (poolId: string, candidateUserId: string, data: { stage?: string; notes?: string }) =>
+    fetchAPI<{ membership: TalentPoolMembership & { pool: { id: string; name: string } } }>(`/api/talent/pools/${poolId}/candidates/${candidateUserId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  removeCandidateFromPool: (poolId: string, candidateUserId: string) =>
+    fetchAPI<void>(`/api/talent/pools/${poolId}/candidates/${candidateUserId}`, {
+      method: "DELETE",
+    }),
   get: (userId: string) => fetchAPI<TalentProfile>(`/api/talent/${userId}`),
 };
 
@@ -1305,7 +1366,9 @@ export interface BillingStatus {
   plan: "FREE" | "BASIC" | "PROFESSIONAL" | "EMPLOYER_FREE" | "EMPLOYER_BASIC" | "EMPLOYER_PREMIUM";
   status: "ACTIVE" | "INACTIVE" | "PAST_DUE" | "CANCELLED";
   currentPeriodEnd: string | null;
+  billingProvider: "STRIPE" | "FLUTTERWAVE" | "PAYPAL" | null;
   hasCustomer: boolean;
+  hasPortal: boolean;
 }
 
 export interface BillingEntitlementState {
@@ -1653,11 +1716,73 @@ export interface TalentProfile {
   verifiedSkills?: CandidateVerifiedSkillItem[];
   partnerMarkers?: CandidatePartnerMarkerItem[];
   trust?: CandidateTrustSummary | null;
+  match: TalentMatchSummary;
+  mobility: TalentMobilitySummary;
+  poolMemberships: TalentPoolMembership[];
+}
+
+export interface TalentMobilitySummary {
+  score: number;
+  label: "READY" | "PROMISING" | "EARLY";
+  factors: string[];
+  activeProcess: {
+    visaType: string;
+    targetCountry: string;
+    status: string;
+  } | null;
+}
+
+export interface TalentMatchSummary {
+  score: number;
+  semanticScore: number;
+  skillScore: number;
+  experienceScore: number;
+  trustScore: number;
+  mobilityScore: number;
+  reasons: string[];
+  mobility: TalentMobilitySummary;
+}
+
+export interface TalentPoolMembership {
+  id: string;
+  stage: string;
+  notes: string | null;
+  poolId: string;
+  poolName: string;
+}
+
+export interface TalentPool {
+  id: string;
+  name: string;
+  description: string | null;
+  candidateCount: number;
+  createdAt: string;
+  updatedAt: string;
+  recentCandidates: Array<{
+    id: string;
+    candidateUserId: string;
+    stage: string;
+    candidateName: string;
+  }>;
+}
+
+export interface TalentComparisonResponse {
+  candidates: TalentProfile[];
+  comparison: {
+    commonSkills: string[];
+    recommendedLead: string | null;
+    summary: string;
+  };
 }
 
 export interface TalentSearchResponse {
   candidates: TalentProfile[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
+  semantic?: {
+    query: string | null;
+    hitCount: number;
+    providerUsed: boolean;
+  };
 }
 
 export interface EmployerAnalytics {

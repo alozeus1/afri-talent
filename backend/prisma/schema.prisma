@@ -430,6 +430,12 @@ enum BillingInterval {
   YEARLY
 }
 
+enum BillingProvider {
+  STRIPE
+  FLUTTERWAVE
+  PAYPAL
+}
+
 enum RegionChangeSource {
   USER_SELECTED
   STRIPE_PAYMENT
@@ -651,6 +657,8 @@ model User {
   abuseReportsAssigned          AbuseReport[]              @relation("AbuseReportAssignee")
   trustCasesAssigned            TrustCase[]                @relation("TrustCaseAssignee")
   trustCaseActions              TrustCaseAction[]          @relation("TrustCaseActionActor")
+  talentPoolMemberships         EmployerTalentPoolCandidate[] @relation("TalentPoolCandidateUser")
+  talentPoolCandidatesAdded     EmployerTalentPoolCandidate[] @relation("TalentPoolCandidateAdder")
 
   @@index([role])
   @@index([createdAt])
@@ -677,6 +685,7 @@ model Employer {
   verificationArtifacts VerificationArtifact[]   @relation("EmployerVerificationArtifacts")
   trustRiskEvents       TrustRiskEvent[]
   abuseReports          AbuseReport[]
+  talentPools           EmployerTalentPool[]
 }
 
 model EmployerOnboardingState {
@@ -692,6 +701,42 @@ model EmployerOnboardingState {
   updatedAt        DateTime          @updatedAt
 
   @@index([currentStep, updatedAt(sort: Desc)])
+}
+
+model EmployerTalentPool {
+  id          String   @id @default(uuid())
+  employerId  String
+  employer    Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  name        String   @db.VarChar(120)
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidates EmployerTalentPoolCandidate[]
+
+  @@unique([employerId, name])
+  @@index([employerId, updatedAt(sort: Desc)])
+}
+
+model EmployerTalentPoolCandidate {
+  id                   String             @id @default(uuid())
+  poolId               String
+  pool                 EmployerTalentPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  candidateUserId      String
+  candidate            User               @relation("TalentPoolCandidateUser", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  addedByUserId        String
+  addedByUser          User               @relation("TalentPoolCandidateAdder", fields: [addedByUserId], references: [id], onDelete: Cascade)
+  stage                String             @default("SOURCED") @db.VarChar(40)
+  notes                String?            @db.Text
+  semanticScore        Int?
+  trustScoreSnapshot   Int?
+  mobilityScoreSnapshot Int?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@unique([poolId, candidateUserId])
+  @@index([candidateUserId, updatedAt(sort: Desc)])
+  @@index([poolId, stage, updatedAt(sort: Desc)])
 }
 
 model Job {
@@ -1689,6 +1734,9 @@ model Subscription {
   user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan             SubscriptionPlan   @default(FREE)
   status           SubscriptionStatus @default(INACTIVE)
+  billingProvider  BillingProvider?
+  providerCustomerId String?          @db.VarChar(255)
+  providerSubscriptionId String?      @db.VarChar(255)
   stripeCustomerId String?            @db.VarChar(255)
   stripeSubId      String?            @db.VarChar(255)
   currentPeriodEnd DateTime?
@@ -1701,6 +1749,9 @@ model Subscription {
   entitlementState      BillingEntitlementState?
 
   @@index([userId])
+  @@index([billingProvider])
+  @@index([providerCustomerId])
+  @@index([providerSubscriptionId])
   @@index([stripeCustomerId])
   @@index([stripeSubId])
 }

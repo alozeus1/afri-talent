@@ -71,14 +71,27 @@ module "rds" {
 # ── Secrets Manager ──────────────────────────────────────────────────────────
 
 module "secrets" {
-  source      = "./modules/secrets"
-  name_prefix = local.name_prefix
-  db_username = var.db_username
-  db_password = random_password.db.result
-  db_endpoint = module.rds.db_endpoint
-  db_port     = module.rds.db_port
-  db_name     = var.db_name
-  jwt_secret  = random_password.jwt.result
+  source                        = "./modules/secrets"
+  name_prefix                   = local.name_prefix
+  db_username                   = var.db_username
+  db_password                   = random_password.db.result
+  db_endpoint                   = module.rds.db_endpoint
+  db_port                       = module.rds.db_port
+  db_name                       = var.db_name
+  jwt_secret                    = random_password.jwt.result
+  anthropic_api_key             = var.anthropic_api_key
+  stripe_secret_key             = var.stripe_secret_key
+  stripe_webhook_secret         = var.stripe_webhook_secret
+  stripe_price_catalog_json     = var.stripe_price_catalog_json
+  flutterwave_public_key        = var.flutterwave_public_key
+  flutterwave_secret_key        = var.flutterwave_secret_key
+  flutterwave_secret_hash       = var.flutterwave_secret_hash
+  flutterwave_plan_catalog_json = var.flutterwave_plan_catalog_json
+  flutterwave_payment_options   = var.flutterwave_payment_options
+  adzuna_app_id                 = var.adzuna_app_id
+  adzuna_api_key                = var.adzuna_api_key
+  redis_url                     = var.redis_url
+  sentry_dsn                    = var.sentry_dsn
 }
 
 # ── S3 Bucket for uploads ────────────────────────────────────────────────────
@@ -155,6 +168,12 @@ module "apprunner" {
     "ANTHROPIC_API_KEY",
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
+    "STRIPE_PRICE_CATALOG_JSON",
+    "FLUTTERWAVE_PUBLIC_KEY",
+    "FLUTTERWAVE_SECRET_KEY",
+    "FLUTTERWAVE_SECRET_HASH",
+    "FLUTTERWAVE_PLAN_CATALOG_JSON",
+    "FLUTTERWAVE_PAYMENT_OPTIONS",
     "ADZUNA_APP_ID",
     "ADZUNA_API_KEY",
     "REDIS_URL",

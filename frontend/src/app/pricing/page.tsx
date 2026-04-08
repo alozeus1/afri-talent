@@ -106,6 +106,9 @@ export default function PricingPage() {
   const prices = pricingData?.prices ?? [];
   const currentPlan = billingStatus?.plan ?? "FREE";
   const taxLabel = pricingData?.taxLabel;
+  const checkoutRoutingHint = region === "AFRICA"
+    ? "Nigeria checkouts use Flutterwave local rails. Other regions use Stripe, with Google Pay shown automatically when supported."
+    : "Checkout is powered by Stripe, with Google Pay shown automatically on eligible devices.";
 
   const activePlans = tab === "candidate" ? CANDIDATE_PLANS : EMPLOYER_PLANS;
   const comparisonRows = tab === "candidate" ? CANDIDATE_COMPARISON_ROWS : EMPLOYER_COMPARISON_ROWS;
@@ -123,6 +126,9 @@ export default function PricingPage() {
           </h1>
           <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
             {t("pricing.subtitle")}
+          </p>
+          <p className="mt-3 text-sm text-gray-500 max-w-3xl mx-auto">
+            {checkoutRoutingHint}
           </p>
         </div>
       </section>

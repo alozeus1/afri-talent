@@ -4,10 +4,15 @@ import { z } from "zod";
 import { authenticate, authorize } from "../middleware/auth.js";
 import {
   getSemanticOverview,
+  indexOpenCandidates,
   indexPublishedJobs,
   searchSemanticDocuments,
   upsertSemanticDocument,
 } from "../lib/rag/store.js";
+import {
+  CANDIDATE_SEMANTIC_NAMESPACE,
+  CANDIDATE_SEMANTIC_SOURCE_TYPE,
+} from "../lib/rag/candidate-documents.js";
 import { JOB_SEMANTIC_NAMESPACE, JOB_SEMANTIC_SOURCE_TYPE } from "../lib/rag/job-documents.js";
 
 const router = Router();
@@ -94,6 +99,25 @@ router.post("/index/jobs", async (req: Request, res: Response) => {
     }
     console.error("Semantic job indexing error:", error);
     res.status(500).json({ error: "Failed to index jobs for semantic search" });
+  }
+});
+
+router.post("/index/candidates", async (req: Request, res: Response) => {
+  try {
+    const payload = jobIndexSchema.parse(req.body ?? {});
+    const result = await indexOpenCandidates(payload.limit, payload.offset);
+    res.json({
+      namespace: CANDIDATE_SEMANTIC_NAMESPACE,
+      sourceType: CANDIDATE_SEMANTIC_SOURCE_TYPE,
+      ...result,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Invalid candidate indexing payload", issues: error.issues });
+      return;
+    }
+    console.error("Semantic candidate indexing error:", error);
+    res.status(500).json({ error: "Failed to index candidates for semantic search" });
   }
 });
 

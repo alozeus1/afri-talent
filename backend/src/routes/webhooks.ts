@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { BillingDiscrepancyType, BillingEventOutcome, Prisma, SubscriptionPlan } from "@prisma/client";
+import { BillingDiscrepancyType, BillingEventOutcome, BillingProvider, Prisma, SubscriptionPlan, SubscriptionStatus } from "@prisma/client";
 import { getStripe, getPlanFromPriceId, isStripeConfigured } from "../lib/stripe.js";
 import prisma from "../lib/prisma.js";
 import { updateStripeCountry } from "../lib/billing/region-resolver.js";
@@ -7,6 +7,7 @@ import { createUserNotification } from "../lib/notifications.js";
 import { redisClient } from "../lib/redis.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
 import { pushDeadLetter } from "../lib/ops/resilience.js";
+import { getFlutterwaveSecretHash, verifyFlutterwaveTransaction } from "../lib/flutterwave.js";
 import {
   mapStripeSubscriptionStatus,
   recordBillingEvent,
@@ -19,6 +20,26 @@ const router = Router();
 // Processed event IDs for idempotency (resets on restart; use Redis for production)
 const processedEvents = new Set<string>();
 const WEBHOOK_IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+function parseRawJsonBody(req: Request): Record<string, unknown> | null {
+  if (!req.body) {
+    return null;
+  }
+
+  if (Buffer.isBuffer(req.body)) {
+    try {
+      return JSON.parse(req.body.toString("utf8")) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  if (typeof req.body === "object") {
+    return req.body as Record<string, unknown>;
+  }
+
+  return null;
+}
 
 async function reserveEventId(eventId: string): Promise<boolean> {
   if (redisClient) {
@@ -50,6 +71,257 @@ async function reserveEventId(eventId: string): Promise<boolean> {
 
   return true;
 }
+
+async function activateFlutterwaveSubscription(input: {
+  userId: string;
+  plan: SubscriptionPlan;
+  txRef: string;
+  transactionId: number;
+  amountMinor: number;
+  currency: string;
+  billingRegion: "AFRICA" | "EUROPE" | "ROW" | null;
+  customerEmail?: string | null;
+  customerId?: string | null;
+  cardCountry?: string | null;
+  rawPayload: Prisma.InputJsonValue;
+}) {
+  const subscription = await prisma.subscription.upsert({
+    where: { userId: input.userId },
+    create: {
+      userId: input.userId,
+      plan: input.plan,
+      status: SubscriptionStatus.ACTIVE,
+      billingProvider: BillingProvider.FLUTTERWAVE,
+      providerCustomerId: input.customerId ?? undefined,
+      providerSubscriptionId: input.txRef,
+    },
+    update: {
+      plan: input.plan,
+      status: SubscriptionStatus.ACTIVE,
+      billingProvider: BillingProvider.FLUTTERWAVE,
+      ...(input.customerId && { providerCustomerId: input.customerId }),
+      providerSubscriptionId: input.txRef,
+    },
+  });
+
+  if (input.cardCountry) {
+    await prisma.userBillingProfile.upsert({
+      where: { userId: input.userId },
+      create: {
+        userId: input.userId,
+        country: input.cardCountry,
+        stripeCountry: input.cardCountry,
+        region: input.billingRegion ?? "AFRICA",
+        currency: input.currency.toUpperCase(),
+      },
+      update: {
+        country: input.cardCountry,
+        stripeCountry: input.cardCountry,
+        currency: input.currency.toUpperCase(),
+      },
+    });
+  }
+
+  await syncBillingEntitlementState(input.userId, "flutterwave_webhook_success");
+  await recordBillingEvent({
+    userId: input.userId,
+    subscriptionId: subscription.id,
+    source: "FLUTTERWAVE_WEBHOOK",
+    eventId: input.txRef,
+    eventType: "charge.completed",
+    outcome: BillingEventOutcome.PROCESSED,
+    plan: input.plan,
+    status: SubscriptionStatus.ACTIVE,
+    billingRegion: input.billingRegion,
+    currency: input.currency,
+    amountMinor: input.amountMinor,
+    reasonCode: "flutterwave_charge_success",
+    metadata: {
+      provider: BillingProvider.FLUTTERWAVE,
+      flutterwaveTransactionId: input.transactionId,
+      txRef: input.txRef,
+      customerEmail: input.customerEmail ?? null,
+      cardCountry: input.cardCountry ?? null,
+    },
+    rawPayload: input.rawPayload,
+    processedAt: new Date(),
+  });
+}
+
+// POST /api/webhooks/flutterwave
+router.post("/flutterwave", async (req: Request, res: Response) => {
+  const startedAt = Date.now();
+  const secretHash = getFlutterwaveSecretHash();
+  const signature = req.headers["verif-hash"];
+
+  if (secretHash && signature !== secretHash) {
+    res.status(401).json({ error: "Invalid Flutterwave signature" });
+    return;
+  }
+
+  const payload = parseRawJsonBody(req);
+  if (!payload) {
+    res.status(400).json({ error: "Invalid webhook payload" });
+    return;
+  }
+
+  const event = typeof payload.event === "string" ? payload.event : null;
+  const data = (payload.data ?? {}) as Record<string, unknown>;
+  const rawEventId = typeof data.tx_ref === "string"
+    ? data.tx_ref
+    : typeof data.id === "number"
+      ? String(data.id)
+      : null;
+
+  if (!rawEventId) {
+    res.status(202).json({ received: true, ignored: true });
+    return;
+  }
+
+  const reserved = await reserveEventId(`flutterwave:${rawEventId}`);
+  if (!reserved) {
+    res.json({ received: true, duplicate: true });
+    return;
+  }
+
+  try {
+    if (event === "charge.completed" && typeof data.id === "number") {
+      const verified = await verifyFlutterwaveTransaction(data.id);
+      const txRef = verified.tx_ref;
+      const checkoutEvent = txRef
+        ? await prisma.billingEventAudit.findFirst({
+            where: { eventId: txRef },
+            orderBy: { createdAt: "desc" },
+          })
+        : null;
+      const checkoutMetadata = (checkoutEvent?.metadata ?? {}) as Record<string, unknown>;
+      const customer = (data.customer ?? {}) as Record<string, unknown>;
+      const customerEmail = typeof customer.email === "string" ? customer.email : undefined;
+      const user = checkoutEvent?.userId
+        ? { id: checkoutEvent.userId }
+        : customerEmail
+          ? await prisma.user.findUnique({
+              where: { email: customerEmail },
+              select: { id: true },
+            })
+          : null;
+
+      if (!user?.id) {
+        await recordBillingEvent({
+          source: "FLUTTERWAVE_WEBHOOK",
+          eventId: txRef ?? String(data.id),
+          eventType: event,
+          outcome: BillingEventOutcome.FAILED,
+          reasonCode: "user_not_found",
+          rawPayload: payload as Prisma.InputJsonValue,
+          processedAt: new Date(),
+        }).catch(() => undefined);
+        res.status(202).json({ received: true, ignored: true });
+        return;
+      }
+
+      if (verified.status.toLowerCase() === "successful") {
+        const plan = (checkoutMetadata.plan as SubscriptionPlan | undefined)
+          ?? (await prisma.subscription.findUnique({
+            where: { userId: user.id },
+            select: { plan: true },
+          }))?.plan
+          ?? SubscriptionPlan.BASIC;
+
+        const card = (verified.card ?? {}) as Record<string, unknown>;
+        await activateFlutterwaveSubscription({
+          userId: user.id,
+          plan,
+          txRef,
+          transactionId: verified.id,
+          amountMinor: Math.round(verified.amount * 100),
+          currency: verified.currency,
+          billingRegion: (checkoutMetadata.billingRegion as "AFRICA" | "EUROPE" | "ROW" | null) ?? "AFRICA",
+          customerEmail,
+          customerId: verified.customer?.id ? String(verified.customer.id) : null,
+          cardCountry: typeof card.country === "string" ? card.country : null,
+          rawPayload: payload as Prisma.InputJsonValue,
+        });
+      } else {
+        const existingSubscription = await prisma.subscription.findUnique({
+          where: { userId: user.id },
+          select: { id: true },
+        });
+        await recordBillingEvent({
+          userId: user.id,
+          subscriptionId: existingSubscription?.id ?? null,
+          source: "FLUTTERWAVE_WEBHOOK",
+          eventId: txRef ?? String(data.id),
+          eventType: event,
+          outcome: BillingEventOutcome.FAILED,
+          status: SubscriptionStatus.PAST_DUE,
+          currency: verified.currency,
+          amountMinor: Math.round(verified.amount * 100),
+          reasonCode: "flutterwave_charge_failed",
+          rawPayload: payload as Prisma.InputJsonValue,
+          processedAt: new Date(),
+        });
+      }
+    }
+
+    if (event === "subscription.cancelled") {
+      const customer = (data.customer ?? {}) as Record<string, unknown>;
+      const email = typeof customer.email === "string" ? customer.email : null;
+      if (email) {
+        const user = await prisma.user.findUnique({
+          where: { email },
+          select: { id: true },
+        });
+
+        if (user?.id) {
+          const subscription = await prisma.subscription.update({
+            where: { userId: user.id },
+            data: {
+              status: SubscriptionStatus.CANCELLED,
+              billingProvider: BillingProvider.FLUTTERWAVE,
+            },
+          }).catch(() => null);
+
+          await syncBillingEntitlementState(user.id, "flutterwave_subscription_cancelled");
+          await recordBillingEvent({
+            userId: user.id,
+            subscriptionId: subscription?.id ?? null,
+            source: "FLUTTERWAVE_WEBHOOK",
+            eventId: rawEventId,
+            eventType: event,
+            outcome: BillingEventOutcome.PROCESSED,
+            status: SubscriptionStatus.CANCELLED,
+            reasonCode: "flutterwave_subscription_cancelled",
+            rawPayload: payload as Prisma.InputJsonValue,
+            processedAt: new Date(),
+          });
+        }
+      }
+    }
+
+    recordOpsEvent({
+      metricName: "billing_checkout_success",
+      category: "billing",
+      durationMs: Date.now() - startedAt,
+      details: {
+        provider: "flutterwave",
+        event,
+      },
+    });
+    res.status(200).json({ received: true });
+  } catch (error) {
+    await pushDeadLetter({
+      category: "webhook",
+      source: "flutterwave",
+      reasonCode: "flutterwave_webhook_processing_failed",
+      error,
+      payload,
+      retryable: true,
+    }).catch(() => undefined);
+
+    res.status(500).json({ error: "Webhook processing failed" });
+  }
+});
 
 // POST /api/webhooks/stripe
 // IMPORTANT: This route MUST be registered BEFORE express.json() in server.ts
@@ -160,12 +432,18 @@ router.post("/stripe", async (req: Request, res: Response) => {
             where: { userId },
             create: {
               userId,
+              billingProvider: BillingProvider.STRIPE,
+              providerCustomerId: session.customer,
+              providerSubscriptionId: session.subscription,
               stripeCustomerId: session.customer,
               stripeSubId: session.subscription,
               plan,
               status: "ACTIVE",
             },
             update: {
+              billingProvider: BillingProvider.STRIPE,
+              providerCustomerId: session.customer,
+              providerSubscriptionId: session.subscription,
               stripeCustomerId: session.customer,
               stripeSubId: session.subscription,
               plan,

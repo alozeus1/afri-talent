@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import logger from "../../logger.js";
 import { AFRICA_FRIENDLY_KEYWORDS } from "./types.js";
+import { buildJobIntelligenceUpdate, buildSourceFingerprint } from "../discovery.js";
 import { RemoteOKSource } from "./sources/remoteok.js";
 import { WeWorkRemotelySource } from "./sources/weworkremotely.js";
 import { AdzunaSource } from "./sources/adzuna.js";
@@ -10,6 +11,9 @@ import { JobbermanSource } from "./sources/jobberman.js";
 import { HimalayasSource } from "./sources/himalayas.js";
 import { ArbeitnowSource } from "./sources/arbeitnow.js";
 import { RemotiveSource } from "./sources/jobsincyprus.js";
+import { GreenhouseSource } from "./sources/greenhouse.js";
+import { LeverSource } from "./sources/lever.js";
+import { WorkableSource } from "./sources/workable.js";
 export class JobAggregator {
     sources = [];
     prisma;
@@ -30,6 +34,35 @@ export class JobAggregator {
         const adzunaApiKey = process.env.ADZUNA_API_KEY;
         if (adzunaAppId && adzunaApiKey) {
             this.sources.push(new AdzunaSource(adzunaAppId, adzunaApiKey));
+        }
+        const greenhouseBoards = (process.env.GREENHOUSE_BOARD_TOKENS || "")
+            .split(",")
+            .map((token) => token.trim())
+            .filter(Boolean);
+        if (greenhouseBoards.length > 0) {
+            this.sources.push(new GreenhouseSource(greenhouseBoards));
+        }
+        const leverSites = (process.env.LEVER_SITE_TOKENS || "")
+            .split(",")
+            .map((token) => token.trim())
+            .filter(Boolean);
+        if (leverSites.length > 0) {
+            this.sources.push(new LeverSource(leverSites));
+        }
+        const workableAccounts = (process.env.WORKABLE_COMPANY_TOKENS || "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean)
+            .map((entry) => {
+            const [account, token] = entry.split(":");
+            return {
+                account: account?.trim() || "",
+                token: token?.trim() || undefined,
+            };
+        })
+            .filter((item) => item.account.length > 0);
+        if (workableAccounts.length > 0) {
+            this.sources.push(new WorkableSource(workableAccounts));
         }
         logger.info({ sourceCount: this.sources.length }, "[aggregator] Initialized job sources");
     }
@@ -60,7 +93,7 @@ export class JobAggregator {
         const results = await this.aggregateJobs(query);
         const allJobs = results.flatMap((r) => r.jobs);
         // Deduplicate by externalId
-        const uniqueJobs = this.deduplicateJobs(allJobs);
+        const groupedJobs = this.groupDuplicateJobs(allJobs);
         let inserted = 0;
         let updated = 0;
         let skipped = 0;
@@ -72,9 +105,10 @@ export class JobAggregator {
             OTHER: 0,
         };
         const bySource = {};
-        for (const job of uniqueJobs) {
+        for (const group of groupedJobs) {
+            const job = group.canonical;
             try {
-                const result = await this.upsertJob(job);
+                const result = await this.upsertJob(job, group.variants);
                 if (result === "inserted")
                     inserted++;
                 else if (result === "updated")
@@ -89,9 +123,9 @@ export class JobAggregator {
                 skipped++;
             }
         }
-        logger.info({ total: uniqueJobs.length, inserted, updated, skipped }, "[aggregator] Sync completed");
+        logger.info({ total: groupedJobs.length, inserted, updated, skipped }, "[aggregator] Sync completed");
         return {
-            total: uniqueJobs.length,
+            total: groupedJobs.length,
             inserted,
             updated,
             skipped,
@@ -99,19 +133,32 @@ export class JobAggregator {
             bySource: bySource,
         };
     }
-    deduplicateJobs(jobs) {
+    groupDuplicateJobs(jobs) {
         const seen = new Map();
         for (const job of jobs) {
-            // Create composite key from title + company + location
-            const key = `${job.title.toLowerCase()}|${job.company.toLowerCase()}|${job.location.toLowerCase()}`;
+            const key = buildSourceFingerprint({
+                title: job.title,
+                description: job.description,
+                location: job.location,
+                sourceUrl: job.sourceUrl,
+                sourceId: job.externalId,
+                sourceName: job.company,
+                jobSource: job.source,
+            });
             if (!seen.has(key)) {
-                seen.set(key, job);
+                seen.set(key, {
+                    canonical: job,
+                    variants: [job],
+                });
             }
             else {
-                // Prefer jobs with more complete data
                 const existing = seen.get(key);
-                if (this.jobCompleteness(job) > this.jobCompleteness(existing)) {
-                    seen.set(key, job);
+                existing.variants.push(job);
+                // Prefer jobs with more complete data, then fresher postings.
+                if (this.jobCompleteness(job) > this.jobCompleteness(existing.canonical) ||
+                    (this.jobCompleteness(job) === this.jobCompleteness(existing.canonical) &&
+                        job.postedAt.getTime() > existing.canonical.postedAt.getTime())) {
+                    existing.canonical = job;
                 }
             }
         }
@@ -133,17 +180,53 @@ export class JobAggregator {
             score += 1;
         return score;
     }
-    async upsertJob(job) {
-        // Check if job already exists by sourceId
+    toJobDocument(job) {
+        return {
+            title: job.title,
+            description: job.description,
+            location: job.location,
+            type: job.jobType,
+            seniority: job.seniority,
+            tags: job.skills,
+            salaryMin: job.salary?.min ?? null,
+            salaryMax: job.salary?.max ?? null,
+            currency: job.salary?.currency ?? null,
+            visaSponsorship: job.visaSponsorship,
+            relocationAssistance: job.relocationAssistance,
+            eligibleCountries: job.eligibleCountries,
+            sourceUrl: job.sourceUrl,
+            sourceId: job.externalId,
+            sourceName: job.company,
+            jobSource: job.source,
+            applicationUrl: job.applicationUrl,
+            publishedAt: job.postedAt,
+            sourceFirstSeenAt: job.postedAt,
+            sourceLastSeenAt: new Date(),
+            expiresAt: job.expiresAt ?? null,
+            riskScore: 0,
+            riskLevel: "LOW",
+        };
+    }
+    async upsertJob(job, variants = [job]) {
+        const fingerprint = buildSourceFingerprint(this.toJobDocument(job));
         const existing = await this.prisma.job.findFirst({
             where: {
-                sourceId: job.externalId,
                 jobSource: "AGGREGATED",
+                OR: [
+                    { sourceId: job.externalId },
+                    { sourceFingerprint: fingerprint },
+                ],
             },
+            orderBy: [
+                { qualityScore: "desc" },
+                { publishedAt: "desc" },
+            ],
         });
         // Generate slug
         const baseSlug = this.generateSlug(job.title, job.company);
         const slug = existing?.slug || await this.ensureUniqueSlug(baseSlug);
+        const relatedJobs = variants.map((variant) => this.toJobDocument(variant));
+        const intelligence = buildJobIntelligenceUpdate(this.toJobDocument(job), existing?.sourceLineage, relatedJobs);
         const jobData = {
             title: job.title,
             slug,
@@ -167,6 +250,10 @@ export class JobAggregator {
             expiresAt: job.expiresAt || null,
             lastCheckedAt: new Date(),
             isExpired: false,
+            riskScore: 0,
+            riskLevel: "LOW",
+            qualityCheckedAt: new Date(),
+            ...intelligence,
         };
         if (existing) {
             await this.prisma.job.update({

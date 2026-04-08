@@ -41,6 +41,16 @@ Frontend:
 - Current shared non-prod deployment path is App Runner frontend/backend + RDS PostgreSQL.
 - If you add diagrams, place them in `docs/architecture/` and link them from `DEPLOYMENT.md`.
 
+## Current Project Status
+
+- As of April 7, 2026, the active shared staging stack is AWS App Runner + ECR + RDS PostgreSQL + S3 + Secrets Manager + Terraform.
+- `develop` remains the staging integration branch and the source for automatic shared staging deployments.
+- Shared staging is operational and the CloudWatch Synthetics canary failure in `deploy-apprunner.yml` has been repaired in commit `9fa48da`.
+- The most recent validation run should be checked in GitHub Actions and `STAGING_RUNBOOK.md` before assuming the latest App Runner rollout is fully complete.
+- Product direction is strongest around trust, employer workflow, ATS depth, and early AI-assisted candidate/recruiter flows.
+- Remaining high-priority pre-prod gaps are Stripe test credential setup, full Terraform reconciliation under the intended AWS path, and deploying plus validating the semantic retrieval layer at staging scale.
+- Public-facing descriptions of the project should stay high-level: share mission, stack, SDLC, DevOps discipline, and product direction, but avoid disclosing proprietary ranking logic, trust-scoring details, or unpublished roadmap specifics.
+
 ## Release Process
 
 - Provision or update infra with Terraform (`infra/terraform`), then capture outputs.

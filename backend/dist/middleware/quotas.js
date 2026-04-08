@@ -24,6 +24,11 @@ export async function checkDailyQuota(req, res, next) {
         next();
         return;
     }
+    const aiRunModel = prisma.aiRun;
+    if (!aiRunModel?.count) {
+        next();
+        return;
+    }
     try {
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
@@ -32,7 +37,7 @@ export async function checkDailyQuota(req, res, next) {
             job_match: AiRunType.JOB_MATCH,
             resume_review: AiRunType.RESUME_REVIEW,
         };
-        const count = await prisma.aiRun.count({
+        const count = await aiRunModel.count({
             where: {
                 userId,
                 runType: typeMap[run_type],

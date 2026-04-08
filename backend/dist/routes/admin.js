@@ -2,7 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import { JobStatus, ReviewStatus, ReviewTargetType, Role } from "@prisma/client";
+import { AbuseReportStatus, JobStatus, ReviewStatus, ReviewTargetType, Role, TrustCaseStatus, VerificationArtifactStatus } from "@prisma/client";
+import { getLastSyncTime } from "../workers/aggregator-cron.js";
+import { summarizeDeadLetters, getWorkerStates, listDeadLetters } from "../lib/ops/resilience.js";
+import { redisHealthStatus } from "../lib/redis.js";
 const router = Router();
 // All admin routes require authentication and ADMIN role
 router.use(authenticate, authorize(Role.ADMIN));
@@ -34,6 +37,85 @@ router.get("/stats", async (_req, res) => {
     }
     catch (error) {
         console.error("Stats error:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+// GET /api/admin/operations/overview - Platform operational state
+router.get("/operations/overview", async (_req, res) => {
+    try {
+        const [lastSyncAt, pendingJobs, verificationBacklog, trustCaseBacklog, abuseReportBacklog, fraudDetectionsLast24h, workerStates, deadLettersBySource, redisStatus,] = await Promise.all([
+            getLastSyncTime(),
+            prisma.job.count({ where: { status: JobStatus.PENDING_REVIEW } }),
+            prisma.verificationArtifact.count({
+                where: {
+                    status: {
+                        in: [VerificationArtifactStatus.PENDING, VerificationArtifactStatus.NEEDS_MORE_INFO],
+                    },
+                },
+            }),
+            prisma.trustCase.count({
+                where: {
+                    status: {
+                        in: [TrustCaseStatus.OPEN, TrustCaseStatus.IN_REVIEW],
+                    },
+                },
+            }),
+            prisma.abuseReport.count({
+                where: {
+                    status: {
+                        in: [AbuseReportStatus.OPEN, AbuseReportStatus.TRIAGED],
+                    },
+                },
+            }),
+            prisma.trustRiskEvent.count({
+                where: {
+                    createdAt: {
+                        gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
+                    },
+                },
+            }),
+            getWorkerStates(),
+            summarizeDeadLetters(),
+            redisHealthStatus(),
+        ]);
+        const minutesSinceLastSync = lastSyncAt
+            ? Math.max(0, Math.round((Date.now() - lastSyncAt.getTime()) / 60000))
+            : null;
+        res.json({
+            serviceHealth: {
+                redis: redisStatus,
+                database: "managed-via-health-endpoint",
+            },
+            ingestion: {
+                lastSyncAt,
+                minutesSinceLastSync,
+                stale: minutesSinceLastSync === null ? true : minutesSinceLastSync > 180,
+            },
+            backlogs: {
+                pendingJobs,
+                verificationBacklog,
+                trustCaseBacklog,
+                abuseReportBacklog,
+                deadLettersBySource,
+            },
+            fraudDetectionsLast24h,
+            workerStates,
+        });
+    }
+    catch (error) {
+        console.error("Operations overview error:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+// GET /api/admin/operations/dead-letters - Inspect recent operational dead letters
+router.get("/operations/dead-letters", async (req, res) => {
+    try {
+        const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "20"), 10) || 20, 1), 100);
+        const deadLetters = await listDeadLetters(limit);
+        res.json({ deadLetters });
+    }
+    catch (error) {
+        console.error("Dead letter listing error:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 });

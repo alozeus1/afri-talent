@@ -135,15 +135,18 @@ export function Header() {
         </div>
       )}
 
-      <header className="bg-white/95 dark:bg-gray-950/95 backdrop-blur border-b border-gray-200 dark:border-gray-800 sticky top-0 z-50">
-        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
+      <header className="sticky top-0 z-50 border-b border-[var(--border-soft)] bg-[rgba(244,239,229,0.72)] backdrop-blur-2xl dark:bg-[rgba(7,17,29,0.74)]">
+        <nav className="page-frame">
+          <div className="flex min-h-[72px] justify-between">
             <div className="flex items-center">
-              <Link href={href("/")} className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">A</span>
+              <Link href={href("/")} className="flex items-center space-x-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/40 bg-[linear-gradient(135deg,#19b99f,#0e6d5d)] shadow-[0_14px_40px_rgba(15,143,120,0.24)]">
+                  <span className="font-display text-lg font-bold text-white">A</span>
                 </div>
-                <span className="font-bold text-xl text-gray-900 dark:text-gray-100">AfriTalent</span>
+                <div className="flex flex-col">
+                  <span className="font-display text-xl font-bold text-gray-950 dark:text-white">AfriTalent</span>
+                  <span className="text-[11px] uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">Trust-first hiring</span>
+                </div>
               </Link>
             </div>
 
@@ -209,8 +212,8 @@ export function Header() {
               ) : user ? (
                 <div className="flex items-center space-x-4">
                   <Link href={href(getDashboardLink())}>
-                    <Button variant="ghost">{t("nav.dashboard")}</Button>
-                  </Link>
+                <Button variant="ghost">{t("nav.dashboard")}</Button>
+              </Link>
                   <div className="flex items-center space-x-3">
                     <span className="text-sm text-gray-600 dark:text-gray-300">{user.name}</span>
                     <Button variant="outline" size="sm" onClick={() => setShowLogoutConfirm(true)}>
@@ -236,7 +239,7 @@ export function Header() {
               <ThemeToggle />
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="inline-flex items-center justify-center p-2.5 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="inline-flex items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-[rgba(255,255,255,0.58)] p-2.5 text-gray-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] hover:text-gray-900 dark:bg-[rgba(255,255,255,0.06)] dark:text-gray-300 dark:hover:text-gray-100"
                 aria-label="Toggle menu"
                 aria-expanded={mobileMenuOpen}
                 aria-controls="mobile-menu-panel"
@@ -265,7 +268,7 @@ export function Header() {
           />
           <div
             id="mobile-menu-panel"
-            className="absolute right-0 top-0 h-full w-[85%] max-w-sm bg-white dark:bg-gray-950 border-l border-gray-200 dark:border-gray-800 shadow-2xl p-5 overflow-y-auto"
+            className="absolute right-0 top-0 h-full w-[85%] max-w-sm overflow-y-auto border-l border-[var(--border-soft)] bg-[rgba(255,255,255,0.88)] p-5 shadow-2xl backdrop-blur-2xl dark:bg-[rgba(7,17,29,0.9)]"
           >
             <div className="flex items-center justify-between mb-6">
               <p className="text-base font-semibold text-gray-900 dark:text-gray-100">Menu</p>

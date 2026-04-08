@@ -143,6 +143,12 @@ jobs:
           BACKEND_SENTRY_DSN: ${{ secrets.BACKEND_SENTRY_DSN }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_CATALOG_JSON: ${{ secrets.STRIPE_PRICE_CATALOG_JSON }}
+          FLUTTERWAVE_PUBLIC_KEY: ${{ secrets.FLUTTERWAVE_PUBLIC_KEY }}
+          FLUTTERWAVE_SECRET_KEY: ${{ secrets.FLUTTERWAVE_SECRET_KEY }}
+          FLUTTERWAVE_SECRET_HASH: ${{ secrets.FLUTTERWAVE_SECRET_HASH }}
+          FLUTTERWAVE_PLAN_CATALOG_JSON: ${{ secrets.FLUTTERWAVE_PLAN_CATALOG_JSON }}
+          FLUTTERWAVE_PAYMENT_OPTIONS: ${{ secrets.FLUTTERWAVE_PAYMENT_OPTIONS }}
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_API_KEY: ${{ secrets.ADZUNA_API_KEY }}
         run: |
@@ -158,6 +164,12 @@ jobs:
             --arg sentry "$BACKEND_SENTRY_DSN" \
             --arg stripe "$STRIPE_SECRET_KEY" \
             --arg stripeWebhook "$STRIPE_WEBHOOK_SECRET" \
+            --arg stripeCatalog "$STRIPE_PRICE_CATALOG_JSON" \
+            --arg flutterwavePublic "$FLUTTERWAVE_PUBLIC_KEY" \
+            --arg flutterwaveSecret "$FLUTTERWAVE_SECRET_KEY" \
+            --arg flutterwaveHash "$FLUTTERWAVE_SECRET_HASH" \
+            --arg flutterwaveCatalog "$FLUTTERWAVE_PLAN_CATALOG_JSON" \
+            --arg flutterwaveOptions "$FLUTTERWAVE_PAYMENT_OPTIONS" \
             --arg adzunaId "$ADZUNA_APP_ID" \
             --arg adzunaKey "$ADZUNA_API_KEY" \
             '
@@ -170,6 +182,12 @@ jobs:
               SENTRY_DSN: prefer_input($sentry; "SENTRY_DSN"),
               STRIPE_SECRET_KEY: prefer_input($stripe; "STRIPE_SECRET_KEY"),
               STRIPE_WEBHOOK_SECRET: prefer_input($stripeWebhook; "STRIPE_WEBHOOK_SECRET"),
+              STRIPE_PRICE_CATALOG_JSON: prefer_input($stripeCatalog; "STRIPE_PRICE_CATALOG_JSON"),
+              FLUTTERWAVE_PUBLIC_KEY: prefer_input($flutterwavePublic; "FLUTTERWAVE_PUBLIC_KEY"),
+              FLUTTERWAVE_SECRET_KEY: prefer_input($flutterwaveSecret; "FLUTTERWAVE_SECRET_KEY"),
+              FLUTTERWAVE_SECRET_HASH: prefer_input($flutterwaveHash; "FLUTTERWAVE_SECRET_HASH"),
+              FLUTTERWAVE_PLAN_CATALOG_JSON: prefer_input($flutterwaveCatalog; "FLUTTERWAVE_PLAN_CATALOG_JSON"),
+              FLUTTERWAVE_PAYMENT_OPTIONS: prefer_input($flutterwaveOptions; "FLUTTERWAVE_PAYMENT_OPTIONS"),
               ADZUNA_APP_ID: prefer_input($adzunaId; "ADZUNA_APP_ID"),
               ADZUNA_API_KEY: prefer_input($adzunaKey; "ADZUNA_API_KEY")
             }')

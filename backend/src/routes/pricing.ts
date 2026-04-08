@@ -12,6 +12,7 @@ import {
   isValidCountryCode,
   countryToRegion,
   REGION_DEFAULTS,
+  getDefaultCurrencyForCountry,
 } from "../lib/billing/index.js";
 import { RegionChangeSource, SubscriptionPlan } from "@prisma/client";
 
@@ -148,13 +149,15 @@ router.post("/billing-country", authenticate, async (req: Request, res: Response
         return;
       }
 
+      const defaultCurrency = getDefaultCurrencyForCountry(country) ?? regionConfig?.defaultCurrency;
+
       await prisma.userBillingProfile.update({
         where: { userId: req.user!.userId },
         data: {
           ...(taxIdType !== undefined && { taxIdType }),
           ...(taxIdValue !== undefined && { taxIdValue }),
           ...(currency && { currency: currency.toUpperCase() }),
-          ...(!currency && regionConfig && { currency: regionConfig.defaultCurrency }),
+          ...(!currency && defaultCurrency && { currency: defaultCurrency }),
         },
       });
     }
@@ -214,7 +217,11 @@ router.get("/payment-localization", async (_req: Request, res: Response) => {
           currencies: config.currencies,
           taxBehavior: config.taxBehavior,
           taxLabel: config.taxLabel,
-          paymentMethodsLive: Array.isArray(metadata.paymentMethodsLive) ? metadata.paymentMethodsLive : ["card"],
+          paymentMethodsLive: Array.isArray(metadata.paymentMethodsLive)
+            ? metadata.paymentMethodsLive
+            : config.region === "AFRICA"
+              ? ["flutterwave", "card"]
+              : ["stripe", "card", "google_pay"],
           paymentMethodsRoadmap: Array.isArray(metadata.paymentMethodsRoadmap)
             ? metadata.paymentMethodsRoadmap
             : [],
