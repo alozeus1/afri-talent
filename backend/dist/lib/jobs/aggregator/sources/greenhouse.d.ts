@@ -5,6 +5,7 @@ export declare class GreenhouseSource extends BaseJobSource {
     constructor(boardTokens: string[]);
     fetchJobs(query: JobQuery): Promise<AggregatorResult>;
     private matchesQuery;
+    private buildFilterStats;
     private transformJob;
 }
 //# sourceMappingURL=greenhouse.d.ts.map

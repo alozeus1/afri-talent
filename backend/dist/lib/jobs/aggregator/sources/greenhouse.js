@@ -19,6 +19,7 @@ export class GreenhouseSource extends BaseJobSource {
         const errors = [];
         for (const boardToken of this.boardTokens.slice(0, 20)) {
             try {
+                const startedAt = Date.now();
                 await this.rateLimit();
                 const response = await fetch(`${this.config.baseUrl}/${encodeURIComponent(boardToken)}/jobs?content=true`, {
                     headers: { Accept: "application/json", "User-Agent": "AfriTalent/1.0" },
@@ -28,13 +29,25 @@ export class GreenhouseSource extends BaseJobSource {
                     continue;
                 }
                 const payload = (await response.json());
-                const transformed = payload.jobs
-                    .map((job) => this.transformJob(job, boardToken))
-                    .filter((job) => this.matchesQuery(job, query));
-                jobs.push(...transformed);
+                const normalizedJobs = payload.jobs.map((job) => this.transformJob(job, boardToken));
+                const matchedJobs = normalizedJobs.filter((job) => this.matchesQuery(job, query));
+                const filterStats = this.buildFilterStats(normalizedJobs, query);
+                this.log("Board fetch complete", {
+                    boardToken,
+                    upstreamCount: payload.jobs.length,
+                    normalizedCount: normalizedJobs.length,
+                    matchedCount: matchedJobs.length,
+                    staleFiltered: filterStats.staleFiltered,
+                    remoteFiltered: filterStats.remoteFiltered,
+                    keywordFiltered: filterStats.keywordFiltered,
+                    sampleTitles: matchedJobs.slice(0, 3).map((job) => job.title),
+                    durationMs: Date.now() - startedAt,
+                });
+                jobs.push(...matchedJobs);
             }
             catch (error) {
                 errors.push(`${boardToken}: ${String(error)}`);
+                this.logError(`Failed to fetch board ${boardToken}`, error);
             }
         }
         return {
@@ -61,6 +74,37 @@ export class GreenhouseSource extends BaseJobSource {
                 return false;
         }
         return true;
+    }
+    buildFilterStats(jobs, query) {
+        let staleFiltered = 0;
+        let remoteFiltered = 0;
+        let keywordFiltered = 0;
+        for (const job of jobs) {
+            if (query.postedWithinDays) {
+                const cutoff = new Date();
+                cutoff.setDate(cutoff.getDate() - query.postedWithinDays);
+                if (job.postedAt < cutoff) {
+                    staleFiltered++;
+                    continue;
+                }
+            }
+            if (query.remote && job.locationType !== "remote") {
+                remoteFiltered++;
+                continue;
+            }
+            if (query.keywords.length > 0) {
+                const bag = `${job.title} ${job.description} ${job.skills.join(" ")}`.toLowerCase();
+                const match = query.keywords.some((keyword) => bag.includes(keyword.toLowerCase()));
+                if (!match) {
+                    keywordFiltered++;
+                }
+            }
+        }
+        return {
+            staleFiltered,
+            remoteFiltered,
+            keywordFiltered,
+        };
     }
     transformJob(job, boardToken) {
         const description = (job.content || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();

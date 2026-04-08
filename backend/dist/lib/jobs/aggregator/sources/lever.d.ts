@@ -5,6 +5,7 @@ export declare class LeverSource extends BaseJobSource {
     constructor(siteTokens: string[]);
     fetchJobs(query: JobQuery): Promise<AggregatorResult>;
     private matchesQuery;
+    private buildFilterStats;
     private transformJob;
 }
 //# sourceMappingURL=lever.d.ts.map
