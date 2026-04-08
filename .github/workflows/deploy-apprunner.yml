@@ -151,6 +151,11 @@ jobs:
           FLUTTERWAVE_PAYMENT_OPTIONS: ${{ secrets.FLUTTERWAVE_PAYMENT_OPTIONS }}
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_API_KEY: ${{ secrets.ADZUNA_API_KEY }}
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          APIFY_JOB_TASKS_JSON: ${{ secrets.APIFY_JOB_TASKS_JSON }}
+          GREENHOUSE_BOARD_TOKENS: ${{ secrets.GREENHOUSE_BOARD_TOKENS }}
+          LEVER_SITE_TOKENS: ${{ secrets.LEVER_SITE_TOKENS }}
+          WORKABLE_COMPANY_TOKENS: ${{ secrets.WORKABLE_COMPANY_TOKENS }}
         run: |
           CURRENT=$(aws secretsmanager get-secret-value \
             --secret-id "$SECRET_NAME" \
@@ -172,6 +177,11 @@ jobs:
             --arg flutterwaveOptions "$FLUTTERWAVE_PAYMENT_OPTIONS" \
             --arg adzunaId "$ADZUNA_APP_ID" \
             --arg adzunaKey "$ADZUNA_API_KEY" \
+            --arg apifyToken "$APIFY_TOKEN" \
+            --arg apifyTasks "$APIFY_JOB_TASKS_JSON" \
+            --arg greenhouseBoards "$GREENHOUSE_BOARD_TOKENS" \
+            --arg leverSites "$LEVER_SITE_TOKENS" \
+            --arg workableCompanies "$WORKABLE_COMPANY_TOKENS" \
             '
             def prefer_input($value; $key):
               if ($value | length) > 0 then $value else ($current[$key] // "") end;
@@ -189,7 +199,12 @@ jobs:
               FLUTTERWAVE_PLAN_CATALOG_JSON: prefer_input($flutterwaveCatalog; "FLUTTERWAVE_PLAN_CATALOG_JSON"),
               FLUTTERWAVE_PAYMENT_OPTIONS: prefer_input($flutterwaveOptions; "FLUTTERWAVE_PAYMENT_OPTIONS"),
               ADZUNA_APP_ID: prefer_input($adzunaId; "ADZUNA_APP_ID"),
-              ADZUNA_API_KEY: prefer_input($adzunaKey; "ADZUNA_API_KEY")
+              ADZUNA_API_KEY: prefer_input($adzunaKey; "ADZUNA_API_KEY"),
+              APIFY_TOKEN: prefer_input($apifyToken; "APIFY_TOKEN"),
+              APIFY_JOB_TASKS_JSON: prefer_input($apifyTasks; "APIFY_JOB_TASKS_JSON"),
+              GREENHOUSE_BOARD_TOKENS: prefer_input($greenhouseBoards; "GREENHOUSE_BOARD_TOKENS"),
+              LEVER_SITE_TOKENS: prefer_input($leverSites; "LEVER_SITE_TOKENS"),
+              WORKABLE_COMPANY_TOKENS: prefer_input($workableCompanies; "WORKABLE_COMPANY_TOKENS")
             }')
 
           aws secretsmanager put-secret-value \

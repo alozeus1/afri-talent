@@ -11,6 +11,7 @@ import { JobbermanSource } from "./sources/jobberman.js";
 import { HimalayasSource } from "./sources/himalayas.js";
 import { ArbeitnowSource } from "./sources/arbeitnow.js";
 import { RemotiveSource } from "./sources/jobsincyprus.js";
+import { ApifySource, parseApifyTaskConfigs } from "./sources/apify.js";
 import { GreenhouseSource } from "./sources/greenhouse.js";
 import { LeverSource } from "./sources/lever.js";
 import { WorkableSource } from "./sources/workable.js";
@@ -34,6 +35,11 @@ export class JobAggregator {
         const adzunaApiKey = process.env.ADZUNA_API_KEY;
         if (adzunaAppId && adzunaApiKey) {
             this.sources.push(new AdzunaSource(adzunaAppId, adzunaApiKey));
+        }
+        const apifyToken = process.env.APIFY_TOKEN?.trim();
+        const apifyTasks = parseApifyTaskConfigs(process.env.APIFY_JOB_TASKS_JSON);
+        if (apifyToken && apifyTasks.length > 0) {
+            this.sources.push(new ApifySource(apifyToken, apifyTasks));
         }
         const greenhouseBoards = (process.env.GREENHOUSE_BOARD_TOKENS || "")
             .split(",")
@@ -64,7 +70,15 @@ export class JobAggregator {
         if (workableAccounts.length > 0) {
             this.sources.push(new WorkableSource(workableAccounts));
         }
-        logger.info({ sourceCount: this.sources.length }, "[aggregator] Initialized job sources");
+        const apiBackedSources = this.sources.filter((source) => ["INDEED_EU", "APIFY", "GREENHOUSE", "LEVER", "WORKABLE"].includes(source.source));
+        logger.info({
+            sourceCount: this.sources.length,
+            enabledSources: this.sources.map((source) => source.source),
+            apiBackedSourceCount: apiBackedSources.length,
+        }, "[aggregator] Initialized job sources");
+        if (apiBackedSources.length === 0) {
+            logger.warn("[aggregator] No API-backed job sources are configured; staging will rely on fragile public scraping only");
+        }
     }
     async aggregateJobs(query) {
         const results = [];
@@ -124,6 +138,11 @@ export class JobAggregator {
             }
         }
         logger.info({ total: groupedJobs.length, inserted, updated, skipped }, "[aggregator] Sync completed");
+        if (groupedJobs.length === 0) {
+            logger.warn({
+                enabledSources: this.getEnabledSources(),
+            }, "[aggregator] Sync completed with zero jobs; verify source credentials and upstream availability");
+        }
         return {
             total: groupedJobs.length,
             inserted,

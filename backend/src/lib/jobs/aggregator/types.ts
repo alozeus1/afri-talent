@@ -66,6 +66,7 @@ export type JobSource =
   | "TURING"
   | "TOPTAL"
   | "ANDELA"
+  | "APIFY"
   | "GREENHOUSE"
   | "LEVER"
   | "WORKABLE"

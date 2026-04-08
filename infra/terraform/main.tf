@@ -90,6 +90,11 @@ module "secrets" {
   flutterwave_payment_options   = var.flutterwave_payment_options
   adzuna_app_id                 = var.adzuna_app_id
   adzuna_api_key                = var.adzuna_api_key
+  apify_token                   = var.apify_token
+  apify_job_tasks_json          = var.apify_job_tasks_json
+  greenhouse_board_tokens       = var.greenhouse_board_tokens
+  lever_site_tokens             = var.lever_site_tokens
+  workable_company_tokens       = var.workable_company_tokens
   redis_url                     = var.redis_url
   sentry_dsn                    = var.sentry_dsn
 }
@@ -176,6 +181,11 @@ module "apprunner" {
     "FLUTTERWAVE_PAYMENT_OPTIONS",
     "ADZUNA_APP_ID",
     "ADZUNA_API_KEY",
+    "APIFY_TOKEN",
+    "APIFY_JOB_TASKS_JSON",
+    "GREENHOUSE_BOARD_TOKENS",
+    "LEVER_SITE_TOKENS",
+    "WORKABLE_COMPANY_TOKENS",
     "REDIS_URL",
     "SENTRY_DSN"
   ]

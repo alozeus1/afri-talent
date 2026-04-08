@@ -20,6 +20,11 @@ resource "aws_secretsmanager_secret_version" "app" {
     FLUTTERWAVE_PAYMENT_OPTIONS   = var.flutterwave_payment_options
     ADZUNA_APP_ID                 = var.adzuna_app_id
     ADZUNA_API_KEY                = var.adzuna_api_key
+    APIFY_TOKEN                   = var.apify_token
+    APIFY_JOB_TASKS_JSON          = var.apify_job_tasks_json
+    GREENHOUSE_BOARD_TOKENS       = var.greenhouse_board_tokens
+    LEVER_SITE_TOKENS             = var.lever_site_tokens
+    WORKABLE_COMPANY_TOKENS       = var.workable_company_tokens
     REDIS_URL                     = var.redis_url
     SENTRY_DSN                    = var.sentry_dsn
   })

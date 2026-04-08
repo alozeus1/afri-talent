@@ -110,6 +110,39 @@ variable "adzuna_api_key" {
   default     = ""
 }
 
+variable "apify_token" {
+  type        = string
+  description = "Apify API token for job task execution"
+  sensitive   = true
+  default     = ""
+}
+
+variable "apify_job_tasks_json" {
+  type        = string
+  description = "Apify task configuration JSON for job crawling"
+  sensitive   = true
+  default     = ""
+}
+
+variable "greenhouse_board_tokens" {
+  type        = string
+  description = "Comma-separated Greenhouse board tokens"
+  default     = ""
+}
+
+variable "lever_site_tokens" {
+  type        = string
+  description = "Comma-separated Lever site tokens"
+  default     = ""
+}
+
+variable "workable_company_tokens" {
+  type        = string
+  description = "Comma-separated Workable account slugs or account:token pairs"
+  sensitive   = true
+  default     = ""
+}
+
 variable "redis_url" {
   type        = string
   description = "Optional Redis connection string"
