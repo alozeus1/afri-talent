@@ -230,7 +230,7 @@ function readLocation(item, task) {
 function readCountry(item, location, fallback) {
     const country = firstNonEmptyString(item, ["country", "countryCode", "country_name"]);
     if (country)
-        return country.toUpperCase();
+        return normalizeCountry(country);
     if (/nigeria/i.test(location))
         return "NG";
     if (/kenya/i.test(location))
@@ -241,7 +241,7 @@ function readCountry(item, location, fallback) {
         return "ZA";
     if (/remote|global|worldwide|anywhere/i.test(location))
         return "GLOBAL";
-    return (fallback || "GLOBAL").toUpperCase();
+    return normalizeCountry(fallback || "GLOBAL");
 }
 function detectLocationType(item, location, fallback) {
     const explicit = firstNonEmptyString(item, ["locationType", "workplaceType", "workType"]);
@@ -320,13 +320,19 @@ function readDate(item, keys) {
     for (const key of keys) {
         const value = item[key];
         if (typeof value === "number" && Number.isFinite(value)) {
-            const date = new Date(value);
+            const timestamp = value < 10_000_000_000 ? value * 1000 : value;
+            const date = new Date(timestamp);
             if (!Number.isNaN(date.getTime()))
                 return date;
         }
         if (typeof value === "string" && value.trim()) {
             const numeric = Number(value);
-            const date = Number.isFinite(numeric) && value.trim().length >= 10 ? new Date(numeric) : new Date(value);
+            const timestamp = Number.isFinite(numeric)
+                ? numeric < 10_000_000_000
+                    ? numeric * 1000
+                    : numeric
+                : null;
+            const date = timestamp !== null ? new Date(timestamp) : new Date(value);
             if (!Number.isNaN(date.getTime()))
                 return date;
         }
@@ -359,7 +365,9 @@ function normalizeJobType(value) {
     const normalized = (value || "").toLowerCase();
     if (normalized.includes("part"))
         return "Part-time";
-    if (normalized.includes("contract") || normalized.includes("freelance"))
+    if (normalized.includes("freelance"))
+        return "Freelance";
+    if (normalized.includes("contract"))
         return "Contract";
     if (normalized.includes("intern"))
         return "Internship";
@@ -411,5 +419,28 @@ function toLocationType(value) {
         return null;
     const normalized = value.trim().toLowerCase();
     return ["remote", "hybrid", "onsite"].includes(normalized) ? normalized : null;
+}
+function normalizeCountry(value) {
+    const normalized = value.trim().toLowerCase();
+    const aliases = {
+        nigeria: "NG",
+        kenya: "KE",
+        ghana: "GH",
+        "south africa": "ZA",
+        egypt: "EG",
+        "united states": "US",
+        usa: "US",
+        canada: "CA",
+        "united kingdom": "GB",
+        uk: "GB",
+        germany: "DE",
+        france: "FR",
+        netherlands: "NL",
+        portugal: "PT",
+        ireland: "IE",
+        global: "GLOBAL",
+        remote: "GLOBAL",
+    };
+    return aliases[normalized] || value.trim().toUpperCase();
 }
 //# sourceMappingURL=apify.js.map

@@ -35,25 +35,19 @@ export class JobAggregator {
   }
 
   private initializeSources(): void {
-    // Always-on free sources (no API key required)
-    this.sources.push(new RemoteOKSource());
-    this.sources.push(new WeWorkRemotelySource());
-    this.sources.push(new JobbermanSource());
-    this.sources.push(new HimalayasSource());
-    this.sources.push(new ArbeitnowSource());
-    this.sources.push(new RemotiveSource());
+    const apiBackedSources: BaseJobSource[] = [];
 
     // API-based sources (require keys)
     const adzunaAppId = process.env.ADZUNA_APP_ID;
     const adzunaApiKey = process.env.ADZUNA_API_KEY;
     if (adzunaAppId && adzunaApiKey) {
-      this.sources.push(new AdzunaSource(adzunaAppId, adzunaApiKey));
+      apiBackedSources.push(new AdzunaSource(adzunaAppId, adzunaApiKey));
     }
 
     const apifyToken = process.env.APIFY_TOKEN?.trim();
     const apifyTasks = parseApifyTaskConfigs(process.env.APIFY_JOB_TASKS_JSON);
     if (apifyToken && apifyTasks.length > 0) {
-      this.sources.push(new ApifySource(apifyToken, apifyTasks));
+      apiBackedSources.push(new ApifySource(apifyToken, apifyTasks));
     }
 
     const greenhouseBoards = (process.env.GREENHOUSE_BOARD_TOKENS || "")
@@ -61,7 +55,7 @@ export class JobAggregator {
       .map((token) => token.trim())
       .filter(Boolean);
     if (greenhouseBoards.length > 0) {
-      this.sources.push(new GreenhouseSource(greenhouseBoards));
+      apiBackedSources.push(new GreenhouseSource(greenhouseBoards));
     }
 
     const leverSites = (process.env.LEVER_SITE_TOKENS || "")
@@ -69,7 +63,7 @@ export class JobAggregator {
       .map((token) => token.trim())
       .filter(Boolean);
     if (leverSites.length > 0) {
-      this.sources.push(new LeverSource(leverSites));
+      apiBackedSources.push(new LeverSource(leverSites));
     }
 
     const workableAccounts = (process.env.WORKABLE_COMPANY_TOKENS || "")
@@ -86,18 +80,29 @@ export class JobAggregator {
       .filter((item) => item.account.length > 0);
 
     if (workableAccounts.length > 0) {
-      this.sources.push(new WorkableSource(workableAccounts));
+      apiBackedSources.push(new WorkableSource(workableAccounts));
     }
 
-    const apiBackedSources = this.sources.filter((source) =>
-      ["INDEED_EU", "APIFY", "GREENHOUSE", "LEVER", "WORKABLE"].includes(source.source),
-    );
+    const preferApiOnly = apiBackedSources.length > 0 && process.env.AGGREGATOR_INCLUDE_SCRAPED_SOURCES !== "1";
+    if (preferApiOnly) {
+      this.sources.push(...apiBackedSources);
+    } else {
+      // Always-on free sources (no API key required)
+      this.sources.push(new RemoteOKSource());
+      this.sources.push(new WeWorkRemotelySource());
+      this.sources.push(new JobbermanSource());
+      this.sources.push(new HimalayasSource());
+      this.sources.push(new ArbeitnowSource());
+      this.sources.push(new RemotiveSource());
+      this.sources.push(...apiBackedSources);
+    }
 
     logger.info(
       {
         sourceCount: this.sources.length,
         enabledSources: this.sources.map((source) => source.source),
         apiBackedSourceCount: apiBackedSources.length,
+        preferApiOnly,
       },
       "[aggregator] Initialized job sources",
     );
