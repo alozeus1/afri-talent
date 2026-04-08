@@ -4,6 +4,11 @@ interface FetchOptions extends RequestInit {
   token?: string;
 }
 
+interface AuthSessionResponse {
+  authenticated: boolean;
+  user: User | null;
+}
+
 async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { token, ...fetchOptions } = options;
 
@@ -71,8 +76,10 @@ export const auth = {
       body: JSON.stringify(data),
     }),
 
-  me: (token?: string) =>
-    fetchAPI<User>("/api/auth/me", { token }),
+  me: async (token?: string) => {
+    const session = await fetchAPI<AuthSessionResponse>("/api/auth/me", { token });
+    return session.user;
+  },
 
   logout: () =>
     fetchAPI<{ message: string }>("/api/auth/logout", { method: "POST" }),

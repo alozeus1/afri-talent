@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { signToken, getTokenExpiresIn } from "../lib/jwt.js";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, optionalAuth } from "../middleware/auth.js";
 import { authLimiter, registerLimiter } from "../middleware/security.js";
 import { blockToken } from "../lib/redis.js";
 import { Role } from "@prisma/client";
@@ -379,8 +379,16 @@ router.post("/logout", authenticate, async (req: Request, res: Response) => {
 });
 
 // GET /api/auth/me
-router.get("/me", authenticate, async (req: Request, res: Response) => {
+router.get("/me", optionalAuth, async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      res.json({
+        authenticated: false,
+        user: null,
+      });
+      return;
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
       include: { employer: true },
@@ -392,13 +400,16 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
     }
 
     res.json({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      emailVerified: user.emailVerified,
-      avatarUrl: user.avatarUrl,
-      employer: user.employer,
+      authenticated: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        emailVerified: user.emailVerified,
+        avatarUrl: user.avatarUrl,
+        employer: user.employer,
+      },
     });
   } catch (error) {
     console.error("Me error:", error);
