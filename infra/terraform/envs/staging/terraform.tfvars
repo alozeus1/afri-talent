@@ -3,9 +3,9 @@ project_name = "afritalent"
 environment  = "staging"
 aws_region   = "us-east-1"
 
-# App Runner backend needs private RDS access and outbound internet for third-party APIs.
+# App Runner backend needs private RDS access and reliable outbound internet for third-party APIs.
 enable_nat_gateway         = true
-nat_strategy               = "instance"
+nat_strategy               = "gateway"
 enable_interface_endpoints = true
 vpc_cidr                   = "10.21.0.0/16"
 public_subnet_cidrs        = ["10.21.0.0/24", "10.21.1.0/24"]

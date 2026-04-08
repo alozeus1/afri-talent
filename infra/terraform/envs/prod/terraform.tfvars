@@ -3,9 +3,9 @@ project_name = "afritalent"
 environment  = "prod"
 aws_region   = "us-east-1"
 
-# Production requires both private RDS connectivity and outbound internet egress.
+# Production requires both private RDS connectivity and reliable outbound internet egress.
 enable_nat_gateway         = true
-nat_strategy               = "instance"
+nat_strategy               = "gateway"
 enable_interface_endpoints = true
 vpc_cidr                   = "10.22.0.0/16"
 public_subnet_cidrs        = ["10.22.0.0/24", "10.22.1.0/24"]

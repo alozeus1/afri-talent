@@ -17,7 +17,7 @@ resource "random_password" "jwt" {
   special = true
 }
 
-# ── Network (simplified - no NAT gateway needed for App Runner) ──────────────
+# ── Network (App Runner backend still needs working NAT for public job APIs) ─
 
 module "network" {
   source                     = "./modules/network"
