@@ -659,6 +659,9 @@ model User {
   trustCaseActions              TrustCaseAction[]          @relation("TrustCaseActionActor")
   talentPoolMemberships         EmployerTalentPoolCandidate[] @relation("TalentPoolCandidateUser")
   talentPoolCandidatesAdded     EmployerTalentPoolCandidate[] @relation("TalentPoolCandidateAdder")
+  candidateAutopilotProfile     CandidateAutopilotProfile?
+  candidateResumeVersions       CandidateResumeVersion[]
+  candidateAgentTasks           CandidateAgentTask[]
 
   @@index([role])
   @@index([createdAt])
@@ -798,6 +801,8 @@ model Job {
   trustRiskEvents           TrustRiskEvent[]
   abuseReports              AbuseReport[]
   trustCases                TrustCase[]
+  resumeVersions            CandidateResumeVersion[]
+  candidateAgentTasks       CandidateAgentTask[]
 
   @@index([status])
   @@index([status, publishedAt(sort: Desc)])
@@ -841,6 +846,7 @@ model Application {
   abuseReports    AbuseReport[]
   trustCases      TrustCase[]
   atsLink         ATSApplicationLink?
+  candidateAgentTasks CandidateAgentTask[]
 
   @@unique([jobId, candidateId])
   @@index([jobId])
@@ -920,6 +926,7 @@ model CandidateProfile {
   updatedAt           DateTime @updatedAt
 
   resumes Resume[]
+  resumeVersions CandidateResumeVersion[]
 
   @@index([userId])
   @@index([openToWork])
@@ -1152,6 +1159,140 @@ model Resume {
 
   @@index([profileId])
   @@index([profileId, isActive])
+}
+
+enum CandidateAutomationLevel {
+  ASSISTED
+  AUTONOMOUS
+}
+
+enum CandidateAgentTaskType {
+  RESUME_REFRESH
+  APPLY_PACK
+  FOLLOW_UP
+  INTERVIEW_PREP
+  SCHEDULING
+}
+
+enum CandidateAgentTaskStatus {
+  QUEUED
+  RUNNING
+  READY
+  NEEDS_REVIEW
+  SENT
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum ResumeVersionSource {
+  PROFILE_SYNTHESIS
+  AI_TAILOR
+  USER_UPLOAD
+}
+
+enum ResumeVersionStatus {
+  DRAFT
+  READY
+  NEEDS_REVIEW
+  ARCHIVED
+}
+
+model CandidateAutopilotProfile {
+  id                   String                   @id @default(uuid())
+  userId               String                   @unique
+  user                 User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled              Boolean                  @default(false)
+  automationLevel      CandidateAutomationLevel @default(ASSISTED)
+  minimumMatchScore    Int                      @default(78)
+  resumeBuilderEnabled Boolean                  @default(true)
+  autoApplyEnabled     Boolean                  @default(false)
+  followUpEnabled      Boolean                  @default(true)
+  interviewPrepEnabled Boolean                  @default(true)
+  schedulingEnabled    Boolean                  @default(true)
+  preferredTone        String?                  @db.VarChar(40)
+  followUpCadenceDays  Int[]
+  availabilityWindows  Json?
+  targetCompensation   Json?
+  searchStrategy       Json?
+  metadata             Json?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  resumeVersions CandidateResumeVersion[]
+  agentTasks     CandidateAgentTask[]
+
+  @@index([enabled, updatedAt(sort: Desc)])
+}
+
+model CandidateResumeVersion {
+  id                 String              @id @default(uuid())
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  autopilotProfileId String?
+  autopilotProfile   CandidateAutopilotProfile? @relation(fields: [autopilotProfileId], references: [id], onDelete: SetNull)
+  profileId          String?
+  profile            CandidateProfile?   @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  jobId              String?
+  job                Job?                @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  aiRunId            String?
+  aiRun              AiRun?              @relation(fields: [aiRunId], references: [id], onDelete: SetNull)
+  source             ResumeVersionSource
+  status             ResumeVersionStatus @default(READY)
+  title              String              @db.VarChar(160)
+  targetRole         String?             @db.VarChar(120)
+  summary            String?             @db.Text
+  content            Json
+  plainText          String              @db.Text
+  keywords           String[]
+  score              Int?
+  notes              String[]
+  isPrimary          Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  agentTasks CandidateAgentTask[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, isPrimary, updatedAt(sort: Desc)])
+  @@index([jobId, createdAt(sort: Desc)])
+  @@index([status, updatedAt(sort: Desc)])
+}
+
+model CandidateAgentTask {
+  id                 String                   @id @default(uuid())
+  userId             String
+  user               User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  autopilotProfileId String?
+  autopilotProfile   CandidateAutopilotProfile? @relation(fields: [autopilotProfileId], references: [id], onDelete: SetNull)
+  applicationId      String?
+  application        Application?             @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  jobId              String?
+  job                Job?                     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  aiRunId            String?
+  aiRun              AiRun?                   @relation(fields: [aiRunId], references: [id], onDelete: SetNull)
+  resumeVersionId    String?
+  resumeVersion      CandidateResumeVersion?  @relation(fields: [resumeVersionId], references: [id], onDelete: SetNull)
+  type               CandidateAgentTaskType
+  status             CandidateAgentTaskStatus @default(QUEUED)
+  priority           Int                      @default(50)
+  title              String                   @db.VarChar(180)
+  summary            String?                  @db.Text
+  inputSnapshot      Json?
+  outputSummary      Json?
+  outputPayload      Json?
+  reviewNotes        String?                  @db.Text
+  scheduledFor       DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  lastError          String?                  @db.VarChar(500)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@index([userId, status, scheduledFor])
+  @@index([applicationId, type, createdAt(sort: Desc)])
+  @@index([jobId, type, createdAt(sort: Desc)])
+  @@index([resumeVersionId, createdAt(sort: Desc)])
 }
 
 model Company {
@@ -1929,7 +2070,9 @@ model AiRun {
   createdAt        DateTime    @default(now())
   completedAt      DateTime?
 
-  jobs AiRunJob[]
+  jobs           AiRunJob[]
+  resumeVersions CandidateResumeVersion[]
+  agentTasks     CandidateAgentTask[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([runId])

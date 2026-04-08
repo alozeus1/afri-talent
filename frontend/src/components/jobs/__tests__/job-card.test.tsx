@@ -50,6 +50,11 @@ const job: Job = {
     visaClear: true,
     relocationClear: true,
     validApplicationPath: true,
+    verifiedApplyPath: true,
+    trustedSource: true,
+    applyPathType: "ATS",
+    sourceVerification: "ATS_PRIMARY",
+    deliveryModel: "EXTERNAL_ATS",
     sourceCount: 2,
     sourceNames: ["Greenhouse", "RemoteOK"],
     lastSeenAt: "2026-01-02T00:00:00.000Z",
@@ -99,6 +104,8 @@ describe("JobCard", () => {
     expect(screen.getByText("Trusted job")).toBeInTheDocument();
     expect(screen.getByText("Cross-checked x2")).toBeInTheDocument();
     expect(screen.getByText("Salary disclosed")).toBeInTheDocument();
+    expect(screen.getByText("Verified ATS path")).toBeInTheDocument();
+    expect(screen.getByText("Direct ATS apply")).toBeInTheDocument();
     expect(screen.getByText(/Recently refreshed job listing/i)).toBeInTheDocument();
   });
 });

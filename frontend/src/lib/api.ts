@@ -980,6 +980,11 @@ export interface JobDiscoverySummary {
   visaClear: boolean;
   relocationClear: boolean;
   validApplicationPath: boolean;
+  verifiedApplyPath: boolean;
+  trustedSource: boolean;
+  applyPathType: "DIRECT" | "ATS" | "BOARD" | "UNKNOWN";
+  sourceVerification: "DIRECT_EMPLOYER" | "ATS_PRIMARY" | "AGGREGATOR_VERIFIED" | "SCRAPED" | "UNKNOWN";
+  deliveryModel: "ON_PLATFORM" | "EXTERNAL_ATS" | "EXTERNAL_BOARD" | "UNKNOWN";
   sourceCount: number;
   sourceNames: string[];
   lastSeenAt: string | null;
@@ -1230,6 +1235,7 @@ export interface Job {
   jobSource?: "EMPLOYER_POSTED" | "AGGREGATED";
   sourceName?: string;
   sourceUrl?: string;
+  applicationUrl?: string | null;
   isExpired?: boolean;
   expiresAt?: string | null;
   status: string;

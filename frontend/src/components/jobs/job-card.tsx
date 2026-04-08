@@ -30,6 +30,8 @@ export function JobCard({ job }: JobCardProps) {
     job.trust?.companyReviewed ? "Company reviewed" : null,
     job.trust?.jobQualityChecked ? "Job quality checked" : null,
     job.discovery?.salaryTransparent ? "Salary disclosed" : null,
+    job.discovery?.sourceVerification === "ATS_PRIMARY" ? "Primary ATS source" : null,
+    job.discovery?.sourceVerification === "DIRECT_EMPLOYER" ? "Direct employer posting" : null,
     job.discovery?.sourceCount && job.discovery.sourceCount > 1
       ? `Cross-checked across ${job.discovery.sourceCount} sources`
       : null,
@@ -80,6 +82,12 @@ export function JobCard({ job }: JobCardProps) {
                 {job.discovery?.trustedJob && (
                   <TrustBadge label="Trusted job" variant="success" />
                 )}
+                {job.discovery?.sourceVerification === "DIRECT_EMPLOYER" && (
+                  <TrustBadge label="Direct employer source" variant="success" />
+                )}
+                {job.discovery?.sourceVerification === "ATS_PRIMARY" && (
+                  <TrustBadge label="Verified ATS path" variant="info" />
+                )}
                 {job.discovery?.sourceCount && job.discovery.sourceCount > 1 && (
                   <TrustBadge label={`Cross-checked x${job.discovery.sourceCount}`} variant="info" />
                 )}
@@ -118,6 +126,16 @@ export function JobCard({ job }: JobCardProps) {
               {job.discovery.salaryTransparent && (
                 <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                   Salary disclosed
+                </span>
+              )}
+              {job.discovery.verifiedApplyPath && job.discovery.applyPathType === "ATS" && (
+                <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-900/30 dark:text-indigo-300">
+                  Direct ATS apply
+                </span>
+              )}
+              {job.discovery.deliveryModel === "ON_PLATFORM" && (
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/30 dark:text-emerald-300">
+                  Apply on AfriTalent
                 </span>
               )}
               {job.discovery.visaClear && job.visaSponsorship === "YES" && (

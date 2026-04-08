@@ -29,6 +29,8 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
   const [applied, setApplied] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [quickApplyOpen, setQuickApplyOpen] = useState(false);
+  const isOnPlatformApply = job.discovery?.deliveryModel === "ON_PLATFORM" || job.jobSource === "EMPLOYER_POSTED";
+  const externalApplyUrl = job.applicationUrl || job.sourceUrl || null;
 
   const handleApply = async () => {
     if (!online) {
@@ -43,6 +45,19 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
 
     if (user.role !== "CANDIDATE") {
       setApplyError("Only candidates can apply to jobs");
+      return;
+    }
+
+    setApplyError(null);
+
+    if (!isOnPlatformApply) {
+      if (!externalApplyUrl) {
+        setApplyError("This role does not have a verified application link yet.");
+        return;
+      }
+
+      window.open(externalApplyUrl, "_blank", "noopener,noreferrer");
+      setApplied(true);
       return;
     }
 
@@ -68,7 +83,9 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
           <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4">
             <p className="text-sm font-semibold text-blue-900">Stay safe while applying</p>
             <p className="mt-2 text-sm text-blue-900">
-              Keep interviews and file sharing on AfriTalent when possible, and never pay application or processing fees.
+              {isOnPlatformApply
+                ? "Keep interviews and file sharing on AfriTalent when possible, and never pay application or processing fees."
+                : "This role continues on the employer or ATS site. Only trust application links we have verified, and never pay application or processing fees."}
             </p>
             <Link
               href={`/trust/report?targetJobId=${job.id}`}
@@ -92,7 +109,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
 
           {applied ? (
             <div className="bg-emerald-50 text-emerald-700 p-4 rounded-lg mb-4">
-              Application submitted successfully!
+              {isOnPlatformApply ? "Application submitted successfully!" : "Employer application page opened successfully."}
             </div>
           ) : user && user.role === "EMPLOYER" ? (
             <div className="bg-blue-50 text-blue-700 p-4 rounded-lg mb-4 text-sm">
@@ -113,14 +130,27 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
               )}
               {!user && (
                 <div className="mb-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-700">
-                  Sign in to apply and track your application from your candidate dashboard.
+                  {isOnPlatformApply
+                    ? "Sign in to apply and track your application from your candidate dashboard."
+                    : "Sign in to save this role and continue to the verified employer application page."}
+                </div>
+              )}
+              {!isOnPlatformApply && (
+                <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
+                  AfriTalent verified this as an external application path. You will continue on the employer or ATS site to complete the application.
                 </div>
               )}
               <div className="space-y-3">
                 <Button className="w-full" size="lg" onClick={handleApply} disabled={applying || !online}>
-                  {applying ? "Applying..." : applied ? "Applied" : "Apply Now"}
+                  {applying
+                    ? "Applying..."
+                    : applied
+                      ? "Applied"
+                      : isOnPlatformApply
+                        ? "Apply Now"
+                        : "Continue to Employer Site"}
                 </Button>
-                {user?.role === "CANDIDATE" && (
+                {user?.role === "CANDIDATE" && isOnPlatformApply && (
                   <Button
                     variant="outline"
                     className="w-full"
@@ -137,8 +167,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
       </Card>
 
       <QuickApplyModal
-        jobId={job.id}
-        jobTitle={job.title}
+        job={job}
         isOpen={quickApplyOpen}
         onClose={() => setQuickApplyOpen(false)}
         onSuccess={() => {
