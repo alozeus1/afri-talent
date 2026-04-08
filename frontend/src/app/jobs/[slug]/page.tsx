@@ -33,7 +33,7 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
         </div>
         <div className="flex flex-wrap gap-3">
           <RetryButton />
-          <Link href="/jobs">
+          <Link href="..">
             <Button variant="outline">Back to jobs</Button>
           </Link>
         </div>
@@ -100,7 +100,7 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
     <>
       <JobJsonLd job={job} />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link href="/jobs" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
+        <Link href=".." className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
           <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>

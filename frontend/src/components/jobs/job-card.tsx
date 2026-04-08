@@ -5,6 +5,7 @@ import { Job } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrustBadge } from "@/components/trust/trust-badge";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 import { formatSalaryRange } from "@/lib/salary";
 import { jobDiscoveryEvents } from "@/lib/analytics";
 
@@ -13,6 +14,7 @@ interface JobCardProps {
 }
 
 export function JobCard({ job }: JobCardProps) {
+  const locale = useLocale();
   const tags = Array.isArray(job.tags) ? job.tags : [];
   const salary = formatSalaryRange({
     salaryMin: job.salaryMin,
@@ -39,7 +41,8 @@ export function JobCard({ job }: JobCardProps) {
 
   return (
     <Link
-      href={`/jobs/${job.slug}`}
+      href={localizePath(`/jobs/${job.slug}`, locale)}
+      className="group block h-full"
       prefetch={false}
       onClick={() => {
         jobDiscoveryEvents.resultClicked({
@@ -52,8 +55,8 @@ export function JobCard({ job }: JobCardProps) {
         });
       }}
     >
-      <Card className="h-full cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_28px_72px_rgba(15,23,32,0.12)]">
-        <CardContent className="p-6">
+      <Card className="isolate h-full cursor-pointer transition-all duration-200 group-hover:-translate-y-1 group-hover:shadow-[0_28px_72px_rgba(15,23,32,0.12)]">
+        <CardContent className="relative z-10 flex h-full flex-col p-6">
           <div className="flex justify-between items-start mb-3">
             <div className="flex-1">
               <h3 className="font-display text-lg font-bold text-gray-900 dark:text-gray-100 mb-1 line-clamp-2">
@@ -187,6 +190,8 @@ export function JobCard({ job }: JobCardProps) {
               )}
             </div>
           )}
+
+          <div className="mt-auto" />
 
           {job.discovery?.sourceCount && job.discovery.sourceCount > 1 && lastSeenText && (
             <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">

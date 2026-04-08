@@ -107,5 +107,9 @@ describe("JobCard", () => {
     expect(screen.getByText("Verified ATS path")).toBeInTheDocument();
     expect(screen.getByText("Direct ATS apply")).toBeInTheDocument();
     expect(screen.getByText(/Recently refreshed job listing/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Senior Backend Engineer/i })).toHaveAttribute(
+      "href",
+      "/en/jobs/senior-backend-engineer",
+    );
   });
 });

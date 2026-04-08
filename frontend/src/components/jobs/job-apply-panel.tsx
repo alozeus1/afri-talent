@@ -8,6 +8,7 @@ import { applications, Job } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 import { useNetworkProfile } from "@/lib/network-profile";
 
 const QuickApplyModal = dynamic(
@@ -22,6 +23,7 @@ interface JobApplyPanelProps {
 }
 
 export function JobApplyPanel({ job }: JobApplyPanelProps) {
+  const locale = useLocale();
   const router = useRouter();
   const { user } = useAuth();
   const { online, isLowBandwidth } = useNetworkProfile();
@@ -39,7 +41,8 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
     }
 
     if (!user) {
-      router.push(`/login?redirect=/jobs/${job.slug}`);
+      const redirectPath = localizePath(`/jobs/${job.slug}`, locale);
+      router.push(`${localizePath("/login", locale)}?redirect=${encodeURIComponent(redirectPath)}`);
       return;
     }
 
@@ -88,7 +91,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
                 : "This role continues on the employer or ATS site. Only trust application links we have verified, and never pay application or processing fees."}
             </p>
             <Link
-              href={`/trust/report?targetJobId=${job.id}`}
+              href={`${localizePath("/trust/report", locale)}?targetJobId=${job.id}`}
               className="mt-3 inline-flex text-sm font-medium text-blue-900 underline-offset-2 hover:underline"
             >
               Report this job

@@ -1,7 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { JobFilters } from "@/components/jobs/job-filters";
 import { JobSearchState, buildJobsHref } from "@/lib/jobs-search";
 import { useNetworkProfile } from "@/lib/network-profile";
@@ -9,6 +8,8 @@ import { jobDiscoveryEvents } from "@/lib/analytics";
 
 interface JobsSearchShellProps {
   filters: JobSearchState;
+  isPending?: boolean;
+  onNavigate?: (state: JobSearchState) => void;
   resultMetrics?: {
     totalResults: number;
     visibleResults: number;
@@ -16,18 +17,8 @@ interface JobsSearchShellProps {
     freshResults: number;
   };
 }
-
-function toComparableQuery(pathname: string, state: JobSearchState) {
-  const href = buildJobsHref(state);
-  const path = href.startsWith("/jobs") ? href.replace("/jobs", pathname || "/jobs") : href;
-  return path;
-}
-
-export function JobsSearchShell({ filters, resultMetrics }: JobsSearchShellProps) {
-  const router = useRouter();
-  const pathname = usePathname();
+export function JobsSearchShell({ filters, isPending = false, onNavigate, resultMetrics }: JobsSearchShellProps) {
   const { isLowBandwidth } = useNetworkProfile();
-  const [isPending, startTransition] = useTransition();
   const [draft, setDraft] = useState<JobSearchState>(filters);
 
   const deferredSearch = useDeferredValue(draft.search);
@@ -47,21 +38,23 @@ export function JobsSearchShell({ filters, resultMetrics }: JobsSearchShellProps
   );
 
   useEffect(() => {
-    const nextHref = toComparableQuery(pathname, nextState);
-    const currentHref = toComparableQuery(pathname, filters);
+    if (!onNavigate) {
+      return;
+    }
+
+    const nextHref = buildJobsHref(nextState);
+    const currentHref = buildJobsHref(filters);
 
     if (nextHref === currentHref) {
       return;
     }
 
     const timeout = window.setTimeout(() => {
-      startTransition(() => {
-        router.replace(nextHref, { scroll: false });
-      });
+      onNavigate(nextState);
     }, isLowBandwidth ? 650 : 300);
 
     return () => window.clearTimeout(timeout);
-  }, [filters, isLowBandwidth, nextState, pathname, router]);
+  }, [filters, isLowBandwidth, nextState, onNavigate]);
 
   useEffect(() => {
     if (!resultMetrics) {

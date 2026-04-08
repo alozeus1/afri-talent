@@ -52,26 +52,34 @@ test("jobs page shows loading skeleton and job detail emits JobPosting schema", 
   page,
   request,
 }) => {
-  await page.route("**/api/jobs?**", async (route) => {
-    await page.waitForTimeout(500);
-    await route.continue();
-  });
+  const jobsRes = await request.get(`${API_URL}/api/jobs?search=manager&remote=true&limit=12`);
+  test.skip(!jobsRes.ok(), `Jobs API unavailable for jobs browse assertion: status ${jobsRes.status()}`);
+  const jobsPayload = await jobsRes.json();
+  const firstJob = jobsPayload.jobs?.[0];
+  test.skip(!firstJob, "No published jobs available for jobs browse assertion");
 
-  await page.goto(`${APP_URL}/jobs`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${APP_URL}/jobs?search=manager&remote=true`, { waitUntil: "domcontentloaded" });
   await expect(
     page.getByRole("heading", {
       name: /Find the roles where your credibility and readiness compound/i,
     }),
   ).toBeVisible();
+  await expect(page.getByText(/jobs found/i)).toBeVisible();
   await expect(
     page.getByText(/Search ranking prioritizes relevance, recent refreshes, verified employers/i),
   ).toBeVisible();
+  await expect(page.getByRole("link", { name: new RegExp(firstJob.title, "i") }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: new RegExp(firstJob.title, "i") }).first()).toHaveAttribute(
+    "href",
+    new RegExp(`/((en|fr|pt|ar)/)?jobs/${firstJob.slug}$`),
+  );
 
-  const jobsRes = await request.get(`${API_URL}/api/jobs?limit=1`);
-  test.skip(!jobsRes.ok(), `Jobs API unavailable for schema assertion: status ${jobsRes.status()}`);
-  const jobsPayload = await jobsRes.json();
-  const firstJob = jobsPayload.jobs?.[0];
-  test.skip(!firstJob, "No published jobs available for schema assertion");
+  const nextButton = page.getByRole("link", { name: "Next" });
+  if (await nextButton.count()) {
+    await nextButton.click();
+    await expect(page).toHaveURL(/page=2/);
+    await expect(page.getByText(/Page 2 of/i)).toBeVisible();
+  }
 
   await page.goto(`${APP_URL}/jobs/${firstJob.slug}`, { waitUntil: "networkidle" });
   const schemaText = await page
