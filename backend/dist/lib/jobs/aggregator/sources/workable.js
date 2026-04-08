@@ -68,7 +68,7 @@ export class WorkableSource extends BaseJobSource {
         return true;
     }
     transformJob(job, account) {
-        const description = (job.description || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+        const description = this.normalizeDescription(job.description || "");
         const location = job.location?.location_str || "Remote";
         const normalized = this.normalizeLocation(location);
         const sourceUrl = job.url || `https://${account}.workable.com`;

@@ -107,7 +107,7 @@ export class GreenhouseSource extends BaseJobSource {
         };
     }
     transformJob(job, boardToken) {
-        const description = (job.content || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+        const description = this.normalizeDescription(job.content || "");
         const location = job.location?.name || "Remote";
         const normalized = this.normalizeLocation(location);
         const employmentMeta = job.metadata?.find((item) => /employment|type/i.test(item.name));

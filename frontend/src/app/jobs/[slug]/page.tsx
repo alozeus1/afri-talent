@@ -8,6 +8,7 @@ import { TrustExplainerModal } from "@/components/trust/trust-explainer-modal";
 import { TrustSupportCard } from "@/components/trust/trust-support-card";
 import { JobJsonLd } from "@/components/jobs/job-jsonld";
 import { JobApplyPanel } from "@/components/jobs/job-apply-panel";
+import { splitJobDescriptionSections } from "@/lib/job-description";
 import { formatSalaryRange } from "@/lib/salary";
 import { getJobDetailServer } from "@/lib/server-public-api";
 
@@ -46,6 +47,7 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
     currency: job.currency,
     salaryPeriod: job.salaryPeriod,
   });
+  const descriptionSections = splitJobDescriptionSections(job.description);
   const trustReasons = [
     job.employer?.trust?.badge
       ? {
@@ -304,7 +306,13 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
 
               <div className="prose max-w-none dark:prose-invert">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4 dark:text-gray-100">Job description</h2>
-                <div className="text-gray-600 whitespace-pre-wrap dark:text-gray-300">{job.description}</div>
+                <div className="space-y-4 text-gray-600 dark:text-gray-300">
+                  {descriptionSections.map((section, index) => (
+                    <p key={`${job.id}-description-${index}`} className="whitespace-pre-line leading-8">
+                      {section}
+                    </p>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

@@ -137,7 +137,7 @@ export class GreenhouseSource extends BaseJobSource {
   }
 
   private transformJob(job: GreenhouseJob, boardToken: string): AggregatedJob {
-    const description = (job.content || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const description = this.normalizeDescription(job.content || "");
     const location = job.location?.name || "Remote";
     const normalized = this.normalizeLocation(location);
 

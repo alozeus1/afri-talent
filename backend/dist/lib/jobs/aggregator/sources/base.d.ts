@@ -10,6 +10,7 @@ export declare abstract class BaseJobSource {
     protected rateLimit(): Promise<void>;
     protected log(message: string, meta?: Record<string, unknown>): void;
     protected logError(message: string, error: unknown): void;
+    protected normalizeDescription(value: string): string;
     protected normalizeLocation(location: string): {
         city: string;
         country: string;

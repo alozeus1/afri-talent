@@ -107,10 +107,7 @@ export class LeverSource extends BaseJobSource {
         };
     }
     transformJob(job, siteToken) {
-        const description = (job.descriptionPlain || job.description || "")
-            .replace(/<[^>]*>/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
+        const description = this.normalizeDescription(job.descriptionPlain || job.description || "");
         const location = job.categories?.location || "Remote";
         const normalized = this.normalizeLocation(location);
         const commitment = (job.categories?.commitment || "").toLowerCase();

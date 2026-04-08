@@ -137,10 +137,7 @@ export class LeverSource extends BaseJobSource {
   }
 
   private transformJob(job: LeverJob, siteToken: string): AggregatedJob {
-    const description = (job.descriptionPlain || job.description || "")
-      .replace(/<[^>]*>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    const description = this.normalizeDescription(job.descriptionPlain || job.description || "");
 
     const location = job.categories?.location || "Remote";
     const normalized = this.normalizeLocation(location);
