@@ -23,6 +23,33 @@ const HTML_ENTITY_MAP: Record<string, string> = {
   hellip: "...",
 };
 
+const TITLE_ROLE_INTENT_PATTERNS = [
+  /\bengineer\b/i,
+  /\bdeveloper\b/i,
+  /\bdevops\b/i,
+  /\bsre\b/i,
+  /site reliability/i,
+  /\bsecurity\b/i,
+  /\bdata\b/i,
+  /machine learning/i,
+  /\bproduct\b/i,
+  /\bdesign(?:er)?\b/i,
+  /\bux\b/i,
+  /\bui\b/i,
+  /\bmobile\b/i,
+  /\bandroid\b/i,
+  /\bios\b/i,
+  /\bfrontend\b/i,
+  /\bfront-end\b/i,
+  /\bbackend\b/i,
+  /\bback-end\b/i,
+  /\bfull[- ]?stack\b/i,
+  /\bcloud\b/i,
+  /\bplatform\b/i,
+  /\binfrastructure\b/i,
+  /\banalytics?\b/i,
+];
+
 function decodeHtmlEntities(value: string): string {
   return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (entity, token: string) => {
     const normalizedToken = token.toLowerCase();
@@ -218,6 +245,26 @@ export abstract class BaseJobSource {
     }
 
     return null;
+  }
+
+  protected matchesKeywordQuery(job: AggregatedJob, query: JobQuery): boolean {
+    if (query.keywords.length === 0) {
+      return true;
+    }
+
+    const normalizedKeywords = query.keywords.map((keyword) => keyword.toLowerCase());
+    const titleSkillsBag = `${job.title} ${job.skills.join(" ")}`.toLowerCase();
+    if (normalizedKeywords.some((keyword) => titleSkillsBag.includes(keyword))) {
+      return true;
+    }
+
+    const titleHasRoleIntent = TITLE_ROLE_INTENT_PATTERNS.some((pattern) => pattern.test(job.title));
+    if (!titleHasRoleIntent) {
+      return false;
+    }
+
+    const descriptionBag = job.description.toLowerCase();
+    return normalizedKeywords.some((keyword) => descriptionBag.includes(keyword));
   }
 }
 

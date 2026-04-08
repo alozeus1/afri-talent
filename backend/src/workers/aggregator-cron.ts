@@ -38,8 +38,8 @@ if (DEFAULT_KEYWORDS.length === 0) {
   );
 }
 
-const MAX_JOBS_PER_SYNC = parseInt(process.env.AGGREGATOR_MAX_JOBS || "200", 10);
-const POSTED_WITHIN_DAYS = parseInt(process.env.AGGREGATOR_POSTED_DAYS || "7", 10);
+const MAX_JOBS_PER_SYNC = parseInt(process.env.AGGREGATOR_MAX_JOBS || "500", 10);
+const POSTED_WITHIN_DAYS = parseInt(process.env.AGGREGATOR_POSTED_DAYS || "21", 10);
 
 export async function runAggregatorCycle(): Promise<void> {
   const aggregator = getJobAggregator(prisma);

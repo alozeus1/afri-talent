@@ -42,6 +42,33 @@ describe("Job board adapter normalization", () => {
         expect(result.jobs[0].relocationAssistance).toBe(true);
         expect(result.jobs[0].skills).toEqual(expect.arrayContaining(["typescript", "react"]));
     });
+    it("does not import non-technical roles that only mention keywords in the description", async () => {
+        const fetchMock = global.fetch;
+        fetchMock.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                jobs: [
+                    {
+                        id: 202,
+                        title: "Accountant",
+                        content: "<p>Partner with engineering, product, and developer teams on month-end close.</p>",
+                        updated_at: "2026-04-08T00:00:00.000Z",
+                        absolute_url: "https://boards.greenhouse.io/acme/jobs/202",
+                        location: { name: "Remote - USA" },
+                        metadata: [{ name: "Employment Type", value: "Full-time" }],
+                    },
+                ],
+            }),
+        });
+        const source = new GreenhouseSource(["acme"]);
+        const result = await source.fetchJobs({
+            keywords: ["developer", "software engineer"],
+            remote: true,
+            postedWithinDays: 30,
+            limit: 10,
+        });
+        expect(result.jobs).toHaveLength(0);
+    });
     it("normalizes Lever jobs and maps commitment into jobType", async () => {
         const fetchMock = global.fetch;
         fetchMock.mockResolvedValueOnce({

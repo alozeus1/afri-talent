@@ -25,6 +25,51 @@ interface AggregatedJobGroup {
   variants: AggregatedJob[];
 }
 
+const DEFAULT_GREENHOUSE_BOARD_TOKENS = [
+  "coinbase",
+  "reddit",
+  "moniepoint",
+  "cloudflare",
+  "canonical",
+  "duolingo",
+  "airtable",
+  "brex",
+  "vercel",
+  "checkr",
+  "stripe",
+  "figma",
+  "clickhouse",
+  "elastic",
+  "datadog",
+  "dropbox",
+];
+
+const DEFAULT_LEVER_SITE_TOKENS = ["plaid"];
+
+function parseTokenList(raw: string | undefined): string[] {
+  return (raw || "")
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+function mergeUniqueTokens(...groups: string[][]): string[] {
+  return Array.from(new Set(groups.flatMap((group) => group)));
+}
+
+export function resolveSourceCatalog(
+  raw: string | undefined,
+  defaults: string[],
+  options?: { includeDefaults?: boolean },
+): string[] {
+  const configured = parseTokenList(raw);
+  if (options?.includeDefaults === false) {
+    return configured;
+  }
+
+  return mergeUniqueTokens(configured, defaults);
+}
+
 export class JobAggregator {
   private sources: BaseJobSource[] = [];
   private prisma: PrismaClient;
@@ -36,6 +81,7 @@ export class JobAggregator {
 
   private initializeSources(): void {
     const apiBackedSources: BaseJobSource[] = [];
+    const includeDefaultBoardCatalog = process.env.AGGREGATOR_INCLUDE_DEFAULT_BOARD_CATALOG !== "0";
 
     // API-based sources (require keys)
     const adzunaAppId = process.env.ADZUNA_APP_ID;
@@ -50,18 +96,16 @@ export class JobAggregator {
       apiBackedSources.push(new ApifySource(apifyToken, apifyTasks));
     }
 
-    const greenhouseBoards = (process.env.GREENHOUSE_BOARD_TOKENS || "")
-      .split(",")
-      .map((token) => token.trim())
-      .filter(Boolean);
+    const greenhouseBoards = resolveSourceCatalog(process.env.GREENHOUSE_BOARD_TOKENS, DEFAULT_GREENHOUSE_BOARD_TOKENS, {
+      includeDefaults: includeDefaultBoardCatalog,
+    });
     if (greenhouseBoards.length > 0) {
       apiBackedSources.push(new GreenhouseSource(greenhouseBoards));
     }
 
-    const leverSites = (process.env.LEVER_SITE_TOKENS || "")
-      .split(",")
-      .map((token) => token.trim())
-      .filter(Boolean);
+    const leverSites = resolveSourceCatalog(process.env.LEVER_SITE_TOKENS, DEFAULT_LEVER_SITE_TOKENS, {
+      includeDefaults: includeDefaultBoardCatalog,
+    });
     if (leverSites.length > 0) {
       apiBackedSources.push(new LeverSource(leverSites));
     }
@@ -103,6 +147,10 @@ export class JobAggregator {
         enabledSources: this.sources.map((source) => source.source),
         apiBackedSourceCount: apiBackedSources.length,
         preferApiOnly,
+        includeDefaultBoardCatalog,
+        greenhouseBoardCount: greenhouseBoards.length,
+        leverSiteCount: leverSites.length,
+        workableAccountCount: workableAccounts.length,
       },
       "[aggregator] Initialized job sources",
     );

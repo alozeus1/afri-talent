@@ -1,6 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import type { AggregatedJob, AggregatorResult, JobSource, JobRegion } from "./types.js";
 import type { JobQuery } from "./sources/base.js";
+export declare function resolveSourceCatalog(raw: string | undefined, defaults: string[], options?: {
+    includeDefaults?: boolean;
+}): string[];
 export declare class JobAggregator {
     private sources;
     private prisma;

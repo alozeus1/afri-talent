@@ -91,11 +91,7 @@ export class WorkableSource extends BaseJobSource {
 
     if (query.remote && job.locationType !== "remote") return false;
 
-    if (query.keywords.length > 0) {
-      const bag = `${job.title} ${job.description} ${job.skills.join(" ")}`.toLowerCase();
-      const match = query.keywords.some((keyword) => bag.includes(keyword.toLowerCase()));
-      if (!match) return false;
-    }
+    if (!this.matchesKeywordQuery(job, query)) return false;
 
     return true;
   }

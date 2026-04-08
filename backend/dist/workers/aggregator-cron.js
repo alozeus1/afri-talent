@@ -14,8 +14,8 @@ const DEFAULT_KEYWORDS = (process.env.AGGREGATOR_KEYWORDS || "").split(",").filt
 if (DEFAULT_KEYWORDS.length === 0) {
     DEFAULT_KEYWORDS.push("software engineer", "developer", "frontend", "backend", "fullstack", "full stack", "devops", "data engineer", "data scientist", "machine learning", "product manager", "product designer", "ui ux designer", "cloud engineer", "mobile developer", "react developer", "python developer", "node developer");
 }
-const MAX_JOBS_PER_SYNC = parseInt(process.env.AGGREGATOR_MAX_JOBS || "200", 10);
-const POSTED_WITHIN_DAYS = parseInt(process.env.AGGREGATOR_POSTED_DAYS || "7", 10);
+const MAX_JOBS_PER_SYNC = parseInt(process.env.AGGREGATOR_MAX_JOBS || "500", 10);
+const POSTED_WITHIN_DAYS = parseInt(process.env.AGGREGATOR_POSTED_DAYS || "21", 10);
 export async function runAggregatorCycle() {
     const aggregator = getJobAggregator(prisma);
     const query = {
