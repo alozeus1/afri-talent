@@ -24,6 +24,16 @@ export const securityHeaders = helmet({
 });
 // General API rate limiter
 const isTestEnv = process.env.NODE_ENV === "test" || process.env.E2E === "1";
+function isInternalPublicFetch(req) {
+    const marker = req.header("x-afritalent-internal-fetch");
+    if (marker !== "server-public-api") {
+        return false;
+    }
+    if (req.method !== "GET") {
+        return false;
+    }
+    return req.path === "/api/public/stats" || req.path.startsWith("/api/jobs");
+}
 export const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: isTestEnv ? 10000 : 100,
@@ -32,7 +42,7 @@ export const generalLimiter = rateLimit({
     message: { error: "Too many requests, please try again later" },
     skip: (req) => {
         // Skip rate limiting for health checks
-        return req.path === "/health";
+        return req.path === "/health" || isInternalPublicFetch(req);
     },
 });
 export const authLimiter = rateLimit({

@@ -28,6 +28,7 @@ async function fetchServerPublicApi<T>(
     signal: buildTimeoutSignal(timeoutMs),
     headers: {
       Accept: "application/json",
+      "x-afritalent-internal-fetch": "server-public-api",
       ...headers,
     },
   });
