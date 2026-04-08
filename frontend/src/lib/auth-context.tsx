@@ -2,11 +2,12 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { auth, User } from "./api";
+import type { BotShieldPayload } from "./bot-shield";
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, options?: { botShield?: BotShieldPayload }) => Promise<void>;
   register: (data: {
     email: string;
     password: string;
@@ -14,7 +15,7 @@ interface AuthContextType {
     role: "CANDIDATE" | "EMPLOYER";
     companyName?: string;
     location?: string;
-  }) => Promise<void>;
+  }, options?: { botShield?: BotShieldPayload }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -41,8 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const response = await auth.login(email, password);
+  const login = async (email: string, password: string, options?: { botShield?: BotShieldPayload }) => {
+    const response = await auth.login(email, password, options);
     // Token is set as HttpOnly cookie by the server — we only store the user object
     setUser(response.user);
   };
@@ -54,8 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role: "CANDIDATE" | "EMPLOYER";
     companyName?: string;
     location?: string;
-  }) => {
-    const response = await auth.register(data);
+  }, options?: { botShield?: BotShieldPayload }) => {
+    const response = await auth.register(data, options);
     // Token is set as HttpOnly cookie by the server — we only store the user object
     setUser(response.user);
   };

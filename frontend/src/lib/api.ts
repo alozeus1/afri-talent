@@ -9,6 +9,11 @@ interface AuthSessionResponse {
   user: User | null;
 }
 
+interface BotShieldPayload {
+  website: string;
+  startedAt: number;
+}
+
 async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { token, ...fetchOptions } = options;
 
@@ -64,16 +69,16 @@ async function fetchMultipartAPI<T>(endpoint: string, options: Omit<FetchOptions
 
 // Auth
 export const auth = {
-  login: (email: string, password: string) =>
+  login: (email: string, password: string, options?: { botShield?: BotShieldPayload }) =>
     fetchAPI<{ user: User; expiresIn: string }>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, botShield: options?.botShield }),
     }),
 
-  register: (data: RegisterData) =>
+  register: (data: RegisterData, options?: { botShield?: BotShieldPayload }) =>
     fetchAPI<{ user: User; expiresIn: string }>("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, botShield: options?.botShield }),
     }),
 
   me: async (token?: string) => {
