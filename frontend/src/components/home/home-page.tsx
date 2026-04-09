@@ -7,22 +7,22 @@ const productSignals = [
   {
     title: "Remote-first jobs",
     description: "Global roles filtered through an Africa-to-global lens instead of a generic listings feed.",
-    tone: "bg-emerald-100 text-emerald-700",
+    tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
   },
   {
     title: "Visa sponsorship clarity",
     description: "Support signals and mobility context that reduce ambiguity before you commit to a role.",
-    tone: "bg-sky-100 text-sky-700",
+    tone: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
   },
   {
     title: "Relocation readiness",
     description: "A product direction that treats cross-border readiness like part of hiring quality, not an afterthought.",
-    tone: "bg-violet-100 text-violet-700",
+    tone: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300",
   },
   {
     title: "AI-assisted workflow",
     description: "Candidate support, matching direction, and apply-pack thinking designed for faster, sharper applications.",
-    tone: "bg-amber-100 text-amber-700",
+    tone: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   },
 ];
 
@@ -38,27 +38,26 @@ const sourceLabels = [
 
 export function HomePageContent() {
   return (
-    <div className="pb-12">
-      <section className="section-shell relative overflow-hidden px-0 pt-8 text-white md:pt-12">
+    <div className="pb-12 bg-[var(--background)]">
+      <section className="section-shell relative overflow-hidden px-0 pt-8 md:pt-12">
         <div className="page-frame">
-          <div className="grid-radiant relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-[linear-gradient(135deg,#0f1720,#0b4d54_38%,#117b6b_68%,#f4a624_120%)] px-6 py-16 shadow-[0_30px_120px_rgba(15,23,32,0.28)] md:px-10 md:py-20 lg:px-14">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_34%)]" />
+          <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white px-6 py-16 shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:px-10 md:py-20 lg:px-14">
             <div className="relative grid items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]">
               <div>
-                <div className="eyebrow-pill mb-6">
-                  <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_18px_rgba(110,255,214,0.85)]" />
-                  <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/82">
+                <div className="eyebrow-pill mb-6 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="text-xs font-semibold uppercase tracking-widest text-zinc-600 dark:text-zinc-400">
                     Trust-first Africa-to-global hiring
                   </span>
                 </div>
 
-                <h1 className="font-display max-w-4xl text-5xl font-bold leading-[0.96] md:text-6xl lg:text-7xl">
+                <h1 className="font-display max-w-4xl text-5xl font-bold leading-[1.05] text-zinc-900 dark:text-zinc-50 md:text-6xl lg:text-7xl">
                   Give African talent a higher-signal path to{" "}
-                  <span className="aurora-text">global opportunities.</span>
+                  <span className="text-emerald-700 dark:text-emerald-400">global opportunities.</span>
                 </h1>
 
-                <p className="mt-6 max-w-2xl text-lg leading-8 text-emerald-50/86 md:text-xl">
-                  AfriTalent combines job discovery, trust verification, candidate AI workflow, and employer-side hiring structure so the shortlist feels smaller, cleaner, and easier to trust.
+                <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-600 dark:text-zinc-400 md:text-xl">
+                  AfriTalent combines job discovery, trust verification, candidate workflow, and employer-side hiring structure so the shortlist feels smaller, cleaner, and easier to trust.
                 </p>
 
                 <div className="mt-8 flex flex-col gap-4 sm:flex-row">
@@ -68,38 +67,38 @@ export function HomePageContent() {
                     </Button>
                   </Link>
                   <Link href="/register?role=employer">
-                    <Button size="lg" variant="outline" className="w-full border-white/25 bg-white/10 text-white hover:bg-white/16 sm:w-auto">
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto">
                       Launch employer onboarding
                     </Button>
                   </Link>
                 </div>
 
-                <div className="mt-8 flex flex-wrap gap-3 text-sm text-white/74">
-                  <Link href="/jobs?filter=remote" className="rounded-full border border-white/14 bg-white/8 px-4 py-2 transition hover:bg-white/14">
+                <div className="mt-8 flex flex-wrap gap-3 text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  <Link href="/jobs?filter=remote" className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     Remote-first roles
                   </Link>
-                  <Link href="/jobs?filter=visa" className="rounded-full border border-white/14 bg-white/8 px-4 py-2 transition hover:bg-white/14">
+                  <Link href="/jobs?filter=visa" className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     Visa-supported opportunities
                   </Link>
-                  <Link href="/trust" className="rounded-full border border-white/14 bg-white/8 px-4 py-2 transition hover:bg-white/14">
+                  <Link href="/trust" className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     See trust model
                   </Link>
                 </div>
               </div>
 
               <div className="relative hidden lg:block">
-                <div className="surface-panel-strong gloss-card absolute -left-10 top-8 z-20 max-w-[14rem] rounded-[1.75rem] p-4">
-                  <p className="text-xs uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">Launch thesis</p>
-                  <p className="font-display mt-3 text-2xl font-bold text-gray-950 dark:text-white">
+                <div className="surface-panel absolute -left-10 top-8 z-20 max-w-[14rem] rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg">
+                  <p className="text-xs uppercase tracking-widest font-semibold text-zinc-500 dark:text-zinc-400">Launch thesis</p>
+                  <p className="font-display mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
                     Smaller shortlists. Stronger trust.
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
-                    Trust cues, workflow depth, and candidate readiness signals designed for distributed teams.
+                  <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+                    Trust cues and candidate readiness signals designed for distributed teams.
                   </p>
                 </div>
 
-                <div className="surface-panel-strong gloss-card relative ml-auto w-full max-w-[36rem] rounded-[2rem] p-5">
-                  <div className="relative h-[540px] overflow-hidden rounded-[1.5rem] border border-white/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(241,248,246,0.88))] dark:bg-[linear-gradient(180deg,rgba(12,28,43,0.95),rgba(8,19,32,0.92))]">
+                <div className="surface-panel relative ml-auto w-full max-w-[36rem] rounded-3xl p-5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+                  <div className="relative h-[540px] overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
                     <Image
                       src="/images/hero/homepage-design.png"
                       alt="AfriTalent platform preview"
@@ -115,7 +114,7 @@ export function HomePageContent() {
                     {["Candidate trust signals", "Semantic-ready discovery", "Employer analytics"].map((item) => (
                       <div
                         key={item}
-                        className="rounded-2xl border border-[var(--border-soft)] bg-white/72 px-3 py-3 text-sm font-medium text-gray-700 dark:bg-white/5 dark:text-gray-200"
+                        className="rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm font-medium text-zinc-700 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
                       >
                         {item}
                       </div>
@@ -133,25 +132,25 @@ export function HomePageContent() {
       <section className="section-shell py-20">
         <div className="page-frame">
           <div className="mb-16 text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-emerald-700 dark:text-emerald-300">
+            <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
               Why AfriTalent feels different
             </p>
-            <h2 className="font-display mt-4 text-3xl font-bold text-gray-900 dark:text-gray-100 md:text-5xl">
+            <h2 className="font-display mt-4 text-3xl font-bold text-zinc-900 dark:text-zinc-50 md:text-5xl">
               A premium hiring experience built around signal, not noise.
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600 dark:text-gray-300">
-              The visual finish is only the surface. Underneath it, AfriTalent is shaping trust, workflow, and AI assistance into a tighter hiring operating model.
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
+              Underneath the interface, AfriTalent is shaping trust, workflow, and verified data into a tighter hiring operating model.
             </p>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {productSignals.map((item) => (
-              <div key={item.title} className="surface-panel gloss-card rounded-[1.75rem] p-6 transition-transform hover:-translate-y-1">
-                <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl ${item.tone}`}>
-                  <span className="font-display text-lg font-bold">{item.title.charAt(0)}</span>
+              <div key={item.title} className="surface-panel rounded-2xl p-6 transition-transform hover:-translate-y-1 hover:shadow-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl font-bold text-lg ${item.tone}`}>
+                  {item.title.charAt(0)}
                 </div>
-                <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">{item.title}</h3>
-                <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">{item.description}</p>
+                <h3 className="mb-2 text-lg font-bold text-zinc-900 dark:text-zinc-100">{item.title}</h3>
+                <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{item.description}</p>
               </div>
             ))}
           </div>
@@ -160,21 +159,21 @@ export function HomePageContent() {
 
       <section className="section-shell py-16">
         <div className="page-frame">
-          <div className="surface-panel-strong rounded-[2rem] px-6 py-10">
+          <div className="surface-panel rounded-3xl border border-zinc-200 bg-white px-6 py-12 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="mb-10 text-center">
-              <h2 className="font-display text-2xl font-bold text-gray-900 dark:text-gray-100 md:text-3xl">
+              <h2 className="font-display text-2xl font-bold text-zinc-900 dark:text-zinc-50 md:text-3xl">
                 Jobs from global platforms, filtered through an Africa-to-global lens
               </h2>
-              <p className="mt-3 text-gray-600 dark:text-gray-300">
-                We already aggregate from multiple sources, but the long-term edge is better trust, better matching, and stronger readiness signals.
+              <p className="mt-3 text-zinc-600 dark:text-zinc-400">
+                We aggregate from multiple sources, offering better trust, sharper matching, and stronger readiness signals.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-8 opacity-70">
+            <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 opacity-80">
               {sourceLabels.map(([label, sublabel]) => (
                 <div key={label} className="text-center">
-                  <div className="font-semibold text-gray-700 dark:text-gray-200">{label}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">{sublabel}</div>
+                  <div className="font-bold text-zinc-800 dark:text-zinc-200">{label}</div>
+                  <div className="text-xs font-medium text-zinc-500 dark:text-zinc-500 mt-1">{sublabel}</div>
                 </div>
               ))}
             </div>
@@ -184,28 +183,27 @@ export function HomePageContent() {
 
       <section className="px-0 py-20">
         <div className="page-frame text-center">
-          <div className="relative overflow-hidden rounded-[2.5rem] border border-[var(--border-soft)] bg-[linear-gradient(135deg,rgba(11,20,32,0.96),rgba(13,55,63,0.94),rgba(14,127,106,0.86))] px-6 py-16 text-white shadow-[0_30px_110px_rgba(11,20,32,0.24)]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.16),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(245,158,11,0.2),transparent_22%)]" />
-            <div className="relative">
-              <p className="text-sm font-semibold uppercase tracking-[0.26em] text-white/68">
-                Production-finish direction
+          <div className="relative overflow-hidden rounded-3xl border border-emerald-900 bg-emerald-950 px-6 py-16 text-white shadow-2xl md:px-12">
+            <div className="relative text-center">
+              <p className="text-sm font-semibold uppercase tracking-widest text-emerald-300">
+                A new standard for hiring
               </p>
-              <h2 className="font-display mt-5 text-3xl font-bold md:text-5xl">
-                Build the profile. Surface the trust. Let the shortlist do the talking.
+              <h2 className="font-display mt-5 text-3xl font-bold text-white md:text-5xl">
+                Build the profile. Surface the trust.
               </h2>
-              <p className="mx-auto mt-6 max-w-2xl text-lg text-white/78">
-                Join a hiring platform designed to reward credibility, readiness, and cleaner cross-border matching.
+              <p className="mx-auto mt-6 max-w-2xl text-lg text-emerald-100/90 leading-relaxed">
+                Join a platform designed to reward credibility and promote cleaner cross-border matching.
               </p>
             </div>
 
-            <div className="relative mt-8 flex flex-col justify-center gap-4 sm:flex-row">
+            <div className="relative mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link href="/register">
-                <Button size="lg" className="w-full sm:w-auto">
+                <Button size="lg" className="w-full sm:w-auto bg-emerald-500 text-white hover:bg-emerald-600 border-transparent">
                   Create your profile
                 </Button>
               </Link>
               <Link href="/resources">
-                <Button size="lg" variant="outline" className="w-full border-white/25 bg-white/10 text-white hover:bg-white/16 sm:w-auto">
+                <Button size="lg" variant="outline" className="w-full border-emerald-700 bg-emerald-900 text-emerald-100 hover:bg-emerald-800 hover:text-white sm:w-auto">
                   Explore resources
                 </Button>
               </Link>

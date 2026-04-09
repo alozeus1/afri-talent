@@ -2,6 +2,15 @@ import crypto from "crypto";
 import { EmployerVerificationLevel, TrustRiskLevel } from "@prisma/client";
 const STALE_THRESHOLD_DAYS = parseInt(process.env.JOB_STALE_DAYS || "30", 10);
 const GENERIC_LOCATION_PATTERNS = ["tbd", "various", "multiple", "to be determined"];
+const TRUSTED_APPLY_HOSTS = [
+    "greenhouse.io",
+    "lever.co",
+    "workable.com",
+    "jobvite.com",
+    "ashbyhq.com",
+    "myworkdaysite.com",
+    "smartrecruiters.com",
+];
 const STOP_WORDS = new Set([
     "a",
     "an",
@@ -191,6 +200,59 @@ function hasValidExternalUrl(value) {
         return false;
     }
 }
+function hostnameFromUrl(value) {
+    if (!value)
+        return null;
+    try {
+        return new URL(value).hostname.toLowerCase();
+    }
+    catch {
+        return null;
+    }
+}
+function matchesTrustedHost(value) {
+    const hostname = hostnameFromUrl(value);
+    if (!hostname)
+        return false;
+    return TRUSTED_APPLY_HOSTS.some((trustedHost) => hostname === trustedHost || hostname.endsWith(`.${trustedHost}`));
+}
+function detectApplyPathType(job) {
+    if (job.jobSource === "EMPLOYER_POSTED" || (job.employerId && !job.applicationUrl && !job.sourceUrl)) {
+        return "DIRECT";
+    }
+    if (matchesTrustedHost(job.applicationUrl) || matchesTrustedHost(job.sourceUrl)) {
+        return "ATS";
+    }
+    if (hasValidExternalUrl(job.applicationUrl) || hasValidExternalUrl(job.sourceUrl)) {
+        return "BOARD";
+    }
+    return "UNKNOWN";
+}
+function detectSourceVerification(job, sourceLineage) {
+    const applyPathType = detectApplyPathType(job);
+    if (applyPathType === "DIRECT")
+        return "DIRECT_EMPLOYER";
+    if (applyPathType === "ATS")
+        return "ATS_PRIMARY";
+    if (sourceLineage.length > 1)
+        return "AGGREGATOR_VERIFIED";
+    if (hasValidExternalUrl(job.sourceUrl) || hasValidExternalUrl(job.applicationUrl))
+        return "SCRAPED";
+    return "UNKNOWN";
+}
+function detectDeliveryModel(job) {
+    const applyPathType = detectApplyPathType(job);
+    if (job.jobSource === "EMPLOYER_POSTED" || applyPathType === "DIRECT") {
+        return "ON_PLATFORM";
+    }
+    if (applyPathType === "ATS") {
+        return "EXTERNAL_ATS";
+    }
+    if (applyPathType === "BOARD") {
+        return "EXTERNAL_BOARD";
+    }
+    return "UNKNOWN";
+}
 export function evaluateFreshness(job, now = new Date()) {
     const referenceAt = toDate(job.sourceLastSeenAt) ??
         toDate(job.lastCheckedAt) ??
@@ -241,6 +303,8 @@ export function evaluateFreshness(job, now = new Date()) {
 export function evaluateJobQuality(job) {
     const normalizedDescription = normalizeText(job.description);
     const riskLevel = riskLevelValue(job.riskLevel);
+    const applyPathType = detectApplyPathType(job);
+    const verifiedApplyPath = applyPathType === "DIRECT" || applyPathType === "ATS";
     const signals = {
         verifiedEmployer: employerTrustScore(job) >= 70,
         descriptionComplete: normalizedDescription.length >= 280 || normalizedDescription.split(" ").length >= 80,
@@ -261,7 +325,8 @@ export function evaluateJobQuality(job) {
     const score = (signals.verifiedEmployer ? 20 : 0) +
         (signals.descriptionComplete ? 20 : 0) +
         (signals.compensationTransparent ? 14 : 0) +
-        (signals.validApplicationPath ? 14 : 0) +
+        (signals.validApplicationPath ? 10 : 0) +
+        (verifiedApplyPath ? 4 : 0) +
         (signals.locationClear ? 10 : 0) +
         (signals.mobilityClear ? 8 : 0) +
         (signals.lowScamRisk ? 10 : 0) +
@@ -413,6 +478,12 @@ function buildExplanation(input) {
         reasons.push("High-quality, complete job details");
     if (input.sourceLineage.length > 1)
         reasons.push("Merged from multiple trusted sources");
+    if (input.sourceVerification === "DIRECT_EMPLOYER")
+        reasons.push("Posted directly by the employer on AfriTalent");
+    if (input.sourceVerification === "ATS_PRIMARY")
+        reasons.push("Links to a primary employer ATS application path");
+    if (input.applyPathType === "BOARD")
+        reasons.push("Application continues on the source board");
     if (reasons.length === 0)
         reasons.push("Balanced mix of freshness and quality");
     return {
@@ -433,6 +504,10 @@ function buildExplanation(input) {
     };
 }
 export function buildJobDiscoverySummary(input) {
+    const applyPathType = detectApplyPathType(input.job);
+    const sourceVerification = detectSourceVerification(input.job, input.sourceLineage);
+    const verifiedApplyPath = applyPathType === "DIRECT" || applyPathType === "ATS";
+    const trustedSource = sourceVerification === "DIRECT_EMPLOYER" || sourceVerification === "ATS_PRIMARY" || sourceVerification === "AGGREGATOR_VERIFIED";
     const sourceNames = uniqueBy(input.sourceLineage
         .map((lineage) => lineage.source || lineage.company || "")
         .filter(Boolean), (value) => value);
@@ -443,6 +518,8 @@ export function buildJobDiscoverySummary(input) {
         trustedJob: input.quality.score >= 70 &&
             input.freshness.score >= 40 &&
             input.employerTrust >= 60 &&
+            trustedSource &&
+            verifiedApplyPath &&
             !input.freshness.isStale,
         stale: input.freshness.isStale,
         freshnessLabel: input.freshness.label,
@@ -452,6 +529,11 @@ export function buildJobDiscoverySummary(input) {
         visaClear: input.quality.signals.mobilityClear && input.quality.signals.validApplicationPath,
         relocationClear: input.quality.signals.mobilityClear,
         validApplicationPath: input.quality.signals.validApplicationPath,
+        verifiedApplyPath,
+        trustedSource,
+        applyPathType,
+        sourceVerification,
+        deliveryModel: detectDeliveryModel(input.job),
         sourceCount: input.sourceLineage.length,
         sourceNames,
         lastSeenAt: input.sourceLineage[0]?.lastSeenAt ?? input.freshness.referenceAt?.toISOString() ?? null,
@@ -546,6 +628,8 @@ export function scoreJobForSearch(job, context) {
         preferenceMatch,
         quality,
         sourceLineage: mergedLineage,
+        sourceVerification: detectSourceVerification(job, mergedLineage),
+        applyPathType: detectApplyPathType(job),
     });
     const discovery = buildJobDiscoverySummary({
         quality,
@@ -553,6 +637,7 @@ export function scoreJobForSearch(job, context) {
         applicationLikelihoodScore: applicationLikelihood,
         employerTrust,
         sourceLineage: mergedLineage,
+        job,
     });
     return {
         job,

@@ -33,6 +33,7 @@ export interface JobDocumentLike {
     sourceName?: string | null;
     jobSource?: string | null;
     applicationUrl?: string | null;
+    employerId?: string | null;
     publishedAt?: Date | string | null;
     createdAt?: Date | string | null;
     updatedAt?: Date | string | null;
@@ -105,6 +106,11 @@ export interface JobDiscoverySummary {
     visaClear: boolean;
     relocationClear: boolean;
     validApplicationPath: boolean;
+    verifiedApplyPath: boolean;
+    trustedSource: boolean;
+    applyPathType: "DIRECT" | "ATS" | "BOARD" | "UNKNOWN";
+    sourceVerification: "DIRECT_EMPLOYER" | "ATS_PRIMARY" | "AGGREGATOR_VERIFIED" | "SCRAPED" | "UNKNOWN";
+    deliveryModel: "ON_PLATFORM" | "EXTERNAL_ATS" | "EXTERNAL_BOARD" | "UNKNOWN";
     sourceCount: number;
     sourceNames: string[];
     lastSeenAt: string | null;
@@ -145,6 +151,7 @@ export declare function buildJobDiscoverySummary(input: {
     applicationLikelihoodScore: number;
     employerTrust: number;
     sourceLineage: JobSourceLineageRecord[];
+    job: JobDocumentLike;
 }): JobDiscoverySummary;
 export declare function buildJobIntelligenceUpdate(job: JobDocumentLike, existingLineage?: unknown, relatedJobs?: JobDocumentLike[], now?: Date): {
     applicationUrl: string | null;

@@ -3,8 +3,9 @@ import bcrypt from "bcrypt";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { signToken, getTokenExpiresIn } from "../lib/jwt.js";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, optionalAuth } from "../middleware/auth.js";
 import { authLimiter, registerLimiter } from "../middleware/security.js";
+import { validateHumanAuthSubmission } from "../middleware/bot-protection.js";
 import { blockToken } from "../lib/redis.js";
 import { issueEmailVerification } from "./email-verification.js";
 import { ensureCandidateTrustProfile, ensureEmployerTrustProfile, refreshEmployerTrustProfile, } from "../lib/trust/service.js";
@@ -41,13 +42,21 @@ const registerSchema = z.object({
     role: z.enum(["CANDIDATE", "EMPLOYER"]),
     companyName: z.string().max(200).trim().optional(),
     location: z.string().max(200).trim().optional(),
+    botShield: z.object({
+        website: z.string().max(200).optional(),
+        startedAt: z.number().int().positive().optional(),
+    }).optional(),
 });
 const loginSchema = z.object({
     email: z.string().email().max(255).toLowerCase(),
     password: z.string().max(128),
+    botShield: z.object({
+        website: z.string().max(200).optional(),
+        startedAt: z.number().int().positive().optional(),
+    }).optional(),
 });
 // POST /api/auth/register - with strict rate limiting
-router.post("/register", registerLimiter, async (req, res) => {
+router.post("/register", registerLimiter, validateHumanAuthSubmission, async (req, res) => {
     const startedAt = Date.now();
     try {
         const data = registerSchema.parse(req.body);
@@ -206,7 +215,7 @@ router.post("/register", registerLimiter, async (req, res) => {
     }
 });
 // POST /api/auth/login - with rate limiting
-router.post("/login", authLimiter, async (req, res) => {
+router.post("/login", authLimiter, validateHumanAuthSubmission, async (req, res) => {
     const startedAt = Date.now();
     try {
         const data = loginSchema.parse(req.body);
@@ -344,8 +353,15 @@ router.post("/logout", authenticate, async (req, res) => {
     }
 });
 // GET /api/auth/me
-router.get("/me", authenticate, async (req, res) => {
+router.get("/me", optionalAuth, async (req, res) => {
     try {
+        if (!req.user) {
+            res.json({
+                authenticated: false,
+                user: null,
+            });
+            return;
+        }
         const user = await prisma.user.findUnique({
             where: { id: req.user.userId },
             include: { employer: true },
@@ -355,13 +371,16 @@ router.get("/me", authenticate, async (req, res) => {
             return;
         }
         res.json({
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            emailVerified: user.emailVerified,
-            avatarUrl: user.avatarUrl,
-            employer: user.employer,
+            authenticated: true,
+            user: {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                emailVerified: user.emailVerified,
+                avatarUrl: user.avatarUrl,
+                employer: user.employer,
+            },
         });
     }
     catch (error) {

@@ -33,7 +33,14 @@ const DEFAULT_GREENHOUSE_BOARD_TOKENS = [
     "datadog",
     "dropbox",
 ];
-const DEFAULT_LEVER_SITE_TOKENS = ["plaid"];
+const DEFAULT_LEVER_SITE_TOKENS = [
+    "plaid",
+    "spreetail",
+    "yubico",
+    "pointclickcare",
+    "levelai",
+    "enter-rcm-llc",
+];
 function parseTokenList(raw) {
     return (raw || "")
         .split(",")

@@ -1,6 +1,6 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: April 8, 2026 12:12 AM (America/Chicago)
+Last updated: April 8, 2026 10:43 AM (America/Chicago)
 
 This is the first file a future Codex run should read for staging, deployment, ops, and recovery work.
 It captures the current live state, the last known deployment progress, where to look in AWS, and the fastest safe troubleshooting paths.
@@ -63,7 +63,7 @@ For incidents, readiness work, or monitoring changes, use these docs after this 
 - Backend service ARN: `arn:aws:apprunner:us-east-1:260820061731:service/afritalent-staging-appr-backend-managed/c768443a22d2415a9d182079a8ff639d`
 - Backend public URL: `https://ed4nsj3sgv.us-east-1.awsapprunner.com`
 - Backend status at handoff: `RUNNING` and returning `200` on `/health` and `/api/health`
-- Backend live health payload is currently `ok` with `database=connected` and `redis=connected`
+- Backend live health payload is currently `ok` with `database=connected`, `redis=connected`, and `billing=configured`
 
 - Frontend live service name: `afritalent-stg-fe-livefix`
 - Frontend live service ARN: `arn:aws:apprunner:us-east-1:260820061731:service/afritalent-stg-fe-livefix/3cfcc7543c0746c582000ae3d4a529b4`
@@ -75,6 +75,66 @@ For incidents, readiness work, or monitoring changes, use these docs after this 
 ## Last Known Deployment State
 
 The current shared staging deployment path is working on AWS App Runner.
+
+Update on April 8, 2026:
+
+- Job description formatting repair:
+  - Commit `4388320` (`Normalize scraped job descriptions`) fixed malformed aggregated descriptions that were rendering literal escaped HTML such as `&lt;p&gt;` and `&amp;nbsp;` on live job detail pages.
+  - Root cause:
+    - some upstream boards, especially Greenhouse-fed content, arrived as entity-encoded HTML
+    - the backend source adapters were stripping tags before decoding entities, so escaped markup survived into stored job descriptions
+    - the frontend job page then rendered that raw text directly
+  - Fix applied:
+    - backend source normalization now deep-decodes HTML entities, preserves paragraph and list structure, and stores normalized description text for Greenhouse, Lever, and Workable imports
+    - frontend job detail rendering now formats normalized sections into readable paragraphs
+    - JSON-LD job descriptions now use the same normalization helper instead of leaking encoded markup
+    - new frontend unit coverage was added for the description parser helper
+  - GitHub Actions run `24143597765` completed with `success`
+  - Verified after deploy:
+    - `https://ed4nsj3sgv.us-east-1.awsapprunner.com/api/jobs?page=1&limit=100` now returns normalized text for previously broken roles like `security-technology-risk-analyst-moniepoint`
+    - `https://3mwn2b4e5t.us-east-1.awsapprunner.com/jobs/security-technology-risk-analyst-moniepoint` now contains readable section text such as `Who we are` and `Key Responsibilities` instead of literal escaped tags
+    - the malformed `&lt;p&gt;` and `&amp;nbsp;` output is no longer present on the live job page
+
+- Job ingestion outage root cause and repair:
+  - Commit `72adf4e` (`Instrument job board source filtering`) added board-level Greenhouse and Lever diagnostics to staging.
+  - Logs proved the live backend was not filtering jobs out; it was failing every outbound board request with `TypeError: fetch failed`.
+  - Root cause: the backend App Runner service uses `egress_type = "VPC"`, and staging private-subnet internet egress through the NAT instance path was not working for public board/API calls.
+  - Commit `f337dc0` (`Use NAT gateways for App Runner egress`) switched staging and prod Terraform env config from `nat_strategy = "instance"` to `nat_strategy = "gateway"`.
+  - GitHub Actions run `24142110966` completed with `success` and rolled the NAT fix plus the latest backend/frontend images.
+- Verified after the repair:
+  - manual `/api/aggregator/sync` succeeded with `Synced 26 jobs`
+  - backend logs now show successful Greenhouse board fetches and matched counts instead of `fetch failed`
+  - Lever now fetches successfully too, but current query still yields `matchedCount=0` because the Plaid postings are stale or non-remote for the default sync query
+  - `https://ed4nsj3sgv.us-east-1.awsapprunner.com/api/jobs?page=1&limit=10` now returns live results with `total=35`
+  - `https://ed4nsj3sgv.us-east-1.awsapprunner.com/api/public/stats` now reports `jobsPosted=26`
+  - the frontend jobs page HTML contains live role titles again instead of the prior empty/error state
+
+- Current ingestion interpretation:
+  - Greenhouse is the primary working live source in staging right now
+  - Lever connectivity is restored, but its current configured site token does not produce fresh remote matches for the default sync query
+  - If jobs fall back to zero again, first check CloudWatch application logs for:
+    - `[aggregator:GREENHOUSE] Board fetch complete`
+    - `[aggregator:LEVER] Site fetch complete`
+    - `[aggregator:*] Failed to fetch ...`
+  - If `fetch failed` returns across all public sources again, inspect the private route table and NAT gateway health before changing crawler code
+
+- Commit `9cec26c` (`Advance AfriTalent product readiness`) was pushed to `develop`.
+- GitHub Actions run `24119546363` completed with `success`.
+- The full shared staging deploy path completed:
+  - base infrastructure
+  - image builds and pushes
+  - full Terraform apply
+  - backend App Runner deployment
+  - frontend App Runner deployment
+  - post-deploy health checks
+- Verified after the run:
+  - backend service `afritalent-staging-appr-backend-managed` is `RUNNING`
+  - frontend service `afritalent-stg-fe-livefix` is `RUNNING`
+  - `https://ed4nsj3sgv.us-east-1.awsapprunner.com/api/health` returns `status=ok` with `billing=configured`
+  - `https://3mwn2b4e5t.us-east-1.awsapprunner.com` still returns the expected `307` redirect to `/en`
+- Latest ECR images deployed from this run:
+  - backend tag `9cec26c92f31cdecc93eac9a9d1ee86ceecc56e6` and `latest`
+  - frontend tag `9cec26c92f31cdecc93eac9a9d1ee86ceecc56e6` and `latest`
 
 Update on April 7, 2026:
 
@@ -118,8 +178,9 @@ Completed on April 3, 2026:
 
 Open:
 
-- Stripe and Flutterwave billing code paths are now implemented locally, but the provider secrets and catalogs still need to be populated in GitHub repo secrets and then hydrated into `afritalent-staging/app-secrets`
-- The Stripe credentials supplied during the April 8 billing setup are live-mode credentials; do not commit them to the repo, and do not wire them into shared staging casually unless the team explicitly accepts live-mode checkout against a non-prod environment
+- Provider secret and catalog hydration is now working in the deploy workflow, and the staging backend billing check currently reports `configured`
+- Confirm whether the active staging `STRIPE_SECRET_KEY` is a test-mode or live-mode key before using hosted checkout in shared staging
+- The Stripe credentials supplied during the April 8 billing setup include live-mode credentials; do not commit them to the repo and prefer test-mode credentials for shared staging
 - Flutterwave account `Godwill Ocheme` is still in `TEST MODE` with account activation incomplete, so live Flutterwave charging is still blocked by provider KYC/activation
 - A full local `terraform plan` from the `admin` IAM user is still blocked by an explicit deny on `ec2:DescribeInstances` from `arn:aws:iam::260820061731:policy/demo-policy`
 - Full Terraform apply is still pending for monitoring, alerting, and other non-App-Runner resources outside the targeted repairs above
@@ -234,43 +295,42 @@ card,banktransfer,ussd
 
 ### Safe Next Step
 
-1. Populate the provider secrets in GitHub repo secrets, not in the repo
-2. Let the deploy workflow hydrate them into `afritalent-staging/app-secrets`
-3. Run a staging deploy only if the team accepts live Stripe against staging, otherwise use Stripe test credentials for staging first
-4. Do not treat Flutterwave as live-ready until the merchant account exits test mode
+1. Confirm the current staging Stripe secret mode before any checkout testing:
+   - prefer Stripe test-mode credentials for shared staging
+   - reserve live Stripe credentials for production cutover
+2. Do not treat Flutterwave as live-ready until the merchant account exits test mode
+3. Deploy and validate semantic retrieval in staging before counting production-grade matching as closed
+4. Clean up the Node 20 GitHub Actions deprecation warnings in a follow-on CI maintenance pass
 
 ## Last Known Image Digests
 
-- Backend tag: `1910dfc-live`
-- Backend digest: `sha256:157eebefaa3db7ab605176a9dd68a6b0b19e5cf0ee53a102f27db799a9830ed9`
-- Backend image pushed at: `2026-04-03 14:53:43 America/Chicago`
+- Backend tag: `9cec26c92f31cdecc93eac9a9d1ee86ceecc56e6`
+- Backend digest: `sha256:91e536207003eb9d0cd2a5ed7b5048359b18b913d756620633d59d871d30a8c7`
+- Backend image pushed at: `2026-04-08 00:34:08 America/Chicago`
 
-- Frontend tag: `apprunnerfix-20260326-221310`
-- Frontend digest: `sha256:13c51e87e91671834c6bf170a6968684ee325a1147c3cfe433af507f0d2a13b8`
-- Frontend image pushed at: `2026-04-03 14:21:31 America/Chicago`
+- Frontend tag: `9cec26c92f31cdecc93eac9a9d1ee86ceecc56e6`
+- Frontend digest: `sha256:40d8299d3a75c2941cd308c1d6d27f753a941f2323a3febc2c6fff1dd8e72847`
+- Frontend image pushed at: `2026-04-08 00:43:32 America/Chicago`
 
 ## Current Repo State
 
-There is a local commit that captures the shared staging deployment repair:
+Latest pushed deployment commit:
 
-- Commit: `fe70c56`
-- Message: `Repair shared staging deployment path`
+- Commit: `9cec26c`
+- Message: `Advance AfriTalent product readiness`
 
-That commit includes the main deploy-path fixes:
+That commit includes:
 
-- `staging` as the shared non-prod environment
-- deploy workflow updates for `develop`
-- backend runtime migration entrypoint
-- Terraform DB password drift fix in root `main.tf`
-- URL-safe secret generation in `infra/terraform/modules/secrets/main.tf`
+- the UI and UX production-finish pass
+- semantic retrieval and recruiter workflow groundwork
+- billing provider routing and webhook support
+- deploy and Terraform secret-hydration updates
+- marketing and operator documentation refreshes
 
-Important: the working tree still has unrelated local modifications that were not reverted:
+Local-only repo note after the successful deploy verification:
 
-- `backend/dist/*`
-- `infra/terraform/modules/apprunner/main.tf`
-- `infra/terraform/modules/apprunner/variables.tf`
-
-Do not reset or discard those unless the user explicitly asks.
+- `STAGING_RUNBOOK.md` now includes this post-deploy handoff update
+- `infra/terraform/canaries/public-journey.zip` remains untracked and was intentionally not committed
 
 ## Known Issues At Handoff
 
@@ -301,7 +361,8 @@ Do not reset or discard those unless the user explicitly asks.
    - `https://3mwn2b4e5t.us-east-1.awsapprunner.com`
 
 6. Billing is now a controlled release item, not a code gap
-   - Stripe account setup is complete enough for integration, but secrets must still be populated out of band
+   - Stripe account setup is complete enough for integration, and staging billing now reports `configured`
+   - confirm whether staging is using Stripe test or live credentials before interactive checkout testing
    - Flutterwave recurring plan IDs exist in test mode, but live charging is blocked by provider activation
    - staging should not be assumed safe for live Stripe keys unless the user explicitly approves that risk
 

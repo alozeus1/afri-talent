@@ -2,17 +2,17 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="section-shell mt-12 bg-[linear-gradient(180deg,rgba(15,23,32,0.94),rgba(7,17,29,1))] text-white">
+    <footer className="section-shell mt-12 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400">
       <div className="page-frame py-14">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
             <Link href="/" className="mb-5 flex items-center space-x-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-[linear-gradient(135deg,#19b99f,#0e6d5d)] shadow-[0_16px_40px_rgba(15,143,120,0.24)]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-500 bg-emerald-600 shadow-sm">
                 <span className="font-display text-lg font-bold text-white">A</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-display text-xl font-bold">AfriTalent</span>
-                <span className="text-[11px] uppercase tracking-[0.24em] text-white/50">Africa to global</span>
+                <span className="font-display text-xl font-bold text-zinc-900 dark:text-zinc-50">AfriTalent</span>
+                <span className="text-[11px] uppercase tracking-widest text-zinc-500">Africa to global</span>
               </div>
             </Link>
             <p className="max-w-lg text-sm leading-7 text-white/70">

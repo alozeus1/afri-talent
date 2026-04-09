@@ -7,7 +7,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
     return (
       <div
         ref={ref}
-        className={`surface-panel gloss-card rounded-[1.75rem] ${className}`}
+        className={`surface-panel rounded-2xl ${className}`}
         {...props}
       >
         {children}

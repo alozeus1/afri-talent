@@ -24,6 +24,10 @@ export const securityHeaders = helmet({
 });
 // General API rate limiter
 const isTestEnv = process.env.NODE_ENV === "test" || process.env.E2E === "1";
+const UNSAFE_OBJECT_KEYS = new Set(["__proto__", "prototype", "constructor"]);
+function getRateLimitKey(req) {
+    return ipKeyGenerator(req.ip ?? req.socket?.remoteAddress ?? "anonymous");
+}
 function isInternalPublicFetch(req) {
     const marker = req.header("x-afritalent-internal-fetch");
     if (marker !== "server-public-api") {
@@ -39,6 +43,7 @@ export const generalLimiter = rateLimit({
     max: isTestEnv ? 10000 : 100,
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: getRateLimitKey,
     message: { error: "Too many requests, please try again later" },
     skip: (req) => {
         // Skip rate limiting for health checks
@@ -50,6 +55,7 @@ export const authLimiter = rateLimit({
     max: isTestEnv ? 1000 : 10,
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: getRateLimitKey,
     message: { error: "Too many authentication attempts, please try again later" },
     skipSuccessfulRequests: false,
 });
@@ -59,6 +65,7 @@ export const registerLimiter = rateLimit({
     max: isTestEnv ? 1000 : 5,
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: getRateLimitKey,
     message: { error: "Too many registration attempts, please try again later" },
 });
 // Password reset limiter (for future use)
@@ -67,6 +74,7 @@ export const passwordResetLimiter = rateLimit({
     max: isTestEnv ? 1000 : 3,
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: getRateLimitKey,
     message: { error: "Too many password reset attempts, please try again later" },
 });
 // Request sanitization middleware
@@ -81,13 +89,25 @@ export function sanitizeRequest(req, _res, next) {
     next();
 }
 function sanitizeObject(obj) {
-    for (const key in obj) {
-        if (typeof obj[key] === "string") {
-            // Remove null bytes and other control characters
-            obj[key] = obj[key].replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+    for (const key of Object.keys(obj)) {
+        if (UNSAFE_OBJECT_KEYS.has(key)) {
+            delete obj[key];
+            continue;
         }
-        else if (typeof obj[key] === "object" && obj[key] !== null) {
-            sanitizeObject(obj[key]);
+        const value = obj[key];
+        if (typeof value === "string") {
+            // Remove null bytes and other control characters
+            obj[key] = value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+        }
+        else if (Array.isArray(value)) {
+            value.forEach((entry) => {
+                if (entry && typeof entry === "object") {
+                    sanitizeObject(entry);
+                }
+            });
+        }
+        else if (typeof value === "object" && value !== null) {
+            sanitizeObject(value);
         }
     }
 }
@@ -105,7 +125,7 @@ export const orchestratorLimiter = rateLimit({
         // Use user ID if authenticated (more precise), fallback to IP via the
         // ipKeyGenerator helper (required by express-rate-limit v8 for IPv6 safety).
         const userId = req.user?.userId;
-        return userId ?? ipKeyGenerator(req.ip ?? req.socket?.remoteAddress ?? "anonymous");
+        return userId ?? getRateLimitKey(req);
     },
     message: {
         error: "rate_limit_exceeded",

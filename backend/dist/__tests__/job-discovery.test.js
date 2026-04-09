@@ -50,10 +50,13 @@ describe("job discovery intelligence", () => {
     it("scores freshness and quality for complete trusted jobs", () => {
         const freshness = evaluateFreshness(baseJob, new Date(baseJob.publishedAt.getTime() + 2 * 86400000));
         const quality = evaluateJobQuality(baseJob);
+        const ranked = scoreJobForSearch(baseJob, { query: "backend engineer", skills: ["typescript"] });
         expect(freshness.label).toBe("FRESH");
         expect(freshness.score).toBeGreaterThanOrEqual(80);
         expect(["TRUSTED", "SOLID"]).toContain(quality.label);
         expect(quality.score).toBeGreaterThanOrEqual(64);
+        expect(ranked.discovery.sourceVerification).toBe("SCRAPED");
+        expect(ranked.discovery.applyPathType).toBe("BOARD");
     });
     it("merges source lineage into persisted job intelligence", () => {
         const intelligence = buildJobIntelligenceUpdate(baseJob, null, [
@@ -87,6 +90,16 @@ describe("job discovery intelligence", () => {
         expect(ranked).toHaveLength(1);
         expect(ranked[0].score).toBeGreaterThan(0);
         expect(ranked[0].explanation.summary.length).toBeGreaterThan(0);
+    });
+    it("marks direct ATS application paths as trusted", () => {
+        const ranked = scoreJobForSearch({
+            ...baseJob,
+            applicationUrl: "https://jobs.lever.co/techcorp/backend-engineer",
+            sourceUrl: "https://jobs.lever.co/techcorp/backend-engineer",
+        }, { query: "backend engineer" });
+        expect(ranked.discovery.applyPathType).toBe("ATS");
+        expect(ranked.discovery.verifiedApplyPath).toBe(true);
+        expect(ranked.discovery.sourceVerification).toBe("ATS_PRIMARY");
     });
 });
 //# sourceMappingURL=job-discovery.test.js.map

@@ -102,7 +102,7 @@ function hashOtp(code) {
     return crypto.createHash("sha256").update(code).digest("hex");
 }
 function generateOtp() {
-    return `${Math.floor(100000 + Math.random() * 900000)}`;
+    return crypto.randomInt(100000, 1000000).toString();
 }
 function mapArtifact(artifact) {
     return {

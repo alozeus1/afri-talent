@@ -8,19 +8,19 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className = "", variant = "primary", size = "md", children, disabled, ...props }, ref) => {
     const baseStyles =
-      "inline-flex items-center justify-center gap-2 font-semibold rounded-full border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none";
+      "inline-flex items-center justify-center gap-2 font-medium rounded-md border transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-zinc-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none";
 
     const variants = {
       primary:
-        "border-transparent bg-[linear-gradient(135deg,#14b89a,#0e7f6a)] text-white shadow-[0_18px_40px_rgba(15,143,120,0.28)] hover:-translate-y-0.5 hover:shadow-[0_24px_54px_rgba(15,143,120,0.34)] focus:ring-emerald-500",
+        "border-transparent bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 focus:ring-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-600",
       secondary:
-        "border-transparent bg-[rgba(15,23,32,0.06)] text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] hover:bg-[rgba(15,23,32,0.1)] focus:ring-gray-500 dark:bg-[rgba(255,255,255,0.08)] dark:text-gray-100 dark:hover:bg-[rgba(255,255,255,0.12)]",
+        "border-zinc-200 bg-white text-zinc-900 shadow-sm hover:bg-zinc-50 focus:ring-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800",
       outline:
-        "border-[rgba(15,143,120,0.28)] bg-[rgba(255,255,255,0.55)] text-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] hover:-translate-y-0.5 hover:border-[rgba(15,143,120,0.42)] hover:bg-[rgba(255,255,255,0.75)] focus:ring-emerald-500 dark:border-[rgba(52,211,178,0.3)] dark:bg-[rgba(7,17,29,0.58)] dark:text-emerald-200 dark:hover:bg-[rgba(7,17,29,0.72)]",
+        "border-zinc-200 bg-transparent text-zinc-900 shadow-sm hover:bg-zinc-100 hover:text-zinc-900 focus:ring-zinc-500 dark:border-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-800",
       ghost:
-        "border-transparent bg-transparent text-gray-700 hover:bg-[rgba(15,23,32,0.06)] focus:ring-gray-500 dark:text-gray-200 dark:hover:bg-[rgba(255,255,255,0.08)]",
+        "border-transparent bg-transparent text-zinc-700 hover:bg-zinc-100 focus:ring-zinc-500 dark:text-zinc-300 dark:hover:bg-zinc-800",
       danger:
-        "border-transparent bg-[linear-gradient(135deg,#ef4444,#b91c1c)] text-white shadow-[0_18px_40px_rgba(239,68,68,0.22)] hover:-translate-y-0.5 hover:shadow-[0_24px_54px_rgba(239,68,68,0.3)] focus:ring-red-500",
+        "border-transparent bg-red-600 text-white shadow-sm hover:bg-red-700 focus:ring-red-500 dark:bg-red-500 dark:hover:bg-red-600",
     };
 
     const sizes = {

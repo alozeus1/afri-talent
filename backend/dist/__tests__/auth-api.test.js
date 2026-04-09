@@ -151,9 +151,13 @@ describe("Auth API", () => {
         });
     });
     describe("GET /api/auth/me", () => {
-        it("returns 401 without token", async () => {
+        it("returns an anonymous session payload without token", async () => {
             const res = await request(app).get("/api/auth/me");
-            expect(res.status).toBe(401);
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({
+                authenticated: false,
+                user: null,
+            });
         });
         it("returns 404 if user no longer exists", async () => {
             // Return null, then the endpoint hits an invalid code path (in real life)
@@ -174,8 +178,9 @@ describe("Auth API", () => {
             const token = makeCandidateToken("user123");
             const res = await request(app).get("/api/auth/me").set("Authorization", `Bearer ${token}`);
             expect(res.status).toBe(200);
-            expect(res.body.id).toBe("user123");
-            expect(res.body.email).toBe("candidate@test.com");
+            expect(res.body.authenticated).toBe(true);
+            expect(res.body.user.id).toBe("user123");
+            expect(res.body.user.email).toBe("candidate@test.com");
         });
     });
 });

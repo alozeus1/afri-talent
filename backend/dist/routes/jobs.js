@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize, optionalAuth } from "../middleware/auth.js";
+import { anonymousJobsLimiter, blockAnonymousJobsAutomation } from "../middleware/bot-protection.js";
 import { JobStatus, Role, TrustEntityType, TrustRiskLevel } from "@prisma/client";
 import { buildCacheKey, getCachedJson, setCachedJson } from "../lib/cache.js";
 import { requireAccountStanding } from "../middleware/account-standing.js";
@@ -131,7 +132,7 @@ router.get("/ai-search", authenticate, authorize(Role.CANDIDATE), async (req, re
     }
 });
 // GET /api/jobs - Public: list published jobs
-router.get("/", optionalAuth, async (req, res) => {
+router.get("/", optionalAuth, anonymousJobsLimiter, blockAnonymousJobsAutomation, async (req, res) => {
     const startedAt = Date.now();
     try {
         const viewerKey = req.user?.role === Role.CANDIDATE ? req.user.userId : "anon";
