@@ -69,6 +69,11 @@ import trustRoutes from "./routes/trust.js";
 import adminTrustRoutes from "./routes/admin-trust.js";
 import adminAtsRoutes from "./routes/admin-ats.js";
 import adminRagRoutes from "./routes/admin-rag.js";
+// AI Skills routes (premium, additive)
+import skillsResumeBuilderRoutes from "./routes/skills/resume-builder.js";
+import skillsJobMatcherRoutes from "./routes/skills/job-matcher.js";
+import skillsApplicationWriterRoutes from "./routes/skills/application-writer.js";
+import skillsCareerAdvisorRoutes from "./routes/skills/career-advisor.js";
 import { swaggerSpec } from "./lib/swagger.js";
 
 dotenv.config({ quiet: true });
@@ -338,6 +343,11 @@ app.use("/api/trust", trustRoutes);
 app.use("/api/admin/trust", adminTrustRoutes);
 app.use("/api/admin/rag", adminRagRoutes);
 app.use("/api/bots", botsRoutes);
+// AI Skills (premium gated — require PROFESSIONAL plan)
+app.use("/api/skills/resume-builder", skillsResumeBuilderRoutes);
+app.use("/api/skills/job-matcher", skillsJobMatcherRoutes);
+app.use("/api/skills/application-writer", skillsApplicationWriterRoutes);
+app.use("/api/skills/career-advisor", skillsCareerAdvisorRoutes);
 
 // OpenAPI/Swagger docs
 app.get("/api/docs/spec.json", (_req, res) => {

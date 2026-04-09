@@ -3039,3 +3039,134 @@ export const chat = {
   deleteConversation: (id: string) =>
     fetchAPI<{ message: string }>(`/api/chat/conversations/${id}`, { method: "DELETE" }),
 };
+
+// ── AI Skills (premium — PROFESSIONAL plan) ───────────────────────────────────
+
+export interface GeneratedResumeSection {
+  summary: string;
+  skills: string[];
+  experience: Array<{ company: string; title: string; period: string; bullets: string[] }>;
+  education: Array<{ institution: string; degree: string; period: string }>;
+  certifications: string[];
+}
+
+export interface GeneratedResume {
+  sections: GeneratedResumeSection;
+  rawText: string;
+  source: "ai" | "template";
+}
+
+export interface JobMatch {
+  jobId: string;
+  title: string;
+  company: string;
+  location: string;
+  type: string;
+  seniority: string;
+  slug: string;
+  score: number;
+  matchMethod: "vector" | "keyword";
+}
+
+export interface SkillGap {
+  skill: string;
+  priority: "high" | "medium" | "low";
+  reason: string;
+}
+
+export interface CareerPath {
+  title: string;
+  timeline: string;
+  description: string;
+}
+
+export interface CareerAdviceResult {
+  skillGaps: SkillGap[];
+  careerPaths: CareerPath[];
+  certifications: Array<{ name: string; provider: string; rationale: string }>;
+  salaryRange: { min: number; max: number; currency: string; market: string };
+  actionPlan: Array<{ week: string; action: string }>;
+  summary: string;
+}
+
+export const skills = {
+  // Resume Builder
+  generateResume: (data: {
+    fullName: string;
+    email: string;
+    phone?: string;
+    location?: string;
+    targetRole: string;
+    yearsExperience: number;
+    summary?: string;
+    skills: string[];
+    workHistory: Array<{ company: string; title: string; period: string; description?: string }>;
+    educationHistory: Array<{ institution: string; degree: string; period?: string }>;
+    certifications?: string[];
+  }) =>
+    fetchAPI<{ resume: GeneratedResume }>("/api/skills/resume-builder/generate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  saveResume: (data: { content: Record<string, unknown>; rawText: string }) =>
+    fetchAPI<{ message: string; id: string; version: number }>("/api/skills/resume-builder/save", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getMyResume: () =>
+    fetchAPI<{ resume: { id: string; content: GeneratedResumeSection; rawText: string; version: number; updatedAt: string } | null }>("/api/skills/resume-builder/my-resume"),
+
+  // Job Matcher
+  getJobMatches: (limit = 10) =>
+    fetchAPI<{ matches: JobMatch[]; total: number; matchMethod: string }>(`/api/skills/job-matcher/matches?limit=${limit}`),
+
+  embedResume: () =>
+    fetchAPI<{ message: string }>("/api/skills/job-matcher/embed-resume", { method: "POST" }),
+
+  // Application Writer
+  generateCoverLetter: (data: { jobId: string; resumeText?: string }) =>
+    fetchAPI<{ coverLetter: string; source: "ai" | "template" }>("/api/skills/application-writer/generate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  submitApplication: (data: { jobId: string; coverLetter: string; cvUrl?: string }) =>
+    fetchAPI<{ message: string; application: { id: string; status: string; createdAt: string } }>("/api/skills/application-writer/submit", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getMyApplications: (params?: { page?: number; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set("page", params.page.toString());
+    if (params?.limit) searchParams.set("limit", params.limit.toString());
+    const query = searchParams.toString();
+    return fetchAPI<{
+      applications: Array<{
+        id: string;
+        status: string;
+        coverLetter: string | null;
+        createdAt: string;
+        job: { id: string; title: string; sourceName: string | null; location: string; slug: string };
+      }>;
+      total: number;
+      page: number;
+      limit: number;
+    }>(`/api/skills/application-writer/my-applications${query ? `?${query}` : ""}`);
+  },
+
+  // Career Advisor
+  analyseCareer: (data: { targetRole: string; resumeText?: string }) =>
+    fetchAPI<{ advice: CareerAdviceResult; sessionId: string; createdAt: string }>("/api/skills/career-advisor/analyze", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getCareerHistory: (limit = 10) =>
+    fetchAPI<{
+      sessions: Array<{ id: string; targetRole: string | null; adviceContent: CareerAdviceResult; createdAt: string }>;
+      total: number;
+    }>(`/api/skills/career-advisor/history?limit=${limit}`),
+};

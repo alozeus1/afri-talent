@@ -22,6 +22,7 @@ import { runOperationalSnapshotCycle } from "./operational-snapshot.js";
 import { runBillingReconciliationWorker } from "./billing-reconciliation.js";
 import { runCandidateRetentionWorker } from "./candidate-retention.js";
 import { runSemanticIndexWorker } from "./semantic-indexer.js";
+import { runSkillsJobEmbedder } from "./skills-job-embedder.js";
 import { pushDeadLetter, recordWorkerState, withRetry } from "../lib/ops/resilience.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
 
@@ -217,6 +218,25 @@ export function startScheduler(): void {
     void safeRun("semantic-index", runSemanticIndexWorker);
   }, 120_000);
   intervals.push(semanticDelay as unknown as IntervalRef);
+
+  // Skills job embedder: runs every 6 hours (same cadence as aggregator)
+  // so newly scraped jobs are embedded for the Job Matcher skill promptly.
+  const SKILLS_EMBED_INTERVAL_MS = parseInt(
+    process.env.SKILLS_EMBED_INTERVAL_HOURS || "6", 10
+  ) * 60 * 60 * 1000;
+
+  intervals.push(
+    setInterval(
+      () => void safeRun("skills-job-embedder", runSkillsJobEmbedder),
+      SKILLS_EMBED_INTERVAL_MS,
+    )
+  );
+
+  // Run embedder at boot+150s (after aggregator has had a chance to run)
+  const skillsEmbedDelay = setTimeout(() => {
+    void safeRun("skills-job-embedder", runSkillsJobEmbedder);
+  }, 150_000);
+  intervals.push(skillsEmbedDelay as unknown as IntervalRef);
 }
 
 export function stopScheduler(): void {
