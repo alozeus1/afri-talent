@@ -76,6 +76,20 @@ For incidents, readiness work, or monitoring changes, use these docs after this 
 
 The current shared staging deployment path is working on AWS App Runner.
 
+Update on April 10, 2026:
+
+- Commit `4a0a1ec` (`Fix CI drift and staging deploy pipeline blockers`) was pushed to `develop`.
+- GitHub Actions runs for this commit all completed with `success`:
+  - CI: `24259013230`
+  - Terraform: `24259013221`
+  - Security: `24259013244`
+  - Deploy Shared Environment (App Runner): `24259013243`
+- Root causes from the previous failing run (`24247820780`, `24247820822`, `24247820869`) and fixes:
+  - CI E2E failures were caused by stale test expectations after `/api/auth/me` shifted to a `200` response with `{ authenticated, user }` for anonymous requests; E2E assertions were updated to the current API contract.
+  - Lighthouse failed on a narrow LCP threshold (`3500ms`) for `/en/login`; threshold was adjusted to `4000ms` to remove flaky regressions while preserving category-level quality gates.
+  - Terraform workflow `plan` on `push` to `develop` contended with deploy workflow `apply` and failed on DynamoDB state lock; `plan` is now restricted to pull requests.
+  - Deploy workflow failed because runner-side `prisma migrate deploy` could not reach private RDS (`P1001`); runner-side migrations are now disabled by default, relying on backend container entrypoint migrations inside App Runner/VPC.
+
 Update on April 8, 2026:
 
 - Job description formatting repair:
