@@ -7,6 +7,8 @@ import { skills, GeneratedResume } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ATSScoreDisplay } from "@/components/ui/ats-score-display";
+import { LoadingState } from "@/components/ui/loading-state";
 
 interface WorkEntry {
   company: string;
@@ -61,6 +63,18 @@ export default function ResumeBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  // ATS scan state
+  const [atsJobDescription, setAtsJobDescription] = useState("");
+  const [atsResult, setAtsResult] = useState<{
+    score: number;
+    missingKeywords: string[];
+    presentKeywords: string[];
+    suggestions: string[];
+    source: "ai" | "heuristic";
+  } | null>(null);
+  const [atsLoading, setAtsLoading] = useState(false);
+  const [atsError, setAtsError] = useState<string | null>(null);
 
   if (!user) {
     router.push("/login");
@@ -130,6 +144,24 @@ export default function ResumeBuilderPage() {
 
   function handlePrint() {
     window.print();
+  }
+
+  async function handleAtsScan() {
+    if (!generated) return;
+    setAtsLoading(true);
+    setAtsError(null);
+    setAtsResult(null);
+    try {
+      const result = await skills.scanResumeAts({
+        resumeText: generated.rawText,
+        jobDescription: atsJobDescription.trim() || undefined,
+      });
+      setAtsResult(result);
+    } catch (err) {
+      setAtsError(err instanceof Error ? err.message : "ATS scan failed");
+    } finally {
+      setAtsLoading(false);
+    }
   }
 
   return (
@@ -390,6 +422,101 @@ export default function ResumeBuilderPage() {
                 Resume saved. Job Matcher will now use this for similarity scoring.
               </p>
             )}
+
+            {/* ATS Scanner */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold">ATS Score Check</h2>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Optionally paste a job description for a targeted analysis
+                    </p>
+                  </div>
+                  <Badge variant="info">Premium</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <textarea
+                  value={atsJobDescription}
+                  onChange={(e) => setAtsJobDescription(e.target.value)}
+                  rows={4}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  placeholder="Paste a job description here for a targeted keyword match (optional)"
+                />
+                <Button onClick={handleAtsScan} disabled={atsLoading} className="w-full">
+                  {atsLoading ? "Scanning..." : "Scan ATS Compatibility"}
+                </Button>
+
+                {atsError && (
+                  <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                    {atsError}
+                  </div>
+                )}
+
+                {atsLoading && <LoadingState lines={4} />}
+
+                {atsResult && !atsLoading && (
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center gap-4">
+                      <ATSScoreDisplay score={atsResult.score} size="lg" />
+                      <div className="text-sm text-gray-500">
+                        {atsResult.source === "ai" ? "AI-powered analysis" : "Heuristic analysis"}
+                      </div>
+                    </div>
+
+                    {atsResult.presentKeywords.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2">
+                          Keywords Found ({atsResult.presentKeywords.length})
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {atsResult.presentKeywords.map((kw) => (
+                            <span
+                              key={kw}
+                              className="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700"
+                            >
+                              {kw}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {atsResult.missingKeywords.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2">
+                          Missing Keywords ({atsResult.missingKeywords.length})
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {atsResult.missingKeywords.map((kw) => (
+                            <span
+                              key={kw}
+                              className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-600"
+                            >
+                              {kw}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {atsResult.suggestions.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">
+                          Suggestions
+                        </p>
+                        <ol className="text-sm text-gray-700 space-y-1 list-decimal list-inside">
+                          {atsResult.suggestions.map((s, i) => (
+                            <li key={i}>{s}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>

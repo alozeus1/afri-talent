@@ -13,6 +13,8 @@ import prisma from "../../lib/prisma.js";
 import logger from "../../lib/logger.js";
 import { buildResume } from "../../lib/ai/skills/resume-builder.js";
 import { embedUserResume } from "../../lib/ai/skills/job-matcher.js";
+import { scanResumeAts } from "../../lib/ai/skills/ats-scanner.js";
+import { translateResume, type SupportedTranslationLanguage } from "../../lib/ai/skills/resume-translator.js";
 
 const router = Router();
 
@@ -148,6 +150,70 @@ router.get(
     } catch (error) {
       logger.error({ error, userId: req.user?.userId }, "[resume-builder] fetch failed");
       res.status(500).json({ error: "Failed to fetch resume" });
+    }
+  }
+);
+
+// ── POST /api/skills/resume-builder/scan-ats ─────────────────────────────────
+router.post(
+  "/scan-ats",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  requirePlan(SubscriptionPlan.PROFESSIONAL),
+  async (req: Request, res: Response): Promise<void> => {
+    if (!checkSkillsEnabled(res)) return;
+
+    const scanAtsSchema = z.object({
+      resumeText: z.string().min(50).max(20000),
+      jobDescription: z.string().max(5000).optional(),
+    });
+
+    try {
+      const { resumeText, jobDescription } = scanAtsSchema.parse(req.body);
+      const result = await scanResumeAts({
+        resumeText,
+        jobDescription: jobDescription ?? "",
+      });
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Validation failed", details: error.issues });
+        return;
+      }
+      logger.error({ error, userId: req.user?.userId }, "[resume-builder] scan-ats failed");
+      res.status(500).json({ error: "Failed to scan resume" });
+    }
+  }
+);
+
+// ── POST /api/skills/resume-builder/translate ────────────────────────────────
+router.post(
+  "/translate",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  requirePlan(SubscriptionPlan.PROFESSIONAL),
+  async (req: Request, res: Response): Promise<void> => {
+    if (!checkSkillsEnabled(res)) return;
+
+    const translateSchema = z.object({
+      resumeText: z.string().min(50).max(20000),
+      targetLanguage: z.enum(["fr", "pt", "ar", "sw", "es"]),
+    });
+
+    try {
+      const { resumeText, targetLanguage } = translateSchema.parse(req.body);
+      const result = await translateResume({
+        resumeText,
+        targetLanguage: targetLanguage as SupportedTranslationLanguage,
+      });
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Validation failed", details: error.issues });
+        return;
+      }
+      logger.error({ error, userId: req.user?.userId }, "[resume-builder] translate failed");
+      res.status(500).json({ error: "Failed to translate resume" });
     }
   }
 );

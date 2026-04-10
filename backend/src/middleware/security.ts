@@ -124,6 +124,28 @@ function sanitizeObject(obj: Record<string, unknown>): void {
   }
 }
 
+// Skills rate limiter — per user, 20 requests per minute
+// Applied to all AI skill endpoints to prevent Claude API cost abuse
+export const skillsLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  keyGenerator: (req: Request): string => {
+    const userId = (req as Request & { user?: { userId: string } }).user?.userId;
+    return userId ?? getRateLimitKey(req);
+  },
+  message: {
+    error: "rate_limit_exceeded",
+    message: "Too many AI skill requests. Please wait a minute before trying again.",
+    retryAfter: 60,
+  },
+  handler: (_req, res, _next, options) => {
+    res.status(429).json(options.message);
+  },
+});
+
 // Orchestrator rate limiter — per user, 10 requests per minute
 // This is more restrictive than the general limiter due to Claude API costs
 export const orchestratorLimiter = rateLimit({

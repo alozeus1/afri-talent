@@ -19,6 +19,7 @@ export interface ApplicationWriterInput {
   jobTitle: string;
   jobCompany: string;
   jobDescription: string;
+  tone?: "professional" | "conversational" | "executive";
 }
 
 export interface GeneratedApplication {
@@ -45,6 +46,12 @@ export async function writeCoverLetter(
 async function generateWithClaude(input: ApplicationWriterInput): Promise<string> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+  const toneInstruction = input.tone === "conversational"
+    ? "Use a warm, approachable, and conversational tone — friendly yet professional."
+    : input.tone === "executive"
+    ? "Use a confident, strategic, and executive tone — authoritative and results-driven."
+    : "Use a polished, professional tone — clear and direct.";
+
   const prompt = `You are an expert career coach and professional writer.
 
 Write a compelling, personalised cover letter for ${input.candidateName} applying to the role of "${input.jobTitle}" at ${input.jobCompany}.
@@ -60,7 +67,7 @@ Requirements:
 - Opening: hook that connects the candidate's strongest relevant achievement to this specific role
 - Middle: 2-3 specific ways their background matches the job requirements
 - Closing: confident call to action
-- Professional but warm tone — not generic
+- ${toneInstruction}
 - No "Dear Hiring Manager", no "I am writing to express my interest"
 - No salutation or sign-off — return body paragraphs only
 - Reference specific details from the job description`;

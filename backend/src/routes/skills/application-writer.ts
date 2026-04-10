@@ -28,6 +28,7 @@ function checkSkillsEnabled(res: Response): boolean {
 const generateSchema = z.object({
   jobId: z.string().uuid(),
   resumeText: z.string().min(50).max(10000).optional(),
+  tone: z.enum(["professional", "conversational", "executive"]).optional(),
 });
 
 const submitSchema = z.object({
@@ -46,7 +47,7 @@ router.post(
     if (!checkSkillsEnabled(res)) return;
 
     try {
-      const { jobId, resumeText: providedResumeText } = generateSchema.parse(req.body);
+      const { jobId, resumeText: providedResumeText, tone } = generateSchema.parse(req.body);
       const userId = req.user!.userId;
 
       // Fetch job
@@ -103,6 +104,7 @@ router.post(
         jobTitle: job.title,
         jobCompany: job.sourceName || "the company",
         jobDescription: job.description,
+        tone,
       });
 
       res.json({ coverLetter: result.coverLetter, source: result.source });

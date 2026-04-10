@@ -662,6 +662,9 @@ model User {
   candidateAutopilotProfile     CandidateAutopilotProfile?
   candidateResumeVersions       CandidateResumeVersion[]
   candidateAgentTasks           CandidateAgentTask[]
+  coverLetterVersions           CoverLetterVersion[]
+  autoApplyBatches              AutoApplyBatch[]
+  careerGapSessions             CareerGapSession[]
 
   @@index([role])
   @@index([createdAt])
@@ -803,6 +806,7 @@ model Job {
   trustCases                TrustCase[]
   resumeVersions            CandidateResumeVersion[]
   candidateAgentTasks       CandidateAgentTask[]
+  coverLetterVersions       CoverLetterVersion[]
 
   @@index([status])
   @@index([status, publishedAt(sort: Desc)])
@@ -867,6 +871,8 @@ model UserResume {
   version   Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  atsReports AtsReport[]
 }
 
 model CareerAdvice {
@@ -2076,6 +2082,8 @@ enum AiRunType {
   RESUME_REVIEW
   JOB_MATCH
   APPLY_PACK
+  CAREER_GAP_EXPLAIN
+  SALARY_NEGOTIATE
 }
 
 model AiRun {
@@ -2561,4 +2569,137 @@ model SemanticDocument {
   @@unique([namespace, sourceType, sourceId])
   @@index([namespace, sourceType])
   @@index([namespace, updatedAt(sort: Desc)])
+}
+
+// ──────────────── Phase 2 New Models — Database Agent ────────────────
+
+model AtsReport {
+  id                String    @id @default(cuid())
+  resumeId          String
+  jobDescriptionId  String?
+
+  // Scores
+  score             Float     @default(0) // 0.0 to 1.0
+
+  // Missing elements
+  missingKeywords   String[]  @default([])
+  presentKeywords   String[]  @default([])
+
+  // Formatting issues
+  formatting        Json?     // { "pageBreaks": true, "columns": false, ... }
+  suggestions       String[]  @default([])
+
+  // Tracking
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  resume            UserResume? @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId])
+  @@index([createdAt])
+}
+
+model CoverLetterVersion {
+  id                String    @id @default(cuid())
+  candidateId       String
+  jobId             String
+
+  // Content
+  content           String    @db.Text
+  tone              String?   // "formal" | "conversational" | "executive"
+
+  // Tracking
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  candidate         User      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job               Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([jobId])
+  @@index([createdAt])
+}
+
+model AutoApplyBatch {
+  id                String    @id @default(cuid())
+  candidateId       String
+
+  // Batch metadata
+  jobFilters        Json?     // Filter criteria used (visaSponsorship, salaryMin, etc.)
+  jobsTargeted      Int       @default(0)
+
+  // Progress tracking
+  jobsApplied       Int       @default(0)
+  jobsFailed        Int       @default(0)
+  creditsUsed       Int       @default(0)
+
+  // Status
+  status            String    @default("queued") // "queued" | "in_progress" | "completed" | "failed"
+
+  // Timestamps
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  candidate         User      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SalaryBenchmark {
+  id                String    @id @default(cuid())
+
+  // Classification
+  role              String    // "Software Engineer", "Data Analyst", etc.
+  level             String    // "entry" | "mid" | "senior" | "lead"
+  country           String    // "NG" | "KE" | "ZA" | "EG" | "GH" etc.
+  currency          String    @default("USD")
+
+  // Data
+  salaryMin         Float
+  salaryMedian      Float
+  salaryMax         Float
+
+  // Metadata
+  sampleSize        Int       @default(0)
+  lastUpdated       DateTime  @default(now())
+  source            String?   // "crowdsourced" | "glassdoor" | "payscale" etc.
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([role, level, country, currency])
+  @@index([country])
+  @@index([role])
+}
+
+model CareerGapSession {
+  id                String    @id @default(cuid())
+  candidateId       String
+
+  // Gap details
+  startDate         DateTime
+  endDate           DateTime
+  reason            String?   @db.Text // User-provided reason
+
+  // Analysis
+  analysis          String    @db.Text // AI-generated analysis
+  reframing         String    @db.Text // How to frame it positively
+  talkingPoints     String[]  @default([])
+
+  // Metadata
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  candidate         User      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([createdAt])
 }

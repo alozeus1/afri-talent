@@ -15,6 +15,7 @@ import {
   generalLimiter,
   sanitizeRequest,
   orchestratorLimiter,
+  skillsLimiter,
 } from "./middleware/security.js";
 
 import authRoutes from "./routes/auth.js";
@@ -74,6 +75,8 @@ import skillsResumeBuilderRoutes from "./routes/skills/resume-builder.js";
 import skillsJobMatcherRoutes from "./routes/skills/job-matcher.js";
 import skillsApplicationWriterRoutes from "./routes/skills/application-writer.js";
 import skillsCareerAdvisorRoutes from "./routes/skills/career-advisor.js";
+import careerGapRoutes from "./routes/career-gap.js";
+import salaryBenchmarksRoutes from "./routes/salary-benchmarks.js";
 import { swaggerSpec } from "./lib/swagger.js";
 
 dotenv.config({ quiet: true });
@@ -333,7 +336,7 @@ app.use("/api/profile/resume-parser", resumeParserRoutes);
 app.use("/api/push", pushRoutes);
 app.use("/api/preferences", preferencesRoutes);
 app.use("/api/ats", atsRoutes);
-app.use("/api/mock-interviews", mockInterviewsRoutes);
+app.use("/api/mock-interviews", skillsLimiter, mockInterviewsRoutes);
 app.use("/api/analytics", analyticsEventsRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/salary-negotiation", salaryNegotiationRoutes);
@@ -343,11 +346,13 @@ app.use("/api/trust", trustRoutes);
 app.use("/api/admin/trust", adminTrustRoutes);
 app.use("/api/admin/rag", adminRagRoutes);
 app.use("/api/bots", botsRoutes);
-// AI Skills (premium gated — require PROFESSIONAL plan)
-app.use("/api/skills/resume-builder", skillsResumeBuilderRoutes);
-app.use("/api/skills/job-matcher", skillsJobMatcherRoutes);
-app.use("/api/skills/application-writer", skillsApplicationWriterRoutes);
-app.use("/api/skills/career-advisor", skillsCareerAdvisorRoutes);
+// AI Skills (premium gated — require PROFESSIONAL plan + per-user rate limit)
+app.use("/api/skills/resume-builder", skillsLimiter, skillsResumeBuilderRoutes);
+app.use("/api/skills/job-matcher", skillsLimiter, skillsJobMatcherRoutes);
+app.use("/api/skills/application-writer", skillsLimiter, skillsApplicationWriterRoutes);
+app.use("/api/skills/career-advisor", skillsLimiter, skillsCareerAdvisorRoutes);
+app.use("/api/career-gap", skillsLimiter, careerGapRoutes);
+app.use("/api/salary-benchmarks", skillsLimiter, salaryBenchmarksRoutes);
 
 // OpenAPI/Swagger docs
 app.get("/api/docs/spec.json", (_req, res) => {

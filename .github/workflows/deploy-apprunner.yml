@@ -421,6 +421,24 @@ jobs:
           echo "backend_arn=$BACKEND_ARN" >> "$GITHUB_OUTPUT"
           echo "frontend_arn=$FRONTEND_ARN" >> "$GITHUB_OUTPUT"
 
+      - name: Set up Node.js for migrations
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run Prisma migrations
+        working-directory: backend
+        env:
+          SECRET_NAME: afritalent-${{ env.DEPLOY_ENV }}/app-secrets
+        run: |
+          DATABASE_URL=$(aws secretsmanager get-secret-value \
+            --secret-id "$SECRET_NAME" \
+            --query 'SecretString' \
+            --output text | jq -r '.DATABASE_URL')
+          export DATABASE_URL
+          npm ci --ignore-scripts
+          npx prisma migrate deploy
+
       - name: Deploy backend
         run: aws apprunner start-deployment --service-arn "${{ steps.services.outputs.backend_arn }}"
 

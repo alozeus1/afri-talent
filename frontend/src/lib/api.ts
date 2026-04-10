@@ -705,6 +705,19 @@ export const mockInterviews = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  submitAnswer: (id: string, data: { question: string; answer: string }) =>
+    fetchAPI<{
+      score: number;
+      feedback: string;
+      suggestedAnswer: string;
+      talkingPoints: string[];
+      strengths: string[];
+      improvements: string[];
+      source: "ai" | "heuristic";
+    }>(`/api/mock-interviews/${id}/submit-answer`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   updatePrivacy: (
     id: string,
     data: {
@@ -3169,4 +3182,31 @@ export const skills = {
       sessions: Array<{ id: string; targetRole: string | null; adviceContent: CareerAdviceResult; createdAt: string }>;
       total: number;
     }>(`/api/skills/career-advisor/history?limit=${limit}`),
+
+  // ATS Scanner
+  scanResumeAts: (data: { resumeText: string; jobDescription?: string }) =>
+    fetchAPI<{
+      score: number;
+      missingKeywords: string[];
+      presentKeywords: string[];
+      suggestions: string[];
+      source: "ai" | "heuristic";
+    }>("/api/skills/resume-builder/scan-ats", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  // Career Gap Explainer
+  explainCareerGap: (data: { gapStartDate: string; gapEndDate: string; activities?: string; targetRole?: string }) =>
+    fetchAPI<{ explanation: string; framing: string; talkingPoints: string[]; source: "ai" | "template" }>("/api/career-gap/explain", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  // Salary Negotiation
+  getSalaryNegotiation: (data: { role: string; location: string; currency?: string; yearsExperience?: number; currentSalary?: number; targetSalary?: number }) =>
+    fetchAPI<{ recommendedRange: string; talkingPoints: string[]; benefitsToNegotiate: string[]; negotiationScript: string; source: "ai" | "template" }>("/api/salary-benchmarks/negotiate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };
