@@ -5,8 +5,8 @@
  *  1. HttpOnly cookie auth — token not exposed to JavaScript
  *  2. Cookie-based session — /api/auth/me works without Bearer header
  *  3. Logout invalidates session (token blocked in Redis)
- *  4. Protected routes return 401 without credentials
- *  5. Invalid / expired token returns 401
+ *  4. Protected routes enforce anonymous vs authenticated behavior correctly
+ *  5. Invalid / expired token resolves to anonymous me payload
  *  6. Input validation (jobs pagination cap, CV URL scheme)
  *
  * Requires the backend running on API_BASE_URL (default http://localhost:4000).
@@ -46,14 +46,15 @@ test("/api/auth/me works via cookie without Authorization header", async ({
   const meRes = await request.get(`${API}/api/auth/me`);
   expect(meRes.ok()).toBe(true);
   const body = await meRes.json();
-  expect(body.email).toBe(TEST_CANDIDATE.email);
+  expect(body.authenticated).toBe(true);
+  expect(body.user?.email).toBe(TEST_CANDIDATE.email);
 });
 
 // ---------------------------------------------------------------------------
 // 3. Logout invalidates session
 // ---------------------------------------------------------------------------
 
-test("after logout /api/auth/me returns 401", async ({ request }) => {
+test("after logout /api/auth/me returns unauthenticated payload", async ({ request }) => {
   await loginAs(request, TEST_CANDIDATE);
 
   // Confirm we're authenticated
@@ -64,9 +65,12 @@ test("after logout /api/auth/me returns 401", async ({ request }) => {
   const logoutRes = await request.post(`${API}/api/auth/logout`);
   expect(logoutRes.ok()).toBe(true);
 
-  // Cookie should be cleared — subsequent request should be 401
+  // Cookie should be cleared — subsequent request should be unauthenticated
   const after = await request.get(`${API}/api/auth/me`);
-  expect(after.status()).toBe(401);
+  expect(after.status()).toBe(200);
+  const afterBody = await after.json();
+  expect(afterBody.authenticated).toBe(false);
+  expect(afterBody.user).toBeNull();
 });
 
 // ---------------------------------------------------------------------------
@@ -74,37 +78,45 @@ test("after logout /api/auth/me returns 401", async ({ request }) => {
 // ---------------------------------------------------------------------------
 
 test.describe("unauthenticated access", () => {
-  const protectedRoutes: [string, string][] = [
-    ["GET", "/api/auth/me"],
-    ["GET", "/api/profile"],
-    ["GET", "/api/applications/my"],
-    ["GET", "/api/notifications"],
-    ["GET", "/api/billing/status"],
+  const protectedRoutes: [string, string, number][] = [
+    ["GET", "/api/auth/me", 200],
+    ["GET", "/api/profile", 401],
+    ["GET", "/api/applications/my", 401],
+    ["GET", "/api/notifications", 401],
+    ["GET", "/api/billing/status", 401],
   ];
 
-  for (const [method, path] of protectedRoutes) {
-    test(`${method} ${path} returns 401 without cookie`, async ({
+  for (const [method, path, expectedStatus] of protectedRoutes) {
+    test(`${method} ${path} enforces anonymous behavior without cookie`, async ({
       request,
     }) => {
       // Fresh request context — no cookies
       const res = await request.fetch(`${API}${path}`, { method });
-      expect(res.status()).toBe(401);
+      expect(res.status()).toBe(expectedStatus);
+      if (path === "/api/auth/me") {
+        const body = await res.json();
+        expect(body.authenticated).toBe(false);
+        expect(body.user).toBeNull();
+      }
     });
   }
 });
 
 // ---------------------------------------------------------------------------
-// 5. Invalid token returns 401
+// 5. Invalid token handling
 // ---------------------------------------------------------------------------
 
-test("Bearer token with garbage value returns 401", async ({ request }) => {
+test("Bearer token with garbage value resolves to unauthenticated me payload", async ({ request }) => {
   const res = await request.get(`${API}/api/auth/me`, {
     headers: { Authorization: "Bearer this.is.not.a.valid.jwt" },
   });
-  expect(res.status()).toBe(401);
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  expect(body.authenticated).toBe(false);
+  expect(body.user).toBeNull();
 });
 
-test("Bearer token with valid structure but wrong signature returns 401", async ({
+test("Bearer token with bad signature resolves to unauthenticated me payload", async ({
   request,
 }) => {
   // A JWT with correct format but tampered signature
@@ -115,7 +127,10 @@ test("Bearer token with valid structure but wrong signature returns 401", async 
   const res = await request.get(`${API}/api/auth/me`, {
     headers: { Authorization: `Bearer ${fakeJwt}` },
   });
-  expect(res.status()).toBe(401);
+  expect(res.status()).toBe(200);
+  const body = await res.json();
+  expect(body.authenticated).toBe(false);
+  expect(body.user).toBeNull();
 });
 
 // ---------------------------------------------------------------------------

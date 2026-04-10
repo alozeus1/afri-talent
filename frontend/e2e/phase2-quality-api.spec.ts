@@ -93,7 +93,8 @@ test("employer journey API smoke: signup -> post job -> upgrade", async ({ reque
   const meRes = await request.get(`${API}/api/auth/me`);
   expect(meRes.ok()).toBe(true);
   const me = await meRes.json();
-  expect(me.role).toBe("EMPLOYER");
+  expect(me.authenticated).toBe(true);
+  expect(me.user?.role).toBe("EMPLOYER");
 
   const createJobRes = await request.post(`${API}/api/jobs`, {
     data: {

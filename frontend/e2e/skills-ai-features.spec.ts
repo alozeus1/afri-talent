@@ -259,8 +259,8 @@ test.describe("Career Advisor History", () => {
   }) => {
     await loginAs(request, TEST_CANDIDATE);
     const res = await request.get(`${SKILLS_BASE}/career-advisor/history`);
-    // 403 for FREE user, 200 for PROFESSIONAL
-    expect([200, 403]).toContain(res.status());
+    // 403 for FREE user, 200 for PROFESSIONAL, 429 if minute limiter trips in CI
+    expect([200, 403, 429]).toContain(res.status());
     if (res.status() === 200) {
       const body = await res.json();
       expect(Array.isArray(body.sessions)).toBe(true);

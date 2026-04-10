@@ -31,6 +31,9 @@ env:
   AWS_REGION: us-east-1
   ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
   DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+  # GitHub-hosted runners cannot reach private RDS endpoints in this VPC.
+  # Backend container startup already runs `prisma migrate deploy` inside App Runner.
+  RUN_PRISMA_MIGRATIONS_FROM_RUNNER: "false"
 
 jobs:
   validate-ref:
@@ -422,11 +425,13 @@ jobs:
           echo "frontend_arn=$FRONTEND_ARN" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js for migrations
+        if: env.RUN_PRISMA_MIGRATIONS_FROM_RUNNER == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Run Prisma migrations
+        if: env.RUN_PRISMA_MIGRATIONS_FROM_RUNNER == 'true'
         working-directory: backend
         env:
           SECRET_NAME: afritalent-${{ env.DEPLOY_ENV }}/app-secrets

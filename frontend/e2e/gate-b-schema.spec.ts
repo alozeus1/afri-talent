@@ -97,8 +97,10 @@ test.describe("Resumes", () => {
     // First we need to get the candidate's userId from /api/auth/me
     const meRes = await request.get(`${API}/api/auth/me`);
     const me = await meRes.json();
+    expect(me.authenticated).toBe(true);
+    expect(me.user?.id).toBeTruthy();
 
-    const s3Key = `resumes/${me.id}/test-resume-e2e.pdf`;
+    const s3Key = `resumes/${me.user.id}/test-resume-e2e.pdf`;
 
     const res = await request.post(`${API}/api/profile/resumes`, {
       data: {

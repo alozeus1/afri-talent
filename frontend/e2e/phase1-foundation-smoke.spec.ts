@@ -28,7 +28,8 @@ test("smoke: register then login with cookie session", async ({ request }) => {
   const meRes = await request.get(`${API}/api/auth/me`);
   expect(meRes.ok()).toBe(true);
   const me = await meRes.json();
-  expect(me.email).toBe(email);
+  expect(me.authenticated).toBe(true);
+  expect(me.user?.email).toBe(email);
 });
 
 test("smoke: active job detail page includes JobPosting schema", async ({ request, page }) => {

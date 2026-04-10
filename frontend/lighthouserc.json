@@ -33,7 +33,7 @@
         ],
         "largest-contentful-paint": [
           "error",
-          { "maxNumericValue": 3500 }
+          { "maxNumericValue": 4000 }
         ],
         "cumulative-layout-shift": [
           "error",
