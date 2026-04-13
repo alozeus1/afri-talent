@@ -3,7 +3,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { AbuseReportStatus, JobStatus, ReviewStatus, ReviewTargetType, Role, TrustCaseStatus, VerificationArtifactStatus } from "@prisma/client";
-import { getLastSyncTime } from "../workers/aggregator-cron.js";
+import { getIngestionReliabilityState, getLastSyncTime } from "../workers/aggregator-cron.js";
 import { summarizeDeadLetters, getWorkerStates, listDeadLetters } from "../lib/ops/resilience.js";
 import { redisHealthStatus } from "../lib/redis.js";
 
@@ -62,6 +62,7 @@ router.get("/operations/overview", async (_req: Request, res: Response) => {
       trustCaseBacklog,
       abuseReportBacklog,
       fraudDetectionsLast24h,
+      ingestionReliability,
       workerStates,
       deadLettersBySource,
       redisStatus,
@@ -96,6 +97,7 @@ router.get("/operations/overview", async (_req: Request, res: Response) => {
           },
         },
       }),
+      getIngestionReliabilityState(),
       getWorkerStates(),
       summarizeDeadLetters(),
       redisHealthStatus(),
@@ -114,6 +116,11 @@ router.get("/operations/overview", async (_req: Request, res: Response) => {
         lastSyncAt,
         minutesSinceLastSync,
         stale: minutesSinceLastSync === null ? true : minutesSinceLastSync > 180,
+        cycleStatus: ingestionReliability.lastCycleStatus,
+        lastCycleAt: ingestionReliability.lastCycleAt,
+        consecutiveFailureCount: ingestionReliability.consecutiveFailureCount,
+        consecutiveZeroResultCount: ingestionReliability.consecutiveZeroResultCount,
+        lastJobsIngested: ingestionReliability.lastJobsIngested,
       },
       backlogs: {
         pendingJobs,

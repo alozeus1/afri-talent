@@ -63,6 +63,18 @@ variable "enable_interface_endpoints" {
   default     = false
 }
 
+variable "enable_s3_gateway_endpoint" {
+  type        = bool
+  description = "Create S3 gateway endpoint for private route tables."
+  default     = true
+}
+
+variable "interface_endpoint_services" {
+  type        = list(string)
+  description = "Allowlisted interface endpoint services to create when enable_interface_endpoints is true."
+  default     = ["ecr.api", "ecr.dkr", "secretsmanager"]
+}
+
 variable "acm_certificate_arn" {
   type        = string
   description = "ACM certificate ARN for HTTPS (optional)"
@@ -396,7 +408,7 @@ variable "synthetics_schedule_expression" {
 variable "job_ingestion_staleness_threshold_minutes" {
   type        = number
   description = "Alarm threshold for stale job ingestion freshness snapshots."
-  default     = 180
+  default     = 60
 }
 
 variable "moderation_queue_backlog_threshold" {
@@ -423,6 +435,36 @@ variable "notification_failure_threshold" {
   default     = 10
 }
 
+variable "ingestion_egress_failure_threshold" {
+  type        = number
+  description = "Alarm threshold for ingestion source fetch failures in a 5 minute window."
+  default     = 3
+}
+
+variable "ingestion_consecutive_failure_threshold" {
+  type        = number
+  description = "SEV2 threshold for consecutive ingestion cycle failures."
+  default     = 2
+}
+
+variable "ingestion_consecutive_zero_result_threshold" {
+  type        = number
+  description = "SEV2 threshold for consecutive zero-result ingestion cycles."
+  default     = 2
+}
+
+variable "ingestion_source_failure_spike_threshold" {
+  type        = number
+  description = "SEV3 threshold for per-source fetch failure spikes within 15 minutes."
+  default     = 2
+}
+
+variable "cleanup_guardrail_role_names" {
+  type        = list(string)
+  description = "IAM role names that should be denied critical NAT and route-table mutations."
+  default     = []
+}
+
 variable "ses_region" {
   type        = string
   description = "AWS region used for SES sends"
@@ -433,6 +475,12 @@ variable "ses_from_email" {
   type        = string
   description = "Verified SES from address for transactional email"
   default     = ""
+}
+
+variable "aggregator_interval_minutes" {
+  type        = number
+  description = "Aggregator scheduler interval in minutes for runtime configuration."
+  default     = 30
 }
 
 variable "ai_fast_model" {

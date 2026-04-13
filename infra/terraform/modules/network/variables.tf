@@ -39,3 +39,15 @@ variable "enable_interface_endpoints" {
   description = "Create VPC interface/gateway endpoints for AWS APIs (ECR, Secrets Manager, S3)"
   default     = true
 }
+
+variable "enable_s3_gateway_endpoint" {
+  type        = bool
+  description = "Create S3 gateway endpoint for private route tables."
+  default     = true
+}
+
+variable "interface_endpoint_services" {
+  type        = list(string)
+  description = "Allowlisted interface endpoint services to create when enable_interface_endpoints is true."
+  default     = ["ecr.api", "ecr.dkr", "secretsmanager"]
+}

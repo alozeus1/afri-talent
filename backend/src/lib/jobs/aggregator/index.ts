@@ -4,7 +4,15 @@
 
 import { PrismaClient } from "@prisma/client";
 import logger from "../../logger.js";
-import type { AggregatedJob, AggregatorResult, JobSource, JobRegion } from "./types.js";
+import { recordLatencyMetric, recordOpsEvent } from "../../ops/events.js";
+import type {
+  AggregatedJob,
+  AggregationDiagnostics,
+  AggregatorResult,
+  JobSource,
+  JobRegion,
+  SourceFetchDiagnostics,
+} from "./types.js";
 import { AFRICA_FRIENDLY_KEYWORDS } from "./types.js";
 import { buildJobIntelligenceUpdate, buildSourceFingerprint } from "../discovery.js";
 import { RemoteOKSource } from "./sources/remoteok.js";
@@ -62,6 +70,42 @@ function parseTokenList(raw: string | undefined): string[] {
 
 function mergeUniqueTokens(...groups: string[][]): string[] {
   return Array.from(new Set(groups.flatMap((group) => group)));
+}
+
+function classifyFailureReason(message: string): string {
+  const normalized = message.toLowerCase();
+
+  const httpMatch = normalized.match(/http\s+(\d{3})/);
+  if (httpMatch) {
+    const status = Number.parseInt(httpMatch[1], 10);
+    if (!Number.isNaN(status)) {
+      if (status >= 500) return "http_5xx";
+      if (status === 429) return "rate_limited";
+      if (status === 401 || status === 403) return "auth";
+      if (status >= 400) return "http_4xx";
+    }
+  }
+
+  if (
+    normalized.includes("fetch failed") ||
+    normalized.includes("econnreset") ||
+    normalized.includes("etimedout") ||
+    normalized.includes("enotfound") ||
+    normalized.includes("eai_again") ||
+    normalized.includes("network")
+  ) {
+    return "network";
+  }
+
+  if (normalized.includes("timeout")) {
+    return "timeout";
+  }
+
+  if (normalized.includes("unauthorized") || normalized.includes("forbidden") || normalized.includes("token")) {
+    return "auth";
+  }
+
+  return "unknown";
 }
 
 export function resolveSourceCatalog(
@@ -169,31 +213,146 @@ export class JobAggregator {
     }
   }
 
-  async aggregateJobs(query: JobQuery): Promise<AggregatorResult[]> {
+  private emitSourceMetrics(diagnostics: SourceFetchDiagnostics): void {
+    recordLatencyMetric("source_fetch_latency", diagnostics.durationMs, {
+      source: diagnostics.source,
+      status: diagnostics.status,
+    });
+
+    if (diagnostics.status === "success") {
+      recordOpsEvent({
+        metricName: "source_fetch_success",
+        category: "ingestion",
+        details: {
+          source: diagnostics.source,
+          jobs_fetched: diagnostics.jobsFetched,
+          error_count: diagnostics.errorCount,
+        },
+      });
+    } else {
+      recordOpsEvent({
+        metricName: "source_fetch_failure",
+        category: "ingestion",
+        outcome: "failure",
+        severity: "warning",
+        details: {
+          source: diagnostics.source,
+          jobs_fetched: diagnostics.jobsFetched,
+          error_count: diagnostics.errorCount,
+          reason: diagnostics.failureReason ?? "unknown",
+        },
+      });
+    }
+
+    const reasonCounts = new Map<string, number>();
+    for (const error of diagnostics.errors ?? []) {
+      const reason = classifyFailureReason(error);
+      reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+    }
+
+    for (const [reason, count] of reasonCounts.entries()) {
+      recordOpsEvent({
+        metricName: "source_fetch_error",
+        category: "ingestion",
+        outcome: diagnostics.status === "failure" ? "failure" : "degraded",
+        severity: diagnostics.status === "failure" ? "warning" : "info",
+        value: count,
+        details: {
+          source: diagnostics.source,
+          reason,
+        },
+      });
+    }
+  }
+
+  async aggregateJobsWithDiagnostics(query: JobQuery): Promise<{
+    results: AggregatorResult[];
+    diagnostics: AggregationDiagnostics;
+  }> {
     const results: AggregatorResult[] = [];
+    const sourceDiagnostics: SourceFetchDiagnostics[] = [];
 
     for (const source of this.sources) {
       if (!source.isEnabled) continue;
+      const startedAt = Date.now();
 
       try {
         const result = await source.fetchJobs(query);
         results.push(result);
+        const errorCount = result.errors?.length ?? 0;
+        const sourceStatus: SourceFetchDiagnostics["status"] =
+          result.jobs.length === 0 && errorCount > 0 ? "failure" : "success";
+        const failureReason =
+          sourceStatus === "failure" ? classifyFailureReason(result.errors?.[0] ?? "unknown") : undefined;
+        const diagnostics: SourceFetchDiagnostics = {
+          source: source.source,
+          status: sourceStatus,
+          jobsFetched: result.jobs.length,
+          errorCount,
+          durationMs: Date.now() - startedAt,
+          failureReason,
+          errors: result.errors,
+        };
+        sourceDiagnostics.push(diagnostics);
+        this.emitSourceMetrics(diagnostics);
         logger.info(
-          { source: source.source, jobCount: result.jobs.length },
+          {
+            source: source.source,
+            jobCount: result.jobs.length,
+            durationMs: diagnostics.durationMs,
+            errorCount,
+            sourceStatus,
+            failureReason,
+          },
           "[aggregator] Source completed"
         );
       } catch (error) {
+        const durationMs = Date.now() - startedAt;
+        const errorMessage = String(error);
+        const failureReason = classifyFailureReason(errorMessage);
         logger.error({ source: source.source, error: String(error) }, "[aggregator] Source failed");
         results.push({
           source: source.source,
           jobs: [],
           totalFound: 0,
           fetchedAt: new Date(),
-          errors: [String(error)],
+          errors: [errorMessage],
         });
+        const diagnostics: SourceFetchDiagnostics = {
+          source: source.source,
+          status: "failure",
+          jobsFetched: 0,
+          errorCount: 1,
+          durationMs,
+          failureReason,
+          errors: [errorMessage],
+        };
+        sourceDiagnostics.push(diagnostics);
+        this.emitSourceMetrics(diagnostics);
       }
     }
 
+    const sourcesAttempted = sourceDiagnostics.length;
+    const sourcesFailed = sourceDiagnostics.filter((entry) => entry.status === "failure").length;
+    const sourcesSucceeded = sourcesAttempted - sourcesFailed;
+    const jobsFetched = results.reduce((sum, result) => sum + result.jobs.length, 0);
+    const hadErrors = sourceDiagnostics.some((entry) => entry.errorCount > 0);
+
+    return {
+      results,
+      diagnostics: {
+        sourcesAttempted,
+        sourcesSucceeded,
+        sourcesFailed,
+        jobsFetched,
+        hadErrors,
+        sourceDiagnostics,
+      },
+    };
+  }
+
+  async aggregateJobs(query: JobQuery): Promise<AggregatorResult[]> {
+    const { results } = await this.aggregateJobsWithDiagnostics(query);
     return results;
   }
 
@@ -204,8 +363,9 @@ export class JobAggregator {
     skipped: number;
     byRegion: Record<JobRegion, number>;
     bySource: Record<JobSource, number>;
+    diagnostics: AggregationDiagnostics;
   }> {
-    const results = await this.aggregateJobs(query);
+    const { results, diagnostics } = await this.aggregateJobsWithDiagnostics(query);
     const allJobs = results.flatMap((r) => r.jobs);
 
     // Deduplicate by externalId
@@ -260,6 +420,7 @@ export class JobAggregator {
       skipped,
       byRegion,
       bySource: bySource as Record<JobSource, number>,
+      diagnostics,
     };
   }
 

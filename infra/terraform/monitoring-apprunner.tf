@@ -89,6 +89,54 @@ locals {
       metric_name = "SchedulerTaskFailureCount"
       pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"scheduler_task_failure\" }"
     }
+    ingestion_source_fetch_failure = {
+      metric_name = "IngestionSourceFetchFailureCount"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_failure\" }"
+    }
+    source_fetch_success = {
+      metric_name = "SourceFetchSuccessCount"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_success\" }"
+    }
+    source_fetch_failure = {
+      metric_name = "SourceFetchFailureCount"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_failure\" }"
+    }
+    source_fetch_success_greenhouse = {
+      metric_name = "SourceFetchSuccessCountGreenhouse"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_success\" && $.details.source = \"GREENHOUSE\" }"
+    }
+    source_fetch_success_lever = {
+      metric_name = "SourceFetchSuccessCountLever"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_success\" && $.details.source = \"LEVER\" }"
+    }
+    source_fetch_success_workable = {
+      metric_name = "SourceFetchSuccessCountWorkable"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_success\" && $.details.source = \"WORKABLE\" }"
+    }
+    source_fetch_failure_greenhouse = {
+      metric_name = "SourceFetchFailureCountGreenhouse"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_failure\" && $.details.source = \"GREENHOUSE\" }"
+    }
+    source_fetch_failure_lever = {
+      metric_name = "SourceFetchFailureCountLever"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_failure\" && $.details.source = \"LEVER\" }"
+    }
+    source_fetch_failure_workable = {
+      metric_name = "SourceFetchFailureCountWorkable"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_failure\" && $.details.source = \"WORKABLE\" }"
+    }
+    source_fetch_failure_reason_network = {
+      metric_name = "SourceFetchFailureCountNetwork"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_failure\" && $.details.reason = \"network\" }"
+    }
+    source_fetch_failure_reason_auth = {
+      metric_name = "SourceFetchFailureCountAuth"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_failure\" && $.details.reason = \"auth\" }"
+    }
+    source_fetch_failure_reason_rate_limited = {
+      metric_name = "SourceFetchFailureCountRateLimited"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_failure\" && $.details.reason = \"rate_limited\" }"
+    }
   }
 
   ops_value_metric_filters = {
@@ -111,6 +159,71 @@ locals {
       metric_name = "JobIngestionFreshnessMinutes"
       pattern     = "{ $.event_type = \"ops_snapshot\" && $.metric_name = \"job_ingestion_freshness_minutes\" }"
       unit        = "Count"
+    }
+    last_successful_ingestion_timestamp = {
+      metric_name = "LastSuccessfulIngestionTimestamp"
+      pattern     = "{ $.event_type = \"ops_snapshot\" && $.metric_name = \"last_successful_ingestion_timestamp\" }"
+      unit        = "Count"
+    }
+    ingestion_cycle_status = {
+      metric_name = "IngestionCycleStatus"
+      pattern     = "{ $.event_type = \"ops_snapshot\" && $.metric_name = \"ingestion_cycle_status\" }"
+      unit        = "Count"
+    }
+    consecutive_failure_count = {
+      metric_name = "ConsecutiveFailureCount"
+      pattern     = "{ $.event_type = \"ops_snapshot\" && $.metric_name = \"consecutive_failure_count\" }"
+      unit        = "Count"
+    }
+    consecutive_zero_result_count = {
+      metric_name = "ConsecutiveZeroResultCount"
+      pattern     = "{ $.event_type = \"ops_snapshot\" && $.metric_name = \"consecutive_zero_result_count\" }"
+      unit        = "Count"
+    }
+    jobs_ingested_per_cycle = {
+      metric_name = "JobsIngestedPerCycle"
+      pattern     = "{ $.event_type = \"ops_snapshot\" && $.metric_name = \"jobs_ingested_per_cycle\" }"
+      unit        = "Count"
+    }
+    source_fetch_latency = {
+      metric_name = "SourceFetchLatencyMs"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_latency\" }"
+      unit        = "Milliseconds"
+    }
+    source_fetch_error = {
+      metric_name = "SourceFetchErrorCount"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_error\" }"
+      unit        = "Count"
+    }
+    source_fetch_error_greenhouse = {
+      metric_name = "SourceFetchErrorCountGreenhouse"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_error\" && $.details.source = \"GREENHOUSE\" }"
+      unit        = "Count"
+    }
+    source_fetch_error_lever = {
+      metric_name = "SourceFetchErrorCountLever"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_error\" && $.details.source = \"LEVER\" }"
+      unit        = "Count"
+    }
+    source_fetch_error_workable = {
+      metric_name = "SourceFetchErrorCountWorkable"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_error\" && $.details.source = \"WORKABLE\" }"
+      unit        = "Count"
+    }
+    source_fetch_latency_greenhouse = {
+      metric_name = "SourceFetchLatencyMsGreenhouse"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_latency\" && $.details.source = \"GREENHOUSE\" }"
+      unit        = "Milliseconds"
+    }
+    source_fetch_latency_lever = {
+      metric_name = "SourceFetchLatencyMsLever"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_latency\" && $.details.source = \"LEVER\" }"
+      unit        = "Milliseconds"
+    }
+    source_fetch_latency_workable = {
+      metric_name = "SourceFetchLatencyMsWorkable"
+      pattern     = "{ $.event_type = \"ops_metric\" && $.metric_name = \"source_fetch_latency\" && $.details.source = \"WORKABLE\" }"
+      unit        = "Milliseconds"
     }
     fraud_detections_24h = {
       metric_name = "FraudDetections24h"
@@ -149,6 +262,174 @@ resource "aws_sns_topic_subscription" "ops_warning_email" {
   topic_arn = aws_sns_topic.ops_warning[0].arn
   protocol  = "email"
   endpoint  = var.alerts_email
+}
+
+resource "aws_iam_role_policy" "cleanup_guardrails" {
+  for_each = var.enable_ops_monitoring ? toset(var.cleanup_guardrail_role_names) : toset([])
+
+  name = "${local.name_prefix}-deny-critical-network-mutations"
+  role = each.value
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "DenyNatGatewayDeletion"
+        Effect = "Deny"
+        Action = [
+          "ec2:DeleteNatGateway",
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "DenyRouteMutations"
+        Effect = "Deny"
+        Action = [
+          "ec2:CreateRoute",
+          "ec2:ReplaceRoute",
+          "ec2:DeleteRoute",
+        ]
+        Resource = "*"
+      },
+    ]
+  })
+}
+
+resource "aws_cloudwatch_event_rule" "nat_gateway_deletion" {
+  count = var.enable_ops_monitoring ? 1 : 0
+
+  name        = "${local.name_prefix}-nat-gateway-deletion"
+  description = "Critical event. NAT gateway deletion detected via CloudTrail. Owner: Platform On-Call."
+
+  event_pattern = jsonencode({
+    source      = ["aws.ec2"]
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventSource = ["ec2.amazonaws.com"]
+      eventName   = ["DeleteNatGateway"]
+      requestParameters = {
+        vpcId = [module.network.vpc_id]
+      }
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_rule" "private_route_mutation" {
+  count = var.enable_ops_monitoring ? 1 : 0
+
+  name        = "${local.name_prefix}-private-route-mutation"
+  description = "Critical event. Private route table mutation detected via CloudTrail. Owner: Platform On-Call."
+
+  event_pattern = jsonencode({
+    source      = ["aws.ec2"]
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventSource = ["ec2.amazonaws.com"]
+      eventName   = ["CreateRoute", "ReplaceRoute", "DeleteRoute"]
+      requestParameters = {
+        routeTableId = module.network.private_route_table_ids
+      }
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_target" "nat_gateway_deletion_ops_critical" {
+  count = var.enable_ops_monitoring ? 1 : 0
+
+  rule      = aws_cloudwatch_event_rule.nat_gateway_deletion[0].name
+  target_id = "ops-critical-sns"
+  arn       = aws_sns_topic.ops_critical[0].arn
+}
+
+resource "aws_cloudwatch_event_target" "private_route_mutation_ops_critical" {
+  count = var.enable_ops_monitoring ? 1 : 0
+
+  rule      = aws_cloudwatch_event_rule.private_route_mutation[0].name
+  target_id = "ops-critical-sns"
+  arn       = aws_sns_topic.ops_critical[0].arn
+}
+
+data "aws_iam_policy_document" "ops_critical_topic_policy" {
+  count = var.enable_ops_monitoring ? 1 : 0
+
+  statement {
+    sid    = "AllowAccountOwnerManagementAndPublish"
+    effect = "Allow"
+    actions = [
+      "SNS:GetTopicAttributes",
+      "SNS:SetTopicAttributes",
+      "SNS:AddPermission",
+      "SNS:RemovePermission",
+      "SNS:DeleteTopic",
+      "SNS:Subscribe",
+      "SNS:ListSubscriptionsByTopic",
+      "SNS:Publish",
+    ]
+    resources = [aws_sns_topic.ops_critical[0].arn]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceOwner"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  statement {
+    sid    = "AllowEventBridgePublish"
+    effect = "Allow"
+    actions = [
+      "SNS:Publish",
+    ]
+    resources = [aws_sns_topic.ops_critical[0].arn]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values = [
+        aws_cloudwatch_event_rule.nat_gateway_deletion[0].arn,
+        aws_cloudwatch_event_rule.private_route_mutation[0].arn,
+      ]
+    }
+  }
+
+  statement {
+    sid    = "AllowCloudWatchAlarmPublish"
+    effect = "Allow"
+    actions = [
+      "SNS:Publish",
+    ]
+    resources = [aws_sns_topic.ops_critical[0].arn]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values = [
+        "arn:aws:cloudwatch:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alarm:*",
+      ]
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "ops_critical_events" {
+  count = var.enable_ops_monitoring ? 1 : 0
+
+  arn    = aws_sns_topic.ops_critical[0].arn
+  policy = data.aws_iam_policy_document.ops_critical_topic_policy[0].json
 }
 
 resource "aws_cloudwatch_log_metric_filter" "ops_counts" {
@@ -469,7 +750,7 @@ resource "aws_cloudwatch_metric_alarm" "rds_free_storage" {
 resource "aws_cloudwatch_metric_alarm" "job_ingestion_stale" {
   count               = var.enable_ops_monitoring ? 1 : 0
   alarm_name          = "${local.name_prefix}-job-ingestion-stale-sev2"
-  alarm_description   = "SEV2 alert. Job ingestion freshness is stale. Owner: Data Platform."
+  alarm_description   = "SEV2 alert. Last successful ingestion age is above target. Owner: Data Platform."
   namespace           = local.ops_metric_namespace
   metric_name         = "JobIngestionFreshnessMinutes"
   comparison_operator = "GreaterThanThreshold"
@@ -479,6 +760,42 @@ resource "aws_cloudwatch_metric_alarm" "job_ingestion_stale" {
   period              = 900
   statistic           = "Maximum"
   treat_missing_data  = "breaching"
+  alarm_actions       = [aws_sns_topic.ops_warning[0].arn]
+  ok_actions          = [aws_sns_topic.ops_warning[0].arn]
+  depends_on          = [aws_cloudwatch_log_metric_filter.ops_values]
+  tags                = local.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "ingestion_consecutive_failures" {
+  count               = var.enable_ops_monitoring ? 1 : 0
+  alarm_name          = "${local.name_prefix}-ingestion-consecutive-failures-sev2"
+  alarm_description   = "SEV2 alert. Ingestion has consecutive failed cycles. Owner: Data Platform."
+  namespace           = local.ops_metric_namespace
+  metric_name         = "ConsecutiveFailureCount"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  threshold           = var.ingestion_consecutive_failure_threshold
+  period              = 900
+  statistic           = "Maximum"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.ops_warning[0].arn]
+  ok_actions          = [aws_sns_topic.ops_warning[0].arn]
+  depends_on          = [aws_cloudwatch_log_metric_filter.ops_values]
+  tags                = local.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "ingestion_consecutive_zero_results" {
+  count               = var.enable_ops_monitoring ? 1 : 0
+  alarm_name          = "${local.name_prefix}-ingestion-consecutive-zero-results-sev2"
+  alarm_description   = "SEV2 alert. Ingestion has consecutive zero-result cycles. Owner: Data Platform."
+  namespace           = local.ops_metric_namespace
+  metric_name         = "ConsecutiveZeroResultCount"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  threshold           = var.ingestion_consecutive_zero_result_threshold
+  period              = 900
+  statistic           = "Maximum"
+  treat_missing_data  = "notBreaching"
   alarm_actions       = [aws_sns_topic.ops_warning[0].arn]
   ok_actions          = [aws_sns_topic.ops_warning[0].arn]
   depends_on          = [aws_cloudwatch_log_metric_filter.ops_values]
@@ -552,6 +869,78 @@ resource "aws_cloudwatch_metric_alarm" "notification_delivery_failure" {
   datapoints_to_alarm = 2
   threshold           = var.notification_failure_threshold
   period              = 300
+  statistic           = "Sum"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.ops_warning[0].arn]
+  ok_actions          = [aws_sns_topic.ops_warning[0].arn]
+  depends_on          = [aws_cloudwatch_log_metric_filter.ops_counts]
+  tags                = local.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "ingestion_egress_failure" {
+  count               = var.enable_ops_monitoring ? 1 : 0
+  alarm_name          = "${local.name_prefix}-ingestion-egress-failure-sev2"
+  alarm_description   = "SEV2 alert. Ingestion source egress failures detected from backend runtime path. Owner: Data Platform + Platform On-Call."
+  namespace           = local.ops_metric_namespace
+  metric_name         = "IngestionSourceFetchFailureCount"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  threshold           = var.ingestion_egress_failure_threshold
+  period              = 300
+  statistic           = "Sum"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.ops_critical[0].arn]
+  ok_actions          = [aws_sns_topic.ops_critical[0].arn]
+  depends_on          = [aws_cloudwatch_log_metric_filter.ops_counts]
+  tags                = local.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "ingestion_source_failure_spike_greenhouse" {
+  count               = var.enable_ops_monitoring ? 1 : 0
+  alarm_name          = "${local.name_prefix}-source-failure-spike-greenhouse-sev3"
+  alarm_description   = "SEV3 alert. Greenhouse source failures are elevated. Owner: Data Platform."
+  namespace           = local.ops_metric_namespace
+  metric_name         = "SourceFetchFailureCountGreenhouse"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  threshold           = var.ingestion_source_failure_spike_threshold
+  period              = 900
+  statistic           = "Sum"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.ops_warning[0].arn]
+  ok_actions          = [aws_sns_topic.ops_warning[0].arn]
+  depends_on          = [aws_cloudwatch_log_metric_filter.ops_counts]
+  tags                = local.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "ingestion_source_failure_spike_lever" {
+  count               = var.enable_ops_monitoring ? 1 : 0
+  alarm_name          = "${local.name_prefix}-source-failure-spike-lever-sev3"
+  alarm_description   = "SEV3 alert. Lever source failures are elevated. Owner: Data Platform."
+  namespace           = local.ops_metric_namespace
+  metric_name         = "SourceFetchFailureCountLever"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  threshold           = var.ingestion_source_failure_spike_threshold
+  period              = 900
+  statistic           = "Sum"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.ops_warning[0].arn]
+  ok_actions          = [aws_sns_topic.ops_warning[0].arn]
+  depends_on          = [aws_cloudwatch_log_metric_filter.ops_counts]
+  tags                = local.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "ingestion_source_failure_spike_workable" {
+  count               = var.enable_ops_monitoring ? 1 : 0
+  alarm_name          = "${local.name_prefix}-source-failure-spike-workable-sev3"
+  alarm_description   = "SEV3 alert. Workable source failures are elevated. Owner: Data Platform."
+  namespace           = local.ops_metric_namespace
+  metric_name         = "SourceFetchFailureCountWorkable"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  threshold           = var.ingestion_source_failure_spike_threshold
+  period              = 900
   statistic           = "Sum"
   treat_missing_data  = "notBreaching"
   alarm_actions       = [aws_sns_topic.ops_warning[0].arn]
@@ -655,10 +1044,12 @@ resource "aws_cloudwatch_dashboard" "platform_overview" {
           view   = "timeSeries"
           metrics = [
             [local.ops_metric_namespace, "JobIngestionFreshnessMinutes", { stat = "Maximum", label = "Job ingestion freshness (min)" }],
+            [".", "IngestionCycleStatus", { stat = "Minimum", label = "Ingestion cycle status (1=success,0=failure)" }],
+            [".", "ConsecutiveFailureCount", { stat = "Maximum", label = "Consecutive failures" }],
+            [".", "ConsecutiveZeroResultCount", { stat = "Maximum", label = "Consecutive zero-result cycles" }],
+            [".", "JobsIngestedPerCycle", { stat = "Maximum", label = "Jobs ingested per cycle" }],
             [".", "ModerationQueueBacklog", { stat = "Maximum", label = "Moderation backlog" }],
             [".", "EmployerVerificationQueueBacklog", { stat = "Maximum", label = "Employer verification backlog" }],
-            [".", "FraudDetections24h", { stat = "Maximum", label = "Fraud detections 24h" }],
-            [".", "DeadLetterBacklog", { stat = "Maximum", label = "Dead letters" }],
           ]
         }
       },
@@ -677,6 +1068,50 @@ resource "aws_cloudwatch_dashboard" "platform_overview" {
             [".", "DatabaseConnections", ".", ".", { stat = "Average", label = "RDS connections" }],
             [".", "FreeStorageSpace", ".", ".", { stat = "Average", label = "RDS free storage" }],
             ["CloudWatchSynthetics", "SuccessPercent", "CanaryName", var.enable_synthetic_canaries ? aws_synthetics_canary.public_journey[0].name : "disabled", { stat = "Average", label = "Public journey success %" }],
+          ]
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 12
+        width  = 12
+        height = 6
+        properties = {
+          title  = "Ingestion Source Reliability"
+          region = var.aws_region
+          view   = "timeSeries"
+          metrics = [
+            [local.ops_metric_namespace, "SourceFetchSuccessCountGreenhouse", { stat = "Sum", label = "Greenhouse success" }],
+            [".", "SourceFetchFailureCountGreenhouse", { stat = "Sum", label = "Greenhouse failure" }],
+            [".", "SourceFetchSuccessCountLever", { stat = "Sum", label = "Lever success" }],
+            [".", "SourceFetchFailureCountLever", { stat = "Sum", label = "Lever failure" }],
+            [".", "SourceFetchSuccessCountWorkable", { stat = "Sum", label = "Workable success" }],
+            [".", "SourceFetchFailureCountWorkable", { stat = "Sum", label = "Workable failure" }],
+            [".", "SourceFetchLatencyMsGreenhouse", { stat = "p95", label = "Greenhouse latency p95 (ms)" }],
+            [".", "SourceFetchLatencyMsLever", { stat = "p95", label = "Lever latency p95 (ms)" }],
+            [".", "SourceFetchLatencyMsWorkable", { stat = "p95", label = "Workable latency p95 (ms)" }],
+            [".", "SourceFetchErrorCountGreenhouse", { stat = "Sum", label = "Greenhouse errors by reason" }],
+            [".", "SourceFetchErrorCountLever", { stat = "Sum", label = "Lever errors by reason" }],
+            [".", "SourceFetchErrorCountWorkable", { stat = "Sum", label = "Workable errors by reason" }],
+          ]
+        }
+      },
+      {
+        type   = "alarm"
+        x      = 0
+        y      = 18
+        width  = 24
+        height = 3
+        properties = {
+          title = "Ingestion Alert States"
+          alarms = [
+            aws_cloudwatch_metric_alarm.job_ingestion_stale[0].arn,
+            aws_cloudwatch_metric_alarm.ingestion_consecutive_failures[0].arn,
+            aws_cloudwatch_metric_alarm.ingestion_consecutive_zero_results[0].arn,
+            aws_cloudwatch_metric_alarm.ingestion_source_failure_spike_greenhouse[0].arn,
+            aws_cloudwatch_metric_alarm.ingestion_source_failure_spike_lever[0].arn,
+            aws_cloudwatch_metric_alarm.ingestion_source_failure_spike_workable[0].arn,
           ]
         }
       }

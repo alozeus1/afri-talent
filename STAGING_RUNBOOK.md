@@ -1,6 +1,6 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: April 8, 2026 10:43 AM (America/Chicago)
+Last updated: April 13, 2026 5:45 PM (America/Chicago)
 
 This is the first file a future Codex run should read for staging, deployment, ops, and recovery work.
 It captures the current live state, the last known deployment progress, where to look in AWS, and the fastest safe troubleshooting paths.
@@ -75,6 +75,62 @@ For incidents, readiness work, or monitoring changes, use these docs after this 
 ## Last Known Deployment State
 
 The current shared staging deployment path is working on AWS App Runner.
+
+Update on April 13, 2026:
+
+- Incident: staging ingestion freshness alarms were triggered after the shared staging NAT gateway used by the App Runner VPC egress path was deleted.
+- Confirmed impacted network path:
+  - VPC: `vpc-0b13fbb463d50399c`
+  - public subnet used for NAT: `subnet-05e5e26502bb7d9b3`
+  - private route table: `rtb-08313869fb1ac192b`
+- Recovery performed:
+  - recreated NAT gateway: `nat-0676fd9b8f87a940b` (EIP `eipalloc-0e9e1ab50fcca0fd4`, public IP `18.205.255.48`)
+  - repaired private route default egress: `0.0.0.0/0 -> nat-0676fd9b8f87a940b`
+  - verified route state is `active` (not `blackhole`)
+  - forced backend App Runner deployment to restart scheduler and ingestion workers
+- Post-recovery ingestion validation from backend App Runner logs:
+  - Greenhouse board fetches succeeded again across configured tokens (`Board fetch complete`)
+  - Lever site fetches succeeded again (`Site fetch complete`)
+  - ingestion sync completed successfully at `2026-04-13T21:03:55.906Z` with `total=269`, `updated=269`, `bySource={GREENHOUSE:262, LEVER:7}`
+- Immediate recurrence controls applied:
+  - disabled EventBridge cleanup rule `24hrTrigger`
+  - set Lambda env `InstanceTermination.DELETE_NAT_GATEWAYS=false`
+  - attached inline deny policy `DenyCriticalNetworkMutations` to role `InstanceTermination-role-kzboa777` to block:
+    - `ec2:DeleteNatGateway`
+    - `ec2:CreateRoute`
+    - `ec2:ReplaceRoute`
+    - `ec2:DeleteRoute`
+  - Terraform-managed core network guardrails were applied:
+    - critical network resources now tagged `cleanup=skip`:
+      - `vpc-0b13fbb463d50399c`
+      - `rtb-030194856753f541d`
+      - `rtb-08313869fb1ac192b`
+      - `nat-0676fd9b8f87a940b`
+      - `eipalloc-0e9e1ab50fcca0fd4`
+    - EventBridge detection rules:
+      - `afritalent-staging-nat-gateway-deletion` -> `afritalent-staging-ops-critical`
+      - `afritalent-staging-private-route-mutation` -> `afritalent-staging-ops-critical`
+    - SNS topic policy for `afritalent-staging-ops-critical` now explicitly allows:
+      - EventBridge rule publish
+      - CloudWatch alarm publish
+      - account owner management/publish permissions
+- Follow-up still required:
+  - add a dedicated route blackhole detector (scheduled check or config/custom rule) instead of relying only on route mutation detection
+  - reconcile remaining Terraform drift in App Runner backend runtime environment variables before broad full-stack applies
+
+- Reliability + cost follow-up executed:
+  - staging ElastiCache Serverless cache `afritalent-staging-redis` usage limit was reduced from `DataStorage Maximum=2GB` to `1GB` after validating:
+    - 14-day `BytesUsedForCache` max was ~`1.26 MB`
+    - 14-day `CurrItems` max was `28`
+    - backend health remained `ok` with `redis=connected` after the change
+  - Interface endpoint traffic check (CloudWatch `AWS/PrivateLinkEndpoints`) showed no metrics for staging-managed interface endpoints:
+    - `vpce-016fbb8423762be28` (secretsmanager)
+    - `vpce-05ff141f455da2a4f` (ecr.api)
+    - `vpce-0029d984351658cbc` (ecr.dkr)
+  - Terraform staging config was prepared to disable interface endpoints while keeping the free S3 gateway endpoint enabled:
+    - `enable_interface_endpoints = false`
+    - `enable_s3_gateway_endpoint = true`
+    - `interface_endpoint_services = []`
 
 Update on April 10, 2026:
 

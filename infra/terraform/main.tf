@@ -20,15 +20,17 @@ resource "random_password" "jwt" {
 # ── Network (App Runner backend still needs working NAT for public job APIs) ─
 
 module "network" {
-  source                     = "./modules/network"
-  name_prefix                = local.name_prefix
-  az_count                   = var.az_count
-  vpc_cidr                   = var.vpc_cidr
-  public_subnet_cidrs        = var.public_subnet_cidrs
-  private_subnet_cidrs       = var.private_subnet_cidrs
-  enable_nat_gateway         = var.enable_nat_gateway
-  nat_strategy               = var.nat_strategy
-  enable_interface_endpoints = var.enable_interface_endpoints
+  source                      = "./modules/network"
+  name_prefix                 = local.name_prefix
+  az_count                    = var.az_count
+  vpc_cidr                    = var.vpc_cidr
+  public_subnet_cidrs         = var.public_subnet_cidrs
+  private_subnet_cidrs        = var.private_subnet_cidrs
+  enable_nat_gateway          = var.enable_nat_gateway
+  nat_strategy                = var.nat_strategy
+  enable_interface_endpoints  = var.enable_interface_endpoints
+  enable_s3_gateway_endpoint  = var.enable_s3_gateway_endpoint
+  interface_endpoint_services = var.interface_endpoint_services
 }
 
 # ── Security Groups ──────────────────────────────────────────────────────────
@@ -163,6 +165,7 @@ module "apprunner" {
       DAILY_APPLY_PACK_LIMIT            = tostring(var.daily_apply_pack_limit)
       DAILY_JOB_MATCH_LIMIT             = tostring(var.daily_job_match_limit)
       DAILY_RESUME_REVIEW_LIMIT         = tostring(var.daily_resume_review_limit)
+      AGGREGATOR_INTERVAL_MINUTES       = tostring(var.aggregator_interval_minutes)
       STRIPE_PRICE_BASIC_MONTHLY        = var.stripe_price_basic_monthly
       STRIPE_PRICE_PROFESSIONAL_MONTHLY = var.stripe_price_professional_monthly
     } : key => value if value != null

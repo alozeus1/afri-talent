@@ -26,7 +26,17 @@ import { runSkillsJobEmbedder } from "./skills-job-embedder.js";
 import { pushDeadLetter, recordWorkerState, withRetry } from "../lib/ops/resilience.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
 
-const AGGREGATOR_INTERVAL_MS = parseInt(process.env.AGGREGATOR_INTERVAL_HOURS || "6", 10) * 60 * 60 * 1000;
+const AGGREGATOR_INTERVAL_MS = (() => {
+  const intervalMinutesRaw = process.env.AGGREGATOR_INTERVAL_MINUTES;
+  if (intervalMinutesRaw) {
+    const minutes = Number.parseInt(intervalMinutesRaw, 10);
+    if (!Number.isNaN(minutes) && minutes > 0) {
+      return minutes * 60 * 1000;
+    }
+  }
+
+  return parseInt(process.env.AGGREGATOR_INTERVAL_HOURS || "6", 10) * 60 * 60 * 1000;
+})();
 const MATCHER_INTERVAL_MS = parseInt(process.env.MATCHER_INTERVAL_MINUTES || "30", 10) * 60 * 1000;
 const ALERT_INTERVAL_MS = parseInt(process.env.ALERT_INTERVAL_MINUTES || "15", 10) * 60 * 1000;
 const OPS_SNAPSHOT_INTERVAL_MS = parseInt(process.env.OPS_SNAPSHOT_INTERVAL_MINUTES || "15", 10) * 60 * 1000;
@@ -78,6 +88,18 @@ async function safeRun(name: string, fn: () => Promise<void>): Promise<void> {
       operationName: `scheduler_${name}`,
       attempts: 3,
       initialDelayMs: 1_000,
+      shouldRetry: (error) => {
+        if (
+          name === "aggregator" &&
+          error instanceof Error &&
+          error.message.includes("ingestion cycle failed")
+        ) {
+          // Ingestion policy failures are deterministic for the cycle and should
+          // alert immediately, not fan out into noisy rapid retries.
+          return false;
+        }
+        return true;
+      },
     });
     const durationMs = Date.now() - start;
     logger.info({ task: name, durationMs }, "[scheduler] task complete");
@@ -136,6 +158,7 @@ export function startScheduler(): void {
   logger.info(
     {
       aggregatorIntervalHours: AGGREGATOR_INTERVAL_MS / 3600000,
+      aggregatorIntervalMinutes: AGGREGATOR_INTERVAL_MS / 60000,
       matcherIntervalMinutes: MATCHER_INTERVAL_MS / 60000,
       alertIntervalMinutes: ALERT_INTERVAL_MS / 60000,
       opsSnapshotIntervalMinutes: OPS_SNAPSHOT_INTERVAL_MS / 60000,

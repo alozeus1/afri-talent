@@ -9,7 +9,7 @@ import {
 } from "@prisma/client";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
-import { getLastSyncTime } from "./aggregator-cron.js";
+import { getIngestionReliabilityState, getLastSyncTime } from "./aggregator-cron.js";
 import { recordOpsSnapshotMetric } from "../lib/ops/events.js";
 import { summarizeDeadLetters } from "../lib/ops/resilience.js";
 
@@ -18,6 +18,7 @@ const AGGREGATOR_STALENESS_MINUTES = parseInt(process.env.AGGREGATOR_STALENESS_M
 export async function runOperationalSnapshotCycle(): Promise<void> {
   const [
     lastSyncAt,
+    ingestionReliability,
     pendingJobs,
     verificationQueueBacklog,
     moderationQueueBacklog,
@@ -33,6 +34,7 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
     latestSemanticIndex,
   ] = await Promise.all([
     getLastSyncTime(),
+    getIngestionReliabilityState(),
     prisma.job.count({ where: { status: JobStatus.PENDING_REVIEW } }),
     prisma.verificationArtifact.count({
       where: {
@@ -129,6 +131,43 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
   });
 
   recordOpsSnapshotMetric({
+    metricName: "ingestion_cycle_status",
+    value: ingestionReliability.lastCycleStatus === "failure" ? 0 : 1,
+    details: {
+      cycle_status: ingestionReliability.lastCycleStatus,
+      last_cycle_at: ingestionReliability.lastCycleAt?.toISOString() ?? "never",
+    },
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "consecutive_failure_count",
+    value: ingestionReliability.consecutiveFailureCount,
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "consecutive_zero_result_count",
+    value: ingestionReliability.consecutiveZeroResultCount,
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "jobs_ingested_per_cycle",
+    value: ingestionReliability.lastJobsIngested,
+    details: {
+      cycle_status: ingestionReliability.lastCycleStatus,
+    },
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "last_successful_ingestion_timestamp",
+    value: ingestionReliability.lastSuccessfulIngestionAt
+      ? Math.floor(ingestionReliability.lastSuccessfulIngestionAt.getTime() / 1000)
+      : 0,
+    details: {
+      iso8601: ingestionReliability.lastSuccessfulIngestionAt?.toISOString() ?? "never",
+    },
+  });
+
+  recordOpsSnapshotMetric({
     metricName: "moderation_queue_backlog",
     value: pendingJobs + moderationQueueBacklog,
     details: {
@@ -200,6 +239,7 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
     {
       lastSyncAt: lastSyncAt?.toISOString() ?? null,
       minutesSinceLastSync,
+      ingestionReliability,
       pendingJobs,
       verificationQueueBacklog,
       moderationQueueBacklog,
