@@ -68,6 +68,15 @@ export default function AdminDashboard() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
         <p className="text-gray-600">Manage and moderate the platform</p>
         <div className="flex flex-wrap gap-3 mt-4">
+          <Link href="/admin/ops">
+            <Button variant="outline">Platform Operations</Button>
+          </Link>
+          <Link href="/admin/audit-logs">
+            <Button variant="outline">Audit Logs</Button>
+          </Link>
+          <Link href="/admin/bulk">
+            <Button variant="outline">Bulk Operations</Button>
+          </Link>
           <Link href="/admin/integrations">
             <Button variant="outline">ATS Operations</Button>
           </Link>

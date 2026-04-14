@@ -377,6 +377,98 @@ enum PhoneVerificationStatus {
   EXPIRED
 }
 
+// ──────────────── Admin & Audit ────────────────
+
+enum AdminPermission {
+  // User management
+  VIEW_USERS
+  MANAGE_USER_ACCOUNTS
+  RESET_USER_PASSWORD
+  RESTRICT_USER_ACCOUNT
+  
+  // Content moderation
+  REVIEW_JOBS
+  REVIEW_APPLICATIONS
+  REVIEW_RESOURCES
+  REVIEW_COMPANY_DATA
+  
+  // Trust & Safety
+  VIEW_TRUST_CASES
+  MANAGE_TRUST_CASES
+  VIEW_ABUSE_REPORTS
+  MANAGE_ABUSE_REPORTS
+  VIEW_VERIFICATION_ARTIFACTS
+  APPROVE_VERIFICATION
+  
+  // Platform operations
+  VIEW_AUDIT_LOGS
+  VIEW_HEALTH_STATUS
+  MANAGE_ALERTS
+  VIEW_SYSTEMS_METRICS
+  
+  // Billing & Finance
+  VIEW_BILLING_DATA
+  MANAGE_BILLING_DISPUTES
+  VIEW_REVENUE_REPORTS
+  
+  // Data operations
+  EXPORT_DATA
+  RUN_BULK_OPERATIONS
+  MODIFY_BULK_DATA
+}
+
+enum AdminAction {
+  USER_CREATED
+  USER_UPDATED
+  USER_DELETED
+  USER_RESTRICTED
+  USER_PASSWORD_RESET
+  JOB_REVIEWED
+  JOB_APPROVED
+  JOB_REJECTED
+  APPLICATION_REVIEWED
+  VERIFICATION_APPROVED
+  VERIFICATION_REJECTED
+  TRUST_CASE_OPENED
+  TRUST_CASE_ACTIONED
+  ABUSE_REPORT_ACTIONED
+  ALERT_CREATED
+  ALERT_RESOLVED
+  BULK_OPERATION_STARTED
+  BULK_OPERATION_COMPLETED
+  SYSTEM_CONFIGURATION_CHANGED
+  ALERT_SETTINGS_UPDATED
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum BulkOperationType {
+  USER_RESTRICTION
+  PASSWORD_RESET
+  DATA_EXPORT
+  JOB_BATCH_REVIEW
+  VERIFICATION_BATCH_PROCESS
+  CUSTOM_QUERY
+}
+
+enum BulkOperationStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  PARTIAL
+  FAILED
+}
+
 // ──────────────── OAuth & Email Verification ────────────────
 
 enum OAuthProvider {
@@ -665,6 +757,7 @@ model User {
   coverLetterVersions           CoverLetterVersion[]
   autoApplyBatches              AutoApplyBatch[]
   careerGapSessions             CareerGapSession[]
+  adminRole                     AdminRole?
 
   @@index([role])
   @@index([createdAt])
@@ -2702,4 +2795,91 @@ model CareerGapSession {
 
   @@index([candidateId])
   @@index([createdAt])
+}
+
+// ──────────────── Admin Control Plane ────────────────
+
+model AdminRole {
+  id              String                 @id @default(uuid())
+  adminId         String                 @unique
+  admin           User                   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  title           String                 @db.VarChar(100)
+  description     String?                @db.VarChar(500)
+  permissions     AdminPermission[]
+  isActive        Boolean                @default(true)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  auditLogs       AuditLog[]             @relation("AuditLogAdmin")
+
+  @@index([isActive])
+}
+
+model AuditLog {
+  id              String                 @id @default(uuid())
+  adminId         String?
+  admin           AdminRole?             @relation("AuditLogAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+  action          AdminAction
+  targetType      String                 @db.VarChar(50)
+  targetId        String?
+  targetName      String?                @db.VarChar(200)
+  resourceType    String?                @db.VarChar(50)
+  resourceId      String?
+  changes         Json?
+  reason          String?                @db.VarChar(500)
+  metadata        Json?
+  ipAddress       String?                @db.VarChar(50)
+  userAgent       String?                @db.VarChar(500)
+  status          String                 @default("SUCCESS") @db.VarChar(20)
+  errorDetails    String?                @db.Text
+  createdAt       DateTime               @default(now())
+
+  @@index([adminId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@index([targetId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model PlatformAlert {
+  id              String                 @id @default(uuid())
+  title           String                 @db.VarChar(200)
+  description     String                 @db.Text
+  severity        AlertSeverity
+  status          AlertStatus            @default(ACTIVE)
+  category        String                 @db.VarChar(50)
+  metrics         Json?
+  affectedUsers   Int?
+  affectedJobs    Int?
+  affectedApps    Int?
+  firstOccurredAt DateTime               @default(now())
+  lastOccurredAt  DateTime               @updatedAt
+  resolvedAt      DateTime?
+  resolution      String?                @db.Text
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([severity, status, createdAt(sort: Desc)])
+  @@index([category, status])
+  @@index([status, updatedAt(sort: Desc)])
+}
+
+model BulkOperation {
+  id              String                 @id @default(uuid())
+  operationType   BulkOperationType
+  status          BulkOperationStatus    @default(QUEUED)
+  initiatedBy     String?                @db.VarChar(100)
+  query           Json?
+  filters         Json?
+  targetCount     Int                    @default(0)
+  successCount    Int                    @default(0)
+  failureCount    Int                    @default(0)
+  results         Json?
+  errorLog        String?                @db.Text
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([operationType, createdAt(sort: Desc)])
 }
