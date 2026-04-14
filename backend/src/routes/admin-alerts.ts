@@ -58,7 +58,7 @@ router.get(
                 },
             });
         } catch (error) {
-            logger.error("Failed to fetch alerts:", error);
+            console.error("Failed to fetch alerts:", error);
             res.status(500).json({ error: "Failed to fetch alerts" });
         }
     }
@@ -116,7 +116,7 @@ router.get(
                 ),
             });
         } catch (error) {
-            logger.error("Failed to fetch alert stats:", error);
+            logger.error({ error }, "Failed to fetch alert stats");
             res.status(500).json({ error: "Failed to fetch alert statistics" });
         }
     }
@@ -149,7 +149,7 @@ router.post(
 
             res.json({ success: true });
         } catch (error) {
-            logger.error("Failed to acknowledge alert:", error);
+            logger.error({ error }, "Failed to acknowledge alert");
             res.status(500).json({ error: "Failed to acknowledge alert" });
         }
     }
@@ -183,7 +183,7 @@ router.post(
 
             res.json({ success: true });
         } catch (error) {
-            logger.error("Failed to resolve alert:", error);
+            logger.error({ error }, "Failed to resolve alert");
             res.status(500).json({ error: "Failed to resolve alert" });
         }
     }
@@ -206,7 +206,7 @@ router.get(
 
             res.json(alert);
         } catch (error) {
-            logger.error("Failed to fetch alert:", error);
+            logger.error({ error }, "Failed to fetch alert");
             res.status(500).json({ error: "Failed to fetch alert" });
         }
     }

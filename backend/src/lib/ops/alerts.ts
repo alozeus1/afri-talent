@@ -1,5 +1,4 @@
-import prisma from "../lib/prisma.js";
-import logger from "../lib/logger.js";
+import prisma from "../prisma.js";
 import { AlertSeverity, AlertStatus } from "@prisma/client";
 
 export interface AlertMetrics {
@@ -9,6 +8,7 @@ export interface AlertMetrics {
     value?: number;
     threshold?: number;
     current?: number;
+    [key: string]: any;
 }
 
 export interface CreateAlertInput {
@@ -59,9 +59,9 @@ export async function createAlert(input: CreateAlertInput): Promise<void> {
             },
         });
 
-        logger.info(`Created alert: ${input.title} (${input.severity})`);
-    } catch (error) {
-        logger.error("Failed to create alert:", error);
+        console.log(`Created alert: ${input.title} (${input.severity})`);
+    } catch (error: any) {
+        console.error("Failed to create alert:", error);
     }
 }
 
@@ -82,9 +82,9 @@ export async function resolveAlert(
             },
         });
 
-        logger.info(`Resolved alert: ${alertId}`);
+        console.log(`Resolved alert: ${alertId}`);
     } catch (error) {
-        logger.error("Failed to resolve alert:", error);
+        console.error("Failed to resolve alert:", error);
     }
 }
 
@@ -100,7 +100,7 @@ export async function acknowledgeAlert(alertId: string): Promise<void> {
             },
         });
     } catch (error) {
-        logger.error("Failed to acknowledge alert:", error);
+        console.error("Failed to acknowledge alert:", error);
     }
 }
 
@@ -118,8 +118,8 @@ export async function getActiveLerts(severity?: AlertSeverity) {
                 lastOccurredAt: "desc",
             },
         });
-    } catch (error) {
-        logger.error("Failed to fetch alerts:", error);
+    } catch (error: any) {
+        console.error("Failed to fetch alerts:", error);
         return [];
     }
 }

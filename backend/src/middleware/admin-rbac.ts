@@ -29,7 +29,7 @@ export async function enforceAdminRbac(req: Request, res: Response, next: NextFu
 
         // Must have ADMIN role
         if (req.user.role !== Role.ADMIN) {
-            logger.warn(`Non-admin user ${req.user.userId} attempted admin access`);
+            console.warn(`Non-admin user ${req.user.userId} attempted admin access`);
             res.status(403).json({ error: "Admin access required" });
             return;
         }
@@ -54,7 +54,7 @@ export async function enforceAdminRbac(req: Request, res: Response, next: NextFu
 
         next();
     } catch (error) {
-        logger.error("RBAC error:", error);
+        logger.error({ error }, "RBAC error");
         res.status(500).json({ error: "Authorization failed" });
     }
 }
@@ -130,6 +130,6 @@ export async function createAuditLog(
             },
         });
     } catch (error) {
-        logger.error("Failed to create audit log:", error);
+        logger.error({ error }, "Failed to create audit log");
     }
 }

@@ -111,7 +111,7 @@ router.get(
                 },
             });
         } catch (error) {
-            logger.error("Failed to fetch audit logs:", error);
+            logger.error({ error }, "Failed to fetch audit logs");
             res.status(500).json({ error: "Failed to fetch audit logs" });
         }
     }
@@ -171,7 +171,7 @@ router.get(
                 timestamp: log.createdAt,
             });
         } catch (error) {
-            logger.error("Failed to fetch audit log:", error);
+            logger.error({ error }, "Failed to fetch audit log");
             res.status(500).json({ error: "Failed to fetch audit log" });
         }
     }
@@ -218,7 +218,7 @@ router.get(
                 })),
             });
         } catch (error) {
-            logger.error("Failed to fetch audit stats:", error);
+            logger.error({ error }, "Failed to fetch audit stats");
             res.status(500).json({ error: "Failed to fetch audit statistics" });
         }
     }
