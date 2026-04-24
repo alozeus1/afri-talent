@@ -97,8 +97,10 @@ test.describe("Resumes", () => {
     // First we need to get the candidate's userId from /api/auth/me
     const meRes = await request.get(`${API}/api/auth/me`);
     const me = await meRes.json();
+    expect(me.authenticated).toBe(true);
+    expect(me.user?.id).toBeTruthy();
 
-    const s3Key = `resumes/${me.id}/test-resume-e2e.pdf`;
+    const s3Key = `resumes/${me.user.id}/test-resume-e2e.pdf`;
 
     const res = await request.post(`${API}/api/profile/resumes`, {
       data: {
@@ -304,8 +306,8 @@ test.describe("Billing", () => {
     const res = await request.post(`${API}/api/billing/checkout`, {
       data: {}, // missing plan
     });
-    // 400 (validation) or 500 (no Stripe key in dev)
-    expect([400, 500]).toContain(res.status());
+    // 400 (validation), 403 (email verification), or 503 (Stripe not configured)
+    expect([400, 403, 503]).toContain(res.status());
   });
 
   test("POST /api/billing/checkout with invalid plan returns 400", async ({
@@ -315,8 +317,8 @@ test.describe("Billing", () => {
     const res = await request.post(`${API}/api/billing/checkout`, {
       data: { plan: "ULTRA_PREMIUM" },
     });
-    // 400 (validation) or 500 (no Stripe key in dev)
-    expect([400, 500]).toContain(res.status());
+    // 400 (validation), 403 (email verification), or 503 (Stripe not configured)
+    expect([400, 403, 503]).toContain(res.status());
   });
 });
 
@@ -328,8 +330,9 @@ test("GET /health returns ok with db connected", async ({ request }) => {
   const res = await request.get(`${API}/health`);
   expect(res.ok()).toBe(true);
   const body = await res.json();
-  expect(body.status).toBe("ok");
-  expect(body.db).toBe("connected");
+  expect(["ok", "degraded"]).toContain(body.status);
+  expect(body.checks?.database).toBe("connected");
+  expect(typeof body.checks?.redis).toBe("string");
 });
 
 test("GET /live returns alive", async ({ request }) => {

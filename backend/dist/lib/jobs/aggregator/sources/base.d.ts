@@ -1,4 +1,4 @@
-import type { AggregatorResult, JobSource, JobSourceConfig } from "../types.js";
+import type { AggregatedJob, AggregatorResult, JobSource, JobSourceConfig } from "../types.js";
 export declare abstract class BaseJobSource {
     protected config: JobSourceConfig;
     protected requestCount: number;
@@ -10,6 +10,7 @@ export declare abstract class BaseJobSource {
     protected rateLimit(): Promise<void>;
     protected log(message: string, meta?: Record<string, unknown>): void;
     protected logError(message: string, error: unknown): void;
+    protected normalizeDescription(value: string): string;
     protected normalizeLocation(location: string): {
         city: string;
         country: string;
@@ -18,6 +19,7 @@ export declare abstract class BaseJobSource {
     protected extractSkills(text: string): string[];
     protected detectVisaSponsorship(text: string): "YES" | "NO" | "UNKNOWN";
     protected detectSeniority(title: string, description: string): "Junior" | "Mid-level" | "Senior" | "Lead" | "Executive" | null;
+    protected matchesKeywordQuery(job: AggregatedJob, query: JobQuery): boolean;
 }
 export interface JobQuery {
     keywords: string[];

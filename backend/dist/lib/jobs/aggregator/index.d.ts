@@ -1,11 +1,19 @@
 import { PrismaClient } from "@prisma/client";
-import type { AggregatedJob, AggregatorResult, JobSource, JobRegion } from "./types.js";
+import type { AggregatedJob, AggregationDiagnostics, AggregatorResult, JobSource, JobRegion } from "./types.js";
 import type { JobQuery } from "./sources/base.js";
+export declare function resolveSourceCatalog(raw: string | undefined, defaults: string[], options?: {
+    includeDefaults?: boolean;
+}): string[];
 export declare class JobAggregator {
     private sources;
     private prisma;
     constructor(prisma: PrismaClient);
     private initializeSources;
+    private emitSourceMetrics;
+    aggregateJobsWithDiagnostics(query: JobQuery): Promise<{
+        results: AggregatorResult[];
+        diagnostics: AggregationDiagnostics;
+    }>;
     aggregateJobs(query: JobQuery): Promise<AggregatorResult[]>;
     syncJobsToDatabase(query: JobQuery): Promise<{
         total: number;
@@ -14,9 +22,11 @@ export declare class JobAggregator {
         skipped: number;
         byRegion: Record<JobRegion, number>;
         bySource: Record<JobSource, number>;
+        diagnostics: AggregationDiagnostics;
     }>;
-    private deduplicateJobs;
+    private groupDuplicateJobs;
     private jobCompleteness;
+    private toJobDocument;
     private upsertJob;
     private generateSlug;
     private ensureUniqueSlug;

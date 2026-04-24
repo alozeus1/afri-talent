@@ -3,10 +3,11 @@
     "collect": {
       "numberOfRuns": 2,
       "url": [
-        "http://localhost:3000/",
-        "http://localhost:3000/pricing",
-        "http://localhost:3000/jobs",
-        "http://localhost:3000/login"
+        "http://localhost:3000/en",
+        "http://localhost:3000/en/pricing",
+        "http://localhost:3000/en/jobs",
+        "http://localhost:3000/en/login",
+        "http://localhost:3000/en/trust"
       ],
       "settings": {
         "chromeFlags": "--no-sandbox --disable-dev-shm-usage"
@@ -15,7 +16,7 @@
     "assert": {
       "assertions": {
         "categories:performance": [
-          "warn",
+          "error",
           { "minScore": 0.7 }
         ],
         "categories:accessibility": [
@@ -31,16 +32,20 @@
           { "minScore": 0.9 }
         ],
         "largest-contentful-paint": [
-          "warn",
+          "error",
           { "maxNumericValue": 4000 }
         ],
         "cumulative-layout-shift": [
-          "warn",
-          { "maxNumericValue": 0.15 }
+          "error",
+          { "maxNumericValue": 0.1 }
         ],
         "interactive": [
-          "warn",
+          "error",
           { "maxNumericValue": 6000 }
+        ],
+        "total-blocking-time": [
+          "error",
+          { "maxNumericValue": 300 }
         ]
       }
     }

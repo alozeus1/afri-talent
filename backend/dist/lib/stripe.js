@@ -2,9 +2,12 @@ import Stripe from "stripe";
 import { SubscriptionPlan } from "@prisma/client";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY?.trim() || "";
 export const STRIPE_PRICES = {
-    FREE: undefined, // No Stripe price for free tier
+    FREE: undefined,
     BASIC: process.env.STRIPE_PRICE_BASIC_MONTHLY,
     PROFESSIONAL: process.env.STRIPE_PRICE_PROFESSIONAL_MONTHLY,
+    EMPLOYER_FREE: undefined,
+    EMPLOYER_BASIC: process.env.STRIPE_PRICE_EMPLOYER_BASIC_MONTHLY,
+    EMPLOYER_PREMIUM: process.env.STRIPE_PRICE_EMPLOYER_PREMIUM_MONTHLY,
 };
 let _stripe = null;
 export function isStripeConfigured() {

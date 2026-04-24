@@ -17,15 +17,31 @@ const subscriptionSchema = z.object({
 
 const notificationPreferenceSchema = z.object({
   savedSearchAlerts: z.boolean().optional(),
+  weeklyDigests: z.boolean().optional(),
+  applicationReminders: z.boolean().optional(),
+  profileCompletionNudges: z.boolean().optional(),
+  verificationCompletionNudges: z.boolean().optional(),
+  visaRelocationAlerts: z.boolean().optional(),
+  salaryInsights: z.boolean().optional(),
+  interviewPrepRecommendations: z.boolean().optional(),
   interviewReminders: z.boolean().optional(),
   applicationUpdates: z.boolean().optional(),
   subscriptionNotices: z.boolean().optional(),
   marketing: z.boolean().optional(),
+  maxNotificationsPerWeek: z.number().int().min(1).max(21).optional(),
+  minimumHoursBetweenNotifications: z.number().int().min(1).max(72).optional(),
 });
 
 const testNotificationSchema = z.object({
   type: z.enum([
     "savedSearchAlerts",
+    "weeklyDigests",
+    "applicationReminders",
+    "profileCompletionNudges",
+    "verificationCompletionNudges",
+    "visaRelocationAlerts",
+    "salaryInsights",
+    "interviewPrepRecommendations",
     "interviewReminders",
     "applicationUpdates",
     "subscriptionNotices",
@@ -129,12 +145,26 @@ router.post("/test", authenticate, async (req: Request, res: Response) => {
     const data = testNotificationSchema.parse(req.body);
     const titleMap: Record<z.infer<typeof testNotificationSchema>["type"], string> = {
       savedSearchAlerts: "New jobs match your saved search",
+      weeklyDigests: "Your weekly trusted-job digest is ready",
+      applicationReminders: "Keep your search momentum going",
+      profileCompletionNudges: "Complete your profile to improve match quality",
+      verificationCompletionNudges: "Finish verification to boost employer trust",
+      visaRelocationAlerts: "Visa-friendly roles just matched your preferences",
+      salaryInsights: "Fresh salary insight is available",
+      interviewPrepRecommendations: "Interview prep is recommended now",
       interviewReminders: "Interview reminder",
       applicationUpdates: "Your application has an update",
       subscriptionNotices: "Subscription notice",
     };
     const bodyMap: Record<z.infer<typeof testNotificationSchema>["type"], string> = {
       savedSearchAlerts: "New high-match roles were found for your saved alert.",
+      weeklyDigests: "This week’s top trusted jobs are ready to review.",
+      applicationReminders: "A handful of strong matches are still fresh right now.",
+      profileCompletionNudges: "A more complete profile helps employers trust your application faster.",
+      verificationCompletionNudges: "Phone, identity, and skills signals improve your shortlist odds.",
+      visaRelocationAlerts: "We found roles with clear visa or relocation support signals.",
+      salaryInsights: "Current pay data can help you avoid low-signal applications.",
+      interviewPrepRecommendations: "Practice before your next recruiter response lands.",
       interviewReminders: "Your interview is coming up soon. Good luck!",
       applicationUpdates: "An employer has changed your application status.",
       subscriptionNotices: "Your plan renewal and billing summary are ready.",
@@ -142,7 +172,16 @@ router.post("/test", authenticate, async (req: Request, res: Response) => {
 
     const notification = await createUserNotification({
       userId: req.user!.userId,
-      type: "VERIFICATION",
+      type:
+        data.type === "weeklyDigests"
+          ? "WEEKLY_DIGEST"
+          : data.type === "salaryInsights"
+            ? "SALARY_INSIGHT"
+            : data.type === "interviewPrepRecommendations"
+              ? "INTERVIEW_PREP"
+              : data.type === "profileCompletionNudges" || data.type === "applicationReminders" || data.type === "visaRelocationAlerts"
+                ? "RETENTION_NUDGE"
+                : "VERIFICATION",
       title: titleMap[data.type],
       body: bodyMap[data.type],
       channel: data.type,

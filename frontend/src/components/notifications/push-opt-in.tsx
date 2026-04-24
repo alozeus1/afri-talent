@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { pushNotifications, NotificationPreference } from "@/lib/api";
 import { registerServiceWorker, urlBase64ToUint8Array } from "@/lib/push-client";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,7 @@ export function PushOptInCard() {
     <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Push Notifications</h3>
       <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-        Get saved-search alerts, interview reminders, application updates, and subscription notices.
+        Get saved-search alerts, interview reminders, application updates, and other urgent candidate nudges in real time.
       </p>
 
       {permission !== "granted" ? (
@@ -104,9 +105,14 @@ export function PushOptInCard() {
         </div>
       )}
 
+      <div className="mt-4">
+        <Link href="/candidate/preferences" className="text-sm font-medium text-emerald-600 hover:text-emerald-700">
+          Manage all alert preferences
+        </Link>
+      </div>
+
       {message && <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">{message}</p>}
       {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
     </div>
   );
 }
-

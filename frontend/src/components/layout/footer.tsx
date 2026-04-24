@@ -2,19 +2,21 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="bg-gray-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <footer className="section-shell mt-12 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400">
+      <div className="page-frame py-14">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
-            <Link href="/" className="flex items-center space-x-2 mb-4">
-              <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">A</span>
+            <Link href="/" className="mb-5 flex items-center space-x-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-500 bg-emerald-600 shadow-sm">
+                <span className="font-display text-lg font-bold text-white">A</span>
               </div>
-              <span className="font-bold text-xl">AfriTalent</span>
+              <div className="flex flex-col">
+                <span className="font-display text-xl font-bold text-zinc-900 dark:text-zinc-50">AfriTalent</span>
+                <span className="text-[11px] uppercase tracking-widest text-zinc-500">Africa to global</span>
+              </div>
             </Link>
-            <p className="text-gray-400 max-w-md">
-              Connecting African tech talent with global opportunities. 
-              Building bridges between skilled professionals and innovative companies worldwide.
+            <p className="max-w-lg text-sm leading-7 text-white/70">
+              A trust-first hiring platform helping global teams discover African talent with stronger credibility, better workflow, and more signal than a generic job board.
             </p>
           </div>
 
@@ -86,7 +88,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="mt-12 flex flex-col items-center justify-between gap-6 border-t border-white/10 pt-8 md:flex-row">
           {/* Social icons */}
           <div className="flex items-center gap-5">
             <a href="https://instagram.com/afritalent" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="text-gray-400 hover:text-white transition-colors">
@@ -104,22 +106,22 @@ export function Footer() {
           </div>
 
           {/* Legal nav */}
-          <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-gray-400">
+          <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-white/55">
             <Link href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link>
             <Link href="/cookies-policy" className="hover:text-white transition-colors">Cookies Policy</Link>
             <Link href="/accessibility" className="hover:text-white transition-colors">Accessibility</Link>
           </nav>
 
-          <p className="text-gray-400 text-sm whitespace-nowrap">
+          <p className="whitespace-nowrap text-sm text-white/55">
             &copy; {new Date().getFullYear()} AfriTalent. All rights reserved.
           </p>
         </div>
 
         {/* Powered by Maralito Labs */}
-        <div className="border-t border-gray-800 mt-6 pt-4 text-center">
-          <p className="text-gray-500 text-xs">
-            Powered by <span className="font-semibold text-gray-400">Maralito Labs</span>
+        <div className="mt-6 border-t border-white/10 pt-4 text-center">
+          <p className="text-xs text-white/40">
+            Powered by <span className="font-semibold text-white/55">Maralito Labs</span>
             <sup className="text-gray-600 ml-0.5">TM</sup>
           </p>
         </div>

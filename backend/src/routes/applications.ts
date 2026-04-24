@@ -13,6 +13,10 @@ import {
   refreshCandidateTrustProfile,
 } from "../lib/trust/service.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
+import {
+  maybeCreateAtsApplicationLink,
+  syncApplicationStatusToAts,
+} from "../lib/ats/service.js";
 
 const router = Router();
 
@@ -147,6 +151,8 @@ router.post(
         },
       },
     });
+
+    await maybeCreateAtsApplicationLink(application.id);
 
     if (applicationRisk.score > 0) {
       await recordTrustRiskEvent({
@@ -358,6 +364,15 @@ router.put("/:id/status", authenticate, authorize(Role.EMPLOYER), async (req: Re
       },
     });
 
+    const atsSync = await syncApplicationStatusToAts({
+      applicationId: updatedApplication.id,
+      actorUserId: req.user!.userId,
+      correlationId: req.requestId ?? null,
+    }).catch((syncError) => ({
+      outcome: "failed",
+      message: syncError instanceof Error ? syncError.message : "ATS stage sync failed",
+    }));
+
     await createUserNotification({
       userId: application.candidateId,
       type: "APPLICATION_STATUS",
@@ -371,7 +386,10 @@ router.put("/:id/status", authenticate, authorize(Role.EMPLOYER), async (req: Re
       },
     });
 
-    res.json(updatedApplication);
+    res.json({
+      ...updatedApplication,
+      atsSync,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: "Validation failed", details: error.issues });

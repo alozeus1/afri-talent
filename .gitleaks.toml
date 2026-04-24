@@ -1,0 +1,16 @@
+title = "AfriTalent Gitleaks Config"
+
+[allowlist]
+description = "Repository-specific examples and test values"
+paths = [
+  '''README\.md''',
+  '''AGENT_BOOTSTRAP\.md''',
+  '''backend/\.env\.example''',
+  '''frontend/\.env\.example''',
+  '''docs/.*'''
+]
+regexes = [
+  '''Password123!''',
+  '''test-jwt-secret-for-ci''',
+  '''postgresql://afritalent:afritalent_test@localhost:5432/afritalent_test'''
+]

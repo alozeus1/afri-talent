@@ -91,17 +91,13 @@ export class WorkableSource extends BaseJobSource {
 
     if (query.remote && job.locationType !== "remote") return false;
 
-    if (query.keywords.length > 0) {
-      const bag = `${job.title} ${job.description} ${job.skills.join(" ")}`.toLowerCase();
-      const match = query.keywords.some((keyword) => bag.includes(keyword.toLowerCase()));
-      if (!match) return false;
-    }
+    if (!this.matchesKeywordQuery(job, query)) return false;
 
     return true;
   }
 
   private transformJob(job: WorkableJob, account: string): AggregatedJob {
-    const description = (job.description || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const description = this.normalizeDescription(job.description || "");
     const location = job.location?.location_str || "Remote";
     const normalized = this.normalizeLocation(location);
     const sourceUrl = job.url || `https://${account}.workable.com`;

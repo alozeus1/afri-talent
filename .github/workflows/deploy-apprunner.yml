@@ -3,6 +3,11 @@ name: Deploy Shared Environment (App Runner)
 on:
   push:
     branches: [develop]
+    paths:
+      - ".github/workflows/deploy-apprunner.yml"
+      - "backend/**"
+      - "frontend/**"
+      - "infra/terraform/**"
   workflow_dispatch:
     inputs:
       environment:
@@ -26,11 +31,54 @@ env:
   AWS_REGION: us-east-1
   ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
   DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+  # GitHub-hosted runners cannot reach private RDS endpoints in this VPC.
+  # Backend container startup already runs `prisma migrate deploy` inside App Runner.
+  RUN_PRISMA_MIGRATIONS_FROM_RUNNER: "false"
 
 jobs:
+  validate-ref:
+    name: Validate Deployment Ref
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce protected deployment refs
+        run: |
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "Push-triggered staging deployment from protected branch is allowed."
+            exit 0
+          fi
+
+          TARGET_ENV="${{ inputs.environment }}"
+          CURRENT_REF="${{ github.ref_name }}"
+
+          if [ "$TARGET_ENV" = "staging" ] && [ "$CURRENT_REF" != "develop" ]; then
+            echo "Staging deployments may only be dispatched from the develop branch."
+            echo "Current ref: $CURRENT_REF"
+            exit 1
+          fi
+
+          if [ "$TARGET_ENV" = "prod" ] && [ "$CURRENT_REF" != "main" ]; then
+            echo "Production deployments may only be dispatched from the main branch."
+            echo "Current ref: $CURRENT_REF"
+            exit 1
+          fi
+
+          echo "Deployment ref policy passed for $TARGET_ENV from $CURRENT_REF."
+
+  prod-gate:
+    name: Production Approval Gate
+    runs-on: ubuntu-latest
+    needs: [validate-ref]
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod'
+    environment: production
+    steps:
+      - name: Approved for production
+        run: echo "Production deployment approved by required reviewer."
+
   provision-infra:
     name: Provision Base Infrastructure
     runs-on: ubuntu-latest
+    needs: [validate-ref, prod-gate]
+    if: always() && needs.validate-ref.result == 'success' && (needs.prod-gate.result == 'success' || needs.prod-gate.result == 'skipped')
     permissions:
       id-token: write
       contents: read
@@ -98,8 +146,19 @@ jobs:
           BACKEND_SENTRY_DSN: ${{ secrets.BACKEND_SENTRY_DSN }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_CATALOG_JSON: ${{ secrets.STRIPE_PRICE_CATALOG_JSON }}
+          FLUTTERWAVE_PUBLIC_KEY: ${{ secrets.FLUTTERWAVE_PUBLIC_KEY }}
+          FLUTTERWAVE_SECRET_KEY: ${{ secrets.FLUTTERWAVE_SECRET_KEY }}
+          FLUTTERWAVE_SECRET_HASH: ${{ secrets.FLUTTERWAVE_SECRET_HASH }}
+          FLUTTERWAVE_PLAN_CATALOG_JSON: ${{ secrets.FLUTTERWAVE_PLAN_CATALOG_JSON }}
+          FLUTTERWAVE_PAYMENT_OPTIONS: ${{ secrets.FLUTTERWAVE_PAYMENT_OPTIONS }}
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_API_KEY: ${{ secrets.ADZUNA_API_KEY }}
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          APIFY_JOB_TASKS_JSON: ${{ secrets.APIFY_JOB_TASKS_JSON }}
+          GREENHOUSE_BOARD_TOKENS: ${{ secrets.GREENHOUSE_BOARD_TOKENS }}
+          LEVER_SITE_TOKENS: ${{ secrets.LEVER_SITE_TOKENS }}
+          WORKABLE_COMPANY_TOKENS: ${{ secrets.WORKABLE_COMPANY_TOKENS }}
         run: |
           CURRENT=$(aws secretsmanager get-secret-value \
             --secret-id "$SECRET_NAME" \
@@ -113,8 +172,19 @@ jobs:
             --arg sentry "$BACKEND_SENTRY_DSN" \
             --arg stripe "$STRIPE_SECRET_KEY" \
             --arg stripeWebhook "$STRIPE_WEBHOOK_SECRET" \
+            --arg stripeCatalog "$STRIPE_PRICE_CATALOG_JSON" \
+            --arg flutterwavePublic "$FLUTTERWAVE_PUBLIC_KEY" \
+            --arg flutterwaveSecret "$FLUTTERWAVE_SECRET_KEY" \
+            --arg flutterwaveHash "$FLUTTERWAVE_SECRET_HASH" \
+            --arg flutterwaveCatalog "$FLUTTERWAVE_PLAN_CATALOG_JSON" \
+            --arg flutterwaveOptions "$FLUTTERWAVE_PAYMENT_OPTIONS" \
             --arg adzunaId "$ADZUNA_APP_ID" \
             --arg adzunaKey "$ADZUNA_API_KEY" \
+            --arg apifyToken "$APIFY_TOKEN" \
+            --arg apifyTasks "$APIFY_JOB_TASKS_JSON" \
+            --arg greenhouseBoards "$GREENHOUSE_BOARD_TOKENS" \
+            --arg leverSites "$LEVER_SITE_TOKENS" \
+            --arg workableCompanies "$WORKABLE_COMPANY_TOKENS" \
             '
             def prefer_input($value; $key):
               if ($value | length) > 0 then $value else ($current[$key] // "") end;
@@ -125,8 +195,19 @@ jobs:
               SENTRY_DSN: prefer_input($sentry; "SENTRY_DSN"),
               STRIPE_SECRET_KEY: prefer_input($stripe; "STRIPE_SECRET_KEY"),
               STRIPE_WEBHOOK_SECRET: prefer_input($stripeWebhook; "STRIPE_WEBHOOK_SECRET"),
+              STRIPE_PRICE_CATALOG_JSON: prefer_input($stripeCatalog; "STRIPE_PRICE_CATALOG_JSON"),
+              FLUTTERWAVE_PUBLIC_KEY: prefer_input($flutterwavePublic; "FLUTTERWAVE_PUBLIC_KEY"),
+              FLUTTERWAVE_SECRET_KEY: prefer_input($flutterwaveSecret; "FLUTTERWAVE_SECRET_KEY"),
+              FLUTTERWAVE_SECRET_HASH: prefer_input($flutterwaveHash; "FLUTTERWAVE_SECRET_HASH"),
+              FLUTTERWAVE_PLAN_CATALOG_JSON: prefer_input($flutterwaveCatalog; "FLUTTERWAVE_PLAN_CATALOG_JSON"),
+              FLUTTERWAVE_PAYMENT_OPTIONS: prefer_input($flutterwaveOptions; "FLUTTERWAVE_PAYMENT_OPTIONS"),
               ADZUNA_APP_ID: prefer_input($adzunaId; "ADZUNA_APP_ID"),
-              ADZUNA_API_KEY: prefer_input($adzunaKey; "ADZUNA_API_KEY")
+              ADZUNA_API_KEY: prefer_input($adzunaKey; "ADZUNA_API_KEY"),
+              APIFY_TOKEN: prefer_input($apifyToken; "APIFY_TOKEN"),
+              APIFY_JOB_TASKS_JSON: prefer_input($apifyTasks; "APIFY_JOB_TASKS_JSON"),
+              GREENHOUSE_BOARD_TOKENS: prefer_input($greenhouseBoards; "GREENHOUSE_BOARD_TOKENS"),
+              LEVER_SITE_TOKENS: prefer_input($leverSites; "LEVER_SITE_TOKENS"),
+              WORKABLE_COMPANY_TOKENS: prefer_input($workableCompanies; "WORKABLE_COMPANY_TOKENS")
             }')
 
           aws secretsmanager put-secret-value \
@@ -137,6 +218,7 @@ jobs:
     name: Build & Push Images
     runs-on: ubuntu-latest
     needs: [provision-infra]
+    if: always() && needs.provision-infra.result == 'success'
     permissions:
       id-token: write
       contents: read
@@ -153,15 +235,21 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push backend
         env:
           ECR_REPOSITORY: afritalent-${{ env.DEPLOY_ENV }}-backend
           IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
-          docker build -t $IMAGE:$IMAGE_TAG -t $IMAGE:latest ./backend
-          docker push $IMAGE:$IMAGE_TAG
-          docker push $IMAGE:latest
+          docker buildx build \
+            --platform linux/amd64 \
+            --push \
+            -t "$IMAGE:$IMAGE_TAG" \
+            -t "$IMAGE:latest" \
+            ./backend
 
       - name: Build and push initial frontend
         env:
@@ -189,21 +277,24 @@ jobs:
           fi
 
           IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
-          docker build \
+          docker buildx build \
+            --platform linux/amd64 \
+            --push \
             --build-arg NEXT_PUBLIC_API_URL="$PUBLIC_API_URL" \
             --build-arg NEXT_PUBLIC_BACKEND_URL="$PUBLIC_API_URL" \
             --build-arg NEXT_PUBLIC_SENTRY_DSN="$NEXT_PUBLIC_SENTRY_DSN" \
             --build-arg SENTRY_ORG="$SENTRY_ORG" \
             --build-arg SENTRY_PROJECT="$SENTRY_PROJECT" \
             --secret id=sentry_auth_token,env=SENTRY_AUTH_TOKEN \
-            -t $IMAGE:$IMAGE_TAG -t $IMAGE:latest ./frontend
-          docker push $IMAGE:$IMAGE_TAG
-          docker push $IMAGE:latest
+            -t "$IMAGE:$IMAGE_TAG" \
+            -t "$IMAGE:latest" \
+            ./frontend
 
   finalize-infra:
     name: Finalize Infrastructure
     runs-on: ubuntu-latest
     needs: [provision-infra, build-and-push]
+    if: always() && needs.provision-infra.result == 'success' && needs.build-and-push.result == 'success'
     permissions:
       id-token: write
       contents: read
@@ -232,11 +323,17 @@ jobs:
       - name: Import existing App Runner services into Terraform state
         working-directory: infra/terraform
         run: |
+          if [ "${{ env.DEPLOY_ENV }}" = "staging" ]; then
+            FRONTEND_SERVICE_NAME="afritalent-stg-fe-livefix"
+          else
+            FRONTEND_SERVICE_NAME="afritalent-${{ env.DEPLOY_ENV }}-appr-frontend-managed"
+          fi
+
           BACKEND_ARN=$(aws apprunner list-services \
             --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-backend-managed'].ServiceArn | [0]" \
             --output text)
           FRONTEND_ARN=$(aws apprunner list-services \
-            --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-frontend-managed'].ServiceArn | [0]" \
+            --query "ServiceSummaryList[?ServiceName=='$FRONTEND_SERVICE_NAME'].ServiceArn | [0]" \
             --output text)
 
           if [ "$BACKEND_ARN" != "None" ] && ! terraform state show module.apprunner.aws_apprunner_service.backend >/dev/null 2>&1; then
@@ -269,6 +366,7 @@ jobs:
     name: Deploy to App Runner
     runs-on: ubuntu-latest
     needs: [finalize-infra]
+    if: always() && needs.finalize-infra.result == 'success'
     permissions:
       id-token: write
       contents: read
@@ -285,6 +383,9 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push final frontend
         env:
           ECR_REPOSITORY: afritalent-${{ env.DEPLOY_ENV }}-frontend
@@ -296,37 +397,65 @@ jobs:
           PUBLIC_API_URL: ${{ needs.finalize-infra.outputs.backend_url }}
         run: |
           IMAGE=${{ env.ECR_REGISTRY }}/$ECR_REPOSITORY
-          docker build \
+          docker buildx build \
+            --platform linux/amd64 \
+            --push \
             --build-arg NEXT_PUBLIC_API_URL="$PUBLIC_API_URL" \
             --build-arg NEXT_PUBLIC_BACKEND_URL="$PUBLIC_API_URL" \
             --build-arg NEXT_PUBLIC_SENTRY_DSN="$NEXT_PUBLIC_SENTRY_DSN" \
             --build-arg SENTRY_ORG="$SENTRY_ORG" \
             --build-arg SENTRY_PROJECT="$SENTRY_PROJECT" \
             --secret id=sentry_auth_token,env=SENTRY_AUTH_TOKEN \
-            -t $IMAGE:$IMAGE_TAG -t $IMAGE:latest ./frontend
-          docker push $IMAGE:$IMAGE_TAG
-          docker push $IMAGE:latest
+            -t "$IMAGE:$IMAGE_TAG" \
+            -t "$IMAGE:latest" \
+            ./frontend
 
       - name: Get App Runner service ARNs
         id: services
         run: |
+          if [ "${{ env.DEPLOY_ENV }}" = "staging" ]; then
+            FRONTEND_SERVICE_NAME="afritalent-stg-fe-livefix"
+          else
+            FRONTEND_SERVICE_NAME="afritalent-${{ env.DEPLOY_ENV }}-appr-frontend-managed"
+          fi
+
           BACKEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-backend-managed'].ServiceArn" --output text)
-          FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='afritalent-${{ env.DEPLOY_ENV }}-appr-frontend-managed'].ServiceArn" --output text)
+          FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='$FRONTEND_SERVICE_NAME'].ServiceArn" --output text)
           echo "backend_arn=$BACKEND_ARN" >> "$GITHUB_OUTPUT"
           echo "frontend_arn=$FRONTEND_ARN" >> "$GITHUB_OUTPUT"
 
+      - name: Set up Node.js for migrations
+        if: env.RUN_PRISMA_MIGRATIONS_FROM_RUNNER == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run Prisma migrations
+        if: env.RUN_PRISMA_MIGRATIONS_FROM_RUNNER == 'true'
+        working-directory: backend
+        env:
+          SECRET_NAME: afritalent-${{ env.DEPLOY_ENV }}/app-secrets
+        run: |
+          DATABASE_URL=$(aws secretsmanager get-secret-value \
+            --secret-id "$SECRET_NAME" \
+            --query 'SecretString' \
+            --output text | jq -r '.DATABASE_URL')
+          export DATABASE_URL
+          npm ci --ignore-scripts
+          npx prisma migrate deploy
+
       - name: Deploy backend
-        run: aws apprunner start-deployment --service-arn ${{ steps.services.outputs.backend_arn }}
+        run: aws apprunner start-deployment --service-arn "${{ steps.services.outputs.backend_arn }}"
 
       - name: Deploy frontend
-        run: aws apprunner start-deployment --service-arn ${{ steps.services.outputs.frontend_arn }}
+        run: aws apprunner start-deployment --service-arn "${{ steps.services.outputs.frontend_arn }}"
 
       - name: Wait for backend deployment
         run: |
           echo "Waiting for backend service to become running..."
-          for i in {1..30}; do
-            STATUS=$(aws apprunner describe-service --service-arn ${{ steps.services.outputs.backend_arn }} --query 'Service.Status' --output text)
-            echo "Backend status: $STATUS"
+          for attempt in $(seq 1 30); do
+            STATUS=$(aws apprunner describe-service --service-arn "${{ steps.services.outputs.backend_arn }}" --query 'Service.Status' --output text)
+            echo "Backend status on attempt $attempt: $STATUS"
             if [ "$STATUS" = "RUNNING" ]; then
               echo "Backend is running!"
               break
@@ -337,9 +466,9 @@ jobs:
       - name: Wait for frontend deployment
         run: |
           echo "Waiting for frontend service to become running..."
-          for i in {1..30}; do
-            STATUS=$(aws apprunner describe-service --service-arn ${{ steps.services.outputs.frontend_arn }} --query 'Service.Status' --output text)
-            echo "Frontend status: $STATUS"
+          for attempt in $(seq 1 30); do
+            STATUS=$(aws apprunner describe-service --service-arn "${{ steps.services.outputs.frontend_arn }}" --query 'Service.Status' --output text)
+            echo "Frontend status on attempt $attempt: $STATUS"
             if [ "$STATUS" = "RUNNING" ]; then
               echo "Frontend is running!"
               break
@@ -351,13 +480,14 @@ jobs:
     name: Post-Deploy Health Check
     runs-on: ubuntu-latest
     needs: [deploy-apprunner, finalize-infra]
+    if: always() && needs.deploy-apprunner.result == 'success' && needs.finalize-infra.result == 'success'
 
     steps:
       - name: Check backend health
         run: |
           echo "Checking backend health at ${{ needs.finalize-infra.outputs.backend_url }}/health"
           for i in {1..5}; do
-            if curl -sf "${{ needs.finalize-infra.outputs.backend_url }}/health" | grep -q "ok"; then
+            if curl -fsS "${{ needs.finalize-infra.outputs.backend_url }}/health" | jq -e '.status == "ok" or .status == "degraded"' >/dev/null; then
               echo "Backend health check passed!"
               exit 0
             fi
@@ -371,7 +501,7 @@ jobs:
         run: |
           echo "Checking frontend at ${{ needs.finalize-infra.outputs.frontend_url }}"
           for i in {1..5}; do
-            if curl -sf "${{ needs.finalize-infra.outputs.frontend_url }}" | grep -q "AfriTalent"; then
+            if curl -fsSL "${{ needs.finalize-infra.outputs.frontend_url }}" | grep -q "AfriTalent"; then
               echo "Frontend health check passed!"
               exit 0
             fi
@@ -383,8 +513,10 @@ jobs:
 
       - name: Deployment Summary
         run: |
-          echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ env.DEPLOY_ENV }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Backend URL:** ${{ needs.finalize-infra.outputs.backend_url }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Frontend URL:** ${{ needs.finalize-infra.outputs.frontend_url }}" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Deployment Complete"
+            echo
+            echo "**Environment:** ${{ env.DEPLOY_ENV }}"
+            echo "**Backend URL:** ${{ needs.finalize-infra.outputs.backend_url }}"
+            echo "**Frontend URL:** ${{ needs.finalize-infra.outputs.frontend_url }}"
+          } >> "$GITHUB_STEP_SUMMARY"

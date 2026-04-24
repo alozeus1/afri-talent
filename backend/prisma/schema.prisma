@@ -78,11 +78,25 @@ enum NotificationType {
   APPLICATION_STATUS
   JOB_MATCH
   VERIFICATION
+  RETENTION_NUDGE
+  WEEKLY_DIGEST
+  SALARY_INSIGHT
+  INTERVIEW_PREP
 }
 
 enum NotificationStatus {
   UNREAD
   READ
+}
+
+enum CandidateLifecycleTriggerType {
+  WEEKLY_DIGEST
+  APPLICATION_REMINDER
+  PROFILE_COMPLETION
+  VERIFICATION_COMPLETION
+  VISA_RELOCATION_MATCH
+  SALARY_INSIGHT
+  INTERVIEW_PREP
 }
 
 enum SubscriptionStatus {
@@ -119,6 +133,27 @@ enum ATSSyncStatus {
   SUCCESS
   PARTIAL
   FAILED
+}
+
+enum ATSHealthStatus {
+  HEALTHY
+  DEGRADED
+  DOWN
+  NEEDS_ATTENTION
+}
+
+enum ATSWebhookEventStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+enum ATSApplicationLinkStatus {
+  PENDING
+  SYNCED
+  FAILED
+  MANUAL_REVIEW
 }
 
 enum MockInterviewStatus {
@@ -342,6 +377,98 @@ enum PhoneVerificationStatus {
   EXPIRED
 }
 
+// ──────────────── Admin & Audit ────────────────
+
+enum AdminPermission {
+  // User management
+  VIEW_USERS
+  MANAGE_USER_ACCOUNTS
+  RESET_USER_PASSWORD
+  RESTRICT_USER_ACCOUNT
+  
+  // Content moderation
+  REVIEW_JOBS
+  REVIEW_APPLICATIONS
+  REVIEW_RESOURCES
+  REVIEW_COMPANY_DATA
+  
+  // Trust & Safety
+  VIEW_TRUST_CASES
+  MANAGE_TRUST_CASES
+  VIEW_ABUSE_REPORTS
+  MANAGE_ABUSE_REPORTS
+  VIEW_VERIFICATION_ARTIFACTS
+  APPROVE_VERIFICATION
+  
+  // Platform operations
+  VIEW_AUDIT_LOGS
+  VIEW_HEALTH_STATUS
+  MANAGE_ALERTS
+  VIEW_SYSTEMS_METRICS
+  
+  // Billing & Finance
+  VIEW_BILLING_DATA
+  MANAGE_BILLING_DISPUTES
+  VIEW_REVENUE_REPORTS
+  
+  // Data operations
+  EXPORT_DATA
+  RUN_BULK_OPERATIONS
+  MODIFY_BULK_DATA
+}
+
+enum AdminAction {
+  USER_CREATED
+  USER_UPDATED
+  USER_DELETED
+  USER_RESTRICTED
+  USER_PASSWORD_RESET
+  JOB_REVIEWED
+  JOB_APPROVED
+  JOB_REJECTED
+  APPLICATION_REVIEWED
+  VERIFICATION_APPROVED
+  VERIFICATION_REJECTED
+  TRUST_CASE_OPENED
+  TRUST_CASE_ACTIONED
+  ABUSE_REPORT_ACTIONED
+  ALERT_CREATED
+  ALERT_RESOLVED
+  BULK_OPERATION_STARTED
+  BULK_OPERATION_COMPLETED
+  SYSTEM_CONFIGURATION_CHANGED
+  ALERT_SETTINGS_UPDATED
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum BulkOperationType {
+  USER_RESTRICTION
+  PASSWORD_RESET
+  DATA_EXPORT
+  JOB_BATCH_REVIEW
+  VERIFICATION_BATCH_PROCESS
+  CUSTOM_QUERY
+}
+
+enum BulkOperationStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  PARTIAL
+  FAILED
+}
+
 // ──────────────── OAuth & Email Verification ────────────────
 
 enum OAuthProvider {
@@ -393,6 +520,12 @@ enum BillingRegion {
 enum BillingInterval {
   MONTHLY
   YEARLY
+}
+
+enum BillingProvider {
+  STRIPE
+  FLUTTERWAVE
+  PAYPAL
 }
 
 enum RegionChangeSource {
@@ -589,6 +722,8 @@ model User {
   pushSubscriptions             PushSubscription[]
   analyticsEvents               AnalyticsEvent[]
   mockInterviewSessions         MockInterviewSession[]
+  candidateLifecycleState       CandidateLifecycleState?
+  candidateLifecycleEvents      CandidateLifecycleEvent[]
   socialProfile                 SocialProfile?
   socialConnectionsSent         SocialConnection[]         @relation("SocialConnectionRequester")
   socialConnectionsRecv         SocialConnection[]         @relation("SocialConnectionRecipient")
@@ -614,6 +749,15 @@ model User {
   abuseReportsAssigned          AbuseReport[]              @relation("AbuseReportAssignee")
   trustCasesAssigned            TrustCase[]                @relation("TrustCaseAssignee")
   trustCaseActions              TrustCaseAction[]          @relation("TrustCaseActionActor")
+  talentPoolMemberships         EmployerTalentPoolCandidate[] @relation("TalentPoolCandidateUser")
+  talentPoolCandidatesAdded     EmployerTalentPoolCandidate[] @relation("TalentPoolCandidateAdder")
+  candidateAutopilotProfile     CandidateAutopilotProfile?
+  candidateResumeVersions       CandidateResumeVersion[]
+  candidateAgentTasks           CandidateAgentTask[]
+  coverLetterVersions           CoverLetterVersion[]
+  autoApplyBatches              AutoApplyBatch[]
+  careerGapSessions             CareerGapSession[]
+  adminRole                     AdminRole?
 
   @@index([role])
   @@index([createdAt])
@@ -640,6 +784,7 @@ model Employer {
   verificationArtifacts VerificationArtifact[]   @relation("EmployerVerificationArtifacts")
   trustRiskEvents       TrustRiskEvent[]
   abuseReports          AbuseReport[]
+  talentPools           EmployerTalentPool[]
 }
 
 model EmployerOnboardingState {
@@ -655,6 +800,42 @@ model EmployerOnboardingState {
   updatedAt        DateTime          @updatedAt
 
   @@index([currentStep, updatedAt(sort: Desc)])
+}
+
+model EmployerTalentPool {
+  id          String   @id @default(uuid())
+  employerId  String
+  employer    Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  name        String   @db.VarChar(120)
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidates EmployerTalentPoolCandidate[]
+
+  @@unique([employerId, name])
+  @@index([employerId, updatedAt(sort: Desc)])
+}
+
+model EmployerTalentPoolCandidate {
+  id                   String             @id @default(uuid())
+  poolId               String
+  pool                 EmployerTalentPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  candidateUserId      String
+  candidate            User               @relation("TalentPoolCandidateUser", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  addedByUserId        String
+  addedByUser          User               @relation("TalentPoolCandidateAdder", fields: [addedByUserId], references: [id], onDelete: Cascade)
+  stage                String             @default("SOURCED") @db.VarChar(40)
+  notes                String?            @db.Text
+  semanticScore        Int?
+  trustScoreSnapshot   Int?
+  mobilityScoreSnapshot Int?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@unique([poolId, candidateUserId])
+  @@index([candidateUserId, updatedAt(sort: Desc)])
+  @@index([poolId, stage, updatedAt(sort: Desc)])
 }
 
 model Job {
@@ -716,6 +897,9 @@ model Job {
   trustRiskEvents           TrustRiskEvent[]
   abuseReports              AbuseReport[]
   trustCases                TrustCase[]
+  resumeVersions            CandidateResumeVersion[]
+  candidateAgentTasks       CandidateAgentTask[]
+  coverLetterVersions       CoverLetterVersion[]
 
   @@index([status])
   @@index([status, publishedAt(sort: Desc)])
@@ -753,11 +937,13 @@ model Application {
   candidateId String
   candidate   User   @relation(fields: [candidateId], references: [id])
 
-  adminReviews    AdminReview[]    @relation("ApplicationReviews")
+  adminReviews    AdminReview[]       @relation("ApplicationReviews")
   thread          MessageThread?
   trustRiskEvents TrustRiskEvent[]
   abuseReports    AbuseReport[]
   trustCases      TrustCase[]
+  atsLink         ATSApplicationLink?
+  candidateAgentTasks CandidateAgentTask[]
 
   @@unique([jobId, candidateId])
   @@index([jobId])
@@ -765,6 +951,31 @@ model Application {
   @@index([status])
   @@index([createdAt(sort: Desc)])
   @@index([riskLevel, riskScore])
+}
+
+// ──────────────── AI Skills Models ────────────────
+
+model UserResume {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  content   Json
+  rawText   String   @db.Text
+  pdfUrl    String?
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  atsReports AtsReport[]
+}
+
+model CareerAdvice {
+  id            String   @id @default(uuid())
+  userId        String
+  adviceContent Json
+  targetRole    String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Resource {
@@ -837,6 +1048,7 @@ model CandidateProfile {
   updatedAt           DateTime @updatedAt
 
   resumes Resume[]
+  resumeVersions CandidateResumeVersion[]
 
   @@index([userId])
   @@index([openToWork])
@@ -1071,6 +1283,140 @@ model Resume {
   @@index([profileId, isActive])
 }
 
+enum CandidateAutomationLevel {
+  ASSISTED
+  AUTONOMOUS
+}
+
+enum CandidateAgentTaskType {
+  RESUME_REFRESH
+  APPLY_PACK
+  FOLLOW_UP
+  INTERVIEW_PREP
+  SCHEDULING
+}
+
+enum CandidateAgentTaskStatus {
+  QUEUED
+  RUNNING
+  READY
+  NEEDS_REVIEW
+  SENT
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum ResumeVersionSource {
+  PROFILE_SYNTHESIS
+  AI_TAILOR
+  USER_UPLOAD
+}
+
+enum ResumeVersionStatus {
+  DRAFT
+  READY
+  NEEDS_REVIEW
+  ARCHIVED
+}
+
+model CandidateAutopilotProfile {
+  id                   String                   @id @default(uuid())
+  userId               String                   @unique
+  user                 User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled              Boolean                  @default(false)
+  automationLevel      CandidateAutomationLevel @default(ASSISTED)
+  minimumMatchScore    Int                      @default(78)
+  resumeBuilderEnabled Boolean                  @default(true)
+  autoApplyEnabled     Boolean                  @default(false)
+  followUpEnabled      Boolean                  @default(true)
+  interviewPrepEnabled Boolean                  @default(true)
+  schedulingEnabled    Boolean                  @default(true)
+  preferredTone        String?                  @db.VarChar(40)
+  followUpCadenceDays  Int[]
+  availabilityWindows  Json?
+  targetCompensation   Json?
+  searchStrategy       Json?
+  metadata             Json?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  resumeVersions CandidateResumeVersion[]
+  agentTasks     CandidateAgentTask[]
+
+  @@index([enabled, updatedAt(sort: Desc)])
+}
+
+model CandidateResumeVersion {
+  id                 String              @id @default(uuid())
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  autopilotProfileId String?
+  autopilotProfile   CandidateAutopilotProfile? @relation(fields: [autopilotProfileId], references: [id], onDelete: SetNull)
+  profileId          String?
+  profile            CandidateProfile?   @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  jobId              String?
+  job                Job?                @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  aiRunId            String?
+  aiRun              AiRun?              @relation(fields: [aiRunId], references: [id], onDelete: SetNull)
+  source             ResumeVersionSource
+  status             ResumeVersionStatus @default(READY)
+  title              String              @db.VarChar(160)
+  targetRole         String?             @db.VarChar(120)
+  summary            String?             @db.Text
+  content            Json
+  plainText          String              @db.Text
+  keywords           String[]
+  score              Int?
+  notes              String[]
+  isPrimary          Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  agentTasks CandidateAgentTask[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, isPrimary, updatedAt(sort: Desc)])
+  @@index([jobId, createdAt(sort: Desc)])
+  @@index([status, updatedAt(sort: Desc)])
+}
+
+model CandidateAgentTask {
+  id                 String                   @id @default(uuid())
+  userId             String
+  user               User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  autopilotProfileId String?
+  autopilotProfile   CandidateAutopilotProfile? @relation(fields: [autopilotProfileId], references: [id], onDelete: SetNull)
+  applicationId      String?
+  application        Application?             @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  jobId              String?
+  job                Job?                     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  aiRunId            String?
+  aiRun              AiRun?                   @relation(fields: [aiRunId], references: [id], onDelete: SetNull)
+  resumeVersionId    String?
+  resumeVersion      CandidateResumeVersion?  @relation(fields: [resumeVersionId], references: [id], onDelete: SetNull)
+  type               CandidateAgentTaskType
+  status             CandidateAgentTaskStatus @default(QUEUED)
+  priority           Int                      @default(50)
+  title              String                   @db.VarChar(180)
+  summary            String?                  @db.Text
+  inputSnapshot      Json?
+  outputSummary      Json?
+  outputPayload      Json?
+  reviewNotes        String?                  @db.Text
+  scheduledFor       DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  lastError          String?                  @db.VarChar(500)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@index([userId, status, scheduledFor])
+  @@index([applicationId, type, createdAt(sort: Desc)])
+  @@index([jobId, type, createdAt(sort: Desc)])
+  @@index([resumeVersionId, createdAt(sort: Desc)])
+}
+
 model Company {
   id                    String                    @id @default(uuid())
   name                  String                    @db.VarChar(200)
@@ -1155,23 +1501,80 @@ model Notification {
   metadata  Json?
   createdAt DateTime           @default(now())
 
+  candidateLifecycleEvents CandidateLifecycleEvent[]
+
   @@index([userId, status])
   @@index([userId, createdAt(sort: Desc)])
 }
 
 model NotificationPreference {
-  id                  String   @id @default(uuid())
-  userId              String   @unique
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  savedSearchAlerts   Boolean  @default(true)
-  interviewReminders  Boolean  @default(true)
-  applicationUpdates  Boolean  @default(true)
-  subscriptionNotices Boolean  @default(true)
-  marketing           Boolean  @default(false)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                               String   @id @default(uuid())
+  userId                           String   @unique
+  user                             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  savedSearchAlerts                Boolean  @default(true)
+  weeklyDigests                    Boolean  @default(true)
+  applicationReminders             Boolean  @default(true)
+  profileCompletionNudges          Boolean  @default(true)
+  verificationCompletionNudges     Boolean  @default(true)
+  visaRelocationAlerts             Boolean  @default(true)
+  salaryInsights                   Boolean  @default(true)
+  interviewPrepRecommendations     Boolean  @default(true)
+  interviewReminders               Boolean  @default(true)
+  applicationUpdates               Boolean  @default(true)
+  subscriptionNotices              Boolean  @default(true)
+  marketing                        Boolean  @default(false)
+  maxNotificationsPerWeek          Int      @default(6)
+  minimumHoursBetweenNotifications Int      @default(18)
+  createdAt                        DateTime @default(now())
+  updatedAt                        DateTime @updatedAt
 
   @@index([userId])
+}
+
+model CandidateLifecycleState {
+  id                        String    @id @default(uuid())
+  userId                    String    @unique
+  user                      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekWindowStartedAt       DateTime?
+  notificationsThisWeek     Int       @default(0)
+  lastNotificationAt        DateTime?
+  lastDigestAt              DateTime?
+  lastApplicationReminderAt DateTime?
+  lastProfileNudgeAt        DateTime?
+  lastVerificationNudgeAt   DateTime?
+  lastVisaAlertAt           DateTime?
+  lastSalaryInsightAt       DateTime?
+  lastInterviewPrepAt       DateTime?
+  lastDigestJobCount        Int       @default(0)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  events CandidateLifecycleEvent[]
+
+  @@index([weekWindowStartedAt])
+  @@index([lastNotificationAt])
+}
+
+model CandidateLifecycleEvent {
+  id               String                        @id @default(uuid())
+  userId           String
+  user             User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lifecycleStateId String?
+  lifecycleState   CandidateLifecycleState?      @relation(fields: [lifecycleStateId], references: [id], onDelete: SetNull)
+  triggerType      CandidateLifecycleTriggerType
+  channel          String                        @db.VarChar(40)
+  reasonCode       String                        @db.VarChar(120)
+  dedupeKey        String                        @unique @db.VarChar(180)
+  title            String                        @db.VarChar(255)
+  body             String                        @db.VarChar(1000)
+  metadata         Json?
+  notificationId   String?
+  notification     Notification?                 @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  sentAt           DateTime                      @default(now())
+  createdAt        DateTime                      @default(now())
+
+  @@index([userId, triggerType, createdAt(sort: Desc)])
+  @@index([channel, createdAt(sort: Desc)])
 }
 
 model PushSubscription {
@@ -1192,44 +1595,135 @@ model PushSubscription {
 }
 
 model ATSConnection {
-  id                    String              @id @default(uuid())
-  employerId            String
-  employer              Employer            @relation(fields: [employerId], references: [id], onDelete: Cascade)
-  provider              ATSProvider
-  externalOrgId         String              @db.VarChar(255)
-  encryptedAccessToken  String?             @db.Text
-  encryptedRefreshToken String?             @db.Text
-  metadata              Json?
-  status                ATSConnectionStatus @default(ACTIVE)
-  lastSyncedAt          DateTime?
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
+  id                     String              @id @default(uuid())
+  employerId             String
+  employer               Employer            @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  provider               ATSProvider
+  displayName            String?             @db.VarChar(120)
+  externalOrgId          String              @db.VarChar(255)
+  encryptedAccessToken   String?             @db.Text
+  encryptedRefreshToken  String?             @db.Text
+  encryptedWebhookSecret String?             @db.Text
+  metadata               Json?
+  status                 ATSConnectionStatus @default(ACTIVE)
+  healthStatus           ATSHealthStatus     @default(NEEDS_ATTENTION)
+  webhookSyncEnabled     Boolean             @default(false)
+  twoWaySyncEnabled      Boolean             @default(false)
+  lastSyncedAt           DateTime?
+  lastSuccessfulSyncAt   DateTime?
+  lastConnectionTestAt   DateTime?
+  lastConnectionTestOk   Boolean?
+  lastWebhookAt          DateTime?
+  lastErrorAt            DateTime?
+  lastErrorMessage       String?             @db.Text
+  consecutiveFailures    Int                 @default(0)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
 
-  syncRuns ATSSyncRun[]
+  syncRuns         ATSSyncRun[]
+  webhookEvents    ATSWebhookEvent[]
+  auditLogs        ATSConnectionAuditLog[]
+  applicationLinks ATSApplicationLink[]
 
   @@unique([employerId, provider, externalOrgId])
   @@index([employerId])
+  @@index([employerId, healthStatus])
   @@index([provider])
+  @@index([status, healthStatus])
 }
 
 model ATSSyncRun {
-  id           String        @id @default(uuid())
-  connectionId String
-  connection   ATSConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  status       ATSSyncStatus @default(QUEUED)
-  startedAt    DateTime      @default(now())
-  finishedAt   DateTime?
-  pulledJobs   Int           @default(0)
-  createdJobs  Int           @default(0)
-  updatedJobs  Int           @default(0)
-  dedupedJobs  Int           @default(0)
-  errorCount   Int           @default(0)
-  cursor       String?       @db.VarChar(255)
-  errors       Json?
-  metadata     Json?
+  id               String        @id @default(uuid())
+  connectionId     String
+  connection       ATSConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  status           ATSSyncStatus @default(QUEUED)
+  syncType         String        @default("JOB_IMPORT") @db.VarChar(40)
+  direction        String        @default("IMPORT") @db.VarChar(20)
+  trigger          String        @default("MANUAL") @db.VarChar(24)
+  correlationId    String?       @db.VarChar(80)
+  startedAt        DateTime      @default(now())
+  finishedAt       DateTime?
+  pulledJobs       Int           @default(0)
+  createdJobs      Int           @default(0)
+  updatedJobs      Int           @default(0)
+  dedupedJobs      Int           @default(0)
+  processedEvents  Int           @default(0)
+  pushedCandidates Int           @default(0)
+  updatedStages    Int           @default(0)
+  retryCount       Int           @default(0)
+  errorCount       Int           @default(0)
+  cursor           String?       @db.VarChar(255)
+  errors           Json?
+  warnings         Json?
+  metadata         Json?
 
   @@index([connectionId, startedAt(sort: Desc)])
   @@index([status, startedAt(sort: Desc)])
+  @@index([syncType, direction, startedAt(sort: Desc)])
+}
+
+model ATSWebhookEvent {
+  id           String                @id @default(uuid())
+  connectionId String
+  connection   ATSConnection         @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  provider     ATSProvider
+  eventType    String                @db.VarChar(120)
+  eventKey     String?               @db.VarChar(255)
+  status       ATSWebhookEventStatus @default(RECEIVED)
+  httpHeaders  Json?
+  payload      Json
+  errorMessage String?               @db.Text
+  metadata     Json?
+  receivedAt   DateTime              @default(now())
+  processedAt  DateTime?
+
+  @@unique([connectionId, eventKey])
+  @@index([connectionId, receivedAt(sort: Desc)])
+  @@index([status, receivedAt(sort: Desc)])
+  @@index([provider, receivedAt(sort: Desc)])
+}
+
+model ATSConnectionAuditLog {
+  id             String        @id @default(uuid())
+  connectionId   String
+  connection     ATSConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  actorUserId    String?       @db.VarChar(36)
+  actionType     String        @db.VarChar(60)
+  reasonCode     String?       @db.VarChar(120)
+  summary        String        @db.Text
+  syncRunId      String?       @db.VarChar(36)
+  webhookEventId String?       @db.VarChar(36)
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+
+  @@index([connectionId, createdAt(sort: Desc)])
+  @@index([actionType, createdAt(sort: Desc)])
+}
+
+model ATSApplicationLink {
+  id                    String                   @id @default(uuid())
+  connectionId          String
+  connection            ATSConnection            @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  applicationId         String                   @unique
+  application           Application              @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  externalJobId         String?                  @db.VarChar(255)
+  externalApplicationId String?                  @db.VarChar(255)
+  externalCandidateId   String?                  @db.VarChar(255)
+  externalStageId       String?                  @db.VarChar(255)
+  externalStageName     String?                  @db.VarChar(120)
+  status                ATSApplicationLinkStatus @default(PENDING)
+  lastOutboundSyncAt    DateTime?
+  lastInboundSyncAt     DateTime?
+  lastSyncError         String?                  @db.Text
+  metadata              Json?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  @@unique([connectionId, externalApplicationId])
+  @@index([connectionId, status])
+  @@index([connectionId, externalCandidateId])
+  @@index([lastInboundSyncAt])
+  @@index([lastOutboundSyncAt])
 }
 
 model MockInterviewSession {
@@ -1503,6 +1997,9 @@ model Subscription {
   user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan             SubscriptionPlan   @default(FREE)
   status           SubscriptionStatus @default(INACTIVE)
+  billingProvider  BillingProvider?
+  providerCustomerId String?          @db.VarChar(255)
+  providerSubscriptionId String?      @db.VarChar(255)
   stripeCustomerId String?            @db.VarChar(255)
   stripeSubId      String?            @db.VarChar(255)
   currentPeriodEnd DateTime?
@@ -1515,6 +2012,9 @@ model Subscription {
   entitlementState      BillingEntitlementState?
 
   @@index([userId])
+  @@index([billingProvider])
+  @@index([providerCustomerId])
+  @@index([providerSubscriptionId])
   @@index([stripeCustomerId])
   @@index([stripeSubId])
 }
@@ -1675,6 +2175,8 @@ enum AiRunType {
   RESUME_REVIEW
   JOB_MATCH
   APPLY_PACK
+  CAREER_GAP_EXPLAIN
+  SALARY_NEGOTIATE
 }
 
 model AiRun {
@@ -1692,7 +2194,9 @@ model AiRun {
   createdAt        DateTime    @default(now())
   completedAt      DateTime?
 
-  jobs AiRunJob[]
+  jobs           AiRunJob[]
+  resumeVersions CandidateResumeVersion[]
+  agentTasks     CandidateAgentTask[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([runId])
@@ -2134,4 +2638,248 @@ model ChatMessage {
   createdAt      DateTime         @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+// ──────────────── Semantic Retrieval Foundation ────────────────
+
+model SemanticDocument {
+  id                  String   @id @default(uuid())
+  namespace           String   @db.VarChar(100)
+  sourceType          String   @db.VarChar(100)
+  sourceId            String   @db.VarChar(191)
+  title               String?  @db.VarChar(300)
+  content             String   @db.Text
+  metadata            Json?
+  embedding           Float[]
+  embeddingDimensions Int
+  embeddingProvider   String   @db.VarChar(50)
+  embeddingModel      String   @db.VarChar(100)
+  checksum            String   @db.VarChar(64)
+  lastIndexedAt       DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([namespace, sourceType, sourceId])
+  @@index([namespace, sourceType])
+  @@index([namespace, updatedAt(sort: Desc)])
+}
+
+// ──────────────── Phase 2 New Models — Database Agent ────────────────
+
+model AtsReport {
+  id                String    @id @default(cuid())
+  resumeId          String
+  jobDescriptionId  String?
+
+  // Scores
+  score             Float     @default(0) // 0.0 to 1.0
+
+  // Missing elements
+  missingKeywords   String[]  @default([])
+  presentKeywords   String[]  @default([])
+
+  // Formatting issues
+  formatting        Json?     // { "pageBreaks": true, "columns": false, ... }
+  suggestions       String[]  @default([])
+
+  // Tracking
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  resume            UserResume? @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId])
+  @@index([createdAt])
+}
+
+model CoverLetterVersion {
+  id                String    @id @default(cuid())
+  candidateId       String
+  jobId             String
+
+  // Content
+  content           String    @db.Text
+  tone              String?   // "formal" | "conversational" | "executive"
+
+  // Tracking
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  candidate         User      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job               Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([jobId])
+  @@index([createdAt])
+}
+
+model AutoApplyBatch {
+  id                String    @id @default(cuid())
+  candidateId       String
+
+  // Batch metadata
+  jobFilters        Json?     // Filter criteria used (visaSponsorship, salaryMin, etc.)
+  jobsTargeted      Int       @default(0)
+
+  // Progress tracking
+  jobsApplied       Int       @default(0)
+  jobsFailed        Int       @default(0)
+  creditsUsed       Int       @default(0)
+
+  // Status
+  status            String    @default("queued") // "queued" | "in_progress" | "completed" | "failed"
+
+  // Timestamps
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  candidate         User      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SalaryBenchmark {
+  id                String    @id @default(cuid())
+
+  // Classification
+  role              String    // "Software Engineer", "Data Analyst", etc.
+  level             String    // "entry" | "mid" | "senior" | "lead"
+  country           String    // "NG" | "KE" | "ZA" | "EG" | "GH" etc.
+  currency          String    @default("USD")
+
+  // Data
+  salaryMin         Float
+  salaryMedian      Float
+  salaryMax         Float
+
+  // Metadata
+  sampleSize        Int       @default(0)
+  lastUpdated       DateTime  @default(now())
+  source            String?   // "crowdsourced" | "glassdoor" | "payscale" etc.
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([role, level, country, currency])
+  @@index([country])
+  @@index([role])
+}
+
+model CareerGapSession {
+  id                String    @id @default(cuid())
+  candidateId       String
+
+  // Gap details
+  startDate         DateTime
+  endDate           DateTime
+  reason            String?   @db.Text // User-provided reason
+
+  // Analysis
+  analysis          String    @db.Text // AI-generated analysis
+  reframing         String    @db.Text // How to frame it positively
+  talkingPoints     String[]  @default([])
+
+  // Metadata
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  candidate         User      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([createdAt])
+}
+
+// ──────────────── Admin Control Plane ────────────────
+
+model AdminRole {
+  id              String                 @id @default(uuid())
+  adminId         String                 @unique
+  admin           User                   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  title           String                 @db.VarChar(100)
+  description     String?                @db.VarChar(500)
+  permissions     AdminPermission[]
+  isActive        Boolean                @default(true)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  auditLogs       AuditLog[]             @relation("AuditLogAdmin")
+
+  @@index([isActive])
+}
+
+model AuditLog {
+  id              String                 @id @default(uuid())
+  adminId         String?
+  admin           AdminRole?             @relation("AuditLogAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+  action          AdminAction
+  targetType      String                 @db.VarChar(50)
+  targetId        String?
+  targetName      String?                @db.VarChar(200)
+  resourceType    String?                @db.VarChar(50)
+  resourceId      String?
+  changes         Json?
+  reason          String?                @db.VarChar(500)
+  metadata        Json?
+  ipAddress       String?                @db.VarChar(50)
+  userAgent       String?                @db.VarChar(500)
+  status          String                 @default("SUCCESS") @db.VarChar(20)
+  errorDetails    String?                @db.Text
+  createdAt       DateTime               @default(now())
+
+  @@index([adminId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@index([targetId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model PlatformAlert {
+  id              String                 @id @default(uuid())
+  title           String                 @db.VarChar(200)
+  description     String                 @db.Text
+  severity        AlertSeverity
+  status          AlertStatus            @default(ACTIVE)
+  category        String                 @db.VarChar(50)
+  metrics         Json?
+  affectedUsers   Int?
+  affectedJobs    Int?
+  affectedApps    Int?
+  firstOccurredAt DateTime               @default(now())
+  lastOccurredAt  DateTime               @updatedAt
+  resolvedAt      DateTime?
+  resolution      String?                @db.Text
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([severity, status, createdAt(sort: Desc)])
+  @@index([category, status])
+  @@index([status, updatedAt(sort: Desc)])
+}
+
+model BulkOperation {
+  id              String                 @id @default(uuid())
+  operationType   BulkOperationType
+  status          BulkOperationStatus    @default(QUEUED)
+  initiatedBy     String?                @db.VarChar(100)
+  query           Json?
+  filters         Json?
+  targetCount     Int                    @default(0)
+  successCount    Int                    @default(0)
+  failureCount    Int                    @default(0)
+  results         Json?
+  errorLog        String?                @db.Text
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([operationType, createdAt(sort: Desc)])
 }

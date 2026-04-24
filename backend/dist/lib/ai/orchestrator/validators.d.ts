@@ -39,9 +39,9 @@ export declare const JobSchemaValidator: z.ZodObject<{
     must_have_skills: z.ZodDefault<z.ZodArray<z.ZodString>>;
     nice_to_have_skills: z.ZodDefault<z.ZodArray<z.ZodString>>;
     visa_sponsorship: z.ZodDefault<z.ZodEnum<{
-        YES: "YES";
         NO: "NO";
         UNKNOWN: "UNKNOWN";
+        YES: "YES";
     }>>;
     relocation_assistance: z.ZodDefault<z.ZodBoolean>;
     eligible_countries: z.ZodDefault<z.ZodArray<z.ZodString>>;

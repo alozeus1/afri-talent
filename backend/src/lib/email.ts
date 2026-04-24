@@ -179,6 +179,64 @@ export async function jobMatchEmail(opts: {
   });
 }
 
+export async function candidateWeeklyDigestEmail(opts: {
+  to: string;
+  candidateName: string;
+  digestUrl: string;
+  jobs: Array<{
+    title: string;
+    companyName: string;
+    location: string;
+    summary: string;
+    url: string;
+  }>;
+}): Promise<void> {
+  const topJobs = opts.jobs.slice(0, 5);
+  if (topJobs.length === 0) {
+    return;
+  }
+
+  await sendEmail({
+    to: opts.to,
+    subject: "Your AfriTalent weekly digest is ready",
+    templateName: "candidate_weekly_digest",
+    html: `
+      <div style="font-family: sans-serif; max-width: 640px; margin: 0 auto;">
+        <h2>Hi ${opts.candidateName},</h2>
+        <p>Here are the strongest fresh opportunities we found for you this week.</p>
+        <ul style="padding-left: 18px;">
+          ${topJobs
+            .map(
+              (job) => `
+                <li style="margin-bottom: 16px;">
+                  <strong>${job.title}</strong> at <strong>${job.companyName}</strong><br/>
+                  <span style="color: #4b5563;">${job.location}</span><br/>
+                  <span style="color: #6b7280;">${job.summary}</span><br/>
+                  <a href="${job.url}" style="color: #059669;">View role</a>
+                </li>
+              `,
+            )
+            .join("")}
+        </ul>
+        <p><a href="${opts.digestUrl}" style="background:#059669;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Manage digest preferences</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: [
+      `Hi ${opts.candidateName},`,
+      "",
+      "Here are the strongest fresh opportunities we found for you this week:",
+      "",
+      ...topJobs.map(
+        (job) =>
+          `- ${job.title} at ${job.companyName} (${job.location})\n  ${job.summary}\n  ${job.url}`,
+      ),
+      "",
+      `Manage digest preferences: ${opts.digestUrl}`,
+    ].join("\n"),
+  });
+}
+
 export async function passwordResetEmail(opts: {
   to: string;
   userName: string;

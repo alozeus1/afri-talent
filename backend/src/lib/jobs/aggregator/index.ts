@@ -4,7 +4,15 @@
 
 import { PrismaClient } from "@prisma/client";
 import logger from "../../logger.js";
-import type { AggregatedJob, AggregatorResult, JobSource, JobRegion } from "./types.js";
+import { recordLatencyMetric, recordOpsEvent } from "../../ops/events.js";
+import type {
+  AggregatedJob,
+  AggregationDiagnostics,
+  AggregatorResult,
+  JobSource,
+  JobRegion,
+  SourceFetchDiagnostics,
+} from "./types.js";
 import { AFRICA_FRIENDLY_KEYWORDS } from "./types.js";
 import { buildJobIntelligenceUpdate, buildSourceFingerprint } from "../discovery.js";
 import { RemoteOKSource } from "./sources/remoteok.js";
@@ -14,6 +22,7 @@ import { JobbermanSource } from "./sources/jobberman.js";
 import { HimalayasSource } from "./sources/himalayas.js";
 import { ArbeitnowSource } from "./sources/arbeitnow.js";
 import { RemotiveSource } from "./sources/jobsincyprus.js";
+import { ApifySource, parseApifyTaskConfigs } from "./sources/apify.js";
 import { GreenhouseSource } from "./sources/greenhouse.js";
 import { LeverSource } from "./sources/lever.js";
 import { WorkableSource } from "./sources/workable.js";
@@ -22,6 +31,94 @@ import type { BaseJobSource, JobQuery } from "./sources/base.js";
 interface AggregatedJobGroup {
   canonical: AggregatedJob;
   variants: AggregatedJob[];
+}
+
+const DEFAULT_GREENHOUSE_BOARD_TOKENS = [
+  "coinbase",
+  "reddit",
+  "moniepoint",
+  "cloudflare",
+  "canonical",
+  "duolingo",
+  "airtable",
+  "brex",
+  "vercel",
+  "checkr",
+  "stripe",
+  "figma",
+  "clickhouse",
+  "elastic",
+  "datadog",
+  "dropbox",
+];
+
+const DEFAULT_LEVER_SITE_TOKENS = [
+  "plaid",
+  "spreetail",
+  "yubico",
+  "pointclickcare",
+  "levelai",
+  "enter-rcm-llc",
+];
+
+function parseTokenList(raw: string | undefined): string[] {
+  return (raw || "")
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+function mergeUniqueTokens(...groups: string[][]): string[] {
+  return Array.from(new Set(groups.flatMap((group) => group)));
+}
+
+function classifyFailureReason(message: string): string {
+  const normalized = message.toLowerCase();
+
+  const httpMatch = normalized.match(/http\s+(\d{3})/);
+  if (httpMatch) {
+    const status = Number.parseInt(httpMatch[1], 10);
+    if (!Number.isNaN(status)) {
+      if (status >= 500) return "http_5xx";
+      if (status === 429) return "rate_limited";
+      if (status === 401 || status === 403) return "auth";
+      if (status >= 400) return "http_4xx";
+    }
+  }
+
+  if (
+    normalized.includes("fetch failed") ||
+    normalized.includes("econnreset") ||
+    normalized.includes("etimedout") ||
+    normalized.includes("enotfound") ||
+    normalized.includes("eai_again") ||
+    normalized.includes("network")
+  ) {
+    return "network";
+  }
+
+  if (normalized.includes("timeout")) {
+    return "timeout";
+  }
+
+  if (normalized.includes("unauthorized") || normalized.includes("forbidden") || normalized.includes("token")) {
+    return "auth";
+  }
+
+  return "unknown";
+}
+
+export function resolveSourceCatalog(
+  raw: string | undefined,
+  defaults: string[],
+  options?: { includeDefaults?: boolean },
+): string[] {
+  const configured = parseTokenList(raw);
+  if (options?.includeDefaults === false) {
+    return configured;
+  }
+
+  return mergeUniqueTokens(configured, defaults);
 }
 
 export class JobAggregator {
@@ -34,35 +131,34 @@ export class JobAggregator {
   }
 
   private initializeSources(): void {
-    // Always-on free sources (no API key required)
-    this.sources.push(new RemoteOKSource());
-    this.sources.push(new WeWorkRemotelySource());
-    this.sources.push(new JobbermanSource());
-    this.sources.push(new HimalayasSource());
-    this.sources.push(new ArbeitnowSource());
-    this.sources.push(new RemotiveSource());
+    const apiBackedSources: BaseJobSource[] = [];
+    const includeDefaultBoardCatalog = process.env.AGGREGATOR_INCLUDE_DEFAULT_BOARD_CATALOG !== "0";
 
     // API-based sources (require keys)
     const adzunaAppId = process.env.ADZUNA_APP_ID;
     const adzunaApiKey = process.env.ADZUNA_API_KEY;
     if (adzunaAppId && adzunaApiKey) {
-      this.sources.push(new AdzunaSource(adzunaAppId, adzunaApiKey));
+      apiBackedSources.push(new AdzunaSource(adzunaAppId, adzunaApiKey));
     }
 
-    const greenhouseBoards = (process.env.GREENHOUSE_BOARD_TOKENS || "")
-      .split(",")
-      .map((token) => token.trim())
-      .filter(Boolean);
+    const apifyToken = process.env.APIFY_TOKEN?.trim();
+    const apifyTasks = parseApifyTaskConfigs(process.env.APIFY_JOB_TASKS_JSON);
+    if (apifyToken && apifyTasks.length > 0) {
+      apiBackedSources.push(new ApifySource(apifyToken, apifyTasks));
+    }
+
+    const greenhouseBoards = resolveSourceCatalog(process.env.GREENHOUSE_BOARD_TOKENS, DEFAULT_GREENHOUSE_BOARD_TOKENS, {
+      includeDefaults: includeDefaultBoardCatalog,
+    });
     if (greenhouseBoards.length > 0) {
-      this.sources.push(new GreenhouseSource(greenhouseBoards));
+      apiBackedSources.push(new GreenhouseSource(greenhouseBoards));
     }
 
-    const leverSites = (process.env.LEVER_SITE_TOKENS || "")
-      .split(",")
-      .map((token) => token.trim())
-      .filter(Boolean);
+    const leverSites = resolveSourceCatalog(process.env.LEVER_SITE_TOKENS, DEFAULT_LEVER_SITE_TOKENS, {
+      includeDefaults: includeDefaultBoardCatalog,
+    });
     if (leverSites.length > 0) {
-      this.sources.push(new LeverSource(leverSites));
+      apiBackedSources.push(new LeverSource(leverSites));
     }
 
     const workableAccounts = (process.env.WORKABLE_COMPANY_TOKENS || "")
@@ -79,37 +175,184 @@ export class JobAggregator {
       .filter((item) => item.account.length > 0);
 
     if (workableAccounts.length > 0) {
-      this.sources.push(new WorkableSource(workableAccounts));
+      apiBackedSources.push(new WorkableSource(workableAccounts));
     }
 
-    logger.info({ sourceCount: this.sources.length }, "[aggregator] Initialized job sources");
+    const preferApiOnly = apiBackedSources.length > 0 && process.env.AGGREGATOR_INCLUDE_SCRAPED_SOURCES !== "1";
+    if (preferApiOnly) {
+      this.sources.push(...apiBackedSources);
+    } else {
+      // Always-on free sources (no API key required)
+      this.sources.push(new RemoteOKSource());
+      this.sources.push(new WeWorkRemotelySource());
+      this.sources.push(new JobbermanSource());
+      this.sources.push(new HimalayasSource());
+      this.sources.push(new ArbeitnowSource());
+      this.sources.push(new RemotiveSource());
+      this.sources.push(...apiBackedSources);
+    }
+
+    logger.info(
+      {
+        sourceCount: this.sources.length,
+        enabledSources: this.sources.map((source) => source.source),
+        apiBackedSourceCount: apiBackedSources.length,
+        preferApiOnly,
+        includeDefaultBoardCatalog,
+        greenhouseBoardCount: greenhouseBoards.length,
+        leverSiteCount: leverSites.length,
+        workableAccountCount: workableAccounts.length,
+      },
+      "[aggregator] Initialized job sources",
+    );
+
+    if (apiBackedSources.length === 0) {
+      logger.warn(
+        "[aggregator] No API-backed job sources are configured; staging will rely on fragile public scraping only",
+      );
+    }
   }
 
-  async aggregateJobs(query: JobQuery): Promise<AggregatorResult[]> {
+  private emitSourceMetrics(diagnostics: SourceFetchDiagnostics): void {
+    recordLatencyMetric("source_fetch_latency", diagnostics.durationMs, {
+      source: diagnostics.source,
+      status: diagnostics.status,
+    });
+
+    if (diagnostics.status === "success") {
+      recordOpsEvent({
+        metricName: "source_fetch_success",
+        category: "ingestion",
+        details: {
+          source: diagnostics.source,
+          jobs_fetched: diagnostics.jobsFetched,
+          error_count: diagnostics.errorCount,
+        },
+      });
+    } else {
+      recordOpsEvent({
+        metricName: "source_fetch_failure",
+        category: "ingestion",
+        outcome: "failure",
+        severity: "warning",
+        details: {
+          source: diagnostics.source,
+          jobs_fetched: diagnostics.jobsFetched,
+          error_count: diagnostics.errorCount,
+          reason: diagnostics.failureReason ?? "unknown",
+        },
+      });
+    }
+
+    const reasonCounts = new Map<string, number>();
+    for (const error of diagnostics.errors ?? []) {
+      const reason = classifyFailureReason(error);
+      reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+    }
+
+    for (const [reason, count] of reasonCounts.entries()) {
+      recordOpsEvent({
+        metricName: "source_fetch_error",
+        category: "ingestion",
+        outcome: diagnostics.status === "failure" ? "failure" : "degraded",
+        severity: diagnostics.status === "failure" ? "warning" : "info",
+        value: count,
+        details: {
+          source: diagnostics.source,
+          reason,
+        },
+      });
+    }
+  }
+
+  async aggregateJobsWithDiagnostics(query: JobQuery): Promise<{
+    results: AggregatorResult[];
+    diagnostics: AggregationDiagnostics;
+  }> {
     const results: AggregatorResult[] = [];
+    const sourceDiagnostics: SourceFetchDiagnostics[] = [];
 
     for (const source of this.sources) {
       if (!source.isEnabled) continue;
+      const startedAt = Date.now();
 
       try {
         const result = await source.fetchJobs(query);
         results.push(result);
+        const errorCount = result.errors?.length ?? 0;
+        const sourceStatus: SourceFetchDiagnostics["status"] =
+          result.jobs.length === 0 && errorCount > 0 ? "failure" : "success";
+        const failureReason =
+          sourceStatus === "failure" ? classifyFailureReason(result.errors?.[0] ?? "unknown") : undefined;
+        const diagnostics: SourceFetchDiagnostics = {
+          source: source.source,
+          status: sourceStatus,
+          jobsFetched: result.jobs.length,
+          errorCount,
+          durationMs: Date.now() - startedAt,
+          failureReason,
+          errors: result.errors,
+        };
+        sourceDiagnostics.push(diagnostics);
+        this.emitSourceMetrics(diagnostics);
         logger.info(
-          { source: source.source, jobCount: result.jobs.length },
+          {
+            source: source.source,
+            jobCount: result.jobs.length,
+            durationMs: diagnostics.durationMs,
+            errorCount,
+            sourceStatus,
+            failureReason,
+          },
           "[aggregator] Source completed"
         );
       } catch (error) {
+        const durationMs = Date.now() - startedAt;
+        const errorMessage = String(error);
+        const failureReason = classifyFailureReason(errorMessage);
         logger.error({ source: source.source, error: String(error) }, "[aggregator] Source failed");
         results.push({
           source: source.source,
           jobs: [],
           totalFound: 0,
           fetchedAt: new Date(),
-          errors: [String(error)],
+          errors: [errorMessage],
         });
+        const diagnostics: SourceFetchDiagnostics = {
+          source: source.source,
+          status: "failure",
+          jobsFetched: 0,
+          errorCount: 1,
+          durationMs,
+          failureReason,
+          errors: [errorMessage],
+        };
+        sourceDiagnostics.push(diagnostics);
+        this.emitSourceMetrics(diagnostics);
       }
     }
 
+    const sourcesAttempted = sourceDiagnostics.length;
+    const sourcesFailed = sourceDiagnostics.filter((entry) => entry.status === "failure").length;
+    const sourcesSucceeded = sourcesAttempted - sourcesFailed;
+    const jobsFetched = results.reduce((sum, result) => sum + result.jobs.length, 0);
+    const hadErrors = sourceDiagnostics.some((entry) => entry.errorCount > 0);
+
+    return {
+      results,
+      diagnostics: {
+        sourcesAttempted,
+        sourcesSucceeded,
+        sourcesFailed,
+        jobsFetched,
+        hadErrors,
+        sourceDiagnostics,
+      },
+    };
+  }
+
+  async aggregateJobs(query: JobQuery): Promise<AggregatorResult[]> {
+    const { results } = await this.aggregateJobsWithDiagnostics(query);
     return results;
   }
 
@@ -120,8 +363,9 @@ export class JobAggregator {
     skipped: number;
     byRegion: Record<JobRegion, number>;
     bySource: Record<JobSource, number>;
+    diagnostics: AggregationDiagnostics;
   }> {
-    const results = await this.aggregateJobs(query);
+    const { results, diagnostics } = await this.aggregateJobsWithDiagnostics(query);
     const allJobs = results.flatMap((r) => r.jobs);
 
     // Deduplicate by externalId
@@ -160,6 +404,15 @@ export class JobAggregator {
       "[aggregator] Sync completed"
     );
 
+    if (groupedJobs.length === 0) {
+      logger.warn(
+        {
+          enabledSources: this.getEnabledSources(),
+        },
+        "[aggregator] Sync completed with zero jobs; verify source credentials and upstream availability",
+      );
+    }
+
     return {
       total: groupedJobs.length,
       inserted,
@@ -167,6 +420,7 @@ export class JobAggregator {
       skipped,
       byRegion,
       bySource: bySource as Record<JobSource, number>,
+      diagnostics,
     };
   }
 

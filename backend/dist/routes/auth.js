@@ -3,9 +3,13 @@ import bcrypt from "bcrypt";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { signToken, getTokenExpiresIn } from "../lib/jwt.js";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, optionalAuth } from "../middleware/auth.js";
 import { authLimiter, registerLimiter } from "../middleware/security.js";
+import { validateHumanAuthSubmission } from "../middleware/bot-protection.js";
 import { blockToken } from "../lib/redis.js";
+import { issueEmailVerification } from "./email-verification.js";
+import { ensureCandidateTrustProfile, ensureEmployerTrustProfile, refreshEmployerTrustProfile, } from "../lib/trust/service.js";
+import { recordOpsEvent } from "../lib/ops/events.js";
 const router = Router();
 const COOKIE_NAME = "auth_token";
 const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
@@ -38,23 +42,79 @@ const registerSchema = z.object({
     role: z.enum(["CANDIDATE", "EMPLOYER"]),
     companyName: z.string().max(200).trim().optional(),
     location: z.string().max(200).trim().optional(),
+    botShield: z.object({
+        website: z.string().max(200).optional(),
+        startedAt: z.number().int().positive().optional(),
+    }).optional(),
 });
 const loginSchema = z.object({
     email: z.string().email().max(255).toLowerCase(),
     password: z.string().max(128),
+    botShield: z.object({
+        website: z.string().max(200).optional(),
+        startedAt: z.number().int().positive().optional(),
+    }).optional(),
 });
 // POST /api/auth/register - with strict rate limiting
-router.post("/register", registerLimiter, async (req, res) => {
+router.post("/register", registerLimiter, validateHumanAuthSubmission, async (req, res) => {
+    const startedAt = Date.now();
     try {
         const data = registerSchema.parse(req.body);
         if (data.role === "EMPLOYER" && (!data.companyName || !data.location)) {
+            recordOpsEvent({
+                metricName: "signup_failure",
+                category: "auth",
+                outcome: "failure",
+                severity: "warning",
+                durationMs: Date.now() - startedAt,
+                details: {
+                    role: data.role,
+                    reason: "missing_employer_fields",
+                },
+            });
             res.status(400).json({ error: "Employer registration requires companyName and location" });
             return;
         }
         const existingUser = await prisma.user.findUnique({
             where: { email: data.email },
+            include: {
+                oauthAccounts: {
+                    select: { provider: true },
+                },
+            },
         });
         if (existingUser) {
+            const providerNames = (existingUser.oauthAccounts || []).map((acc) => acc.provider);
+            if (existingUser.password === "" && providerNames.length > 0) {
+                recordOpsEvent({
+                    metricName: "signup_failure",
+                    category: "auth",
+                    outcome: "failure",
+                    severity: "warning",
+                    durationMs: Date.now() - startedAt,
+                    details: {
+                        role: data.role,
+                        reason: "provider_mismatch",
+                    },
+                });
+                res.status(409).json({
+                    error: `This email is already registered via ${providerNames.join(", ")}. Please continue with social sign in.`,
+                    code: "PROVIDER_MISMATCH",
+                    providers: providerNames,
+                });
+                return;
+            }
+            recordOpsEvent({
+                metricName: "signup_failure",
+                category: "auth",
+                outcome: "failure",
+                severity: "warning",
+                durationMs: Date.now() - startedAt,
+                details: {
+                    role: data.role,
+                    reason: "email_exists",
+                },
+            });
             res.status(400).json({ error: "Email already registered" });
             return;
         }
@@ -69,12 +129,36 @@ router.post("/register", registerLimiter, async (req, res) => {
         });
         // If employer, create employer profile
         if (data.role === "EMPLOYER") {
-            await prisma.employer.create({
+            const employer = await prisma.employer.create({
                 data: {
                     userId: user.id,
                     companyName: data.companyName,
                     location: data.location || "Remote",
                 },
+            });
+            await ensureEmployerTrustProfile(employer.id);
+            await refreshEmployerTrustProfile(employer.id).catch(() => undefined);
+        }
+        else {
+            await ensureCandidateTrustProfile(user.id);
+        }
+        if (process.env.NODE_ENV !== "test") {
+            void issueEmailVerification({
+                userId: user.id,
+                email: user.email,
+                name: user.name,
+                invalidateExisting: true,
+            }).catch((verificationError) => {
+                console.error("Failed to send verification email:", verificationError);
+                recordOpsEvent({
+                    metricName: "verification_email_failure",
+                    category: "verification",
+                    outcome: "failure",
+                    severity: "warning",
+                    details: {
+                        source: "register",
+                    },
+                });
             });
         }
         const token = signToken({
@@ -92,30 +176,103 @@ router.post("/register", registerLimiter, async (req, res) => {
             },
             expiresIn: getTokenExpiresIn(),
         });
+        recordOpsEvent({
+            metricName: "signup_success",
+            category: "auth",
+            durationMs: Date.now() - startedAt,
+            details: {
+                role: user.role,
+            },
+        });
     }
     catch (error) {
         if (error instanceof z.ZodError) {
+            recordOpsEvent({
+                metricName: "signup_failure",
+                category: "auth",
+                outcome: "failure",
+                severity: "warning",
+                durationMs: Date.now() - startedAt,
+                details: {
+                    reason: "validation_failed",
+                },
+            });
             res.status(400).json({ error: "Validation failed", details: error.issues });
             return;
         }
         console.error("Register error:", error);
+        recordOpsEvent({
+            metricName: "signup_failure",
+            category: "auth",
+            outcome: "failure",
+            severity: "critical",
+            durationMs: Date.now() - startedAt,
+            details: {
+                reason: "internal_error",
+            },
+        });
         res.status(500).json({ error: "Internal server error" });
     }
 });
 // POST /api/auth/login - with rate limiting
-router.post("/login", authLimiter, async (req, res) => {
+router.post("/login", authLimiter, validateHumanAuthSubmission, async (req, res) => {
+    const startedAt = Date.now();
     try {
         const data = loginSchema.parse(req.body);
         const user = await prisma.user.findUnique({
             where: { email: data.email },
-            include: { employer: true },
+            include: {
+                employer: true,
+                oauthAccounts: {
+                    select: { provider: true },
+                },
+            },
         });
         if (!user) {
+            recordOpsEvent({
+                metricName: "login_failure",
+                category: "auth",
+                outcome: "failure",
+                severity: "warning",
+                durationMs: Date.now() - startedAt,
+                details: {
+                    reason: "user_not_found",
+                },
+            });
             res.status(401).json({ error: "Invalid email or password" });
             return;
         }
-        const validPassword = await bcrypt.compare(data.password, user.password);
+        if (!user.password && (user.oauthAccounts?.length ?? 0) > 0) {
+            const providers = (user.oauthAccounts || []).map((acc) => acc.provider);
+            res.status(409).json({
+                error: "This account uses social sign-in. Please continue with your OAuth provider.",
+                code: "PROVIDER_MISMATCH",
+                providers,
+            });
+            recordOpsEvent({
+                metricName: "login_failure",
+                category: "auth",
+                outcome: "failure",
+                severity: "warning",
+                durationMs: Date.now() - startedAt,
+                details: {
+                    reason: "provider_mismatch",
+                },
+            });
+            return;
+        }
+        const validPassword = await bcrypt.compare(data.password, user.password || "");
         if (!validPassword) {
+            recordOpsEvent({
+                metricName: "login_failure",
+                category: "auth",
+                outcome: "failure",
+                severity: "warning",
+                durationMs: Date.now() - startedAt,
+                details: {
+                    reason: "invalid_password",
+                },
+            });
             res.status(401).json({ error: "Invalid email or password" });
             return;
         }
@@ -131,17 +288,48 @@ router.post("/login", authLimiter, async (req, res) => {
                 email: user.email,
                 name: user.name,
                 role: user.role,
+                emailVerified: user.emailVerified,
+                avatarUrl: user.avatarUrl,
                 employer: user.employer,
             },
             expiresIn: getTokenExpiresIn(),
         });
+        recordOpsEvent({
+            metricName: "login_success",
+            category: "auth",
+            durationMs: Date.now() - startedAt,
+            details: {
+                role: user.role,
+                email_verified: user.emailVerified,
+            },
+        });
     }
     catch (error) {
         if (error instanceof z.ZodError) {
+            recordOpsEvent({
+                metricName: "login_failure",
+                category: "auth",
+                outcome: "failure",
+                severity: "warning",
+                durationMs: Date.now() - startedAt,
+                details: {
+                    reason: "validation_failed",
+                },
+            });
             res.status(400).json({ error: "Validation failed", details: error.issues });
             return;
         }
         console.error("Login error:", error);
+        recordOpsEvent({
+            metricName: "login_failure",
+            category: "auth",
+            outcome: "failure",
+            severity: "critical",
+            durationMs: Date.now() - startedAt,
+            details: {
+                reason: "internal_error",
+            },
+        });
         res.status(500).json({ error: "Internal server error" });
     }
 });
@@ -165,8 +353,15 @@ router.post("/logout", authenticate, async (req, res) => {
     }
 });
 // GET /api/auth/me
-router.get("/me", authenticate, async (req, res) => {
+router.get("/me", optionalAuth, async (req, res) => {
     try {
+        if (!req.user) {
+            res.json({
+                authenticated: false,
+                user: null,
+            });
+            return;
+        }
         const user = await prisma.user.findUnique({
             where: { id: req.user.userId },
             include: { employer: true },
@@ -176,11 +371,16 @@ router.get("/me", authenticate, async (req, res) => {
             return;
         }
         res.json({
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            employer: user.employer,
+            authenticated: true,
+            user: {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                emailVerified: user.emailVerified,
+                avatarUrl: user.avatarUrl,
+                employer: user.employer,
+            },
         });
     }
     catch (error) {

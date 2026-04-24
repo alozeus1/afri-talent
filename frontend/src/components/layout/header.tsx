@@ -8,26 +8,83 @@ import { notifications as notificationsApi, messages as messagesApi } from "@/li
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { useNetworkProfile } from "@/lib/network-profile";
 
 export function Header() {
   const locale = useLocale();
   const t = useT();
   const { user, isLoading, logout } = useAuth();
+  const { online, isLowBandwidth } = useNetworkProfile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => {
-    if (!user) return;
-    notificationsApi.unreadCount().then(d => setUnreadNotifs(d.count)).catch(() => {});
-    messagesApi.unreadCount().then(d => setUnreadMessages(d.count)).catch(() => {});
-    const interval = setInterval(() => {
-      notificationsApi.unreadCount().then(d => setUnreadNotifs(d.count)).catch(() => {});
-      messagesApi.unreadCount().then(d => setUnreadMessages(d.count)).catch(() => {});
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
+    if (!user || !online) return;
+
+    let cancelled = false;
+    const intervalMs = isLowBandwidth ? 120000 : 30000;
+
+    const refreshCounts = async () => {
+      if (cancelled || document.visibilityState === "hidden") {
+        return;
+      }
+
+      const [notificationsResult, messagesResult] = await Promise.allSettled([
+        notificationsApi.unreadCount(),
+        messagesApi.unreadCount(),
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (notificationsResult.status === "fulfilled") {
+        setUnreadNotifs(notificationsResult.value.count);
+      }
+
+      if (messagesResult.status === "fulfilled") {
+        setUnreadMessages(messagesResult.value.count);
+      }
+    };
+
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    const idleHandle = idleWindow.requestIdleCallback
+      ? idleWindow.requestIdleCallback(() => {
+          void refreshCounts();
+        }, { timeout: 1000 })
+      : window.setTimeout(() => {
+          void refreshCounts();
+        }, 150);
+
+    const interval = window.setInterval(() => {
+      void refreshCounts();
+    }, intervalMs);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshCounts();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.clearInterval(interval);
+      if (idleWindow.cancelIdleCallback && typeof idleHandle === "number") {
+        idleWindow.cancelIdleCallback(idleHandle);
+      } else {
+        window.clearTimeout(idleHandle as number);
+      }
+    };
+  }, [isLowBandwidth, online, user]);
 
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
@@ -78,15 +135,18 @@ export function Header() {
         </div>
       )}
 
-      <header className="bg-white/95 dark:bg-gray-950/95 backdrop-blur border-b border-gray-200 dark:border-gray-800 sticky top-0 z-50">
-        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
+      <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
+        <nav className="page-frame">
+          <div className="flex min-h-[72px] justify-between">
             <div className="flex items-center">
-              <Link href={href("/")} className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">A</span>
+              <Link href={href("/")} className="flex items-center space-x-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-500 bg-emerald-600 shadow-sm">
+                  <span className="font-display text-lg font-bold text-white">A</span>
                 </div>
-                <span className="font-bold text-xl text-gray-900 dark:text-gray-100">AfriTalent</span>
+                <div className="flex flex-col">
+                  <span className="font-display text-xl font-bold text-zinc-900 dark:text-white">AfriTalent</span>
+                  <span className="text-[11px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Trust-first hiring</span>
+                </div>
               </Link>
             </div>
 
@@ -152,8 +212,8 @@ export function Header() {
               ) : user ? (
                 <div className="flex items-center space-x-4">
                   <Link href={href(getDashboardLink())}>
-                    <Button variant="ghost">{t("nav.dashboard")}</Button>
-                  </Link>
+                <Button variant="ghost">{t("nav.dashboard")}</Button>
+              </Link>
                   <div className="flex items-center space-x-3">
                     <span className="text-sm text-gray-600 dark:text-gray-300">{user.name}</span>
                     <Button variant="outline" size="sm" onClick={() => setShowLogoutConfirm(true)}>
@@ -179,7 +239,7 @@ export function Header() {
               <ThemeToggle />
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="inline-flex items-center justify-center p-2.5 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="inline-flex items-center justify-center rounded-md border border-zinc-200 bg-white p-2.5 text-zinc-600 shadow-sm hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100 transition-colors"
                 aria-label="Toggle menu"
                 aria-expanded={mobileMenuOpen}
                 aria-controls="mobile-menu-panel"
@@ -208,7 +268,7 @@ export function Header() {
           />
           <div
             id="mobile-menu-panel"
-            className="absolute right-0 top-0 h-full w-[85%] max-w-sm bg-white dark:bg-gray-950 border-l border-gray-200 dark:border-gray-800 shadow-2xl p-5 overflow-y-auto"
+            className="absolute right-0 top-0 h-full w-[85%] max-w-sm overflow-y-auto border-l border-zinc-200 bg-white p-5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-950"
           >
             <div className="flex items-center justify-between mb-6">
               <p className="text-base font-semibold text-gray-900 dark:text-gray-100">Menu</p>

@@ -10,7 +10,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { TrustChecklist } from "@/components/trust/trust-checklist";
+import { TrustExplainerModal } from "@/components/trust/trust-explainer-modal";
 import { TrustScoreCard } from "@/components/trust/trust-score-card";
+import { TrustStatusBanner } from "@/components/trust/trust-status-banner";
+import { TrustSupportCard } from "@/components/trust/trust-support-card";
 import { uploadVerificationFile } from "@/lib/trust-files";
 import { humanizeTrustValue } from "@/lib/trust-labels";
 import { localizePath, useLocale } from "@/lib/i18n/client";
@@ -22,6 +25,34 @@ const artifactTypes = [
 ] as const;
 
 type EmployerArtifactType = (typeof artifactTypes)[number]["value"];
+
+function artifactStatusCopy(status: VerificationArtifactItem["status"]) {
+  if (status === "APPROVED") {
+    return {
+      tone: "success" as const,
+      summary: "Approved and contributing to your employer trust profile.",
+    };
+  }
+
+  if (status === "REJECTED") {
+    return {
+      tone: "danger" as const,
+      summary: "Needs updated evidence before it can strengthen your trust standing.",
+    };
+  }
+
+  if (status === "NEEDS_MORE_INFO") {
+    return {
+      tone: "warning" as const,
+      summary: "A reviewer needs more detail before this signal can be approved.",
+    };
+  }
+
+  return {
+    tone: "warning" as const,
+    summary: "Submitted and waiting for trust review.",
+  };
+}
 
 export default function EmployerTrustPage() {
   const locale = useLocale();
@@ -74,6 +105,66 @@ export default function EmployerTrustPage() {
     }
     return "Optional supporting URL";
   }, [artifactType]);
+
+  const artifactSummary = useMemo(() => {
+    return (dashboard?.artifacts || []).reduce(
+      (summary, artifact) => {
+        if (artifact.status === "APPROVED") summary.approved += 1;
+        if (artifact.status === "REJECTED") summary.rejected += 1;
+        if (artifact.status === "PENDING" || artifact.status === "NEEDS_MORE_INFO") summary.pending += 1;
+        return summary;
+      },
+      { approved: 0, rejected: 0, pending: 0 },
+    );
+  }, [dashboard?.artifacts]);
+
+  const trustState = useMemo(() => {
+    if (!dashboard) {
+      return {
+        tone: "info" as const,
+        title: "Loading trust state",
+        body: "We are preparing your current employer verification summary.",
+      };
+    }
+
+    if (artifactSummary.rejected > 0) {
+      return {
+        tone: "danger" as const,
+        title: "Some verification evidence needs attention",
+        body: "At least one submission was rejected or needs more detail. Update the evidence and reviewer notes so your public trust state can improve.",
+      };
+    }
+
+    if (!dashboard.trust.postingEligibility) {
+      return {
+        tone: "warning" as const,
+        title: "Public job posting is still limited",
+        body: "Complete the minimum trust checks first. This protects candidates from low-credibility employers and protects your jobs from avoidable moderation delays.",
+      };
+    }
+
+    if (artifactSummary.pending > 0) {
+      return {
+        tone: "info" as const,
+        title: "Review in progress",
+        body: "Your latest employer evidence is being reviewed. We keep your current trust status visible while new evidence is assessed.",
+      };
+    }
+
+    if (dashboard.trust.requiresEnhancedVerification) {
+      return {
+        tone: "warning" as const,
+        title: "Enhanced verification is required",
+        body: "High-volume or higher-risk employers need stronger proof before they can keep scaling. This is a precaution, not a penalty.",
+      };
+    }
+
+    return {
+      tone: "success" as const,
+      title: "Your trust profile is in good standing",
+      body: "Candidates can see that your company has passed meaningful checks. Keep your website, domain, and evidence current to stay in the highest-confidence tier.",
+    };
+  }, [artifactSummary.pending, artifactSummary.rejected, dashboard]);
 
   const handleProfileSave = async (event: FormEvent) => {
     event.preventDefault();
@@ -155,27 +246,34 @@ export default function EmployerTrustPage() {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700 mb-3">
           Employer Trust
         </p>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Build a credible hiring presence before you publish at scale</h1>
-        <p className="max-w-3xl text-lg text-gray-600">
-          AfriTalent uses multiple signals before granting employer badges or broad posting privileges. Verified employers convert better and trigger fewer moderation delays.
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">Build a hiring presence candidates can trust on first glance</h1>
+        <p className="max-w-3xl text-lg leading-8 text-gray-600">
+          AfriTalent uses domain checks, company evidence, moderation history, and manual review before granting higher employer trust states. Strong trust signals improve apply quality and reduce review friction.
         </p>
       </section>
 
       {pageError && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {pageError}
-        </div>
+        <TrustStatusBanner tone="danger" title="We couldn't update your trust profile" body={pageError} />
       )}
 
       {pageSuccess && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {pageSuccess}
-        </div>
+        <TrustStatusBanner tone="success" title="Trust update saved" body={pageSuccess} />
       )}
+
+      <TrustStatusBanner
+        tone={trustState.tone}
+        title={trustState.title}
+        body={trustState.body}
+        actions={
+          <Link href={localizePath("/trust", locale)}>
+            <Button size="sm" variant="outline">Open trust center</Button>
+          </Link>
+        }
+      />
 
       <TrustScoreCard
         title={dashboard.employer.companyName}
-        subtitle="Domain checks, company evidence, moderation history, and review outcomes all contribute to employer trust."
+        subtitle="AfriTalent never shows an employer trust badge based on payment alone. Domain alignment, company evidence, moderation history, and review outcomes all contribute."
         badge={dashboard.trust.badge}
         authenticityScore={dashboard.trust.authenticityScore}
         riskScore={dashboard.trust.riskScore}
@@ -187,6 +285,35 @@ export default function EmployerTrustPage() {
                 Post a job
               </Button>
             </Link>
+            <TrustExplainerModal
+              title="What candidates see when they evaluate your company"
+              description="Candidates should understand why your employer account is credible before they apply or reply."
+              items={[
+                {
+                  title: "Employer badge",
+                  description: `${dashboard.trust.badge} reflects the strongest trust tier your company currently qualifies for.`,
+                  statusLabel: dashboard.trust.badge,
+                  statusVariant: "success",
+                },
+                {
+                  title: "Posting eligibility",
+                  description: dashboard.trust.postingEligibility
+                    ? "Public job posting is enabled because the minimum trust checks passed."
+                    : "Public job posting is still limited until more trust checks pass.",
+                  statusLabel: dashboard.trust.postingEligibility ? "Enabled" : "Limited",
+                  statusVariant: dashboard.trust.postingEligibility ? "success" : "warning",
+                },
+                {
+                  title: "Verification depth",
+                  description: dashboard.trust.requiresEnhancedVerification
+                    ? "Your account now needs stronger verification due to scale or risk context."
+                    : "Your current verification depth is appropriate for your current activity.",
+                  statusLabel: dashboard.trust.requiresEnhancedVerification ? "Enhanced review" : "Current level okay",
+                  statusVariant: dashboard.trust.requiresEnhancedVerification ? "warning" : "info",
+                },
+              ]}
+              triggerLabel="What candidates see"
+            />
             <Link href={localizePath("/trust", locale)}>
               <Button size="sm" variant="outline">Trust center</Button>
             </Link>
@@ -196,14 +323,14 @@ export default function EmployerTrustPage() {
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="space-y-4">
             <div className="rounded-2xl border border-white/80 bg-white/80 p-5">
-              <h3 className="text-lg font-semibold text-gray-900">What employers see</h3>
+              <h3 className="text-lg font-semibold text-gray-900">What candidates see</h3>
               <div className="mt-4 flex flex-wrap gap-2">
                 <TrustBadge label={dashboard.trust.badge} riskLevel={dashboard.trust.riskLevel} variant="success" />
                 {dashboard.trust.verifiedDomain && (
-                  <TrustBadge label={`Domain matched: ${dashboard.trust.verifiedDomain}`} variant="info" />
+                  <TrustBadge label={`Verified domain: ${dashboard.trust.verifiedDomain}`} variant="info" />
                 )}
                 {dashboard.trust.requiresEnhancedVerification && (
-                  <TrustBadge label="Enhanced verification required" riskLevel="MEDIUM" variant="warning" />
+                  <TrustBadge label="Enhanced verification requested" riskLevel="MEDIUM" variant="warning" />
                 )}
               </div>
               <p className="mt-4 text-sm text-gray-600">
@@ -211,6 +338,9 @@ export default function EmployerTrustPage() {
                 <span className="font-semibold text-gray-900">
                   {dashboard.trust.postingEligibility ? "enabled" : "blocked until minimum trust checks pass"}.
                 </span>
+              </p>
+              <p className="mt-3 text-sm text-gray-600">
+                Paid features can improve distribution and workflow depth, but they do not create trust badges without real checks.
               </p>
             </div>
 
@@ -264,6 +394,9 @@ export default function EmployerTrustPage() {
               <Button type="submit" disabled={savingProfile}>
                 {savingProfile ? "Saving..." : "Save trust profile"}
               </Button>
+              <p className="text-xs leading-5 text-gray-500">
+                Keep company email, website, and LinkedIn details aligned. Mismatches slow approvals and can create caution labels.
+              </p>
             </form>
           </CardContent>
         </Card>
@@ -272,7 +405,7 @@ export default function EmployerTrustPage() {
           <CardHeader>
             <h2 className="text-xl font-semibold text-gray-900">Submit verification evidence</h2>
             <p className="text-sm text-gray-600">
-              Upload business registration documents, domain ownership proof, or a LinkedIn company page for review.
+              Upload business registration documents, domain ownership proof, or a LinkedIn company page for review. Reviewer notes will appear below if we need more information.
             </p>
           </CardHeader>
           <CardContent>
@@ -324,6 +457,9 @@ export default function EmployerTrustPage() {
               <Button type="submit" disabled={submittingArtifact}>
                 {submittingArtifact ? "Submitting..." : "Submit for review"}
               </Button>
+              <p className="text-xs leading-5 text-gray-500">
+                Clear, recent documents reduce review time. If your account is scaling quickly, we may ask for stronger evidence before broad posting continues.
+              </p>
             </form>
           </CardContent>
         </Card>
@@ -336,19 +472,20 @@ export default function EmployerTrustPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {dashboard.artifacts.length === 0 ? (
-              <p className="text-sm text-gray-600">
-                No verification evidence has been submitted yet.
-              </p>
+              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+                No verification evidence has been submitted yet. Start with your business registration or domain proof so candidates see a stronger credibility trail.
+              </div>
             ) : (
               dashboard.artifacts.map((artifact: VerificationArtifactItem) => (
                 <div key={artifact.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium text-gray-900">{humanizeTrustValue(artifact.type)}</p>
-                    <TrustBadge label={humanizeTrustValue(artifact.status)} variant={artifact.status === "APPROVED" ? "success" : artifact.status === "REJECTED" ? "danger" : "warning"} />
+                    <TrustBadge label={humanizeTrustValue(artifact.status)} variant={artifactStatusCopy(artifact.status).tone} />
                   </div>
                   <p className="mt-2 text-sm text-gray-500">
                     Submitted {new Date(artifact.submittedAt).toLocaleDateString()}
                   </p>
+                  <p className="mt-2 text-sm text-gray-700">{artifactStatusCopy(artifact.status).summary}</p>
                   {artifact.fileName && (
                     <p className="mt-2 text-sm text-gray-700">File: {artifact.fileName}</p>
                   )}
@@ -376,12 +513,15 @@ export default function EmployerTrustPage() {
         <Card>
           <CardHeader>
             <h2 className="text-xl font-semibold text-gray-900">Recent jobs and moderation</h2>
+            <p className="text-sm text-gray-600">
+              We show moderation context here so you can see how trust affects publishing and candidate-facing visibility.
+            </p>
           </CardHeader>
           <CardContent className="space-y-4">
             {dashboard.recentJobs.length === 0 ? (
-              <p className="text-sm text-gray-600">
-                No recent jobs yet. Once you pass the minimum threshold, you can publish roles from the employer dashboard.
-              </p>
+              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+                No recent jobs yet. Once your minimum trust threshold passes, you can publish roles from the employer dashboard and see moderation outcomes here.
+              </div>
             ) : (
               dashboard.recentJobs.map((job) => (
                 <div key={job.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
@@ -397,12 +537,25 @@ export default function EmployerTrustPage() {
                       <TrustBadge label={`${job.riskLevel} risk`} riskLevel={job.riskLevel} />
                     </div>
                   </div>
+                  <p className="mt-3 text-sm text-gray-600">
+                    {job.status === "PUBLISHED"
+                      ? "This role passed moderation and is visible to candidates."
+                      : job.status === "REJECTED"
+                        ? "This role was blocked from publishing. Review your trust guidance before reposting."
+                        : "This role is still being reviewed or limited before broader publication."}
+                  </p>
                 </div>
               ))
             )}
           </CardContent>
         </Card>
       </div>
+
+      <TrustSupportCard
+        reportHref={localizePath("/trust/report", locale)}
+        title="Need trust support or a manual follow-up?"
+        description="If your employer verification feels stuck, a moderation result looks wrong, or a suspicious actor is targeting your team, contact support or send a trust report."
+      />
     </div>
   );
 }

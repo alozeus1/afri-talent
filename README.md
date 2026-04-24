@@ -2,15 +2,17 @@
 
 A full-stack MVP application connecting African tech talent with global opportunities.
 
-## Deployment State Start Here
+## Start Here
 
-For the current live deployment state, staging URLs, AWS resource names, recovery steps, and troubleshooting workflow, read [STAGING_RUNBOOK.md](./STAGING_RUNBOOK.md) first.
+For a fast project orientation, read [AGENT_BOOTSTRAP.md](./AGENT_BOOTSTRAP.md) first.
+
+For the current live deployment state, staging URLs, AWS resource names, recovery steps, and troubleshooting workflow, read [STAGING_RUNBOOK.md](./STAGING_RUNBOOK.md) next.
 
 Agent-specific pointers:
 
 - Codex: reads [AGENTS.md](./AGENTS.md)
 - Claude: reads [CLAUDE.md](./CLAUDE.md)
-- Droid or other agents: start with [STAGING_RUNBOOK.md](./STAGING_RUNBOOK.md)
+- Droid or other agents: start with [AGENT_BOOTSTRAP.md](./AGENT_BOOTSTRAP.md)
 
 ---
 

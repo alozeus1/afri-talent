@@ -1,0 +1,1 @@
+{"version":3,"file":"candidate-retention.js","sourceRoot":"","sources":["../../src/workers/candidate-retention.ts"],"names":[],"mappings":"AAAA,OAAO,MAAM,MAAM,kBAAkB,CAAC;AACtC,OAAO,EAAE,0BAA0B,EAAE,MAAM,+BAA+B,CAAC;AAE3E,MAAM,CAAC,KAAK,UAAU,2BAA2B;IAC/C,MAAM,IAAI,GAAG,MAAM,0BAA0B,EAAE,CAAC;IAChD,MAAM,CAAC,IAAI,CAAC,EAAE,IAAI,EAAE,EAAE,sCAAsC,CAAC,CAAC;AAChE,CAAC"}

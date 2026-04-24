@@ -93,7 +93,8 @@ test("employer journey API smoke: signup -> post job -> upgrade", async ({ reque
   const meRes = await request.get(`${API}/api/auth/me`);
   expect(meRes.ok()).toBe(true);
   const me = await meRes.json();
-  expect(me.role).toBe("EMPLOYER");
+  expect(me.authenticated).toBe(true);
+  expect(me.user?.role).toBe("EMPLOYER");
 
   const createJobRes = await request.post(`${API}/api/jobs`, {
     data: {
@@ -107,7 +108,11 @@ test("employer journey API smoke: signup -> post job -> upgrade", async ({ reque
       currency: "USD",
     },
   });
-  expect([201, 400]).toContain(createJobRes.status());
+  expect([201, 400, 403]).toContain(createJobRes.status());
+  if (createJobRes.status() === 403) {
+    const body = await createJobRes.json();
+    expect(["EMAIL_VERIFICATION_REQUIRED", "EMPLOYER_TRUST_REQUIRED"]).toContain(body.code);
+  }
 
   const checkoutRes = await request.post(`${API}/api/billing/checkout`, {
     data: { plan: "EMPLOYER_BASIC", interval: "MONTHLY" },

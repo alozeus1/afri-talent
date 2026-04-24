@@ -27,15 +27,35 @@ export const securityHeaders = helmet({
 
 // General API rate limiter
 const isTestEnv = process.env.NODE_ENV === "test" || process.env.E2E === "1";
+const UNSAFE_OBJECT_KEYS = new Set(["__proto__", "prototype", "constructor"]);
+
+function getRateLimitKey(req: Request): string {
+  return ipKeyGenerator(req.ip ?? req.socket?.remoteAddress ?? "anonymous");
+}
+
+function isInternalPublicFetch(req: Request): boolean {
+  const marker = req.header("x-afritalent-internal-fetch");
+  if (marker !== "server-public-api") {
+    return false;
+  }
+
+  if (req.method !== "GET") {
+    return false;
+  }
+
+  return req.path === "/api/public/stats" || req.path.startsWith("/api/jobs");
+}
+
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: isTestEnv ? 10000 : 100,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: getRateLimitKey,
   message: { error: "Too many requests, please try again later" },
   skip: (req) => {
     // Skip rate limiting for health checks
-    return req.path === "/health";
+    return req.path === "/health" || isInternalPublicFetch(req);
   },
 });
 export const authLimiter = rateLimit({
@@ -43,6 +63,7 @@ export const authLimiter = rateLimit({
   max: isTestEnv ? 1000 : 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: getRateLimitKey,
   message: { error: "Too many authentication attempts, please try again later" },
   skipSuccessfulRequests: false,
 });
@@ -53,6 +74,7 @@ export const registerLimiter = rateLimit({
   max: isTestEnv ? 1000 : 5,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: getRateLimitKey,
   message: { error: "Too many registration attempts, please try again later" },
 });
 
@@ -62,6 +84,7 @@ export const passwordResetLimiter = rateLimit({
   max: isTestEnv ? 1000 : 3,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: getRateLimitKey,
   message: { error: "Too many password reset attempts, please try again later" },
 });
 
@@ -78,15 +101,50 @@ export function sanitizeRequest(req: Request, _res: Response, next: NextFunction
 }
 
 function sanitizeObject(obj: Record<string, unknown>): void {
-  for (const key in obj) {
-    if (typeof obj[key] === "string") {
+  for (const key of Object.keys(obj)) {
+    if (UNSAFE_OBJECT_KEYS.has(key)) {
+      delete obj[key];
+      continue;
+    }
+
+    const value = obj[key];
+
+    if (typeof value === "string") {
       // Remove null bytes and other control characters
-      obj[key] = (obj[key] as string).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
-    } else if (typeof obj[key] === "object" && obj[key] !== null) {
-      sanitizeObject(obj[key] as Record<string, unknown>);
+      obj[key] = value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+    } else if (Array.isArray(value)) {
+      value.forEach((entry) => {
+        if (entry && typeof entry === "object") {
+          sanitizeObject(entry as Record<string, unknown>);
+        }
+      });
+    } else if (typeof value === "object" && value !== null) {
+      sanitizeObject(value as Record<string, unknown>);
     }
   }
 }
+
+// Skills rate limiter — per user, 20 requests per minute
+// Applied to all AI skill endpoints to prevent Claude API cost abuse
+export const skillsLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  keyGenerator: (req: Request): string => {
+    const userId = (req as Request & { user?: { userId: string } }).user?.userId;
+    return userId ?? getRateLimitKey(req);
+  },
+  message: {
+    error: "rate_limit_exceeded",
+    message: "Too many AI skill requests. Please wait a minute before trying again.",
+    retryAfter: 60,
+  },
+  handler: (_req, res, _next, options) => {
+    res.status(429).json(options.message);
+  },
+});
 
 // Orchestrator rate limiter — per user, 10 requests per minute
 // This is more restrictive than the general limiter due to Claude API costs
@@ -102,7 +160,7 @@ export const orchestratorLimiter = rateLimit({
     // Use user ID if authenticated (more precise), fallback to IP via the
     // ipKeyGenerator helper (required by express-rate-limit v8 for IPv6 safety).
     const userId = (req as Request & { user?: { userId: string } }).user?.userId;
-    return userId ?? ipKeyGenerator(req.ip ?? req.socket?.remoteAddress ?? "anonymous");
+    return userId ?? getRateLimitKey(req);
   },
   message: {
     error: "rate_limit_exceeded",

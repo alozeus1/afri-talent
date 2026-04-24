@@ -17,18 +17,20 @@ resource "random_password" "jwt" {
   special = true
 }
 
-# ── Network (simplified - no NAT gateway needed for App Runner) ──────────────
+# ── Network (App Runner backend still needs working NAT for public job APIs) ─
 
 module "network" {
-  source                     = "./modules/network"
-  name_prefix                = local.name_prefix
-  az_count                   = var.az_count
-  vpc_cidr                   = var.vpc_cidr
-  public_subnet_cidrs        = var.public_subnet_cidrs
-  private_subnet_cidrs       = var.private_subnet_cidrs
-  enable_nat_gateway         = var.enable_nat_gateway
-  nat_strategy               = var.nat_strategy
-  enable_interface_endpoints = var.enable_interface_endpoints
+  source                      = "./modules/network"
+  name_prefix                 = local.name_prefix
+  az_count                    = var.az_count
+  vpc_cidr                    = var.vpc_cidr
+  public_subnet_cidrs         = var.public_subnet_cidrs
+  private_subnet_cidrs        = var.private_subnet_cidrs
+  enable_nat_gateway          = var.enable_nat_gateway
+  nat_strategy                = var.nat_strategy
+  enable_interface_endpoints  = var.enable_interface_endpoints
+  enable_s3_gateway_endpoint  = var.enable_s3_gateway_endpoint
+  interface_endpoint_services = var.interface_endpoint_services
 }
 
 # ── Security Groups ──────────────────────────────────────────────────────────
@@ -71,14 +73,32 @@ module "rds" {
 # ── Secrets Manager ──────────────────────────────────────────────────────────
 
 module "secrets" {
-  source      = "./modules/secrets"
-  name_prefix = local.name_prefix
-  db_username = var.db_username
-  db_password = random_password.db.result
-  db_endpoint = module.rds.db_endpoint
-  db_port     = module.rds.db_port
-  db_name     = var.db_name
-  jwt_secret  = random_password.jwt.result
+  source                        = "./modules/secrets"
+  name_prefix                   = local.name_prefix
+  db_username                   = var.db_username
+  db_password                   = random_password.db.result
+  db_endpoint                   = module.rds.db_endpoint
+  db_port                       = module.rds.db_port
+  db_name                       = var.db_name
+  jwt_secret                    = random_password.jwt.result
+  anthropic_api_key             = var.anthropic_api_key
+  stripe_secret_key             = var.stripe_secret_key
+  stripe_webhook_secret         = var.stripe_webhook_secret
+  stripe_price_catalog_json     = var.stripe_price_catalog_json
+  flutterwave_public_key        = var.flutterwave_public_key
+  flutterwave_secret_key        = var.flutterwave_secret_key
+  flutterwave_secret_hash       = var.flutterwave_secret_hash
+  flutterwave_plan_catalog_json = var.flutterwave_plan_catalog_json
+  flutterwave_payment_options   = var.flutterwave_payment_options
+  adzuna_app_id                 = var.adzuna_app_id
+  adzuna_api_key                = var.adzuna_api_key
+  apify_token                   = var.apify_token
+  apify_job_tasks_json          = var.apify_job_tasks_json
+  greenhouse_board_tokens       = var.greenhouse_board_tokens
+  lever_site_tokens             = var.lever_site_tokens
+  workable_company_tokens       = var.workable_company_tokens
+  redis_url                     = var.redis_url
+  sentry_dsn                    = var.sentry_dsn
 }
 
 # ── S3 Bucket for uploads ────────────────────────────────────────────────────
@@ -145,6 +165,7 @@ module "apprunner" {
       DAILY_APPLY_PACK_LIMIT            = tostring(var.daily_apply_pack_limit)
       DAILY_JOB_MATCH_LIMIT             = tostring(var.daily_job_match_limit)
       DAILY_RESUME_REVIEW_LIMIT         = tostring(var.daily_resume_review_limit)
+      AGGREGATOR_INTERVAL_MINUTES       = tostring(var.aggregator_interval_minutes)
       STRIPE_PRICE_BASIC_MONTHLY        = var.stripe_price_basic_monthly
       STRIPE_PRICE_PROFESSIONAL_MONTHLY = var.stripe_price_professional_monthly
     } : key => value if value != null
@@ -155,8 +176,19 @@ module "apprunner" {
     "ANTHROPIC_API_KEY",
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
+    "STRIPE_PRICE_CATALOG_JSON",
+    "FLUTTERWAVE_PUBLIC_KEY",
+    "FLUTTERWAVE_SECRET_KEY",
+    "FLUTTERWAVE_SECRET_HASH",
+    "FLUTTERWAVE_PLAN_CATALOG_JSON",
+    "FLUTTERWAVE_PAYMENT_OPTIONS",
     "ADZUNA_APP_ID",
     "ADZUNA_API_KEY",
+    "APIFY_TOKEN",
+    "APIFY_JOB_TASKS_JSON",
+    "GREENHOUSE_BOARD_TOKENS",
+    "LEVER_SITE_TOKENS",
+    "WORKABLE_COMPANY_TOKENS",
     "REDIS_URL",
     "SENTRY_DSN"
   ]

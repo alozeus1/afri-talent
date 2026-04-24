@@ -15,8 +15,8 @@ const aggregator = getJobAggregator(prisma);
 router.post("/sync", authenticate, authorize("ADMIN"), async (req, res) => {
   const {
     keywords = ["software engineer", "developer", "designer", "product manager"],
-    postedWithinDays = 7,
-    limit = 100,
+    postedWithinDays = 21,
+    limit = 500,
   } = req.body as Partial<JobQuery & { limit: number }>;
 
   try {
@@ -52,12 +52,12 @@ router.get("/sources", authenticate, async (_req, res) => {
 // GET /api/aggregator/preview - Preview jobs without saving (Admin only)
 router.get("/preview", authenticate, authorize("ADMIN"), async (req, res) => {
   const keywords = (req.query.keywords as string)?.split(",") || ["software engineer"];
-  const limit = parseInt(req.query.limit as string) || 20;
+  const limit = parseInt(req.query.limit as string) || 50;
 
   try {
     const query: JobQuery = {
       keywords,
-      postedWithinDays: 7,
+      postedWithinDays: 21,
       limit,
     };
 

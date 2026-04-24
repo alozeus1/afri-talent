@@ -11,19 +11,32 @@ import { Badge } from "@/components/ui/badge";
 function SuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
+  const provider = searchParams.get("provider");
+  const txRef = searchParams.get("tx_ref");
+  const transactionId = searchParams.get("transaction_id");
   const [status, setStatus] = useState<BillingStatus | null>(null);
-  const hasSession = !!sessionId;
+  const hasSession = !!sessionId || provider === "FLUTTERWAVE";
   const [loading, setLoading] = useState(hasSession);
 
   useEffect(() => {
     if (hasSession) {
-      billing
-        .status()
-        .then(setStatus)
+      const verify = async () => {
+        if (provider === "FLUTTERWAVE" && transactionId) {
+          await billing.verifyCheckout({
+            provider: "FLUTTERWAVE",
+            txRef: txRef ?? undefined,
+            transactionId: Number(transactionId),
+          });
+        }
+        const nextStatus = await billing.status();
+        setStatus(nextStatus);
+      };
+
+      verify()
         .catch(console.error)
         .finally(() => setLoading(false));
     }
-  }, [hasSession]);
+  }, [hasSession, provider, transactionId, txRef]);
 
   if (loading) {
     return (
@@ -38,6 +51,10 @@ function SuccessContent() {
       ? "Professional"
       : status?.plan === "BASIC"
         ? "Basic"
+        : status?.plan === "EMPLOYER_BASIC"
+          ? "Employer Basic"
+          : status?.plan === "EMPLOYER_PREMIUM"
+            ? "Employer Premium"
         : "your new";
 
   return (

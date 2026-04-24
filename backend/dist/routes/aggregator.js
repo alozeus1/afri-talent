@@ -9,7 +9,7 @@ const router = Router();
 const aggregator = getJobAggregator(prisma);
 // POST /api/aggregator/sync - Trigger manual job sync (Admin only)
 router.post("/sync", authenticate, authorize("ADMIN"), async (req, res) => {
-    const { keywords = ["software engineer", "developer", "designer", "product manager"], postedWithinDays = 7, limit = 100, } = req.body;
+    const { keywords = ["software engineer", "developer", "designer", "product manager"], postedWithinDays = 21, limit = 500, } = req.body;
     try {
         const query = {
             keywords,
@@ -40,11 +40,11 @@ router.get("/sources", authenticate, async (_req, res) => {
 // GET /api/aggregator/preview - Preview jobs without saving (Admin only)
 router.get("/preview", authenticate, authorize("ADMIN"), async (req, res) => {
     const keywords = req.query.keywords?.split(",") || ["software engineer"];
-    const limit = parseInt(req.query.limit) || 20;
+    const limit = parseInt(req.query.limit) || 50;
     try {
         const query = {
             keywords,
-            postedWithinDays: 7,
+            postedWithinDays: 21,
             limit,
         };
         const results = await aggregator.aggregateJobs(query);

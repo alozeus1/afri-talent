@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import { ApplicationStatus, JobStatus, Role } from "@prisma/client";
-import { buildJobSearchWhere, fetchRankedJobs } from "../lib/jobs/search.js";
+import { ApplicationStatus, Role } from "@prisma/client";
+import { getCandidateRecommendationFeed, getCandidateRetentionSummary } from "../lib/candidate-retention.js";
 
 const router = Router();
 
@@ -94,72 +94,25 @@ router.get("/application-funnel", authenticate, authorize(Role.CANDIDATE), async
 // Return personalized job recommendations based on skills, targetRoles, and targetCountries.
 router.get("/recommendations", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response) => {
   try {
-    const profile = await prisma.candidateProfile.findUnique({
-      where: { userId: req.user!.userId },
-      select: { skills: true, targetRoles: true, targetCountries: true },
-    });
-
-    if (!profile) {
-      res.json([]);
-      return;
-    }
-
-    const { skills, targetRoles, targetCountries } = profile;
-
-    const baseWhere = buildJobSearchWhere({});
-    const orConditions: any[] = [];
-
-    if (skills.length > 0) {
-      orConditions.push({ tags: { hasSome: skills } });
-    }
-
-    if (targetRoles.length > 0) {
-      for (const role of targetRoles) {
-        orConditions.push({ title: { contains: role, mode: "insensitive" } });
-      }
-    }
-
-    if (targetCountries.length > 0) {
-      orConditions.push({ eligibleCountries: { hasSome: targetCountries } });
-      for (const country of targetCountries) {
-        orConditions.push({ location: { contains: country, mode: "insensitive" } });
-      }
-    }
-
-    if (orConditions.length === 0) {
-      const { jobs } = await fetchRankedJobs({
-        where: baseWhere,
-        page: 1,
-        limit: 20,
-        preferenceContext: {
-          skills,
-          targetRoles,
-          targetCountries,
-        },
-      });
-      res.json(jobs);
-      return;
-    }
-
-    const { jobs } = await fetchRankedJobs({
-      where: {
-        AND: [
-          baseWhere,
-          { OR: orConditions },
-        ],
-      },
-      page: 1,
-      limit: 20,
-      take: 200,
-      preferenceContext: {
-        skills,
-        targetRoles,
-        targetCountries,
-      },
-    });
-    res.json(jobs);
+    const recommendations = await getCandidateRecommendationFeed(req.user!.userId, 20);
+    res.json(recommendations);
   } catch (error) {
     console.error("Job recommendations error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/retention-summary", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response) => {
+  try {
+    const summary = await getCandidateRetentionSummary(req.user!.userId);
+    if (!summary) {
+      res.status(404).json({ error: "Candidate retention summary unavailable" });
+      return;
+    }
+
+    res.json(summary);
+  } catch (error) {
+    console.error("Candidate retention summary error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });

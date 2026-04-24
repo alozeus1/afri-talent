@@ -35,6 +35,7 @@ export class GreenhouseSource extends BaseJobSource {
 
     for (const boardToken of this.boardTokens.slice(0, 20)) {
       try {
+        const startedAt = Date.now();
         await this.rateLimit();
         const response = await fetch(
           `${this.config.baseUrl}/${encodeURIComponent(boardToken)}/jobs?content=true`,
@@ -49,13 +50,26 @@ export class GreenhouseSource extends BaseJobSource {
         }
 
         const payload = (await response.json()) as GreenhouseBoardResponse;
-        const transformed = payload.jobs
-          .map((job) => this.transformJob(job, boardToken))
-          .filter((job) => this.matchesQuery(job, query));
+        const normalizedJobs = payload.jobs.map((job) => this.transformJob(job, boardToken));
+        const matchedJobs = normalizedJobs.filter((job) => this.matchesQuery(job, query));
+        const filterStats = this.buildFilterStats(normalizedJobs, query);
 
-        jobs.push(...transformed);
+        this.log("Board fetch complete", {
+          boardToken,
+          upstreamCount: payload.jobs.length,
+          normalizedCount: normalizedJobs.length,
+          matchedCount: matchedJobs.length,
+          staleFiltered: filterStats.staleFiltered,
+          remoteFiltered: filterStats.remoteFiltered,
+          keywordFiltered: filterStats.keywordFiltered,
+          sampleTitles: matchedJobs.slice(0, 3).map((job) => job.title),
+          durationMs: Date.now() - startedAt,
+        });
+
+        jobs.push(...matchedJobs);
       } catch (error) {
         errors.push(`${boardToken}: ${String(error)}`);
+        this.logError(`Failed to fetch board ${boardToken}`, error);
       }
     }
 
@@ -77,17 +91,45 @@ export class GreenhouseSource extends BaseJobSource {
 
     if (query.remote && job.locationType !== "remote") return false;
 
-    if (query.keywords.length > 0) {
-      const bag = `${job.title} ${job.description} ${job.skills.join(" ")}`.toLowerCase();
-      const match = query.keywords.some((keyword) => bag.includes(keyword.toLowerCase()));
-      if (!match) return false;
-    }
+    if (!this.matchesKeywordQuery(job, query)) return false;
 
     return true;
   }
 
+  private buildFilterStats(jobs: AggregatedJob[], query: JobQuery) {
+    let staleFiltered = 0;
+    let remoteFiltered = 0;
+    let keywordFiltered = 0;
+
+    for (const job of jobs) {
+      if (query.postedWithinDays) {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - query.postedWithinDays);
+        if (job.postedAt < cutoff) {
+          staleFiltered++;
+          continue;
+        }
+      }
+
+      if (query.remote && job.locationType !== "remote") {
+        remoteFiltered++;
+        continue;
+      }
+
+      if (!this.matchesKeywordQuery(job, query)) {
+        keywordFiltered++;
+      }
+    }
+
+    return {
+      staleFiltered,
+      remoteFiltered,
+      keywordFiltered,
+    };
+  }
+
   private transformJob(job: GreenhouseJob, boardToken: string): AggregatedJob {
-    const description = (job.content || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const description = this.normalizeDescription(job.content || "");
     const location = job.location?.name || "Remote";
     const normalized = this.normalizeLocation(location);
 

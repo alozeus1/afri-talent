@@ -36,9 +36,21 @@ export const REGION_DEFAULTS: Record<BillingRegion, { currency: string; currenci
   ROW:    { currency: "USD", currencies: ["USD"] },
 };
 
+const COUNTRY_DEFAULT_CURRENCY: Record<string, string> = {
+  NG: "NGN",
+};
+
 export function isValidCountryCode(code: string): boolean {
   const upper = code.toUpperCase().trim();
   return AFRICA_COUNTRIES.has(upper) || EUROPE_COUNTRIES.has(upper) || upper.length === 2;
+}
+
+export function getDefaultCurrencyForCountry(countryCode: string | null | undefined): string | null {
+  if (!countryCode) {
+    return null;
+  }
+
+  return COUNTRY_DEFAULT_CURRENCY[countryCode.toUpperCase().trim()] ?? null;
 }
 
 export { AFRICA_COUNTRIES, EUROPE_COUNTRIES };

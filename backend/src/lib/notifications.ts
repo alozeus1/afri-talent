@@ -7,6 +7,13 @@ import { pushDeadLetter, withRetry } from "./ops/resilience.js";
 
 export type NotificationChannel =
   | "savedSearchAlerts"
+  | "weeklyDigests"
+  | "applicationReminders"
+  | "profileCompletionNudges"
+  | "verificationCompletionNudges"
+  | "visaRelocationAlerts"
+  | "salaryInsights"
+  | "interviewPrepRecommendations"
   | "interviewReminders"
   | "applicationUpdates"
   | "subscriptionNotices";

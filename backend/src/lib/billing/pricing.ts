@@ -1,14 +1,74 @@
 import { BillingRegion, BillingInterval, SubscriptionPlan } from "@prisma/client";
 import prisma from "../prisma.js";
+import { DEFAULT_REGIONAL_PRICE_CATALOG } from "./default-price-catalog.js";
+import { resolveFlutterwaveCatalogPlanId, resolveStripeCatalogPriceId } from "./provider-catalog.js";
 
-interface PriceInfo {
+export interface PriceInfo {
   plan: SubscriptionPlan;
   region: BillingRegion;
   interval: BillingInterval;
   currency: string;
   amount: number;
   stripePriceId: string | null;
+  flutterwavePlanId: string | null;
   displayAmount: string;
+}
+
+function getFallbackRegionalPrice(
+  plan: SubscriptionPlan,
+  region: BillingRegion,
+  interval: BillingInterval,
+  currency?: string,
+) {
+  const normalizedCurrency = currency?.toUpperCase();
+
+  return DEFAULT_REGIONAL_PRICE_CATALOG.find((row) => (
+    row.plan === plan
+    && row.region === region
+    && row.interval === interval
+    && (!normalizedCurrency || row.currency === normalizedCurrency)
+  )) ?? null;
+}
+
+function getFallbackRegionalPrices(region: BillingRegion, currency?: string) {
+  const normalizedCurrency = currency?.toUpperCase();
+
+  return DEFAULT_REGIONAL_PRICE_CATALOG.filter((row) => (
+    row.region === region
+    && (!normalizedCurrency || row.currency === normalizedCurrency)
+  ));
+}
+
+function toPriceInfo(price: {
+  plan: SubscriptionPlan;
+  region: BillingRegion;
+  interval: BillingInterval;
+  currency: string;
+  amount: number;
+  stripePriceId?: string | null;
+}): PriceInfo {
+  const stripePriceId = price.stripePriceId ?? resolveStripeCatalogPriceId(
+    price.plan,
+    price.region,
+    price.interval,
+    price.currency,
+  );
+
+  return {
+    plan: price.plan,
+    region: price.region,
+    interval: price.interval,
+    currency: price.currency,
+    amount: price.amount,
+    stripePriceId,
+    flutterwavePlanId: resolveFlutterwaveCatalogPlanId(
+      price.plan,
+      price.region,
+      price.interval,
+      price.currency,
+    ),
+    displayAmount: formatAmount(price.amount, price.currency),
+  };
 }
 
 /**
@@ -33,17 +93,12 @@ export async function getRegionalPrice(
     orderBy: { createdAt: "desc" },
   });
 
-  if (!price) return null;
+  if (price) {
+    return toPriceInfo(price);
+  }
 
-  return {
-    plan: price.plan,
-    region: price.region,
-    interval: price.interval,
-    currency: price.currency,
-    amount: price.amount,
-    stripePriceId: price.stripePriceId,
-    displayAmount: formatAmount(price.amount, price.currency),
-  };
+  const fallback = getFallbackRegionalPrice(plan, region, interval, currency);
+  return fallback ? toPriceInfo(fallback) : null;
 }
 
 /**
@@ -64,15 +119,11 @@ export async function getRegionalPrices(
     orderBy: [{ plan: "asc" }, { interval: "asc" }],
   });
 
-  return prices.map((p) => ({
-    plan: p.plan,
-    region: p.region,
-    interval: p.interval,
-    currency: p.currency,
-    amount: p.amount,
-    stripePriceId: p.stripePriceId,
-    displayAmount: formatAmount(p.amount, p.currency),
-  }));
+  if (prices.length > 0) {
+    return prices.map((price) => toPriceInfo(price));
+  }
+
+  return getFallbackRegionalPrices(region, currency).map((price) => toPriceInfo(price));
 }
 
 /**
@@ -102,13 +153,28 @@ export async function resolveStripePriceId(
     },
   });
 
-  if (!price?.stripePriceId) return null;
+  const stripePriceId = price?.stripePriceId ?? resolveStripeCatalogPriceId(plan, region, interval, currency);
+  const amount = price?.amount ?? getFallbackRegionalPrice(plan, region, interval, currency)?.amount;
+  if (!stripePriceId || typeof amount !== "number") {
+    return null;
+  }
 
   return {
-    stripePriceId: price.stripePriceId,
-    currency: price.currency,
-    amount: price.amount,
+    stripePriceId,
+    currency,
+    amount,
   };
+}
+
+export async function resolveCheckoutPrice(
+  userId: string,
+  plan: SubscriptionPlan,
+  interval: BillingInterval = BillingInterval.MONTHLY,
+): Promise<PriceInfo | null> {
+  const profile = await prisma.userBillingProfile.findUnique({ where: { userId } });
+  const region = profile?.region ?? BillingRegion.ROW;
+  const currency = profile?.currency ?? "USD";
+  return getRegionalPrice(plan, region, interval, currency);
 }
 
 function formatAmount(amountMinor: number, currency: string): string {

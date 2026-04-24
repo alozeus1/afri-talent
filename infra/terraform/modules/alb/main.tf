@@ -44,6 +44,7 @@ resource "aws_lb_target_group" "backend" {
   }
 }
 
+# checkov:skip=CKV_AWS_2: Legacy ALB module retains an HTTP listener for optional redirect and API fallback paths in the ECS rollback stack.
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.app.arn
   port              = 80

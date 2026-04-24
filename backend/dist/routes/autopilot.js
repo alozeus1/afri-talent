@@ -1,24 +1,129 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Autopilot API — User-facing endpoints for the proactive AI agent
+// Autopilot API — user-facing candidate automation framework
 //
-// GET  /api/autopilot/status    — Agent status, pending apply packs, stats
-// GET  /api/autopilot/matches   — AI-scored job matches for the user
-// POST /api/autopilot/settings  — Enable/disable auto-apply, set thresholds
-// POST /api/autopilot/apply     — Trigger on-demand apply pack for a specific job
+// GET  /api/autopilot/status         — overview of the agent system
+// GET  /api/autopilot/matches        — AI-scored job matches for the user
+// POST /api/autopilot/settings       — update automation settings
+// GET  /api/autopilot/pipeline       — resume versions + task queue snapshot
+// POST /api/autopilot/resume-builder — synthesize a profile-based resume version
+// POST /api/autopilot/follow-up/:applicationId
+// POST /api/autopilot/interview-prep/:applicationId
+// POST /api/autopilot/apply          — trigger on-demand apply pack for a job
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router } from "express";
-import { z } from "zod";
+import { z } from "zod/v4";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import { Role } from "@prisma/client";
+import { CandidateAgentTaskStatus, CandidateAgentTaskType, CandidateAutomationLevel, Role, SubscriptionPlan, } from "@prisma/client";
 import { generateQuickCoverLetter } from "../lib/ai/cover-letter.js";
+import { getUserEntitlements } from "../lib/billing/entitlements.js";
+import { buildFollowUpDraft, buildInterviewPrepPack, buildResumeVersion, buildTaskTitle, ensureCandidateAutopilotProfile, getCandidatePipelineSnapshot, queueCandidateAgentTask, } from "../lib/autopilot/framework.js";
 const router = Router();
+const applySchema = z.object({
+    jobId: z.string().uuid(),
+    /**
+     * Explicit candidate consent to submit an AI-assembled application pack.
+     * Must be true. Absent/false → 400 CONSENT_REQUIRED.
+     */
+    confirm: z.literal(true, "Consent required: set confirm=true to submit."),
+});
+const batchApplySchema = z.object({
+    jobIds: z.array(z.string()).min(1).max(50),
+    customMessage: z.string().max(2000).optional(),
+});
+const settingsSchema = z.object({
+    enabled: z.boolean().optional(),
+    automationLevel: z.nativeEnum(CandidateAutomationLevel).optional(),
+    minimumMatchScore: z.number().int().min(50).max(95).optional(),
+    resumeBuilderEnabled: z.boolean().optional(),
+    autoApplyEnabled: z.boolean().optional(),
+    followUpEnabled: z.boolean().optional(),
+    interviewPrepEnabled: z.boolean().optional(),
+    schedulingEnabled: z.boolean().optional(),
+    preferredTone: z.enum(["professional", "warm", "direct"]).optional(),
+    followUpCadenceDays: z.array(z.number().int().min(1).max(30)).max(5).optional(),
+    availabilityWindows: z.array(z.object({
+        day: z.enum(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]),
+        startHour: z.number().int().min(0).max(23),
+        endHour: z.number().int().min(1).max(24),
+        timezone: z.string().min(2).max(80),
+    })).max(14).optional(),
+    targetCompensation: z.object({
+        currency: z.string().min(3).max(3).optional(),
+        minimum: z.number().int().min(0).optional(),
+        ideal: z.number().int().min(0).optional(),
+    }).optional(),
+}).strict();
+const resumeBuilderSchema = z.object({
+    jobId: z.string().uuid().optional(),
+});
+function featureBlocked(res, message) {
+    res.status(403).json({ error: message });
+}
+function hasResumeBuilderAccess(plan) {
+    return plan === SubscriptionPlan.BASIC || plan === SubscriptionPlan.PROFESSIONAL;
+}
+function hasInterviewPrepAccess(plan, videoMockInterviews) {
+    return plan !== SubscriptionPlan.FREE && (videoMockInterviews ?? 0) !== 0;
+}
+async function loadCandidateContext(userId) {
+    const [profile, user, entitlements] = await Promise.all([
+        prisma.candidateProfile.findUnique({
+            where: { userId },
+            include: {
+                resumes: {
+                    where: { isActive: true },
+                    take: 1,
+                    orderBy: { uploadedAt: "desc" },
+                },
+            },
+        }),
+        prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, name: true, email: true },
+        }),
+        getUserEntitlements(userId),
+    ]);
+    return { profile, user, entitlements };
+}
+function buildRecommendations(input) {
+    const recs = [];
+    if (!input.profile) {
+        recs.push("Complete your candidate profile to unlock autonomous resume building and verified job matching.");
+        return recs;
+    }
+    if (input.profile.profileCompleteness < 70) {
+        recs.push(`Improve your profile completeness for stronger resume synthesis and match quality (${input.profile.profileCompleteness}%).`);
+    }
+    if (input.profile.skills.length < 5) {
+        recs.push("Add more skills so the agent can tailor resumes and outreach with better precision.");
+    }
+    if (!input.profile.openToWork) {
+        recs.push("Enable 'Open to Work' so the autonomous search agent can keep your pipeline active.");
+    }
+    if (input.savedSearchCount === 0) {
+        recs.push("Create at least one saved search so the job-discovery agent has a market brief to work from.");
+    }
+    if (!input.entitlements.autopilot) {
+        recs.push("Upgrade to Professional to unlock autonomous apply packs, follow-up drafting, and scheduling support.");
+    }
+    if (!input.latestResumeVersionTitle) {
+        recs.push("Generate a master resume from your profile so every apply pack starts from a current baseline.");
+    }
+    if (input.taskSummary.needsReview > 0) {
+        recs.push(`You have ${input.taskSummary.needsReview} automation item(s) waiting for review before they can be sent.`);
+    }
+    if (recs.length === 0) {
+        recs.push("Your candidate agent system is active and ready to keep your search moving.");
+    }
+    return recs;
+}
 // GET /api/autopilot/status — Overview of the proactive agent for this user
 router.get("/status", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
     const userId = req.user.userId;
     try {
-        const [subscription, savedSearchCount, totalAlerts, pendingAlerts, recentApplications, profile,] = await Promise.all([
+        const [subscription, savedSearchCount, totalAlerts, pendingAlerts, recentApplications, profile, pipeline,] = await Promise.all([
             prisma.subscription.findUnique({ where: { userId }, select: { plan: true, status: true } }),
             prisma.savedSearch.count({ where: { userId, alertEnabled: true } }),
             prisma.jobAlert.count({ where: { userId } }),
@@ -30,26 +135,45 @@ router.get("/status", authenticate, authorize(Role.CANDIDATE), async (req, res) 
                 where: { userId },
                 select: { profileCompleteness: true, skills: true, openToWork: true },
             }),
+            getCandidatePipelineSnapshot(userId),
         ]);
-        const isPro = subscription?.plan === "PROFESSIONAL" && subscription?.status === "ACTIVE";
+        const entitlements = await getUserEntitlements(userId);
         res.json({
             agent: {
-                active: savedSearchCount > 0 || (profile?.openToWork ?? false),
-                autoApplyEnabled: isPro,
+                active: savedSearchCount > 0 || (profile?.openToWork ?? false) || pipeline.settings.enabled,
+                autoApplyEnabled: pipeline.settings.autoApplyEnabled && entitlements.autopilot,
                 tier: subscription?.plan ?? "FREE",
+                automationLevel: pipeline.settings.automationLevel,
             },
             stats: {
                 activeSavedSearches: savedSearchCount,
                 totalMatches: totalAlerts,
                 pendingMatches: pendingAlerts,
                 applicationsThisWeek: recentApplications,
+                queuedTasks: pipeline.taskSummary.queued,
+                reviewTasks: pipeline.taskSummary.needsReview,
             },
             profile: {
                 completeness: profile?.profileCompleteness ?? 0,
                 skillCount: profile?.skills.length ?? 0,
                 openToWork: profile?.openToWork ?? false,
+                latestResumeVersion: pipeline.latestResumeVersion,
             },
-            recommendations: buildRecommendations(profile, savedSearchCount, isPro),
+            modules: {
+                resumeBuilder: pipeline.settings.resumeBuilderEnabled,
+                autoApply: pipeline.settings.autoApplyEnabled && entitlements.autopilot,
+                followUp: pipeline.settings.followUpEnabled && entitlements.autopilot,
+                interviewPrep: pipeline.settings.interviewPrepEnabled && hasInterviewPrepAccess(entitlements.plan, entitlements.videoMockInterviews),
+                scheduling: pipeline.settings.schedulingEnabled && entitlements.autopilot,
+            },
+            taskSummary: pipeline.taskSummary,
+            recommendations: buildRecommendations({
+                profile,
+                savedSearchCount,
+                entitlements,
+                taskSummary: pipeline.taskSummary,
+                latestResumeVersionTitle: pipeline.latestResumeVersion?.title ?? null,
+            }),
         });
     }
     catch (err) {
@@ -97,18 +221,16 @@ router.get("/matches", authenticate, authorize(Role.CANDIDATE), async (req, res)
             }),
             prisma.jobAlert.count({ where }),
         ]);
-        // Check which jobs the user already applied to
         const appliedJobIds = new Set((await prisma.application.findMany({
-            where: { candidateId: userId, jobId: { in: matches.map((m) => m.jobId) } },
+            where: { candidateId: userId, jobId: { in: matches.map((match) => match.jobId) } },
             select: { jobId: true },
-        })).map((a) => a.jobId));
-        const enriched = matches.map((m) => ({
-            ...m,
-            alreadyApplied: appliedJobIds.has(m.jobId),
-            companyName: m.job.employer?.companyName ?? m.job.sourceName ?? null,
-        }));
+        })).map((application) => application.jobId));
         res.json({
-            matches: enriched,
+            matches: matches.map((match) => ({
+                ...match,
+                alreadyApplied: appliedJobIds.has(match.jobId),
+                companyName: match.job.employer?.companyName ?? match.job.sourceName ?? null,
+            })),
             pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
         });
     }
@@ -117,26 +239,260 @@ router.get("/matches", authenticate, authorize(Role.CANDIDATE), async (req, res)
         res.status(500).json({ error: "Failed to fetch matches" });
     }
 });
-// POST /api/autopilot/apply — On-demand apply pack for a specific job
-const applySchema = z.object({
-    jobId: z.string().uuid(),
+// POST /api/autopilot/settings — update automation preferences
+router.post("/settings", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+    const userId = req.user.userId;
+    const parsed = settingsSchema.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
+        return;
+    }
+    try {
+        const entitlements = await getUserEntitlements(userId);
+        const profile = await ensureCandidateAutopilotProfile(userId);
+        const data = parsed.data;
+        const update = {
+            ...data,
+        };
+        if (!entitlements.autopilot) {
+            update.enabled = false;
+            update.autoApplyEnabled = false;
+            update.followUpEnabled = false;
+            update.schedulingEnabled = false;
+            update.automationLevel = CandidateAutomationLevel.ASSISTED;
+        }
+        if (!hasInterviewPrepAccess(entitlements.plan, entitlements.videoMockInterviews)) {
+            update.interviewPrepEnabled = false;
+        }
+        if (!hasResumeBuilderAccess(entitlements.plan)) {
+            update.resumeBuilderEnabled = false;
+        }
+        const updated = await prisma.candidateAutopilotProfile.update({
+            where: { id: profile.id },
+            data: update,
+        });
+        res.json(updated);
+    }
+    catch (err) {
+        logger.error({ err }, "[autopilot] settings update failed");
+        res.status(500).json({ error: "Failed to update autopilot settings" });
+    }
 });
+// GET /api/autopilot/pipeline — task queue + resume versions
+router.get("/pipeline", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+    const userId = req.user.userId;
+    try {
+        const [snapshot, resumeVersions, tasks] = await Promise.all([
+            getCandidatePipelineSnapshot(userId),
+            prisma.candidateResumeVersion.findMany({
+                where: { userId },
+                select: {
+                    id: true,
+                    title: true,
+                    targetRole: true,
+                    source: true,
+                    status: true,
+                    score: true,
+                    keywords: true,
+                    createdAt: true,
+                    updatedAt: true,
+                },
+                orderBy: [{ isPrimary: "desc" }, { updatedAt: "desc" }],
+                take: 8,
+            }),
+            prisma.candidateAgentTask.findMany({
+                where: { userId },
+                select: {
+                    id: true,
+                    type: true,
+                    status: true,
+                    title: true,
+                    summary: true,
+                    scheduledFor: true,
+                    completedAt: true,
+                    createdAt: true,
+                    outputSummary: true,
+                },
+                orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+                take: 20,
+            }),
+        ]);
+        res.json({
+            snapshot,
+            resumeVersions,
+            tasks,
+        });
+    }
+    catch (err) {
+        logger.error({ err }, "[autopilot] pipeline fetch failed");
+        res.status(500).json({ error: "Failed to fetch candidate pipeline" });
+    }
+});
+// POST /api/autopilot/resume-builder — synthesize a candidate resume version
+router.post("/resume-builder", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+    const userId = req.user.userId;
+    const parsed = resumeBuilderSchema.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
+        return;
+    }
+    try {
+        const { profile, user, entitlements } = await loadCandidateContext(userId);
+        if (!profile || !user) {
+            res.status(400).json({ error: "Complete your profile before using the resume builder" });
+            return;
+        }
+        if (!hasResumeBuilderAccess(entitlements.plan)) {
+            featureBlocked(res, "Upgrade to Basic or Professional to use the autonomous resume builder.");
+            return;
+        }
+        const targetJob = parsed.data.jobId
+            ? await prisma.job.findUnique({
+                where: { id: parsed.data.jobId },
+                select: { id: true, title: true, description: true, tags: true, sourceName: true },
+            })
+            : null;
+        const version = await buildResumeVersion({
+            user,
+            profile,
+            job: targetJob,
+        });
+        await queueCandidateAgentTask({
+            userId,
+            type: CandidateAgentTaskType.RESUME_REFRESH,
+            jobId: targetJob?.id ?? null,
+            resumeVersionId: version.id,
+            priority: 60,
+            title: buildTaskTitle(CandidateAgentTaskType.RESUME_REFRESH, targetJob?.title ?? null),
+            summary: targetJob
+                ? `Tailored master resume for ${targetJob.title}.`
+                : "Refreshed master resume from profile data.",
+            status: CandidateAgentTaskStatus.COMPLETED,
+            outputSummary: {
+                resumeVersionId: version.id,
+                score: version.score,
+            },
+        });
+        res.status(201).json({ version });
+    }
+    catch (err) {
+        logger.error({ err }, "[autopilot] resume builder failed");
+        res.status(500).json({ error: "Failed to build resume version" });
+    }
+});
+// POST /api/autopilot/follow-up/:applicationId — create follow-up drafts
+router.post("/follow-up/:applicationId", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+    const userId = req.user.userId;
+    const applicationId = req.params.applicationId;
+    try {
+        const { user, entitlements } = await loadCandidateContext(userId);
+        if (!user || !entitlements.autopilot) {
+            featureBlocked(res, "Upgrade to Professional to unlock autonomous follow-up drafting.");
+            return;
+        }
+        const application = await prisma.application.findFirst({
+            where: { id: applicationId, candidateId: userId },
+            include: {
+                job: {
+                    select: {
+                        id: true,
+                        title: true,
+                        sourceName: true,
+                        applicationUrl: true,
+                        sourceUrl: true,
+                    },
+                },
+            },
+        });
+        if (!application) {
+            res.status(404).json({ error: "Application not found" });
+            return;
+        }
+        const drafts = await buildFollowUpDraft({
+            user,
+            application,
+            job: application.job,
+        });
+        res.status(201).json({ drafts });
+    }
+    catch (err) {
+        logger.error({ err, applicationId }, "[autopilot] follow-up generation failed");
+        res.status(500).json({ error: "Failed to create follow-up drafts" });
+    }
+});
+// POST /api/autopilot/interview-prep/:applicationId — build interview prep pack
+router.post("/interview-prep/:applicationId", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+    const userId = req.user.userId;
+    const applicationId = req.params.applicationId;
+    try {
+        const { profile, user, entitlements } = await loadCandidateContext(userId);
+        if (!profile || !user) {
+            res.status(400).json({ error: "Complete your candidate profile before generating interview prep" });
+            return;
+        }
+        if (!hasInterviewPrepAccess(entitlements.plan, entitlements.videoMockInterviews)) {
+            featureBlocked(res, "Upgrade to Basic or Professional to unlock interview prep automation.");
+            return;
+        }
+        const application = await prisma.application.findFirst({
+            where: { id: applicationId, candidateId: userId },
+            include: {
+                job: {
+                    select: {
+                        id: true,
+                        title: true,
+                        description: true,
+                        tags: true,
+                        sourceName: true,
+                    },
+                },
+            },
+        });
+        if (!application) {
+            res.status(404).json({ error: "Application not found" });
+            return;
+        }
+        const pack = await buildInterviewPrepPack({
+            user,
+            profile,
+            application,
+            job: application.job,
+        });
+        res.status(201).json({ pack });
+    }
+    catch (err) {
+        logger.error({ err, applicationId }, "[autopilot] interview prep failed");
+        res.status(500).json({ error: "Failed to build interview prep pack" });
+    }
+});
+// POST /api/autopilot/apply — On-demand apply pack for a specific job
 router.post("/apply", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
     const userId = req.user.userId;
     const parsed = applySchema.safeParse(req.body);
     if (!parsed.success) {
+        const consentIssue = parsed.error.issues.find((i) => Array.isArray(i.path) && i.path.includes("confirm"));
+        if (consentIssue) {
+            res.status(400).json({
+                error: "Explicit consent is required before AfriTalent submits an application on your behalf.",
+                code: "CONSENT_REQUIRED",
+            });
+            return;
+        }
         res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
         return;
     }
     const { jobId } = parsed.data;
     try {
-        // Check job exists and is published
+        const { profile, user, entitlements } = await loadCandidateContext(userId);
+        if (!profile || !user) {
+            res.status(400).json({ error: "Complete your profile first" });
+            return;
+        }
         const job = await prisma.job.findUnique({ where: { id: jobId } });
         if (!job || job.status !== "PUBLISHED") {
             res.status(404).json({ error: "Job not found or not available" });
             return;
         }
-        // Check not already applied
         const existingApp = await prisma.application.findFirst({
             where: { jobId, candidateId: userId },
         });
@@ -144,22 +500,12 @@ router.post("/apply", authenticate, authorize(Role.CANDIDATE), async (req, res) 
             res.status(400).json({ error: "Already applied to this job" });
             return;
         }
-        // Get profile
-        const profile = await prisma.candidateProfile.findUnique({
-            where: { userId },
-            include: { resumes: { where: { isActive: true }, take: 1 } },
-        });
-        if (!profile) {
-            res.status(400).json({ error: "Complete your profile first" });
-            return;
-        }
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+        const activeResume = profile.resumes[0] ?? null;
         const companyName = job.employerId
             ? (await prisma.employer.findUnique({ where: { id: job.employerId }, select: { companyName: true } }))?.companyName ?? job.sourceName ?? "the company"
             : job.sourceName ?? "the company";
-        // Generate AI cover letter
         const clResult = await generateQuickCoverLetter({
-            candidateName: user?.name ?? "Candidate",
+            candidateName: user.name ?? "Candidate",
             headline: profile.headline,
             skills: profile.skills,
             bio: profile.bio,
@@ -168,24 +514,108 @@ router.post("/apply", authenticate, authorize(Role.CANDIDATE), async (req, res) 
             companyName,
             jobDescription: job.description,
         });
-        // Create application
         const application = await prisma.application.create({
             data: {
                 jobId,
                 candidateId: userId,
-                cvUrl: profile.resumes[0]?.s3Key ?? null,
+                cvUrl: activeResume?.s3Key ?? null,
                 coverLetter: clResult.coverLetter,
                 notes: `[AI-Assisted Application] Cover letter source: ${clResult.source}`,
                 status: "PENDING",
             },
             include: {
-                job: { select: { title: true, slug: true } },
+                job: {
+                    select: {
+                        id: true,
+                        title: true,
+                        slug: true,
+                        description: true,
+                        tags: true,
+                        sourceName: true,
+                        applicationUrl: true,
+                        sourceUrl: true,
+                    },
+                },
+            },
+        });
+        const resumeVersion = await buildResumeVersion({
+            user,
+            profile,
+            job: {
+                id: application.job.id,
+                title: application.job.title,
+                description: application.job.description,
+                tags: application.job.tags,
+                sourceName: application.job.sourceName,
+            },
+        });
+        await queueCandidateAgentTask({
+            userId,
+            type: CandidateAgentTaskType.APPLY_PACK,
+            applicationId: application.id,
+            jobId,
+            resumeVersionId: resumeVersion.id,
+            priority: 80,
+            title: buildTaskTitle(CandidateAgentTaskType.APPLY_PACK, job.title),
+            summary: `Prepared resume + cover letter for ${job.title}.`,
+            status: CandidateAgentTaskStatus.COMPLETED,
+            outputSummary: {
+                coverLetterSource: clResult.source,
+                resumeVersionId: resumeVersion.id,
+            },
+        });
+        let followUps = [];
+        let interviewPrepTaskId = null;
+        if (entitlements.autopilot) {
+            followUps = await buildFollowUpDraft({
+                user,
+                application,
+                job: {
+                    id: application.job.id,
+                    title: application.job.title,
+                    sourceName: application.job.sourceName,
+                    applicationUrl: application.job.applicationUrl,
+                    sourceUrl: application.job.sourceUrl,
+                },
+            });
+        }
+        if (hasInterviewPrepAccess(entitlements.plan, entitlements.videoMockInterviews)) {
+            const interviewPrep = await buildInterviewPrepPack({
+                user,
+                profile,
+                application,
+                job: {
+                    id: application.job.id,
+                    title: application.job.title,
+                    description: application.job.description,
+                    tags: application.job.tags,
+                    sourceName: application.job.sourceName,
+                },
+            });
+            interviewPrepTaskId = interviewPrep.taskId;
+        }
+        await prisma.notification.create({
+            data: {
+                userId,
+                type: "APPLICATION_STATUS",
+                title: `AI prepared your application for ${job.title}`,
+                body: `Your apply pack is ready${followUps.length > 0 ? ", including follow-up drafts" : ""}${interviewPrepTaskId ? " and interview prep" : ""}.`,
+                metadata: {
+                    jobId,
+                    jobSlug: application.job.slug,
+                    resumeVersionId: resumeVersion.id,
+                    followUpTaskIds: followUps.map((draft) => draft.taskId),
+                    interviewPrepTaskId,
+                },
             },
         });
         res.status(201).json({
             application,
             coverLetterSource: clResult.source,
-            message: "Application submitted with AI-generated cover letter",
+            resumeVersionId: resumeVersion.id,
+            followUpDrafts: followUps,
+            interviewPrepTaskId,
+            message: "Application submitted with AI-generated cover letter and autonomous task pack",
         });
     }
     catch (err) {
@@ -193,32 +623,143 @@ router.post("/apply", authenticate, authorize(Role.CANDIDATE), async (req, res) 
         res.status(500).json({ error: "Failed to generate application" });
     }
 });
-// Helper: generate personalized recommendations
-function buildRecommendations(profile, savedSearchCount, isPro) {
-    const recs = [];
-    if (!profile) {
-        recs.push("Complete your candidate profile to enable AI job matching");
-        return recs;
+// ── POST /api/autopilot/batch ────────────────────────────────────────────────
+router.post("/batch", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+    const userId = req.user.userId;
+    const parsed = batchApplySchema.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
+        return;
     }
-    if (profile.profileCompleteness < 50) {
-        recs.push("Improve your profile completeness to get better matches (currently " + profile.profileCompleteness + "%)");
+    const { jobIds, customMessage } = parsed.data;
+    try {
+        const batch = await prisma.autoApplyBatch.create({
+            data: {
+                candidateId: userId,
+                jobsTargeted: jobIds.length,
+                status: "queued",
+                jobFilters: { jobIds },
+            },
+        });
+        void processBatch(batch.id, userId, jobIds, customMessage);
+        res.status(202).json({
+            batchId: batch.id,
+            jobsTargeted: jobIds.length,
+            status: "queued",
+            message: "Batch queued. Use GET /api/autopilot/batch/:batchId to track progress.",
+        });
     }
-    if (profile.skills.length < 3) {
-        recs.push("Add more skills to your profile for more accurate matching");
+    catch (err) {
+        logger.error({ err, userId }, "[autopilot] batch create failed");
+        res.status(500).json({ error: "Failed to create batch" });
     }
-    if (!profile.openToWork) {
-        recs.push("Enable 'Open to Work' to receive proactive job matches");
+});
+// ── GET /api/autopilot/batch/:batchId ────────────────────────────────────────
+router.get("/batch/:batchId", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+    const userId = req.user.userId;
+    const { batchId } = req.params;
+    try {
+        const batch = await prisma.autoApplyBatch.findFirst({
+            where: { id: batchId, candidateId: userId },
+        });
+        if (!batch) {
+            res.status(404).json({ error: "Batch not found" });
+            return;
+        }
+        res.json({
+            id: batch.id,
+            status: batch.status,
+            jobsTargeted: batch.jobsTargeted,
+            jobsApplied: batch.jobsApplied,
+            jobsFailed: batch.jobsFailed,
+            creditsUsed: batch.creditsUsed,
+            startedAt: batch.startedAt,
+            completedAt: batch.completedAt,
+            createdAt: batch.createdAt,
+        });
     }
-    if (savedSearchCount === 0) {
-        recs.push("Create a saved search with alerts to get notified about new matching jobs");
+    catch (err) {
+        logger.error({ err, userId, batchId }, "[autopilot] batch status failed");
+        res.status(500).json({ error: "Failed to fetch batch status" });
     }
-    if (!isPro) {
-        recs.push("Upgrade to Professional for AI auto-apply — the agent applies to high-match jobs while you sleep");
+});
+async function processBatch(batchId, userId, jobIds, customMessage) {
+    try {
+        await prisma.autoApplyBatch.update({
+            where: { id: batchId },
+            data: { status: "in_progress", startedAt: new Date() },
+        });
+        const { profile, user } = await loadCandidateContext(userId);
+        for (const jobId of jobIds) {
+            try {
+                const job = await prisma.job.findUnique({ where: { id: jobId } });
+                if (!job || job.status !== "PUBLISHED") {
+                    await prisma.autoApplyBatch.update({
+                        where: { id: batchId },
+                        data: { jobsFailed: { increment: 1 } },
+                    });
+                    continue;
+                }
+                const existing = await prisma.application.findFirst({
+                    where: { jobId, candidateId: userId },
+                });
+                if (existing) {
+                    await prisma.autoApplyBatch.update({
+                        where: { id: batchId },
+                        data: { jobsFailed: { increment: 1 } },
+                    });
+                    continue;
+                }
+                const companyName = job.employerId
+                    ? (await prisma.employer.findUnique({ where: { id: job.employerId }, select: { companyName: true } }))?.companyName ?? job.sourceName ?? "the company"
+                    : job.sourceName ?? "the company";
+                const clResult = await generateQuickCoverLetter({
+                    candidateName: user?.name ?? "Candidate",
+                    headline: profile?.headline ?? null,
+                    skills: profile?.skills ?? [],
+                    bio: profile?.bio ?? null,
+                    yearsExperience: profile?.yearsExperience ?? 0,
+                    jobTitle: job.title,
+                    companyName,
+                    jobDescription: customMessage
+                        ? `${job.description}\n\nCandidate note: ${customMessage}`
+                        : job.description,
+                });
+                await prisma.application.create({
+                    data: {
+                        jobId,
+                        candidateId: userId,
+                        cvUrl: profile?.resumes?.[0]?.s3Key ?? null,
+                        coverLetter: clResult.coverLetter,
+                        notes: `[Batch Application] Cover letter source: ${clResult.source}`,
+                        status: "PENDING",
+                    },
+                });
+                await prisma.autoApplyBatch.update({
+                    where: { id: batchId },
+                    data: { jobsApplied: { increment: 1 }, creditsUsed: { increment: 1 } },
+                });
+            }
+            catch (jobErr) {
+                logger.warn({ jobErr, jobId, batchId }, "[autopilot] batch job failed");
+                await prisma.autoApplyBatch.update({
+                    where: { id: batchId },
+                    data: { jobsFailed: { increment: 1 } },
+                }).catch(() => { });
+            }
+        }
+        await prisma.autoApplyBatch.update({
+            where: { id: batchId },
+            data: { status: "completed", completedAt: new Date() },
+        });
     }
-    if (recs.length === 0) {
-        recs.push("Your AI agent is actively monitoring jobs and will notify you of matches");
+    catch (err) {
+        logger.error({ err, batchId }, "[autopilot] batch processing failed");
+        await prisma.autoApplyBatch.update({
+            where: { id: batchId },
+            data: { status: "failed" },
+        }).catch(() => { });
     }
-    return recs;
 }
 export default router;
 //# sourceMappingURL=autopilot.js.map

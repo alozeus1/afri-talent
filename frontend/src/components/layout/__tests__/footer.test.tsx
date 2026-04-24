@@ -9,7 +9,7 @@ describe('Footer Component', () => {
 
         // Use a function to check for the text since it might be split across elements/lines
         const elements = screen.getAllByText((content, element) => {
-            return element?.textContent?.includes('Connecting African tech talent') || false
+            return element?.textContent?.includes('trust-first hiring platform helping global teams discover African talent') || false
         })
         expect(elements.length).toBeGreaterThan(0)
 

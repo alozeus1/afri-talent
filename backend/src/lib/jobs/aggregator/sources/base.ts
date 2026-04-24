@@ -5,6 +5,78 @@
 import type { AggregatedJob, AggregatorResult, JobSource, JobSourceConfig } from "../types.js";
 import logger from "../../../logger.js";
 
+const HTML_ENTITY_MAP: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  ensp: " ",
+  emsp: " ",
+  ndash: "-",
+  mdash: "-",
+  rsquo: "'",
+  lsquo: "'",
+  rdquo: '"',
+  ldquo: '"',
+  hellip: "...",
+};
+
+const TITLE_ROLE_INTENT_PATTERNS = [
+  /\bengineer\b/i,
+  /\bdeveloper\b/i,
+  /\bdevops\b/i,
+  /\bsre\b/i,
+  /site reliability/i,
+  /\bsecurity\b/i,
+  /\bdata\b/i,
+  /machine learning/i,
+  /\bproduct\b/i,
+  /\bdesign(?:er)?\b/i,
+  /\bux\b/i,
+  /\bui\b/i,
+  /\bmobile\b/i,
+  /\bandroid\b/i,
+  /\bios\b/i,
+  /\bfrontend\b/i,
+  /\bfront-end\b/i,
+  /\bbackend\b/i,
+  /\bback-end\b/i,
+  /\bfull[- ]?stack\b/i,
+  /\bcloud\b/i,
+  /\bplatform\b/i,
+  /\binfrastructure\b/i,
+  /\banalytics?\b/i,
+];
+
+function decodeHtmlEntities(value: string): string {
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (entity, token: string) => {
+    const normalizedToken = token.toLowerCase();
+    if (normalizedToken.startsWith("#x")) {
+      const codePoint = Number.parseInt(normalizedToken.slice(2), 16);
+      return Number.isNaN(codePoint) ? entity : String.fromCodePoint(codePoint);
+    }
+
+    if (normalizedToken.startsWith("#")) {
+      const codePoint = Number.parseInt(normalizedToken.slice(1), 10);
+      return Number.isNaN(codePoint) ? entity : String.fromCodePoint(codePoint);
+    }
+
+    return HTML_ENTITY_MAP[normalizedToken] ?? entity;
+  });
+}
+
+function decodeHtmlEntitiesDeep(value: string, passes = 3): string {
+  let decoded = value;
+  for (let index = 0; index < passes; index += 1) {
+    const next = decodeHtmlEntities(decoded);
+    if (next === decoded) break;
+    decoded = next;
+  }
+  return decoded;
+}
+
 export abstract class BaseJobSource {
   protected config: JobSourceConfig;
   protected requestCount = 0;
@@ -44,6 +116,40 @@ export abstract class BaseJobSource {
 
   protected logError(message: string, error: unknown): void {
     logger.error({ source: this.config.source, error: String(error) }, `[aggregator:${this.config.source}] ${message}`);
+  }
+
+  protected normalizeDescription(value: string): string {
+    const decoded = decodeHtmlEntitiesDeep(value);
+    const withStructure = decoded
+      .replace(/\r\n?/g, "\n")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|section|article|header|footer|h[1-6]|blockquote|table|tr)>/gi, "\n\n")
+      .replace(/<li\b[^>]*>/gi, "\n- ")
+      .replace(/<\/(ul|ol)>/gi, "\n")
+      .replace(/<[^>]*>/g, " ");
+
+    const lines = withStructure
+      .replace(/\u00a0/g, " ")
+      .split("\n")
+      .map((line) => line.replace(/[ \t]+/g, " ").trim());
+
+    const normalizedLines: string[] = [];
+    for (const line of lines) {
+      if (line.length === 0) {
+        if (normalizedLines.length > 0 && normalizedLines[normalizedLines.length - 1] !== "") {
+          normalizedLines.push("");
+        }
+        continue;
+      }
+
+      normalizedLines.push(line);
+    }
+
+    while (normalizedLines[normalizedLines.length - 1] === "") {
+      normalizedLines.pop();
+    }
+
+    return normalizedLines.join("\n").trim();
   }
 
   protected normalizeLocation(location: string): { city: string; country: string; locationType: "remote" | "hybrid" | "onsite" } {
@@ -139,6 +245,26 @@ export abstract class BaseJobSource {
     }
 
     return null;
+  }
+
+  protected matchesKeywordQuery(job: AggregatedJob, query: JobQuery): boolean {
+    if (query.keywords.length === 0) {
+      return true;
+    }
+
+    const normalizedKeywords = query.keywords.map((keyword) => keyword.toLowerCase());
+    const titleSkillsBag = `${job.title} ${job.skills.join(" ")}`.toLowerCase();
+    if (normalizedKeywords.some((keyword) => titleSkillsBag.includes(keyword))) {
+      return true;
+    }
+
+    const titleHasRoleIntent = TITLE_ROLE_INTENT_PATTERNS.some((pattern) => pattern.test(job.title));
+    if (!titleHasRoleIntent) {
+      return false;
+    }
+
+    const descriptionBag = job.description.toLowerCase();
+    return normalizedKeywords.some((keyword) => descriptionBag.includes(keyword));
   }
 }
 

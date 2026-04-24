@@ -1,62 +1,126 @@
-import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { HeroStats } from "@/components/home/hero-stats";
+import { Button } from "@/components/ui/button";
+
+const productSignals = [
+  {
+    title: "Remote-first jobs",
+    description: "Global roles filtered through an Africa-to-global lens instead of a generic listings feed.",
+    tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+  },
+  {
+    title: "Visa sponsorship clarity",
+    description: "Support signals and mobility context that reduce ambiguity before you commit to a role.",
+    tone: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+  },
+  {
+    title: "Relocation readiness",
+    description: "A product direction that treats cross-border readiness like part of hiring quality, not an afterthought.",
+    tone: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300",
+  },
+  {
+    title: "AI-assisted workflow",
+    description: "Candidate support, matching direction, and apply-pack thinking designed for faster, sharper applications.",
+    tone: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  },
+];
+
+const sourceLabels = [
+  ["RemoteOK", "Remote global"],
+  ["We Work Remotely", "Remote global"],
+  ["Jobberman", "Africa"],
+  ["Himalayas", "Remote global"],
+  ["Arbeitnow", "Europe + visa"],
+  ["Remotive", "Remote global"],
+  ["Adzuna", "US, UK, EU, CA"],
+];
 
 export function HomePageContent() {
   return (
-    <div>
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-900 text-white overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/images/hero/pattern.svg')] opacity-10" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32 relative">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full mb-6">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-sm font-medium">Now aggregating jobs from 15+ global platforms</span>
+    <div className="pb-12 bg-[var(--background)]">
+      <section className="section-shell relative overflow-hidden px-0 pt-8 md:pt-12">
+        <div className="page-frame">
+          <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white px-6 py-16 shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:px-10 md:py-20 lg:px-14">
+            <div className="relative grid items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]">
+              <div>
+                <div className="eyebrow-pill mb-6 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="text-xs font-semibold uppercase tracking-widest text-zinc-600 dark:text-zinc-400">
+                    Trust-first Africa-to-global hiring
+                  </span>
+                </div>
+
+                <h1 className="font-display max-w-4xl text-5xl font-bold leading-[1.05] text-zinc-900 dark:text-zinc-50 md:text-6xl lg:text-7xl">
+                  Give African talent a higher-signal path to{" "}
+                  <span className="text-emerald-700 dark:text-emerald-400">global opportunities.</span>
+                </h1>
+
+                <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-600 dark:text-zinc-400 md:text-xl">
+                  AfriTalent combines job discovery, trust verification, candidate workflow, and employer-side hiring structure so the shortlist feels smaller, cleaner, and easier to trust.
+                </p>
+
+                <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+                  <Link href="/jobs">
+                    <Button size="lg" className="w-full sm:w-auto">
+                      Explore trusted jobs
+                    </Button>
+                  </Link>
+                  <Link href="/register?role=employer">
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                      Launch employer onboarding
+                    </Button>
+                  </Link>
+                </div>
+
+                <div className="mt-8 flex flex-wrap gap-3 text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                  <Link href="/jobs?filter=remote" className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                    Remote-first roles
+                  </Link>
+                  <Link href="/jobs?filter=visa" className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                    Visa-supported opportunities
+                  </Link>
+                  <Link href="/trust" className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                    See trust model
+                  </Link>
+                </div>
               </div>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
-                Unlock Global Opportunities for African Talent
-              </h1>
-              <p className="text-xl md:text-2xl text-emerald-100 mb-8">
-                AI-powered job matching connecting skilled professionals across the continent with inclusive, world-class employers offering visa sponsorship and remote work.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <Link href="/jobs">
-                  <Button size="lg" className="bg-white text-emerald-700 hover:bg-gray-100 w-full sm:w-auto font-semibold">
-                    Find Your Dream Job
-                  </Button>
-                </Link>
-                <Link href="/register?role=employer">
-                  <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 w-full sm:w-auto">
-                    Post a Job
-                  </Button>
-                </Link>
-              </div>
-              {/* Quick filter chips */}
-              <div className="flex flex-wrap gap-2">
-                <span className="text-sm text-emerald-200">Popular:</span>
-                <Link href="/jobs?filter=remote" className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-sm font-medium transition">
-                  Remote
-                </Link>
-                <Link href="/jobs?filter=visa" className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-sm font-medium transition">
-                  Visa Sponsorship
-                </Link>
-                <Link href="/jobs?filter=relocation" className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-full text-sm font-medium transition">
-                  Relocation
-                </Link>
-              </div>
-            </div>
-            <div className="hidden lg:block relative">
-              <div className="relative w-full h-[500px]">
-                <Image
-                  src="/images/hero/homepage-design.png"
-                  alt="AfriTalent Platform Preview"
-                  fill
-                  className="object-contain rounded-lg shadow-2xl"
-                  priority
-                />
+
+              <div className="relative hidden lg:block">
+                <div className="surface-panel absolute -left-10 top-8 z-20 max-w-[14rem] rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg">
+                  <p className="text-xs uppercase tracking-widest font-semibold text-zinc-500 dark:text-zinc-400">Launch thesis</p>
+                  <p className="font-display mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                    Smaller shortlists. Stronger trust.
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+                    Trust cues and candidate readiness signals designed for distributed teams.
+                  </p>
+                </div>
+
+                <div className="surface-panel relative ml-auto w-full max-w-[36rem] rounded-3xl p-5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+                  <div className="relative h-[540px] overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+                    <Image
+                      src="/images/hero/homepage-design.png"
+                      alt="AfriTalent platform preview"
+                      fill
+                      className="object-contain p-4"
+                      priority
+                      quality={72}
+                      sizes="(max-width: 1023px) 0px, 50vw"
+                    />
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    {["Candidate trust signals", "Semantic-ready discovery", "Employer analytics"].map((item) => (
+                      <div
+                        key={item}
+                        className="rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm font-medium text-zinc-700 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -65,138 +129,85 @@ export function HomePageContent() {
 
       <HeroStats />
 
-      {/* Features Section */}
-      <section className="py-20 bg-gray-50 dark:bg-gray-900/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-              Why Professionals Choose AfriTalent
+      <section className="section-shell py-20">
+        <div className="page-frame">
+          <div className="mb-16 text-center">
+            <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+              Why AfriTalent feels different
+            </p>
+            <h2 className="font-display mt-4 text-3xl font-bold text-zinc-900 dark:text-zinc-50 md:text-5xl">
+              A premium hiring experience built around signal, not noise.
             </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-              Empowering your career journey across borders with specialized tools and insights
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
+              Underneath the interface, AfriTalent is shaping trust, workflow, and verified data into a tighter hiring operating model.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow">
-              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {productSignals.map((item) => (
+              <div key={item.title} className="surface-panel rounded-2xl p-6 transition-transform hover:-translate-y-1 hover:shadow-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl font-bold text-lg ${item.tone}`}>
+                  {item.title.charAt(0)}
+                </div>
+                <h3 className="mb-2 text-lg font-bold text-zinc-900 dark:text-zinc-100">{item.title}</h3>
+                <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{item.description}</p>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                Remote-First Jobs
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 text-sm">
-                Work from anywhere with top global companies hiring from Africa.
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section-shell py-16">
+        <div className="page-frame">
+          <div className="surface-panel rounded-3xl border border-zinc-200 bg-white px-6 py-12 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="mb-10 text-center">
+              <h2 className="font-display text-2xl font-bold text-zinc-900 dark:text-zinc-50 md:text-3xl">
+                Jobs from global platforms, filtered through an Africa-to-global lens
+              </h2>
+              <p className="mt-3 text-zinc-600 dark:text-zinc-400">
+                We aggregate from multiple sources, offering better trust, sharper matching, and stronger readiness signals.
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                Visa Sponsorship Clarity
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 text-sm">
-                Clear info on visa support and legal requirements for every role.
-              </p>
-            </div>
-
-            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                Relocation Support
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 text-sm">
-                Guidance and assistance for moving abroad for your dream job.
-              </p>
-            </div>
-
-            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800 hover:shadow-md transition-shadow">
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                AI-Powered Matching
-              </h3>
-              <p className="text-gray-600 dark:text-gray-300 text-sm">
-                Smart job matching and tailored resumes powered by Claude AI.
-              </p>
+            <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 opacity-80">
+              {sourceLabels.map(([label, sublabel]) => (
+                <div key={label} className="text-center">
+                  <div className="font-bold text-zinc-800 dark:text-zinc-200">{label}</div>
+                  <div className="text-xs font-medium text-zinc-500 dark:text-zinc-500 mt-1">{sublabel}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Job Sources Section */}
-      <section className="py-16 bg-white dark:bg-gray-950">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Jobs From Global Platforms</h2>
-            <p className="text-gray-600 dark:text-gray-300">We aggregate opportunities from leading job boards worldwide</p>
-          </div>
-          <div className="flex flex-wrap justify-center items-center gap-8 opacity-60">
-            <div className="text-center">
-              <div className="font-semibold text-gray-700 dark:text-gray-200">RemoteOK</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Remote Global</div>
+      <section className="px-0 py-20">
+        <div className="page-frame text-center">
+          <div className="relative overflow-hidden rounded-3xl border border-emerald-900 bg-emerald-950 px-6 py-16 text-white shadow-2xl md:px-12">
+            <div className="relative text-center">
+              <p className="text-sm font-semibold uppercase tracking-widest text-emerald-300">
+                A new standard for hiring
+              </p>
+              <h2 className="font-display mt-5 text-3xl font-bold text-white md:text-5xl">
+                Build the profile. Surface the trust.
+              </h2>
+              <p className="mx-auto mt-6 max-w-2xl text-lg text-emerald-100/90 leading-relaxed">
+                Join a platform designed to reward credibility and promote cleaner cross-border matching.
+              </p>
             </div>
-            <div className="text-center">
-              <div className="font-semibold text-gray-700 dark:text-gray-200">We Work Remotely</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Remote Global</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-gray-700 dark:text-gray-200">Jobberman</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Africa</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-gray-700 dark:text-gray-200">Himalayas</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Remote Global</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-gray-700 dark:text-gray-200">Arbeitnow</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Europe + Visa</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-gray-700 dark:text-gray-200">Remotive</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Remote Global</div>
-            </div>
-            <div className="text-center">
-              <div className="font-semibold text-gray-700 dark:text-gray-200">Adzuna</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">US, UK, EU, CA</div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-gray-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Ready to Start Your Journey?
-          </h2>
-          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Join our community of talented African professionals working with companies around the world.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/register">
-              <Button size="lg" className="w-full sm:w-auto">
-                Create Your Profile
-              </Button>
-            </Link>
-            <Link href="/resources">
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10 w-full sm:w-auto">
-                Explore Resources
-              </Button>
-            </Link>
+            <div className="relative mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+              <Link href="/register">
+                <Button size="lg" className="w-full sm:w-auto bg-emerald-500 text-white hover:bg-emerald-600 border-transparent">
+                  Create your profile
+                </Button>
+              </Link>
+              <Link href="/resources">
+                <Button size="lg" variant="outline" className="w-full border-emerald-700 bg-emerald-900 text-emerald-100 hover:bg-emerald-800 hover:text-white sm:w-auto">
+                  Explore resources
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>

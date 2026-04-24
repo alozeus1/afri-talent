@@ -63,6 +63,18 @@ variable "enable_interface_endpoints" {
   default     = false
 }
 
+variable "enable_s3_gateway_endpoint" {
+  type        = bool
+  description = "Create S3 gateway endpoint for private route tables."
+  default     = true
+}
+
+variable "interface_endpoint_services" {
+  type        = list(string)
+  description = "Allowlisted interface endpoint services to create when enable_interface_endpoints is true."
+  default     = ["ecr.api", "ecr.dkr", "secretsmanager"]
+}
+
 variable "acm_certificate_arn" {
   type        = string
   description = "ACM certificate ARN for HTTPS (optional)"
@@ -396,7 +408,7 @@ variable "synthetics_schedule_expression" {
 variable "job_ingestion_staleness_threshold_minutes" {
   type        = number
   description = "Alarm threshold for stale job ingestion freshness snapshots."
-  default     = 180
+  default     = 60
 }
 
 variable "moderation_queue_backlog_threshold" {
@@ -423,6 +435,36 @@ variable "notification_failure_threshold" {
   default     = 10
 }
 
+variable "ingestion_egress_failure_threshold" {
+  type        = number
+  description = "Alarm threshold for ingestion source fetch failures in a 5 minute window."
+  default     = 3
+}
+
+variable "ingestion_consecutive_failure_threshold" {
+  type        = number
+  description = "SEV2 threshold for consecutive ingestion cycle failures."
+  default     = 2
+}
+
+variable "ingestion_consecutive_zero_result_threshold" {
+  type        = number
+  description = "SEV2 threshold for consecutive zero-result ingestion cycles."
+  default     = 2
+}
+
+variable "ingestion_source_failure_spike_threshold" {
+  type        = number
+  description = "SEV3 threshold for per-source fetch failure spikes within 15 minutes."
+  default     = 2
+}
+
+variable "cleanup_guardrail_role_names" {
+  type        = list(string)
+  description = "IAM role names that should be denied critical NAT and route-table mutations."
+  default     = []
+}
+
 variable "ses_region" {
   type        = string
   description = "AWS region used for SES sends"
@@ -433,6 +475,12 @@ variable "ses_from_email" {
   type        = string
   description = "Verified SES from address for transactional email"
   default     = ""
+}
+
+variable "aggregator_interval_minutes" {
+  type        = number
+  description = "Aggregator scheduler interval in minutes for runtime configuration."
+  default     = 30
 }
 
 variable "ai_fast_model" {
@@ -486,5 +534,127 @@ variable "stripe_price_basic_monthly" {
 variable "stripe_price_professional_monthly" {
   type        = string
   description = "Stripe price ID for the Professional monthly plan"
+  default     = ""
+}
+
+variable "anthropic_api_key" {
+  type        = string
+  description = "Anthropic API key for Claude AI"
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_secret_key" {
+  type        = string
+  description = "Stripe secret key for payments"
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_webhook_secret" {
+  type        = string
+  description = "Stripe webhook signing secret"
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_price_catalog_json" {
+  type        = string
+  description = "Stripe regional price catalog JSON"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_public_key" {
+  type        = string
+  description = "Flutterwave public key"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_secret_key" {
+  type        = string
+  description = "Flutterwave secret key"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_secret_hash" {
+  type        = string
+  description = "Flutterwave webhook verification hash"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_plan_catalog_json" {
+  type        = string
+  description = "Flutterwave regional plan catalog JSON"
+  sensitive   = true
+  default     = ""
+}
+
+variable "flutterwave_payment_options" {
+  type        = string
+  description = "Flutterwave enabled payment options"
+  default     = "card,banktransfer,ussd"
+}
+
+variable "adzuna_app_id" {
+  type        = string
+  description = "Adzuna API app ID for job aggregation"
+  default     = ""
+}
+
+variable "adzuna_api_key" {
+  type        = string
+  description = "Adzuna API key for job aggregation"
+  sensitive   = true
+  default     = ""
+}
+
+variable "apify_token" {
+  type        = string
+  description = "Apify API token for job task execution"
+  sensitive   = true
+  default     = ""
+}
+
+variable "apify_job_tasks_json" {
+  type        = string
+  description = "Apify task configuration JSON for job crawling"
+  sensitive   = true
+  default     = ""
+}
+
+variable "greenhouse_board_tokens" {
+  type        = string
+  description = "Comma-separated Greenhouse board tokens"
+  default     = ""
+}
+
+variable "lever_site_tokens" {
+  type        = string
+  description = "Comma-separated Lever site tokens"
+  default     = ""
+}
+
+variable "workable_company_tokens" {
+  type        = string
+  description = "Comma-separated Workable account slugs or account:token pairs"
+  sensitive   = true
+  default     = ""
+}
+
+variable "redis_url" {
+  type        = string
+  description = "Optional Redis connection string"
+  sensitive   = true
+  default     = ""
+}
+
+variable "sentry_dsn" {
+  type        = string
+  description = "Optional backend Sentry DSN"
+  sensitive   = true
   default     = ""
 }

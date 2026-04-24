@@ -9,7 +9,7 @@ import {
 } from "@prisma/client";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
-import { getLastSyncTime } from "./aggregator-cron.js";
+import { getIngestionReliabilityState, getLastSyncTime } from "./aggregator-cron.js";
 import { recordOpsSnapshotMetric } from "../lib/ops/events.js";
 import { summarizeDeadLetters } from "../lib/ops/resilience.js";
 
@@ -18,6 +18,7 @@ const AGGREGATOR_STALENESS_MINUTES = parseInt(process.env.AGGREGATOR_STALENESS_M
 export async function runOperationalSnapshotCycle(): Promise<void> {
   const [
     lastSyncAt,
+    ingestionReliability,
     pendingJobs,
     verificationQueueBacklog,
     moderationQueueBacklog,
@@ -28,8 +29,12 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
     billingPendingRefundsOpen,
     billingWebhookFailuresOpen,
     billingSuccessfulPayments24h,
+    semanticDocumentsTotal,
+    semanticJobDocumentsTotal,
+    latestSemanticIndex,
   ] = await Promise.all([
     getLastSyncTime(),
+    getIngestionReliabilityState(),
     prisma.job.count({ where: { status: JobStatus.PENDING_REVIEW } }),
     prisma.verificationArtifact.count({
       where: {
@@ -95,12 +100,26 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
         },
       },
     }),
+    prisma.semanticDocument.count(),
+    prisma.semanticDocument.count({
+      where: {
+        namespace: "jobs",
+        sourceType: "JOB",
+      },
+    }),
+    prisma.semanticDocument.findFirst({
+      orderBy: { lastIndexedAt: "desc" },
+      select: { lastIndexedAt: true },
+    }),
   ]);
 
   const minutesSinceLastSync = lastSyncAt
     ? Math.max(0, Math.round((Date.now() - lastSyncAt.getTime()) / 60000))
     : AGGREGATOR_STALENESS_MINUTES + 1;
   const totalDeadLetters = Object.values(deadLettersBySource).reduce((sum, count) => sum + count, 0);
+  const semanticIndexFreshnessMinutes = latestSemanticIndex?.lastIndexedAt
+    ? Math.max(0, Math.round((Date.now() - latestSemanticIndex.lastIndexedAt.getTime()) / 60000))
+    : -1;
 
   recordOpsSnapshotMetric({
     metricName: "job_ingestion_freshness_minutes",
@@ -108,6 +127,43 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
     details: {
       last_sync_at: lastSyncAt?.toISOString() ?? "never",
       stale: minutesSinceLastSync > AGGREGATOR_STALENESS_MINUTES,
+    },
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "ingestion_cycle_status",
+    value: ingestionReliability.lastCycleStatus === "failure" ? 0 : 1,
+    details: {
+      cycle_status: ingestionReliability.lastCycleStatus,
+      last_cycle_at: ingestionReliability.lastCycleAt?.toISOString() ?? "never",
+    },
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "consecutive_failure_count",
+    value: ingestionReliability.consecutiveFailureCount,
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "consecutive_zero_result_count",
+    value: ingestionReliability.consecutiveZeroResultCount,
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "jobs_ingested_per_cycle",
+    value: ingestionReliability.lastJobsIngested,
+    details: {
+      cycle_status: ingestionReliability.lastCycleStatus,
+    },
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "last_successful_ingestion_timestamp",
+    value: ingestionReliability.lastSuccessfulIngestionAt
+      ? Math.floor(ingestionReliability.lastSuccessfulIngestionAt.getTime() / 1000)
+      : 0,
+    details: {
+      iso8601: ingestionReliability.lastSuccessfulIngestionAt?.toISOString() ?? "never",
     },
   });
 
@@ -160,10 +216,30 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
     value: totalDeadLetters,
   });
 
+  recordOpsSnapshotMetric({
+    metricName: "semantic_documents_total",
+    value: semanticDocumentsTotal,
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "semantic_job_documents_total",
+    value: semanticJobDocumentsTotal,
+  });
+
+  recordOpsSnapshotMetric({
+    metricName: "semantic_index_freshness_minutes",
+    value: semanticIndexFreshnessMinutes,
+    details: {
+      last_indexed_at: latestSemanticIndex?.lastIndexedAt?.toISOString() ?? "never",
+      indexed: semanticIndexFreshnessMinutes >= 0,
+    },
+  });
+
   logger.info(
     {
       lastSyncAt: lastSyncAt?.toISOString() ?? null,
       minutesSinceLastSync,
+      ingestionReliability,
       pendingJobs,
       verificationQueueBacklog,
       moderationQueueBacklog,
@@ -174,6 +250,9 @@ export async function runOperationalSnapshotCycle(): Promise<void> {
       billingWebhookFailuresOpen,
       billingSuccessfulPayments24h,
       totalDeadLetters,
+      semanticDocumentsTotal,
+      semanticJobDocumentsTotal,
+      semanticIndexFreshnessMinutes,
     },
     "[ops] operational snapshot emitted",
   );

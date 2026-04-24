@@ -1,4 +1,5 @@
 import { Job } from "@/lib/api";
+import { normalizeJobDescription } from "@/lib/job-description";
 import { salaryPeriodSchemaUnit } from "@/lib/salary";
 
 interface JobJsonLdProps {
@@ -21,7 +22,7 @@ export function JobJsonLd({ job }: JobJsonLdProps) {
 
   const companyName = job.employer?.companyName || job.sourceName || "Company";
   const isRemote = job.location?.toLowerCase().includes("remote");
-  const cleanedDescription = job.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const cleanedDescription = normalizeJobDescription(job.description).replace(/\s+/g, " ").trim();
 
   const jsonLd: Record<string, unknown> = {
     "@context": "https://schema.org/",

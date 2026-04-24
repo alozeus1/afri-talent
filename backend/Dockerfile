@@ -22,11 +22,15 @@ RUN npx prisma generate
 COPY . .
 RUN npm run build
 
-# Prune dev deps for runtime
-RUN npm prune --production
-
-# Re-add Prisma CLI so the runtime container can apply migrations on startup.
-RUN npm install --no-save prisma@5.22.0
+# Preserve Prisma CLI artifacts before pruning so the runtime can still apply migrations.
+RUN mkdir -p /tmp/prisma-cli \
+  && cp -R node_modules/prisma /tmp/prisma-cli/prisma \
+  && cp -R node_modules/@prisma /tmp/prisma-cli/@prisma \
+  && npm prune --omit=dev \
+  && mkdir -p node_modules/.bin node_modules/@prisma \
+  && cp -R /tmp/prisma-cli/prisma node_modules/prisma \
+  && cp -R /tmp/prisma-cli/@prisma/. node_modules/@prisma \
+  && ln -sf ../prisma/build/index.js node_modules/.bin/prisma
 
 # Production image
 FROM base AS runner

@@ -1,10 +1,56 @@
 import { Router } from "express";
 import { z } from "zod";
+import { TrustEntityType } from "@prisma/client";
 import prisma from "../lib/prisma.js";
 import { authenticate } from "../middleware/auth.js";
 import { newMessageEmail } from "../lib/email.js";
 import logger from "../lib/logger.js";
+import { requireAccountStanding } from "../middleware/account-standing.js";
+import { assessContentRisk } from "../lib/trust/risk.js";
+import { addTrustCaseAction, createTrustCase, recordTrustRiskEvent, } from "../lib/trust/service.js";
 const router = Router();
+async function enforceMessageSafety(input) {
+    const risk = assessContentRisk(input.body);
+    if (risk.score > 0) {
+        await recordTrustRiskEvent({
+            entityType: TrustEntityType.MESSAGE,
+            reasonCode: "message_content_risk",
+            summary: "A message triggered trust and safety content rules.",
+            scoreDelta: risk.score,
+            resultingScore: risk.score,
+            riskLevel: risk.level,
+            userId: input.actorId,
+            threadId: input.threadId ?? null,
+            evidence: {
+                flags: risk.flags,
+            },
+            autoHeld: risk.autoHold,
+        });
+    }
+    if (risk.autoHold) {
+        const trustCase = await createTrustCase({
+            entityType: TrustEntityType.MESSAGE,
+            priority: risk.level,
+            title: "Blocked off-platform or fee-soliciting message",
+            reasonCode: "message_blocked",
+            summary: `Message blocked because it matched ${risk.flags.join(", ")}.`,
+            threadId: input.threadId ?? null,
+        });
+        await addTrustCaseAction({
+            caseId: trustCase.id,
+            actorId: input.actorId,
+            actionType: "HOLD",
+            reasonCode: "message_blocked",
+            notes: "Message was blocked before delivery because it triggered scam-prevention rules.",
+            metadata: {
+                flags: risk.flags,
+            },
+        });
+        const error = new Error("For safety, AfriTalent blocked this message. Keep communication on-platform and never request fees or move immediately to WhatsApp, Telegram, or personal email.");
+        error.code = "MESSAGE_BLOCKED";
+        throw error;
+    }
+}
 // GET /api/messages/threads — list threads for authenticated user
 router.get("/threads", authenticate, async (req, res) => {
     try {
@@ -144,7 +190,7 @@ const createThreadSchema = z.object({
     message: z.string().min(1).max(5000).trim(),
 });
 // POST /api/messages/threads — create a new thread
-router.post("/threads", authenticate, async (req, res) => {
+router.post("/threads", authenticate, requireAccountStanding(), async (req, res) => {
     try {
         const userId = req.user.userId;
         const data = createThreadSchema.parse(req.body);
@@ -160,6 +206,10 @@ router.post("/threads", authenticate, async (req, res) => {
             res.status(404).json({ error: "Participant not found" });
             return;
         }
+        await enforceMessageSafety({
+            actorId: userId,
+            body: data.message,
+        });
         // Check for existing thread between same participants on same application
         if (data.applicationId) {
             const existing = await prisma.messageThread.findUnique({
@@ -217,6 +267,13 @@ router.post("/threads", authenticate, async (req, res) => {
         });
     }
     catch (error) {
+        if (error instanceof Error && error.code === "MESSAGE_BLOCKED") {
+            res.status(422).json({
+                error: error.message,
+                code: "MESSAGE_BLOCKED",
+            });
+            return;
+        }
         if (error instanceof z.ZodError) {
             res.status(400).json({ error: "Validation failed", details: error.issues });
             return;
@@ -229,7 +286,7 @@ const sendMessageSchema = z.object({
     body: z.string().min(1).max(5000).trim(),
 });
 // POST /api/messages/threads/:id/messages — send a message
-router.post("/threads/:id/messages", authenticate, async (req, res) => {
+router.post("/threads/:id/messages", authenticate, requireAccountStanding(), async (req, res) => {
     try {
         const userId = req.user.userId;
         const { id } = req.params;
@@ -251,6 +308,11 @@ router.post("/threads/:id/messages", authenticate, async (req, res) => {
             res.status(404).json({ error: "Thread not found" });
             return;
         }
+        await enforceMessageSafety({
+            actorId: userId,
+            threadId: id,
+            body: data.body,
+        });
         const [message] = await Promise.all([
             prisma.message.create({
                 data: {
@@ -281,6 +343,13 @@ router.post("/threads/:id/messages", authenticate, async (req, res) => {
         res.status(201).json(message);
     }
     catch (error) {
+        if (error instanceof Error && error.code === "MESSAGE_BLOCKED") {
+            res.status(422).json({
+                error: error.message,
+                code: "MESSAGE_BLOCKED",
+            });
+            return;
+        }
         if (error instanceof z.ZodError) {
             res.status(400).json({ error: "Validation failed", details: error.issues });
             return;

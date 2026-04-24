@@ -2,19 +2,108 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f9fafb;
-  --foreground: #111827;
+  --background: #fafafa;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-strong: #f8fafc;
+  --surface-soft: #fafafa;
+  --border-soft: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --brand: #0f766e; /* Tailwind teal-700 */
+  --brand-strong: #0f8f78;
+  --accent: #d97706; /* Tailwind amber-600 */
+  --accent-soft: rgba(217, 119, 6, 0.1);
+  --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
+  --shadow-elevated: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
 }
 
 html.dark {
-  --background: #030712;
-  --foreground: #f3f4f6;
+  --background: #09090b; /* Zinc 950 */
+  --foreground: #f8fafc;
+  --surface: #18181b; /* Zinc 900 */
+  --surface-strong: #27272a; /* Zinc 800 */
+  --surface-soft: #18181b;
+  --border-soft: #27272a;
+  --border-strong: #3f3f46;
+  --brand: #14b8a6; /* Tailwind teal-500 */
+  --brand-strong: #2dd4bf; /* Tailwind teal-400 */
+  --accent: #f59e0b; /* Tailwind amber-500 */
+  --accent-soft: rgba(245, 158, 11, 0.15);
+  --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-elevated: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
+  font-family: var(--font-body), sans-serif;
   background: var(--background);
   color: var(--foreground);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background-color: var(--background);
+}
+
+h1,
+h2,
+h3,
+h4,
+.font-display {
+  font-family: var(--font-display), sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.surface-panel {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-soft);
+  border-radius: 1rem;
+}
+
+.surface-panel-strong {
+  background: var(--surface-strong);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-elevated);
+  border-radius: 1rem;
+}
+
+.section-shell {
+  position: relative;
+}
+
+.eyebrow-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  background: var(--surface-strong);
+  border: 1px solid var(--border-soft);
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.page-frame {
+  max-width: 84rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 640px) {
+  .page-frame {
+    padding-inline: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-frame {
+    padding-inline: 2rem;
+  }
 }
 
 .line-clamp-1 {

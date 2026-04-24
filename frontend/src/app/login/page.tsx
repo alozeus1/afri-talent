@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { createBotShieldPayload } from "@/lib/bot-shield";
 
 const SHOW_DEMO_CREDENTIALS =
   process.env.NODE_ENV !== "production" &&
@@ -24,6 +25,8 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [honeypot, setHoneypot] = useState("");
+  const [formStartedAt] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
@@ -54,7 +57,9 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, {
+        botShield: createBotShieldPayload(formStartedAt, honeypot),
+      });
       const redirect = searchParams.get("redirect") || localizePath("/", locale);
       router.push(redirect);
     } catch (err) {
@@ -77,6 +82,18 @@ function LoginForm() {
               {error}
             </div>
           )}
+
+          <div className="sr-only" aria-hidden="true">
+            <label htmlFor="website">Website</label>
+            <input
+              id="website"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+            />
+          </div>
 
           <Input
             id="email"

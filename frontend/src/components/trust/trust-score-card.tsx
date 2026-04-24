@@ -58,7 +58,9 @@ export function TrustScoreCard({
               Authenticity Score
             </p>
             <p className="mt-3 text-3xl font-bold text-gray-900">{authenticityScore}</p>
-            <p className="mt-1 text-sm text-gray-500">Higher means more verified signals are present.</p>
+            <p className="mt-1 text-sm text-gray-500">
+              Higher means more trusted checks, evidence, and consistent signals are on record.
+            </p>
           </div>
           <div className="rounded-2xl border border-white/80 bg-white/80 p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
@@ -66,7 +68,7 @@ export function TrustScoreCard({
             </p>
             <p className="mt-3 text-3xl font-bold text-gray-900">{riskScore}</p>
             <p className="mt-1 text-sm text-gray-500">
-              Current risk level: <span className="font-semibold">{riskLevel}</span>
+              Current review level: <span className="font-semibold">{riskLevel}</span>. Higher scores trigger more moderation, not automatic penalties.
             </p>
           </div>
         </div>

@@ -1,3 +1,46 @@
+data "aws_caller_identity" "current" {}
+
+resource "aws_kms_key" "logs" {
+  description             = "KMS key for ${var.name_prefix} ECS log groups"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "EnableRootPermissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogsUsage"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${var.aws_region}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey",
+        ]
+        Resource = "*"
+      },
+    ]
+  })
+}
+
+resource "aws_kms_alias" "logs" {
+  name          = "alias/${var.name_prefix}-ecs-logs"
+  target_key_id = aws_kms_key.logs.key_id
+}
+
 resource "aws_ecs_cluster" "main" {
   name = "${var.name_prefix}-cluster"
 
@@ -10,11 +53,13 @@ resource "aws_ecs_cluster" "main" {
 resource "aws_cloudwatch_log_group" "frontend" {
   name              = "/ecs/${var.name_prefix}/frontend"
   retention_in_days = var.log_retention_in_days
+  kms_key_id        = aws_kms_key.logs.arn
 }
 
 resource "aws_cloudwatch_log_group" "backend" {
   name              = "/ecs/${var.name_prefix}/backend"
   retention_in_days = var.log_retention_in_days
+  kms_key_id        = aws_kms_key.logs.arn
 }
 
 resource "aws_ecs_task_definition" "frontend" {

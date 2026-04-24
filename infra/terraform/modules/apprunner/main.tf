@@ -168,8 +168,8 @@ resource "aws_apprunner_service" "frontend" {
         runtime_environment_variables = {
           for key, value in merge({
             NODE_ENV                = "production"
-            NEXT_PUBLIC_API_URL     = var.backend_url != "" ? var.backend_url : "https://${aws_apprunner_service.backend.service_url}"
-            NEXT_PUBLIC_BACKEND_URL = var.backend_url != "" ? var.backend_url : "https://${aws_apprunner_service.backend.service_url}"
+            NEXT_PUBLIC_API_URL     = var.backend_url != "" ? var.backend_url : (try(aws_apprunner_service.backend.service_url, null) != null ? "https://${aws_apprunner_service.backend.service_url}" : null)
+            NEXT_PUBLIC_BACKEND_URL = var.backend_url != "" ? var.backend_url : (try(aws_apprunner_service.backend.service_url, null) != null ? "https://${aws_apprunner_service.backend.service_url}" : null)
           }, var.frontend_environment_variables) : key => value if value != null
         }
       }

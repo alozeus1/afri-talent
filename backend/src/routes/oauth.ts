@@ -21,6 +21,21 @@ function setAuthCookie(res: Response, token: string): void {
   });
 }
 
+router.get("/providers", (_req: Request, res: Response) => {
+  const providers = [
+    {
+      provider: "google",
+      enabled: Boolean(process.env.GOOGLE_CLIENT_ID),
+    },
+    {
+      provider: "apple",
+      enabled: Boolean(process.env.APPLE_CLIENT_ID),
+    },
+  ];
+
+  res.json({ providers });
+});
+
 // ---------- Google OAuth ----------
 
 const googleCallbackSchema = z.object({

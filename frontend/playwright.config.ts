@@ -40,7 +40,7 @@ export default defineConfig({
   projects: [
     {
       name: "api",
-      testMatch: /(gate-.*|phase1-foundation-smoke|phase2-.*api.*|phase2-.*security.*)\.spec\.ts$/,
+      testMatch: /(gate-.*|phase1-foundation-smoke|phase2-.*api.*|phase2-.*security.*|skills-ai-features)\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"], baseURL: API_URL },
     },
     {

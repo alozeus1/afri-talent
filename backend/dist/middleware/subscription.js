@@ -4,6 +4,9 @@ const PLAN_RANK = {
     FREE: 0,
     BASIC: 1,
     PROFESSIONAL: 2,
+    EMPLOYER_FREE: 0,
+    EMPLOYER_BASIC: 1,
+    EMPLOYER_PREMIUM: 2,
 };
 /**
  * Middleware factory — requires a user to have at least `minimumPlan`.

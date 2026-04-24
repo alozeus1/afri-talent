@@ -68,7 +68,17 @@ router.get("/model", (_req: Request, res: Response) => {
       acquisition: ["landing_view", "utm_attribution_captured", "signup_started"],
       activation: ["profile_completed", "first_job_posted", "first_application_submitted"],
       conversion: ["plan_selected", "checkout_started", "subscription_activated"],
-      retention: ["saved_search_created", "return_visit_7d", "interview_session_completed"],
+      retention: [
+        "saved_search_created",
+        "return_visit_7d",
+        "interview_session_completed",
+        "candidate_retention_summary_viewed",
+        "candidate_journey_cta_clicked",
+        "candidate_preferences_updated",
+        "candidate_weekly_digest_viewed",
+        "candidate_recommendation_clicked",
+        "candidate_experiment_exposed",
+      ],
       employerPipeline: ["job_viewed", "application_status_changed", "offer_sent"],
     },
   });

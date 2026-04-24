@@ -66,6 +66,7 @@ export type JobSource =
   | "TURING"
   | "TOPTAL"
   | "ANDELA"
+  | "APIFY"
   | "GREENHOUSE"
   | "LEVER"
   | "WORKABLE"
@@ -99,6 +100,27 @@ export interface AggregatorResult {
   fetchedAt: Date;
   nextCursor?: string;
   errors?: string[];
+}
+
+export type SourceFetchStatus = "success" | "failure";
+
+export interface SourceFetchDiagnostics {
+  source: JobSource;
+  status: SourceFetchStatus;
+  jobsFetched: number;
+  errorCount: number;
+  durationMs: number;
+  failureReason?: string;
+  errors?: string[];
+}
+
+export interface AggregationDiagnostics {
+  sourcesAttempted: number;
+  sourcesSucceeded: number;
+  sourcesFailed: number;
+  jobsFetched: number;
+  hadErrors: boolean;
+  sourceDiagnostics: SourceFetchDiagnostics[];
 }
 
 export interface AggregatorConfig {

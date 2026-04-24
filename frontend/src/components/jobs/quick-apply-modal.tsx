@@ -2,34 +2,46 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { quickApply, QuickApplyEligibility } from "@/lib/api";
+import { Job, quickApply, QuickApplyEligibility } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface QuickApplyModalProps {
-  jobId: string;
-  jobTitle: string;
+  job: Job;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function QuickApplyModal({ jobId, jobTitle, isOpen, onClose, onSuccess }: QuickApplyModalProps) {
+export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyModalProps) {
   const [eligibility, setEligibility] = useState<QuickApplyEligibility | null>(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [consented, setConsented] = useState(false);
+
+  const isOnPlatformApply = job.discovery?.deliveryModel === "ON_PLATFORM" || job.jobSource === "EMPLOYER_POSTED";
+  const externalApplyUrl = job.applicationUrl || job.sourceUrl || null;
 
   useEffect(() => {
     if (isOpen) {
+      if (!isOnPlatformApply) {
+        setLoading(false);
+        setEligibility(null);
+        setError(null);
+        setSuccess(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       setSuccess(false);
       setEligibility(null);
+      setConsented(false);
 
       quickApply
-        .checkEligibility(jobId)
+        .checkEligibility(job.id)
         .then((data) => {
           setEligibility(data);
         })
@@ -40,14 +52,18 @@ export function QuickApplyModal({ jobId, jobTitle, isOpen, onClose, onSuccess }:
           setLoading(false);
         });
     }
-  }, [isOpen, jobId]);
+  }, [isOpen, isOnPlatformApply, job.id]);
 
   const handleApply = async () => {
+    if (!consented) {
+      setError("Please confirm you have reviewed this application before submitting.");
+      return;
+    }
     setApplying(true);
     setError(null);
 
     try {
-      await quickApply.apply(jobId);
+      await quickApply.apply(job.id, { confirm: true });
       setSuccess(true);
       setTimeout(() => {
         onSuccess();
@@ -81,15 +97,56 @@ export function QuickApplyModal({ jobId, jobTitle, isOpen, onClose, onSuccess }:
             </button>
 
             {/* Loading */}
-            {loading && (
+            {isOnPlatformApply && loading && (
               <div className="flex flex-col items-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-4"></div>
                 <p className="text-gray-600">Checking eligibility...</p>
               </div>
             )}
 
+            {!isOnPlatformApply && (
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-10 w-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h4m0 0v4m0-4L10 14m-4 6h12a2 2 0 002-2V9a2 2 0 00-2-2h-3m-4 0H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">External Application</h3>
+                    <p className="text-sm text-gray-600">{job.title}</p>
+                  </div>
+                </div>
+
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-indigo-900">
+                    This role uses a verified external employer or ATS application path. AfriTalent will not pretend the application was delivered from inside the platform.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={() => {
+                      if (externalApplyUrl) {
+                        window.open(externalApplyUrl, "_blank", "noopener,noreferrer");
+                        onSuccess();
+                      }
+                    }}
+                    disabled={!externalApplyUrl}
+                  >
+                    Continue to Employer Site
+                  </Button>
+                  <Button variant="outline" className="w-full" onClick={onClose}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Error */}
-            {!loading && error && !eligibility && (
+            {isOnPlatformApply && !loading && error && !eligibility && (
               <div className="py-6">
                 <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
                   {error}
@@ -116,7 +173,7 @@ export function QuickApplyModal({ jobId, jobTitle, isOpen, onClose, onSuccess }:
             )}
 
             {/* Eligible */}
-            {!loading && !success && eligibility?.eligible && (
+            {isOnPlatformApply && !loading && !success && eligibility?.eligible && (
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center">
@@ -126,7 +183,7 @@ export function QuickApplyModal({ jobId, jobTitle, isOpen, onClose, onSuccess }:
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">Quick Apply</h3>
-                    <p className="text-sm text-gray-600">{jobTitle}</p>
+                    <p className="text-sm text-gray-600">{job.title}</p>
                   </div>
                 </div>
 
@@ -156,11 +213,29 @@ export function QuickApplyModal({ jobId, jobTitle, isOpen, onClose, onSuccess }:
                   </div>
                 )}
 
+                <label
+                  htmlFor="quick-apply-consent"
+                  className="flex items-start gap-3 p-3 mb-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <input
+                    id="quick-apply-consent"
+                    type="checkbox"
+                    data-testid="quick-apply-consent-checkbox"
+                    checked={consented}
+                    onChange={(e) => setConsented(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    I confirm I&apos;ve reviewed this application and want AfriTalent to submit it on my behalf.
+                  </span>
+                </label>
+
                 <Button
                   className="w-full"
                   size="lg"
                   onClick={handleApply}
-                  disabled={applying}
+                  disabled={applying || !consented}
+                  data-testid="quick-apply-submit"
                 >
                   {applying ? "Submitting..." : "Apply Now"}
                 </Button>
@@ -168,7 +243,7 @@ export function QuickApplyModal({ jobId, jobTitle, isOpen, onClose, onSuccess }:
             )}
 
             {/* Not Eligible */}
-            {!loading && !success && eligibility && !eligibility.eligible && (
+            {isOnPlatformApply && !loading && !success && eligibility && !eligibility.eligible && (
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="h-10 w-10 bg-amber-100 rounded-lg flex items-center justify-center">
@@ -178,7 +253,7 @@ export function QuickApplyModal({ jobId, jobTitle, isOpen, onClose, onSuccess }:
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">Not Eligible Yet</h3>
-                    <p className="text-sm text-gray-600">{jobTitle}</p>
+                    <p className="text-sm text-gray-600">{job.title}</p>
                   </div>
                 </div>
 

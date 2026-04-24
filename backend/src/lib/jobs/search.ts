@@ -9,6 +9,8 @@ import {
   collapseDuplicateRankedJobs,
   scoreJobForSearch,
 } from "./discovery.js";
+import { buildJobSemanticContent } from "../rag/job-documents.js";
+import { semanticTextScore } from "../rag/embedding.js";
 
 export interface JobSearchFilters {
   search?: string;
@@ -58,6 +60,46 @@ export type RankedPublicJob = Omit<PublicJobRecord, "sourceLineage"> & {
   rankingScore: number;
   sourceLineage: JobSourceLineageRecord[];
 };
+
+function clampScore(value: number, min = 0, max = 100): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function boostSemanticRanking(
+  results: ReturnType<typeof scoreJobForSearch<PublicJobRecord>>[],
+  query?: string,
+): ReturnType<typeof scoreJobForSearch<PublicJobRecord>>[] {
+  if (!query?.trim()) {
+    return results;
+  }
+
+  return results
+    .map((result) => {
+      const semanticMatch = Math.round(semanticTextScore(query, buildJobSemanticContent(result.job)) * 100);
+      if (semanticMatch < 10) {
+        return result;
+      }
+
+      const boost = Math.round(semanticMatch * 0.12);
+      const nextScore = clampScore(result.score + boost);
+
+      return {
+        ...result,
+        score: nextScore,
+        explanation: {
+          ...result.explanation,
+          score: nextScore,
+          summary: `${result.explanation.summary} Semantic query intent also reinforced this match.`,
+          reasons: [...result.explanation.reasons, `semantic intent match ${semanticMatch}/100`],
+          components: {
+            ...result.explanation.components,
+            relevance: clampScore(Math.round((result.explanation.components.relevance * 0.7) + (semanticMatch * 0.3))),
+          },
+        },
+      };
+    })
+    .sort((left, right) => right.score - left.score);
+}
 
 export function buildJobSearchWhere(filters: JobSearchFilters): Prisma.JobWhereInput {
   const conditions: Prisma.JobWhereInput[] = [
@@ -199,9 +241,9 @@ export async function fetchRankedJobs(input: {
     take: Math.min(maxCandidates, 500),
   });
 
-  const ranked = collapseDuplicateRankedJobs(
+  const ranked = boostSemanticRanking(collapseDuplicateRankedJobs(
     jobs.map((job) => scoreJobForSearch(job, input.preferenceContext)),
-  ).map((result) => ({
+  ), input.preferenceContext?.query).map((result) => ({
     ...result.job,
     discovery: result.discovery,
     rankingExplanation: result.explanation,

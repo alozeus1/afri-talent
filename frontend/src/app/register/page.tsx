@@ -11,6 +11,7 @@ import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { getPasswordStrength } from "@/lib/password-strength";
 import { Skeleton } from "@/components/ui/skeleton";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { createBotShieldPayload } from "@/lib/bot-shield";
 
 function RegisterForm() {
   const locale = useLocale();
@@ -29,6 +30,8 @@ function RegisterForm() {
     companyName: "",
     location: "",
   });
+  const [honeypot, setHoneypot] = useState("");
+  const [formStartedAt] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -70,7 +73,9 @@ function RegisterForm() {
     setLoading(true);
 
     try {
-      await register(formData);
+      await register(formData, {
+        botShield: createBotShieldPayload(formStartedAt, honeypot),
+      });
       router.push(localizePath(formData.role === "EMPLOYER" ? "/employer" : "/candidate", locale));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -97,6 +102,18 @@ function RegisterForm() {
               {error}
             </div>
           )}
+
+          <div className="sr-only" aria-hidden="true">
+            <label htmlFor="website">Website</label>
+            <input
+              id="website"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+            />
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">I am a</label>

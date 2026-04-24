@@ -31,14 +31,25 @@ Frontend:
 
 ## Testing Guidelines
 
-- No dedicated test suite yet; rely on linting and typechecks.
-- CI runs `eslint`, `tsc`, and Terraform validation.
+- Backend uses ESLint, TypeScript typecheck, Vitest, and build verification.
+- Frontend uses ESLint, TypeScript typecheck, Jest unit tests, Playwright, Lighthouse, and build verification.
+- Terraform CI runs fmt, validate, TFLint, Checkov, and a staging plan when credentials are available.
 
 ## Architecture Overview
 
 - High-level layout is documented in `DEPLOYMENT.md` and `infra/terraform/README.md`.
 - Current shared non-prod deployment path is App Runner frontend/backend + RDS PostgreSQL.
 - If you add diagrams, place them in `docs/architecture/` and link them from `DEPLOYMENT.md`.
+
+## Current Project Status
+
+- As of April 7, 2026, the active shared staging stack is AWS App Runner + ECR + RDS PostgreSQL + S3 + Secrets Manager + Terraform.
+- `develop` remains the staging integration branch and the source for automatic shared staging deployments.
+- Shared staging is operational and the CloudWatch Synthetics canary failure in `deploy-apprunner.yml` has been repaired in commit `9fa48da`.
+- The most recent validation run should be checked in GitHub Actions and `STAGING_RUNBOOK.md` before assuming the latest App Runner rollout is fully complete.
+- Product direction is strongest around trust, employer workflow, ATS depth, and early AI-assisted candidate/recruiter flows.
+- Remaining high-priority pre-prod gaps are Stripe test credential setup, full Terraform reconciliation under the intended AWS path, and deploying plus validating the semantic retrieval layer at staging scale.
+- Public-facing descriptions of the project should stay high-level: share mission, stack, SDLC, DevOps discipline, and product direction, but avoid disclosing proprietary ranking logic, trust-scoring details, or unpublished roadmap specifics.
 
 ## Release Process
 
@@ -50,6 +61,7 @@ Frontend:
 
 ## Deployment Handoff
 
+- For any fresh Codex session, read `AGENT_BOOTSTRAP.md` before exploring the codebase.
 - For any deployment, staging, infrastructure, or incident task, read `STAGING_RUNBOOK.md` first.
 - Treat `STAGING_RUNBOOK.md` as the current source of truth for live environment state, URLs, AWS resource names, last known blockers, and recovery steps.
 - After any material live change, update `STAGING_RUNBOOK.md` in the same session so future agents inherit the latest state immediately.

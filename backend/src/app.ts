@@ -7,12 +7,15 @@ import prisma from "./lib/prisma.js";
 import logger from "./lib/logger.js";
 import { initSentry, setupExpressErrorHandler } from "./lib/sentry.js";
 import { redisHealthStatus } from "./lib/redis.js";
+import { buildDegradedState } from "./lib/platform/health.js";
+import { isAnyBillingProviderConfigured } from "./lib/billing/index.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import {
   securityHeaders,
   generalLimiter,
   sanitizeRequest,
   orchestratorLimiter,
+  skillsLimiter,
 } from "./middleware/security.js";
 
 import authRoutes from "./routes/auth.js";
@@ -55,6 +58,7 @@ import resumeParserRoutes from "./routes/resume-parser.js";
 import pushRoutes from "./routes/push.js";
 import preferencesRoutes from "./routes/preferences.js";
 import atsRoutes from "./routes/ats.js";
+import atsWebhookRoutes from "./routes/ats-webhooks.js";
 import mockInterviewsRoutes from "./routes/mock-interviews.js";
 import analyticsEventsRoutes from "./routes/analytics-events.js";
 import socialRoutes from "./routes/social.js";
@@ -64,6 +68,18 @@ import employerAiRoutes from "./routes/employer-ai.js";
 import botsRoutes from "./routes/bots.js";
 import trustRoutes from "./routes/trust.js";
 import adminTrustRoutes from "./routes/admin-trust.js";
+import adminAtsRoutes from "./routes/admin-ats.js";
+import adminRagRoutes from "./routes/admin-rag.js";
+import adminAuditRoutes from "./routes/admin-audit.js";
+import adminAlertsRoutes from "./routes/admin-alerts.js";
+import adminBulkRoutes from "./routes/admin-bulk.js";
+// AI Skills routes (premium, additive)
+import skillsResumeBuilderRoutes from "./routes/skills/resume-builder.js";
+import skillsJobMatcherRoutes from "./routes/skills/job-matcher.js";
+import skillsApplicationWriterRoutes from "./routes/skills/application-writer.js";
+import skillsCareerAdvisorRoutes from "./routes/skills/career-advisor.js";
+import careerGapRoutes from "./routes/career-gap.js";
+import salaryBenchmarksRoutes from "./routes/salary-benchmarks.js";
 import { swaggerSpec } from "./lib/swagger.js";
 
 dotenv.config({ quiet: true });
@@ -151,6 +167,7 @@ app.use(generalLimiter);
 // Stripe webhook — MUST be registered BEFORE express.json().
 // Stripe signature verification requires the raw request body bytes.
 app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoutes);
+app.use("/api/ats/webhooks", express.raw({ type: "application/json" }), atsWebhookRoutes);
 
 // Body parsing with size limits (all other routes)
 app.use(express.json({ limit: "10kb" }));
@@ -169,7 +186,9 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
       checks: {
         database: "skipped-in-test",
         redis: "skipped-in-test",
+        billing: "skipped-in-test",
       },
+      degraded: false,
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
@@ -179,27 +198,32 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     const redis = await redisHealthStatus();
+    const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
+    const degraded = buildDegradedState({ redis, billing });
     res.json({
-      status: redis === "connected" || redis === "not_configured" ? "ok" : "degraded",
+      status: degraded ? "degraded" : "ok",
       ...serviceMetadata,
       checks: {
         database: "connected",
         redis,
+        billing,
       },
-      degraded: redis === "degraded",
+      degraded,
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
   } catch {
     const redis = await redisHealthStatus();
+    const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
     res.status(500).json({
       status: "error",
       ...serviceMetadata,
       checks: {
         database: "disconnected",
         redis,
+        billing,
       },
-      degraded: redis === "degraded",
+      degraded: buildDegradedState({ redis, billing }),
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
     });
@@ -219,6 +243,7 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
       checks: {
         database: "skipped-in-test",
         redis: "skipped-in-test",
+        billing: "skipped-in-test",
       },
       degraded: false,
       timestamp: new Date().toISOString(),
@@ -228,27 +253,31 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     const redis = await redisHealthStatus();
+    const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
     res.json({
       status: "ready",
       ...serviceMetadata,
       checks: {
         database: "ok",
         redis,
+        billing,
       },
-      degraded: redis === "degraded",
+      degraded: buildDegradedState({ redis, billing }),
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
     logger.error({ error }, "Readiness check failed");
     const redis = await redisHealthStatus();
+    const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
     res.status(503).json({
       status: "not_ready",
       ...serviceMetadata,
       checks: {
         database: "failed",
         redis,
+        billing,
       },
-      degraded: redis === "degraded",
+      degraded: buildDegradedState({ redis, billing }),
       timestamp: new Date().toISOString(),
     });
   }
@@ -277,6 +306,10 @@ app.use("/api/jobs", jobsRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/resources", resourcesRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/admin/audit-logs", adminAuditRoutes);
+app.use("/api/admin/alerts", adminAlertsRoutes);
+app.use("/api/admin/bulk", adminBulkRoutes);
+app.use("/api/admin/ats", adminAtsRoutes);
 app.use("/api/admin/billing", adminBillingRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/files", filesRoutes);
@@ -309,7 +342,7 @@ app.use("/api/profile/resume-parser", resumeParserRoutes);
 app.use("/api/push", pushRoutes);
 app.use("/api/preferences", preferencesRoutes);
 app.use("/api/ats", atsRoutes);
-app.use("/api/mock-interviews", mockInterviewsRoutes);
+app.use("/api/mock-interviews", skillsLimiter, mockInterviewsRoutes);
 app.use("/api/analytics", analyticsEventsRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/salary-negotiation", salaryNegotiationRoutes);
@@ -317,7 +350,15 @@ app.use("/api/university-partners", universityPartnersRoutes);
 app.use("/api/employer/ai", employerAiRoutes);
 app.use("/api/trust", trustRoutes);
 app.use("/api/admin/trust", adminTrustRoutes);
+app.use("/api/admin/rag", adminRagRoutes);
 app.use("/api/bots", botsRoutes);
+// AI Skills (premium gated — require PROFESSIONAL plan + per-user rate limit)
+app.use("/api/skills/resume-builder", skillsLimiter, skillsResumeBuilderRoutes);
+app.use("/api/skills/job-matcher", skillsLimiter, skillsJobMatcherRoutes);
+app.use("/api/skills/application-writer", skillsLimiter, skillsApplicationWriterRoutes);
+app.use("/api/skills/career-advisor", skillsLimiter, skillsCareerAdvisorRoutes);
+app.use("/api/career-gap", skillsLimiter, careerGapRoutes);
+app.use("/api/salary-benchmarks", skillsLimiter, salaryBenchmarksRoutes);
 
 // OpenAPI/Swagger docs
 app.get("/api/docs/spec.json", (_req, res) => {

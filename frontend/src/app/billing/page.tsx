@@ -128,6 +128,13 @@ export default function BillingPage() {
   const prices = pricingData?.prices ?? [];
   const region = pricingData?.region ?? "ROW";
   const currency = pricingData?.currency ?? "USD";
+  const providerLabel = status?.billingProvider === "FLUTTERWAVE"
+    ? "Flutterwave"
+    : status?.billingProvider === "STRIPE"
+      ? "Stripe"
+      : region === "AFRICA"
+        ? "Flutterwave in Nigeria, Stripe elsewhere"
+        : "Stripe";
 
   const isEmployer = user && (currentPlan.startsWith("EMPLOYER_") || user.role === "EMPLOYER");
   const planOrder = isEmployer ? EMPLOYER_PLAN_ORDER : PLAN_ORDER;
@@ -146,6 +153,9 @@ export default function BillingPage() {
           <Badge variant="info">{region}</Badge>
           <span>in {currency}</span>
         </div>
+        <p className="mt-3 text-sm text-gray-500">
+          Checkout routing: {providerLabel}. Google Pay appears automatically on eligible Stripe devices.
+        </p>
       </div>
 
       {/* Interval toggle */}
@@ -193,7 +203,7 @@ export default function BillingPage() {
                 </p>
               )}
             </div>
-            {status.hasCustomer && (
+            {status.hasPortal && (
               <Button
                 variant="outline"
                 size="sm"

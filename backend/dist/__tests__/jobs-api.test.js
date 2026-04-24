@@ -5,6 +5,56 @@ vi.mock("../lib/ai/persistence.js", () => ({
     completeAiRun: vi.fn().mockResolvedValue(undefined),
     getRunHistory: vi.fn().mockResolvedValue([]),
 }));
+vi.mock("../middleware/account-standing.js", () => ({
+    requireAccountStanding: () => (_req, _res, next) => next(),
+}));
+vi.mock("../lib/trust/risk.js", () => ({
+    assessJobPostingRisk: vi.fn(() => ({
+        score: 0,
+        level: "LOW",
+        flags: [],
+        autoHold: false,
+    })),
+}));
+vi.mock("../lib/trust/service.js", () => ({
+    addTrustCaseAction: vi.fn().mockResolvedValue(undefined),
+    createTrustCase: vi.fn().mockResolvedValue({ id: "case_1" }),
+    employerTrustSummary: vi.fn(() => ({
+        badge: "Email-domain verified",
+        verificationLevel: "EMAIL_DOMAIN_VERIFIED",
+        authenticityScore: 72,
+        riskScore: 12,
+        riskLevel: "LOW",
+        postingEligibility: true,
+        requiresEnhancedVerification: false,
+        verifiedDomain: "techcorp.com",
+        warnings: [],
+        checklist: [],
+    })),
+    jobTrustSummary: vi.fn(() => ({
+        riskLevel: "LOW",
+        riskScore: 10,
+        jobQualityChecked: true,
+        companyReviewed: true,
+        newEmployerCaution: false,
+        publishedRecently: true,
+        guidance: "This job has passed AfriTalent trust checks.",
+        employerMemberSince: "2025-01-01T00:00:00.000Z",
+        employer: null,
+    })),
+    recordTrustRiskEvent: vi.fn().mockResolvedValue(undefined),
+    refreshEmployerTrustProfile: vi.fn().mockResolvedValue({
+        id: "trust_1",
+        verificationLevel: "EMAIL_DOMAIN_VERIFIED",
+        authenticityScore: 72,
+        riskScore: 12,
+        riskLevel: "LOW",
+        postingEligibility: true,
+        requiresEnhancedVerification: false,
+        verifiedDomain: "techcorp.com",
+        suspiciousSignals: [],
+    }),
+}));
 // Mock Prisma
 vi.mock("../lib/prisma.js", () => ({
     default: {
@@ -18,6 +68,9 @@ vi.mock("../lib/prisma.js", () => ({
             delete: vi.fn(),
         },
         employer: {
+            findUnique: vi.fn(),
+        },
+        user: {
             findUnique: vi.fn(),
         },
         $transaction: vi.fn().mockImplementation(async (arr) => {
@@ -54,9 +107,38 @@ const DUMMY_JOB = {
     id: "job123",
     title: "Frontend Engineer",
     slug: "frontend-engineer-123",
+    description: "Build candidate-facing interfaces with React, TypeScript, and accessible design systems.",
+    location: "Remote - Europe",
+    type: "FULL_TIME",
+    seniority: "MID",
+    tags: ["react", "typescript", "frontend"],
+    salaryMin: 70000,
+    salaryMax: 95000,
+    currency: "USD",
+    visaSponsorship: "YES",
+    relocationAssistance: true,
+    eligibleCountries: ["NG", "KE", "GH"],
+    sourceName: "TechCorp",
+    sourceUrl: "https://jobs.example.com/frontend-engineer",
+    applicationUrl: "https://jobs.example.com/frontend-engineer/apply",
+    sourceLineage: null,
+    sourceLastSeenAt: new Date(),
+    publishedAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    riskScore: 8,
+    riskLevel: "LOW",
+    qualityCheckedAt: new Date(),
+    isExpired: false,
     employerId: "emp123",
     status: "PUBLISHED",
-    employer: { companyName: "TechCorp" }
+    employer: {
+        companyName: "TechCorp",
+        location: "Lagos",
+        createdAt: new Date(),
+        trustProfile: null,
+    },
+    _count: { applications: 0 },
 };
 describe("Jobs API", () => {
     beforeEach(() => {
@@ -64,19 +146,32 @@ describe("Jobs API", () => {
     });
     describe("GET /api/jobs", () => {
         it("returns 200 with list of jobs and pagination", async () => {
-            // First is count (1), Second is findMany ([DUMMY_JOB])
-            prisma.job.count.mockResolvedValueOnce(1);
             prisma.job.findMany.mockResolvedValueOnce([DUMMY_JOB]);
             const res = await request(app).get("/api/jobs?page=1&limit=10");
             expect(res.status).toBe(200);
             expect(res.body.jobs).toHaveLength(1);
             expect(res.body.jobs[0].title).toBe("Frontend Engineer");
+            expect(res.body.jobs[0].discovery.qualityScore).toBeGreaterThan(0);
+            expect(res.body.jobs[0].rankingExplanation.summary.length).toBeGreaterThan(0);
             expect(res.body.pagination).toEqual({
                 page: 1,
                 limit: 10,
                 total: 1,
                 totalPages: 1
             });
+        });
+        it("only queries published, non-expired jobs for public listing", async () => {
+            prisma.job.findMany.mockResolvedValueOnce([]);
+            const res = await request(app).get("/api/jobs");
+            expect(res.status).toBe(200);
+            expect(prisma.job.findMany).toHaveBeenCalledWith(expect.objectContaining({
+                where: {
+                    AND: expect.arrayContaining([
+                        expect.objectContaining({ status: "PUBLISHED" }),
+                        expect.objectContaining({ isExpired: false }),
+                    ]),
+                },
+            }));
         });
     });
     describe("GET /api/jobs/:slug", () => {
@@ -92,6 +187,15 @@ describe("Jobs API", () => {
             expect(res.status).toBe(200);
             expect(res.body.id).toBe("job123");
             expect(res.body.slug).toBe("frontend-engineer-123");
+        });
+        it("returns 404 for expired jobs", async () => {
+            prisma.job.findUnique.mockResolvedValueOnce({
+                ...DUMMY_JOB,
+                isExpired: true,
+            });
+            const res = await request(app).get("/api/jobs/frontend-engineer-123");
+            expect(res.status).toBe(404);
+            expect(res.body.error).toBe("Job not found");
         });
     });
     describe("POST /api/jobs", () => {
@@ -122,7 +226,7 @@ describe("Jobs API", () => {
                 title: "Frontend Dev",
                 slug: "frontend-dev",
                 employerId: "emp123",
-                status: "DRAFT"
+                status: "PUBLISHED"
             });
             const res = await request(app).post("/api/jobs")
                 .set("Authorization", `Bearer ${token}`)
@@ -139,7 +243,7 @@ describe("Jobs API", () => {
             });
             expect(res.status).toBe(201);
             expect(res.body.title).toBe("Frontend Dev");
-            expect(res.body.status).toBe("DRAFT");
+            expect(res.body.status).toBe("PUBLISHED");
         });
     });
     describe("PUT /api/jobs/:id", () => {
@@ -174,6 +278,7 @@ describe("Jobs API", () => {
                 .send({ title: "Updated Title", description: "Updated Dev", location: "Lagos", type: "CONTRACT", seniority: "JUNIOR", status: "DRAFT" });
             expect(res.status).toBe(200);
             expect(res.body.title).toBe("Updated Title");
+            expect(res.body.status).toBe("PUBLISHED");
         });
     });
 });

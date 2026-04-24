@@ -10,5 +10,8 @@ export declare function blockToken(token: string, ttlSeconds: number): Promise<v
  * Returns false if Redis is unavailable (fail-open).
  */
 export declare function isTokenBlocked(token: string): Promise<boolean>;
+export declare function isRedisConfigured(): boolean;
+export declare function isRedisAvailable(): boolean;
+export declare function redisHealthStatus(): Promise<"connected" | "degraded" | "not_configured">;
 export { client as redisClient };
 //# sourceMappingURL=redis.d.ts.map

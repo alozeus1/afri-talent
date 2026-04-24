@@ -65,12 +65,6 @@ export async function runJobMatcherCycle(): Promise<void> {
 
         totalAlerts++;
       }
-
-      // Update lastAlertAt on the saved search
-      await prisma.savedSearch.update({
-        where: { id: search.id },
-        data: { lastAlertAt: new Date() },
-      });
     } catch (err) {
       logger.error(
         { searchId: search.id, userId: search.userId.slice(0, 8), err },
