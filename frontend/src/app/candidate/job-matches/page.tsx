@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
 
 const scoreVariant = (score: number): "success" | "info" | "warning" | "danger" | "default" => {
   if (score >= 80) return "success";
@@ -37,7 +39,7 @@ export default function JobMatchesPage() {
   const [matches, setMatches] = useState<JobMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [embedding, setEmbedding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyError | null>(null);
   const [embedMsg, setEmbedMsg] = useState<string | null>(null);
   const [filterVisa, setFilterVisa] = useState(false);
   const [filterRemote, setFilterRemote] = useState(false);
@@ -55,7 +57,7 @@ export default function JobMatchesPage() {
       const data = await skills.getJobMatches(10);
       setMatches(data.matches);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load matches");
+      setError(toFriendlyError(err));
     } finally {
       setLoading(false);
     }
@@ -122,17 +124,20 @@ export default function JobMatchesPage() {
         </div>
 
         {error && (
-          <div className="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-700">
-            {error === "No resume found. Generate one first." ? (
-              <span>
-                {error}{" "}
-                <Link href="/candidate/resume-builder" className="font-medium underline">
-                  Build your resume →
-                </Link>
-              </span>
-            ) : (
-              error
-            )}
+          <div
+            role="alert"
+            aria-live="assertive"
+            data-testid="job-matches-error"
+            className={`rounded-md border p-4 text-sm ${
+              error.tone === "error"
+                ? "bg-red-50 border-red-200 text-red-800"
+                : error.tone === "warning"
+                  ? "bg-amber-50 border-amber-200 text-amber-900"
+                  : "bg-blue-50 border-blue-200 text-blue-900"
+            }`}
+          >
+            <p className="font-medium">{error.title}</p>
+            <p className="mt-0.5">{error.description}</p>
           </div>
         )}
 
@@ -143,27 +148,31 @@ export default function JobMatchesPage() {
         )}
 
         {filteredMatches.length === 0 && !error ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              {matches.length > 0 ? (
-                <>
-                  <p className="text-gray-500">No matches for the active filters.</p>
-                  <p className="text-sm text-gray-400 mt-1">Try removing a filter above.</p>
-                </>
-              ) : (
-                <>
-                  <p className="text-gray-500">No matches yet.</p>
-                  <p className="text-sm text-gray-400 mt-1">
-                    Save a resume first, then click{" "}
-                    <span className="font-medium">Refresh Matches</span>.
-                  </p>
-                  <Link href="/candidate/resume-builder">
-                    <Button className="mt-4">Build Resume</Button>
-                  </Link>
-                </>
-              )}
-            </CardContent>
-          </Card>
+          matches.length > 0 ? (
+            <EmptyState
+              testId="job-matches-empty-filtered"
+              title="No matches for the active filters"
+              description="Try removing a filter above to see more opportunities."
+              primaryAction={{
+                label: "Clear filters",
+                onClick: () => {
+                  setFilterVisa(false);
+                  setFilterRemote(false);
+                },
+              }}
+            />
+          ) : (
+            <EmptyState
+              testId="job-matches-empty"
+              title="No matches yet"
+              description="Save a resume first, then tap Refresh Matches and we will rank roles by fit."
+              primaryAction={{ label: "Build your resume", href: "/candidate/resume-builder" }}
+              secondaryAction={{
+                label: "Refresh matches",
+                onClick: () => void handleReEmbed(),
+              }}
+            />
+          )
         ) : (
           <div className="space-y-3">
             {filteredMatches.map((match) => (

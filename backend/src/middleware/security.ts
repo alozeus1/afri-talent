@@ -124,11 +124,11 @@ function sanitizeObject(obj: Record<string, unknown>): void {
   }
 }
 
-// Skills rate limiter — per user, 20 requests per minute
+// Skills rate limiter — per user, 30 requests per minute
 // Applied to all AI skill endpoints to prevent Claude API cost abuse
 export const skillsLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 20,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => process.env.NODE_ENV === "test",
@@ -138,10 +138,37 @@ export const skillsLimiter = rateLimit({
   },
   message: {
     error: "rate_limit_exceeded",
+    code: "RATE_LIMIT_EXCEEDED",
     message: "Too many AI skill requests. Please wait a minute before trying again.",
     retryAfter: 60,
   },
   handler: (_req, res, _next, options) => {
+    res.setHeader("Retry-After", "60");
+    res.status(429).json(options.message);
+  },
+});
+
+// Stricter limiter for the heaviest AI endpoints (*/generate, */scan-ats).
+// Each call costs $0.003–$0.03 in upstream provider spend, so we cap
+// per-user bursts at 6 per minute.
+export const generateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  keyGenerator: (req: Request): string => {
+    const userId = (req as Request & { user?: { userId: string } }).user?.userId;
+    return userId ?? getRateLimitKey(req);
+  },
+  message: {
+    error: "rate_limit_exceeded",
+    code: "RATE_LIMIT_EXCEEDED",
+    message: "You are generating AI content very quickly. Please wait ~60 seconds before trying again.",
+    retryAfter: 60,
+  },
+  handler: (_req, res, _next, options) => {
+    res.setHeader("Retry-After", "60");
     res.status(429).json(options.message);
   },
 });

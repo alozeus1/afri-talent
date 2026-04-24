@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ATSScoreDisplay } from "@/components/ui/ats-score-display";
 import { LoadingState } from "@/components/ui/loading-state";
+import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
 
 interface WorkEntry {
   company: string;
@@ -62,7 +63,7 @@ export default function ResumeBuilderPage() {
   const [editedText, setEditedText] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyError | null>(null);
   const [saved, setSaved] = useState(false);
 
   // ATS scan state
@@ -75,7 +76,7 @@ export default function ResumeBuilderPage() {
     source: "ai" | "heuristic";
   } | null>(null);
   const [atsLoading, setAtsLoading] = useState(false);
-  const [atsError, setAtsError] = useState<string | null>(null);
+  const [atsError, setAtsError] = useState<FriendlyError | null>(null);
 
   if (!user) {
     router.push("/login");
@@ -121,7 +122,7 @@ export default function ResumeBuilderPage() {
       setGenerated(result.resume);
       setEditedText(result.resume.rawText);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate resume");
+      setError(toFriendlyError(err));
     } finally {
       setLoading(false);
     }
@@ -138,7 +139,7 @@ export default function ResumeBuilderPage() {
       });
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save resume");
+      setError(toFriendlyError(err));
     } finally {
       setSaving(false);
     }
@@ -160,7 +161,7 @@ export default function ResumeBuilderPage() {
       });
       setAtsResult(result);
     } catch (err) {
-      setAtsError(err instanceof Error ? err.message : "ATS scan failed");
+      setAtsError(toFriendlyError(err));
     } finally {
       setAtsLoading(false);
     }
@@ -180,8 +181,20 @@ export default function ResumeBuilderPage() {
         </div>
 
         {error && (
-          <div className="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-700">
-            {error}
+          <div
+            role="alert"
+            aria-live="assertive"
+            data-testid="resume-builder-error"
+            className={`rounded-md border p-4 text-sm ${
+              error.tone === "error"
+                ? "bg-red-50 border-red-200 text-red-800"
+                : error.tone === "warning"
+                  ? "bg-amber-50 border-amber-200 text-amber-900"
+                  : "bg-blue-50 border-blue-200 text-blue-900"
+            }`}
+          >
+            <p className="font-medium">{error.title}</p>
+            <p className="mt-0.5">{error.description}</p>
           </div>
         )}
 
@@ -464,8 +477,20 @@ export default function ResumeBuilderPage() {
                 </Button>
 
                 {atsError && (
-                  <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-                    {atsError}
+                  <div
+                    role="alert"
+                    aria-live="assertive"
+                    data-testid="ats-scan-error"
+                    className={`rounded-md border p-3 text-sm ${
+                      atsError.tone === "error"
+                        ? "bg-red-50 border-red-200 text-red-800"
+                        : atsError.tone === "warning"
+                          ? "bg-amber-50 border-amber-200 text-amber-900"
+                          : "bg-blue-50 border-blue-200 text-blue-900"
+                    }`}
+                  >
+                    <p className="font-medium">{atsError.title}</p>
+                    <p className="mt-0.5">{atsError.description}</p>
                   </div>
                 )}
 

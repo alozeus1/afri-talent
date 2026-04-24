@@ -9,6 +9,7 @@ import { z } from "zod/v4";
 import { Role, SubscriptionPlan, ApplicationStatus } from "@prisma/client";
 import { authenticate, authorize } from "../../middleware/auth.js";
 import { requirePlan } from "../../middleware/subscription.js";
+import { generateLimiter } from "../../middleware/security.js";
 import prisma from "../../lib/prisma.js";
 import logger from "../../lib/logger.js";
 import { writeCoverLetter } from "../../lib/ai/skills/application-writer.js";
@@ -41,6 +42,7 @@ const submitSchema = z.object({
 // ── POST /api/skills/application-writer/generate ─────────────────────────────
 router.post(
   "/generate",
+  generateLimiter,
   authenticate,
   authorize(Role.CANDIDATE),
   requirePlan(SubscriptionPlan.PROFESSIONAL),

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { skills } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
 
 interface ApplicationWriterModalProps {
   jobId: string;
@@ -25,7 +26,28 @@ export function ApplicationWriterModal({
   const [coverLetter, setCoverLetter] = useState("");
   const [source, setSource] = useState<"ai" | "template" | null>(null);
   const [tone, setTone] = useState<Tone>("professional");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyError | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusTimer = window.setTimeout(() => {
+      closeButtonRef.current?.focus();
+    }, 0);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = prevOverflow;
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [onClose]);
 
   async function handleGenerate() {
     setStep("generating");
@@ -36,7 +58,7 @@ export function ApplicationWriterModal({
       setSource(result.source);
       setStep("review");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate cover letter");
+      setError(toFriendlyError(err));
       setStep("idle");
     }
   }
@@ -49,7 +71,7 @@ export function ApplicationWriterModal({
       setStep("done");
       onSuccess(result.application.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit application");
+      setError(toFriendlyError(err));
       setStep("review");
     }
   }
@@ -59,29 +81,43 @@ export function ApplicationWriterModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Application Writer"
+      aria-labelledby="application-writer-title"
     >
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Apply with AI</h2>
+            <h2 id="application-writer-title" className="text-lg font-semibold text-gray-900">Apply with AI</h2>
             <p className="text-sm text-gray-500 mt-0.5">
               {jobTitle} at {jobCompany}
             </p>
           </div>
           <button
+            ref={closeButtonRef}
+            type="button"
             onClick={onClose}
-            aria-label="Close modal"
-            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+            aria-label="Close Application Writer"
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
           >
-            ×
+            <span aria-hidden="true">×</span>
           </button>
         </div>
 
         <div className="p-5 space-y-4">
           {error && (
-            <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-              {error}
+            <div
+              role="alert"
+              aria-live="assertive"
+              data-testid="application-writer-error"
+              className={`rounded-md border p-3 text-sm ${
+                error.tone === "error"
+                  ? "bg-red-50 border-red-200 text-red-800"
+                  : error.tone === "warning"
+                    ? "bg-amber-50 border-amber-200 text-amber-900"
+                    : "bg-blue-50 border-blue-200 text-blue-900"
+              }`}
+            >
+              <p className="font-medium">{error.title}</p>
+              <p className="mt-0.5">{error.description}</p>
             </div>
           )}
 
@@ -103,13 +139,15 @@ export function ApplicationWriterModal({
                 Claude will generate a personalised cover letter using your saved resume and this job description.
                 You can review and edit it before submitting.
               </p>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-2">Tone</label>
+              <div role="radiogroup" aria-label="Cover letter tone">
+                <p className="block text-xs font-medium text-gray-600 mb-2">Tone</p>
                 <div className="grid grid-cols-3 gap-2">
                   {(["professional", "conversational", "executive"] as Tone[]).map((t) => (
                     <button
                       key={t}
                       type="button"
+                      role="radio"
+                      aria-checked={tone === t}
                       onClick={() => setTone(t)}
                       className={`rounded-md border px-3 py-2 text-xs capitalize transition-colors ${
                         tone === t
@@ -146,10 +184,11 @@ export function ApplicationWriterModal({
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="application-writer-textarea" className="block text-sm font-medium text-gray-700 mb-2">
                   Cover Letter <span className="text-gray-400 font-normal">(editable)</span>
                 </label>
                 <textarea
+                  id="application-writer-textarea"
                   value={coverLetter}
                   onChange={(e) => setCoverLetter(e.target.value)}
                   rows={12}

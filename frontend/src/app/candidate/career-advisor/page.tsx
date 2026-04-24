@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
 
 const priorityVariant: Record<string, "danger" | "warning" | "default"> = {
   high: "danger",
@@ -24,7 +26,7 @@ export default function CareerAdvisorPage() {
   const [history, setHistory] = useState<Array<{ id: string; targetRole: string | null; createdAt: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyError | null>(null);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -61,7 +63,7 @@ export default function CareerAdvisorPage() {
       setAdvice(result.advice);
       await loadHistory();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Analysis failed");
+      setError(toFriendlyError(err));
     } finally {
       setLoading(false);
     }
@@ -101,10 +103,32 @@ export default function CareerAdvisorPage() {
               </Button>
             </div>
             {error && (
-              <p className="mt-2 text-sm text-red-600">{error}</p>
+              <div
+                role="alert"
+                aria-live="assertive"
+                data-testid="career-advisor-error"
+                className={`mt-3 rounded-md border p-3 text-sm ${
+                  error.tone === "error"
+                    ? "bg-red-50 border-red-200 text-red-800"
+                    : error.tone === "warning"
+                      ? "bg-amber-50 border-amber-200 text-amber-900"
+                      : "bg-blue-50 border-blue-200 text-blue-900"
+                }`}
+              >
+                <p className="font-medium">{error.title}</p>
+                <p className="mt-0.5">{error.description}</p>
+              </div>
             )}
           </CardContent>
         </Card>
+
+        {!advice && !loading && (
+          <EmptyState
+            testId="career-advisor-empty"
+            title="No analysis yet"
+            description="Enter a target role above and we will map the skill gaps, salary range, and a 90-day plan."
+          />
+        )}
 
         {advice && (
           <div className="space-y-4">
