@@ -6,6 +6,10 @@ const emailMocks = vi.hoisted(() => ({
   applicationStatusEmail: vi.fn(async (_opts: any) => undefined),
   passwordResetEmail: vi.fn(async (_opts: any) => undefined),
   phoneVerifiedEmail: vi.fn(async (_opts: any) => undefined),
+  passwordChangedEmail: vi.fn(async (_opts: any) => undefined),
+  emailVerifiedEmail: vi.fn(async (_opts: any) => undefined),
+  newApplicationEmail: vi.fn(async (_opts: any) => undefined),
+  jobPublishedEmail: vi.fn(async (_opts: any) => undefined),
 }));
 const notificationMocks = vi.hoisted(() => ({
   createUserNotification: vi.fn(async (_input: any) => ({ id: "n1" })),
@@ -206,6 +210,82 @@ describe("notification dispatcher", () => {
     const sms = result.outcomes.find((o) => o.channel === "sms");
     expect(sms?.delivered).toBe(true); // SKIPPED is not treated as failure
     expect(emailMocks.phoneVerifiedEmail).toHaveBeenCalledOnce();
+  });
+
+  it("PASSWORD_CHANGED sends security email + in-app notification", async () => {
+    const changedAt = new Date("2026-04-24T10:00:00Z");
+    await dispatch({
+      kind: "PASSWORD_CHANGED",
+      user: { id: "u11", email: "j@b.com", name: "Jamil" },
+      changedAt,
+      supportUrl: "https://app.test/support",
+    });
+
+    expect(emailMocks.passwordChangedEmail).toHaveBeenCalledOnce();
+    expect(emailMocks.passwordChangedEmail.mock.calls[0]?.[0]).toMatchObject({
+      to: "j@b.com",
+      changedAt,
+      supportUrl: "https://app.test/support",
+    });
+    expect(notificationMocks.createUserNotification).toHaveBeenCalledOnce();
+    expect(notificationMocks.createUserNotification.mock.calls[0]?.[0].type).toBe(
+      "PASSWORD_CHANGED",
+    );
+  });
+
+  it("EMAIL_VERIFIED sends confirmation email + in-app notification", async () => {
+    await dispatch({
+      kind: "EMAIL_VERIFIED",
+      user: { id: "u12", email: "k@b.com", name: "Kemi" },
+      appUrl: "https://app.test",
+    });
+
+    expect(emailMocks.emailVerifiedEmail).toHaveBeenCalledOnce();
+    expect(emailMocks.emailVerifiedEmail.mock.calls[0]?.[0].to).toBe("k@b.com");
+    expect(notificationMocks.createUserNotification.mock.calls[0]?.[0].type).toBe(
+      "EMAIL_VERIFIED",
+    );
+  });
+
+  it("NEW_APPLICATION notifies the employer (email + in-app) with metadata", async () => {
+    await dispatch({
+      kind: "NEW_APPLICATION",
+      employer: { userId: "emp-1", email: "hr@acme.com", name: "Acme HR" },
+      candidateName: "Lola",
+      jobTitle: "Backend Engineer",
+      jobId: "job-1",
+      applicationId: "app-99",
+      applicationUrl: "https://app.test/employer/applications/app-99",
+    });
+
+    expect(emailMocks.newApplicationEmail).toHaveBeenCalledOnce();
+    expect(emailMocks.newApplicationEmail.mock.calls[0]?.[0]).toMatchObject({
+      to: "hr@acme.com",
+      candidateName: "Lola",
+      jobTitle: "Backend Engineer",
+    });
+    const inApp = notificationMocks.createUserNotification.mock.calls[0]?.[0];
+    expect(inApp.userId).toBe("emp-1");
+    expect(inApp.type).toBe("NEW_APPLICATION");
+    expect(inApp.metadata).toMatchObject({ applicationId: "app-99", jobId: "job-1" });
+  });
+
+  it("JOB_PUBLISHED notifies the employer with the live job URL", async () => {
+    await dispatch({
+      kind: "JOB_PUBLISHED",
+      employer: { userId: "emp-2", email: "hire@acme.com", name: "Acme" },
+      jobTitle: "Senior PM",
+      jobId: "job-2",
+      jobUrl: "https://app.test/jobs/senior-pm",
+    });
+
+    expect(emailMocks.jobPublishedEmail).toHaveBeenCalledOnce();
+    expect(emailMocks.jobPublishedEmail.mock.calls[0]?.[0].jobUrl).toBe(
+      "https://app.test/jobs/senior-pm",
+    );
+    expect(notificationMocks.createUserNotification.mock.calls[0]?.[0].type).toBe(
+      "JOB_PUBLISHED",
+    );
   });
 
   it("returns successfully even when a channel throws", async () => {

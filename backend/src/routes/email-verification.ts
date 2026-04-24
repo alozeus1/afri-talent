@@ -5,6 +5,8 @@ import { authenticate } from "../middleware/auth.js";
 import rateLimit from "express-rate-limit";
 import { accountEmailVerificationEmail } from "../lib/email.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
+import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
+import logger from "../lib/logger.js";
 
 const router = Router();
 
@@ -206,6 +208,17 @@ router.post("/verify", verifyLimiter, async (req: Request, res: Response) => {
       category: "verification",
       durationMs: Date.now() - startedAt,
     });
+
+    // Phase 3: notify the user that their email is verified.
+    if (record.user) {
+      const appUrl = process.env.APP_URL || process.env.FRONTEND_URL || "https://afritalent.com";
+      void dispatchNotification({
+        kind: "EMAIL_VERIFIED",
+        user: { id: record.user.id, email: record.user.email, name: record.user.name },
+        appUrl,
+      }).catch((err) => logger.error({ err }, "Failed to dispatch email verified notification"));
+    }
+
     res.json({ message: "Email verified successfully" });
   } catch (error) {
     console.error("Verify email error:", error);

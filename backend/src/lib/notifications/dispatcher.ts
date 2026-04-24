@@ -15,6 +15,10 @@ import { recordOpsEvent } from "../ops/events.js";
 import {
   accountClosedEmail,
   applicationStatusEmail,
+  emailVerifiedEmail,
+  jobPublishedEmail,
+  newApplicationEmail,
+  passwordChangedEmail,
   passwordResetEmail,
   phoneVerifiedEmail,
   welcomeEmail,
@@ -64,6 +68,33 @@ export type DispatchableEvent =
       kind: "PHONE_VERIFIED";
       user: { id: string; email: string; name: string };
       phoneNumber: string;
+    }
+  | {
+      kind: "PASSWORD_CHANGED";
+      user: { id: string; email: string; name: string };
+      changedAt: Date;
+      supportUrl: string;
+    }
+  | {
+      kind: "EMAIL_VERIFIED";
+      user: { id: string; email: string; name: string };
+      appUrl: string;
+    }
+  | {
+      kind: "NEW_APPLICATION";
+      employer: { userId: string; email: string; name: string };
+      candidateName: string;
+      jobTitle: string;
+      jobId: string;
+      applicationId: string;
+      applicationUrl: string;
+    }
+  | {
+      kind: "JOB_PUBLISHED";
+      employer: { userId: string; email: string; name: string };
+      jobTitle: string;
+      jobId: string;
+      jobUrl: string;
     };
 
 interface ChannelOutcome {
@@ -104,6 +135,26 @@ const EVENT_POLICY: Record<DispatchableEvent["kind"], EventPolicy> = {
     notificationType: "PHONE_VERIFIED",
     inAppChannel: "applicationUpdates",
     isSecurityEvent: true,
+  },
+  PASSWORD_CHANGED: {
+    notificationType: "PASSWORD_CHANGED",
+    inAppChannel: "applicationUpdates",
+    isSecurityEvent: true,
+  },
+  EMAIL_VERIFIED: {
+    notificationType: "EMAIL_VERIFIED",
+    inAppChannel: "applicationUpdates",
+    isSecurityEvent: true,
+  },
+  NEW_APPLICATION: {
+    notificationType: "NEW_APPLICATION",
+    inAppChannel: "applicationUpdates",
+    isSecurityEvent: false,
+  },
+  JOB_PUBLISHED: {
+    notificationType: "JOB_PUBLISHED",
+    inAppChannel: "applicationUpdates",
+    isSecurityEvent: false,
   },
 };
 
@@ -293,6 +344,116 @@ export async function dispatch(
               body: `Your phone number ending in ${masked} is now verified.`,
               channel: policy.inAppChannel,
               metadata: { phoneMasked: masked },
+            }),
+          ),
+        );
+      }
+      break;
+    }
+    case "PASSWORD_CHANGED": {
+      outcomes.push(
+        await safeSend("email", () =>
+          passwordChangedEmail({
+            to: event.user.email,
+            userName: event.user.name,
+            changedAt: event.changedAt,
+            supportUrl: event.supportUrl,
+          }),
+        ),
+      );
+      if (policy.notificationType && policy.inAppChannel) {
+        outcomes.push(
+          await safeSend("in_app", () =>
+            createUserNotification({
+              userId: event.user.id,
+              type: policy.notificationType!,
+              title: "Password changed",
+              body: "Your AfriTalent password was changed. If this wasn't you, contact support immediately.",
+              channel: policy.inAppChannel,
+              metadata: { changedAt: event.changedAt.toISOString() },
+            }),
+          ),
+        );
+      }
+      break;
+    }
+    case "EMAIL_VERIFIED": {
+      outcomes.push(
+        await safeSend("email", () =>
+          emailVerifiedEmail({
+            to: event.user.email,
+            userName: event.user.name,
+            appUrl: event.appUrl,
+          }),
+        ),
+      );
+      if (policy.notificationType && policy.inAppChannel) {
+        outcomes.push(
+          await safeSend("in_app", () =>
+            createUserNotification({
+              userId: event.user.id,
+              type: policy.notificationType!,
+              title: "Email verified",
+              body: "Your email address is now verified. You have full access to AfriTalent.",
+              channel: policy.inAppChannel,
+            }),
+          ),
+        );
+      }
+      break;
+    }
+    case "NEW_APPLICATION": {
+      outcomes.push(
+        await safeSend("email", () =>
+          newApplicationEmail({
+            to: event.employer.email,
+            employerName: event.employer.name,
+            candidateName: event.candidateName,
+            jobTitle: event.jobTitle,
+            applicationUrl: event.applicationUrl,
+          }),
+        ),
+      );
+      if (policy.notificationType && policy.inAppChannel) {
+        outcomes.push(
+          await safeSend("in_app", () =>
+            createUserNotification({
+              userId: event.employer.userId,
+              type: policy.notificationType!,
+              title: "New job application received",
+              body: `${event.candidateName} applied for ${event.jobTitle}.`,
+              channel: policy.inAppChannel,
+              metadata: {
+                applicationId: event.applicationId,
+                jobId: event.jobId,
+              },
+            }),
+          ),
+        );
+      }
+      break;
+    }
+    case "JOB_PUBLISHED": {
+      outcomes.push(
+        await safeSend("email", () =>
+          jobPublishedEmail({
+            to: event.employer.email,
+            employerName: event.employer.name,
+            jobTitle: event.jobTitle,
+            jobUrl: event.jobUrl,
+          }),
+        ),
+      );
+      if (policy.notificationType && policy.inAppChannel) {
+        outcomes.push(
+          await safeSend("in_app", () =>
+            createUserNotification({
+              userId: event.employer.userId,
+              type: policy.notificationType!,
+              title: "Your job is now live",
+              body: `${event.jobTitle} is published and visible to candidates.`,
+              channel: policy.inAppChannel,
+              metadata: { jobId: event.jobId },
             }),
           ),
         );

@@ -132,6 +132,24 @@ router.post("/reset-password", passwordResetLimiter, async (req: Request, res: R
     ]);
 
     logger.info({ userId: resetToken.userId.slice(0, 8) }, "Password reset successful");
+
+    // Phase 3: notify the user that their password was changed (security event).
+    const fullUser = await prisma.user.findUnique({
+      where: { id: resetToken.userId },
+      select: { id: true, email: true, name: true },
+    });
+    if (fullUser) {
+      const supportUrl =
+        process.env.SUPPORT_URL ||
+        `${process.env.FRONTEND_URL || "https://afritalent.com"}/support`;
+      void dispatchNotification({
+        kind: "PASSWORD_CHANGED",
+        user: { id: fullUser.id, email: fullUser.email, name: fullUser.name },
+        changedAt: new Date(),
+        supportUrl,
+      }).catch((err) => logger.error({ err }, "Failed to dispatch password changed notification"));
+    }
+
     res.json({ message: "Password has been reset successfully. You can now log in with your new password." });
   } catch (error) {
     if (error instanceof z.ZodError) {

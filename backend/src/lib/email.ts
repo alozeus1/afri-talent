@@ -365,6 +365,100 @@ export async function accountEmailVerificationEmail(opts: {
   });
 }
 
+export async function passwordChangedEmail(opts: {
+  to: string;
+  userName: string;
+  changedAt: Date;
+  supportUrl: string;
+}): Promise<void> {
+  const when = opts.changedAt.toUTCString();
+  await sendEmail({
+    to: opts.to,
+    subject: "Your AfriTalent password was changed",
+    templateName: "password_changed",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.userName},</h2>
+        <p>Your AfriTalent account password was changed on <strong>${when}</strong>.</p>
+        <p>If this was you, no further action is needed.</p>
+        <p>If you didn't make this change, your account may be compromised. Reset your password immediately and contact support:</p>
+        <p><a href="${opts.supportUrl}" style="background:#dc2626;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Contact Support</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Security notification</p>
+      </div>
+    `,
+    text: `Hi ${opts.userName},\n\nYour AfriTalent password was changed on ${when}.\n\nIf this was you, no further action is needed.\n\nIf you didn't make this change, contact support immediately: ${opts.supportUrl}`,
+  });
+}
+
+export async function emailVerifiedEmail(opts: {
+  to: string;
+  userName: string;
+  appUrl: string;
+}): Promise<void> {
+  await sendEmail({
+    to: opts.to,
+    subject: "Your AfriTalent email is verified",
+    templateName: "email_verified",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.userName},</h2>
+        <p>Your email address is now verified on AfriTalent.</p>
+        <p>You now have full access to applications, messages, and verified-only opportunities.</p>
+        <p><a href="${opts.appUrl}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;">Continue to AfriTalent</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: `Hi ${opts.userName},\n\nYour email address is now verified on AfriTalent.\n\nContinue: ${opts.appUrl}`,
+  });
+}
+
+export async function newApplicationEmail(opts: {
+  to: string;
+  employerName: string;
+  candidateName: string;
+  jobTitle: string;
+  applicationUrl: string;
+}): Promise<void> {
+  await sendEmail({
+    to: opts.to,
+    subject: `New application: ${opts.jobTitle}`,
+    templateName: "new_application",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.employerName},</h2>
+        <p><strong>${opts.candidateName}</strong> has applied for <strong>${opts.jobTitle}</strong>.</p>
+        <p>Review their profile and move them through your pipeline.</p>
+        <p><a href="${opts.applicationUrl}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;">Review Application</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: `Hi ${opts.employerName},\n\n${opts.candidateName} has applied for ${opts.jobTitle}.\n\nReview: ${opts.applicationUrl}`,
+  });
+}
+
+export async function jobPublishedEmail(opts: {
+  to: string;
+  employerName: string;
+  jobTitle: string;
+  jobUrl: string;
+}): Promise<void> {
+  await sendEmail({
+    to: opts.to,
+    subject: `Your job is live: ${opts.jobTitle}`,
+    templateName: "job_published",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.employerName},</h2>
+        <p>Your job <strong>${opts.jobTitle}</strong> is now published and visible to candidates on AfriTalent.</p>
+        <p>We'll notify you as applications come in. You can promote, edit, or close the job at any time from your dashboard.</p>
+        <p><a href="${opts.jobUrl}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;">View Job</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: `Hi ${opts.employerName},\n\nYour job ${opts.jobTitle} is now published.\n\nView: ${opts.jobUrl}`,
+  });
+}
+
 export async function phoneVerifiedEmail(opts: {
   to: string;
   userName: string;

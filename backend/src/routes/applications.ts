@@ -3,7 +3,6 @@ import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize, requireVerifiedEmail } from "../middleware/auth.js";
 import { ApplicationStatus, JobStatus, Role, TrustEntityType, TrustRiskLevel } from "@prisma/client";
-import { createUserNotification } from "../lib/notifications.js";
 import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import { requireAccountStanding } from "../middleware/account-standing.js";
 import { assessApplicationRisk } from "../lib/trust/risk.js";
@@ -199,18 +198,32 @@ router.post(
     if (job.employerId && !heldForReview) {
       const employer = await prisma.employer.findUnique({
         where: { id: job.employerId },
-        select: { userId: true },
+        select: {
+          userId: true,
+          companyName: true,
+          user: { select: { email: true, name: true } },
+        },
       });
 
-      if (employer?.userId) {
-        await createUserNotification({
-          userId: employer.userId,
-          type: "APPLICATION_STATUS",
-          title: "New job application received",
-          body: `A candidate applied for ${job.title}.`,
-          channel: "applicationUpdates",
-          metadata: { applicationId: application.id, jobId: job.id },
+      if (employer?.userId && employer.user) {
+        const candidate = await prisma.user.findUnique({
+          where: { id: req.user!.userId },
+          select: { name: true },
         });
+        const appBaseUrl = process.env.APP_URL || process.env.FRONTEND_URL || "https://afritalent.com";
+        void dispatchNotification({
+          kind: "NEW_APPLICATION",
+          employer: {
+            userId: employer.userId,
+            email: employer.user.email,
+            name: employer.user.name || employer.companyName,
+          },
+          candidateName: candidate?.name ?? "A candidate",
+          jobTitle: job.title,
+          jobId: job.id,
+          applicationId: application.id,
+          applicationUrl: `${appBaseUrl}/employer/applications/${application.id}`,
+        }).catch(() => undefined);
       }
     }
 
