@@ -17,13 +17,17 @@ const notificationMocks = vi.hoisted(() => ({
 const opsMocks = vi.hoisted(() => ({
   recordOpsEvent: vi.fn(),
 }));
-type SmsResult = {
-  delivered: boolean;
-  status: string;
-  providerMsgId?: string;
-  errorCode?: string;
-  errorMessage?: string;
-};
+const resilienceMocks = vi.hoisted(() => ({
+  pushDeadLetter: vi.fn(async (_input: any) => undefined),
+  withRetry: vi.fn(async (op: any) => op()),
+}));
+const prismaMocks = vi.hoisted(() => ({
+  default: {
+    notificationPreference: {
+      findUnique: vi.fn(async (_args: any): Promise<Record<string, unknown> | null> => null),
+    },
+  },
+}));
 const smsMocks = vi.hoisted(() => ({
   sendSms: vi.fn(
     async (_opts: any): Promise<{
@@ -39,6 +43,8 @@ const smsMocks = vi.hoisted(() => ({
 vi.mock("../lib/email.js", () => emailMocks);
 vi.mock("../lib/notifications.js", () => notificationMocks);
 vi.mock("../lib/ops/events.js", () => opsMocks);
+vi.mock("../lib/ops/resilience.js", () => resilienceMocks);
+vi.mock("../lib/prisma.js", () => prismaMocks);
 vi.mock("../lib/sms/africasTalking.js", () => smsMocks);
 vi.mock("../lib/logger.js", () => ({
   default: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -50,6 +56,11 @@ beforeEach(() => {
   Object.values(emailMocks).forEach((m) => m.mockClear());
   notificationMocks.createUserNotification.mockClear();
   opsMocks.recordOpsEvent.mockClear();
+  resilienceMocks.pushDeadLetter.mockClear();
+  prismaMocks.default.notificationPreference.findUnique.mockClear();
+  prismaMocks.default.notificationPreference.findUnique.mockImplementation(
+    async (_args: any) => null,
+  );
   smsMocks.sendSms.mockClear();
   smsMocks.sendSms.mockImplementation(async (_opts: any) => ({
     delivered: true,
@@ -302,5 +313,93 @@ describe("notification dispatcher", () => {
     expect(email?.delivered).toBe(false);
     expect(email?.reason).toContain("SES outage");
     expect(inApp?.delivered).toBe(true);
+  });
+
+  it("skips a non-security channel when the user disabled the relevant preference", async () => {
+    prismaMocks.default.notificationPreference.findUnique.mockImplementationOnce(
+      async () => ({ applicationUpdates: false }),
+    );
+
+    const result = await dispatch({
+      kind: "APPLICATION_STATUS_CHANGED",
+      candidate: { id: "u-pref-1", email: "p@b.com", name: "Pia" },
+      jobTitle: "Backend Engineer",
+      companyName: "Acme",
+      status: "INTERVIEW",
+      jobUrl: "https://app.test/applications/app-1",
+      applicationId: "app-1",
+      jobId: "job-1",
+    });
+
+    expect(emailMocks.applicationStatusEmail).not.toHaveBeenCalled();
+    expect(notificationMocks.createUserNotification).not.toHaveBeenCalled();
+    const email = result.outcomes.find((o) => o.channel === "email");
+    const inApp = result.outcomes.find((o) => o.channel === "in_app");
+    expect(email).toMatchObject({ delivered: false, reason: "preference_disabled" });
+    expect(inApp).toMatchObject({ delivered: false, reason: "preference_disabled" });
+
+    const skipMetric = opsMocks.recordOpsEvent.mock.calls.find(
+      ([arg]) => (arg as any).metricName === "notification_delivery_skipped",
+    );
+    expect(skipMetric).toBeTruthy();
+  });
+
+  it("security events bypass user preference flags", async () => {
+    prismaMocks.default.notificationPreference.findUnique.mockImplementationOnce(
+      async () => ({
+        applicationUpdates: false,
+        marketing: false,
+        smsEnabled: false,
+        securityAlerts: false,
+      }),
+    );
+
+    await dispatch({
+      kind: "PASSWORD_CHANGED",
+      user: { id: "u-pref-2", email: "q@b.com", name: "Quincy" },
+      changedAt: new Date("2026-04-24T10:00:00Z"),
+      supportUrl: "https://app.test/support",
+    });
+
+    expect(emailMocks.passwordChangedEmail).toHaveBeenCalledOnce();
+    expect(notificationMocks.createUserNotification).toHaveBeenCalledOnce();
+  });
+
+  it("pushes a dead letter when a channel send fails", async () => {
+    emailMocks.applicationStatusEmail.mockRejectedValueOnce(new Error("SES timeout"));
+
+    const result = await dispatch({
+      kind: "APPLICATION_STATUS_CHANGED",
+      candidate: { id: "u-dlq-1", email: "r@b.com", name: "Rex" },
+      jobTitle: "Backend Engineer",
+      companyName: "Acme",
+      status: "REJECTED",
+      jobUrl: "https://app.test/applications/app-2",
+      applicationId: "app-2",
+      jobId: "job-2",
+    });
+
+    const email = result.outcomes.find((o) => o.channel === "email");
+    expect(email?.delivered).toBe(false);
+    expect(email?.reason).toContain("SES timeout");
+
+    expect(resilienceMocks.pushDeadLetter).toHaveBeenCalledTimes(1);
+    const dlqArg = resilienceMocks.pushDeadLetter.mock.calls[0]?.[0];
+    expect(dlqArg).toMatchObject({
+      category: "notification",
+      source: "dispatcher_application_status_changed_email",
+      reasonCode: "channel_delivery_failed",
+    });
+    expect(dlqArg.payload).toMatchObject({
+      event: "APPLICATION_STATUS_CHANGED",
+      channel: "email",
+      template: "application_status",
+      recipientUserId: "u-dlq-1",
+    });
+
+    const failureMetric = opsMocks.recordOpsEvent.mock.calls.find(
+      ([arg]) => (arg as any).metricName === "notification_delivery_failure",
+    );
+    expect(failureMetric).toBeTruthy();
   });
 });
