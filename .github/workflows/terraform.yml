@@ -29,7 +29,7 @@ jobs:
           fetch-depth: 0
 
       - name: Detect infra diffs
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
