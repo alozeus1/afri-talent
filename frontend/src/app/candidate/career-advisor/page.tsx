@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { skills, CareerAdviceResult } from "@/lib/api";
@@ -26,15 +26,7 @@ export default function CareerAdvisorPage() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-    void loadHistory();
-  }, [user]);
-
-  async function loadHistory() {
+  const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
       const data = await skills.getCareerHistory(5);
@@ -50,7 +42,15 @@ export default function CareerAdvisorPage() {
     } finally {
       setHistoryLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    void loadHistory();
+  }, [user, loadHistory, router]);
 
   async function handleAnalyse() {
     if (!targetRole.trim()) return;

@@ -28,6 +28,7 @@ export default function CoverLetterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [edited, setEdited] = useState(false);
 
   if (!user) {
     router.push("/login");
@@ -42,8 +43,9 @@ export default function CoverLetterPage() {
     setLoading(true);
     setError(null);
     setCoverLetter(null);
+    setEdited(false);
     try {
-      const result = await skills.generateCoverLetter({ jobId: jobId.trim() });
+      const result = await skills.generateCoverLetter({ jobId: jobId.trim(), tone });
       setCoverLetter(result.coverLetter);
       setSource(result.source);
     } catch (err) {
@@ -164,15 +166,26 @@ export default function CoverLetterPage() {
               </div>
             </CardHeader>
             <CardContent>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cover Letter{" "}
+                <span className="text-gray-400 font-normal">
+                  (editable — personalise before sending)
+                </span>
+              </label>
               <textarea
-                readOnly
                 value={coverLetter}
+                onChange={(e) => {
+                  setCoverLetter(e.target.value);
+                  setEdited(true);
+                }}
                 rows={18}
-                className="w-full rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none"
+                data-testid="cover-letter-textarea"
+                className="w-full rounded-md border border-gray-300 px-4 py-3 text-sm text-gray-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-xs text-gray-400 mt-2">
-                Review and personalise before sending. AI-generated letters should always be
-                reviewed.
+                {edited
+                  ? "Your edits are preserved. Copy or paste into the application when ready."
+                  : "Review and personalise before sending. AI-generated letters should always be reviewed."}
               </p>
             </CardContent>
           </Card>

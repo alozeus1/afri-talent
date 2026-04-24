@@ -3,6 +3,8 @@ import { MockInterviewArtifactType, MockInterviewStatus, MockInterviewVisibility
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
+import { generateInterviewQuestions } from "../lib/ai/skills/interview-question-generator.js";
+import { evaluateInterviewAnswer } from "../lib/ai/skills/interview-answer-evaluator.js";
 const router = Router();
 const createSessionSchema = z.object({
     title: z.string().min(2).max(200),
@@ -245,6 +247,68 @@ router.post("/:id/artifacts", authenticate, authorize(Role.CANDIDATE), async (re
             return;
         }
         res.status(500).json({ error: "Failed to register interview artifact" });
+    }
+});
+// ── POST /api/mock-interviews/generate ───────────────────────────────────────
+const generateQuestionsSchema = z.object({
+    sessionId: z.string().min(1),
+    difficulty: z.enum(["easy", "medium", "hard"]).optional(),
+});
+router.post("/generate", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+    try {
+        const { sessionId, difficulty } = generateQuestionsSchema.parse(req.body);
+        const session = await prisma.mockInterviewSession.findFirst({
+            where: { id: sessionId, userId: req.user.userId },
+            select: { id: true, targetRole: true },
+        });
+        if (!session) {
+            res.status(404).json({ error: "Session not found" });
+            return;
+        }
+        const result = await generateInterviewQuestions({
+            role: session.targetRole,
+            difficulty: difficulty ?? "medium",
+            count: 5,
+        });
+        res.json(result);
+    }
+    catch (error) {
+        if (error instanceof z.ZodError) {
+            res.status(400).json({ error: "Validation failed", details: error.issues });
+            return;
+        }
+        res.status(500).json({ error: "Failed to generate interview questions" });
+    }
+});
+// ── POST /api/mock-interviews/:id/submit-answer ──────────────────────────────
+const submitAnswerSchema = z.object({
+    question: z.string().min(1).max(1000),
+    answer: z.string().min(1).max(5000),
+});
+router.post("/:id/submit-answer", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+    try {
+        const { question, answer } = submitAnswerSchema.parse(req.body);
+        const session = await prisma.mockInterviewSession.findFirst({
+            where: { id: req.params.id, userId: req.user.userId },
+            select: { id: true },
+        });
+        if (!session) {
+            res.status(404).json({ error: "Session not found" });
+            return;
+        }
+        const result = await evaluateInterviewAnswer({
+            question,
+            candidateAnswer: answer,
+            expectedPoints: [],
+        });
+        res.json(result);
+    }
+    catch (error) {
+        if (error instanceof z.ZodError) {
+            res.status(400).json({ error: "Validation failed", details: error.issues });
+            return;
+        }
+        res.status(500).json({ error: "Failed to evaluate answer" });
     }
 });
 export default router;

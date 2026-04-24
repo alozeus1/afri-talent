@@ -12,6 +12,8 @@ interface ApplicationWriterModalProps {
   onSuccess: (applicationId: string) => void;
 }
 
+type Tone = "professional" | "conversational" | "executive";
+
 export function ApplicationWriterModal({
   jobId,
   jobTitle,
@@ -22,13 +24,14 @@ export function ApplicationWriterModal({
   const [step, setStep] = useState<"idle" | "generating" | "review" | "submitting" | "done">("idle");
   const [coverLetter, setCoverLetter] = useState("");
   const [source, setSource] = useState<"ai" | "template" | null>(null);
+  const [tone, setTone] = useState<Tone>("professional");
   const [error, setError] = useState<string | null>(null);
 
   async function handleGenerate() {
     setStep("generating");
     setError(null);
     try {
-      const result = await skills.generateCoverLetter({ jobId });
+      const result = await skills.generateCoverLetter({ jobId, tone });
       setCoverLetter(result.coverLetter);
       setSource(result.source);
       setStep("review");
@@ -95,14 +98,35 @@ export function ApplicationWriterModal({
           )}
 
           {step === "idle" && (
-            <div className="text-center py-6 space-y-4">
-              <p className="text-sm text-gray-600">
+            <div className="py-4 space-y-4">
+              <p className="text-sm text-gray-600 text-center">
                 Claude will generate a personalised cover letter using your saved resume and this job description.
                 You can review and edit it before submitting.
               </p>
-              <Button onClick={handleGenerate} data-testid="generate-cover-letter-btn">
-                Generate Cover Letter
-              </Button>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Tone</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["professional", "conversational", "executive"] as Tone[]).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTone(t)}
+                      className={`rounded-md border px-3 py-2 text-xs capitalize transition-colors ${
+                        tone === t
+                          ? "border-blue-500 bg-blue-50 text-blue-700"
+                          : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="text-center">
+                <Button onClick={handleGenerate} data-testid="generate-cover-letter-btn">
+                  Generate Cover Letter
+                </Button>
+              </div>
             </div>
           )}
 

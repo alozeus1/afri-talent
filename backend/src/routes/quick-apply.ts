@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { z } from "zod";
+import { z } from "zod/v4";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { authenticate, authorize, requireVerifiedEmail } from "../middleware/auth.js";
@@ -10,6 +10,12 @@ const router = Router();
 
 const quickApplySchema = z.object({
   jobId: z.string().uuid(),
+  /**
+   * Explicit consent that the candidate has reviewed the application
+   * content (cover letter + CV) and wants to submit it on their behalf.
+   * Must be `true`. Missing or false returns 400 / CONSENT_REQUIRED.
+   */
+  confirm: z.literal(true, "Consent required: set confirm=true to submit."),
 });
 
 // POST /api/quick-apply — Quick apply to a job using profile data
@@ -110,6 +116,17 @@ router.post(
     res.status(201).json(application);
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const consentIssue = error.issues.find(
+        (i) => Array.isArray(i.path) && i.path.includes("confirm")
+      );
+      if (consentIssue) {
+        res.status(400).json({
+          error:
+            "Explicit consent is required before AfriTalent submits an application on your behalf.",
+          code: "CONSENT_REQUIRED",
+        });
+        return;
+      }
       res.status(400).json({ error: "Validation failed", details: error.issues });
       return;
     }

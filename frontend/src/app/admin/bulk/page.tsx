@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDistanceToNow } from "date-fns";
 
@@ -37,23 +36,12 @@ export default function BulkPage() {
         }
     }, [user, isLoading, router]);
 
-    useEffect(() => {
-        if (user?.role === "ADMIN") {
-            loadOperations();
-        }
-    }, [user]);
-
-    const loadOperations = async () => {
+    const loadOperations = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch(
-                `/api/admin/bulk?limit=50`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-                    },
-                }
-            );
+            const response = await fetch(`/api/admin/bulk?limit=50`, {
+                credentials: "include",
+            });
             const data = await response.json();
             setOperations(data.operations || []);
         } catch (error) {
@@ -61,14 +49,20 @@ export default function BulkPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (user?.role === "ADMIN") {
+            void loadOperations();
+        }
+    }, [user, loadOperations]);
 
     const handleCreateOperation = async () => {
         try {
             const response = await fetch(`/api/admin/bulk`, {
                 method: "POST",
+                credentials: "include",
                 headers: {
-                    Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
@@ -116,7 +110,7 @@ export default function BulkPage() {
                         <label className="text-sm font-medium">Operation Type</label>
                         <select
                             value={operationType}
-                            onChange={(e: any) => setOperationType(e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setOperationType(e.target.value)}
                             className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                         >
                             <option value="DATA_EXPORT">Data Export</option>
@@ -132,7 +126,7 @@ export default function BulkPage() {
                         <label className="text-sm font-medium">Filters (JSON)</label>
                         <Textarea
                             value={filters}
-                            onChange={(e: any) => setFilters(e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFilters(e.target.value)}
                             placeholder='{"role": "RECRUITER"}'
                             className="mt-1 font-mono text-xs"
                             rows={4}

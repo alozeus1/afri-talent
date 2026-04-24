@@ -125,3 +125,43 @@ describe("quality-rubric / formatReportLine", () => {
     expect(line).toContain("words=");
   });
 });
+
+describe("quality-rubric / job match explanation", () => {
+  it("passes a specific, non-generic match explanation", () => {
+    const r = gradeAiOutput({
+      text: "This role aligns with your 5 years of AWS and Terraform experience. You are missing SOC 2 certification, but your DevSecOps background partially covers this gap.",
+      kind: "cover_letter",
+    });
+    // A specific explanation should not fail on banned phrases or placeholders
+    expect(r.issues.filter((i) => i.code === "BANNED_PHRASE")).toHaveLength(0);
+    expect(r.issues.filter((i) => i.code === "PLACEHOLDER_LEAK")).toHaveLength(0);
+  });
+
+  it("fails a generic match explanation", () => {
+    const r = gradeAiOutput({
+      text: "You are a results-driven team player who is hard-working and passionate about technology.",
+      kind: "cover_letter",
+    });
+    expect(r.grade).toBe("FAIL");
+    expect(r.issues.some((i) => i.code === "BANNED_PHRASE")).toBe(true);
+  });
+});
+
+describe("quality-rubric / hallucination guard", () => {
+  it("flags placeholder leaks as potential hallucination", () => {
+    // Uses patterns matched by PLACEHOLDER_PATTERNS: [insert ...] and {{...}}
+    const r = gradeAiOutput({
+      text: "I have worked at [insert company name] for {{years_of_experience}} and delivered results.",
+      kind: "resume",
+    });
+    expect(r.issues.some((i) => i.code === "PLACEHOLDER_LEAK")).toBe(true);
+  });
+
+  it("does not flag real experience descriptions", () => {
+    const r = gradeAiOutput({
+      text: "Led migration of 3 microservices to AWS ECS Fargate, reducing deployment time by 40% and cutting infrastructure costs by $12k/month. Implemented CI/CD with GitHub Actions and Terraform for 8 engineers.",
+      kind: "resume",
+    });
+    expect(r.issues.filter((i) => i.code === "PLACEHOLDER_LEAK")).toHaveLength(0);
+  });
+});

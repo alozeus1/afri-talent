@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ChangeEvent, KeyboardEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,13 +47,32 @@ export default function AuditLogsPage() {
         }
     }, [user, isLoading, router]);
 
+    const loadLogs = useCallback(async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(
+                `/api/admin/audit-logs?page=${page}&limit=50${filterAction !== "ALL" ? `&action=${filterAction}` : ""}${filterTarget ? `&targetType=${filterTarget}` : ""}`,
+                {
+                    credentials: "include",
+                }
+            );
+            const data = await response.json();
+            setLogs(data.logs);
+            setTotal(data.pagination.total);
+        } catch (error) {
+            console.error("Failed to load audit logs:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, [page, filterAction, filterTarget]);
+
     useEffect(() => {
         if (user?.role === "ADMIN") {
-            loadLogs();
+            void loadLogs();
         }
-    }, [user, page, filterAction, filterTarget]);
+    }, [user, loadLogs]);
 
-    const loadLogs = async () => {
+    const handleFilterLoad = async () => {
         setLoading(true);
         try {
             const response = await fetch(
@@ -82,9 +101,7 @@ export default function AuditLogsPage() {
             const response = await fetch(
                 `/api/admin/audit-logs?page=1&targetId=${searchTerm}`,
                 {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-                    },
+                    credentials: "include",
                 }
             );
             const data = await response.json();
@@ -139,7 +156,7 @@ export default function AuditLogsPage() {
                             <label className="text-sm font-medium">Action</label>
                             <select
                                 value={filterAction}
-                                onChange={(e: any) => setFilterAction(e.target.value)}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterAction(e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                             >
                                 <option value="ALL">All Actions</option>
@@ -157,7 +174,7 @@ export default function AuditLogsPage() {
                             <label className="text-sm font-medium">Target Type</label>
                             <select
                                 value={filterTarget}
-                                onChange={(e: any) => setFilterTarget(e.target.value)}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterTarget(e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                             >
                                 <option value="">All Types</option>

@@ -59,6 +59,7 @@ export default function ResumeBuilderPage() {
   });
 
   const [generated, setGenerated] = useState<GeneratedResume | null>(null);
+  const [editedText, setEditedText] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +119,7 @@ export default function ResumeBuilderPage() {
           : undefined,
       });
       setGenerated(result.resume);
+      setEditedText(result.resume.rawText);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate resume");
     } finally {
@@ -132,7 +134,7 @@ export default function ResumeBuilderPage() {
     try {
       await skills.saveResume({
         content: generated.sections as unknown as Record<string, unknown>,
-        rawText: generated.rawText,
+        rawText: editedText || generated.rawText,
       });
       setSaved(true);
     } catch (err) {
@@ -153,7 +155,7 @@ export default function ResumeBuilderPage() {
     setAtsResult(null);
     try {
       const result = await skills.scanResumeAts({
-        resumeText: generated.rawText,
+        resumeText: editedText || generated.rawText,
         jobDescription: atsJobDescription.trim() || undefined,
       });
       setAtsResult(result);
@@ -397,7 +399,7 @@ export default function ResumeBuilderPage() {
                 {saved && <Badge variant="success">Saved</Badge>}
               </div>
               <div className="flex gap-2">
-                <Button onClick={() => { setGenerated(null); setSaved(false); }} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+                <Button onClick={() => { setGenerated(null); setSaved(false); setEditedText(""); }} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
                   Edit Inputs
                 </Button>
                 <Button onClick={handlePrint} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
@@ -410,10 +412,23 @@ export default function ResumeBuilderPage() {
             </div>
 
             <Card>
-              <CardContent className="p-6">
-                <pre className="whitespace-pre-wrap font-mono text-sm text-gray-800 leading-relaxed">
-                  {generated.rawText}
-                </pre>
+              <CardContent className="p-6 space-y-2">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Preview{" "}
+                  <span className="normal-case font-normal text-gray-400">
+                    (editable — refine before saving)
+                  </span>
+                </label>
+                <textarea
+                  value={editedText}
+                  onChange={(e) => {
+                    setEditedText(e.target.value);
+                    setSaved(false);
+                  }}
+                  rows={24}
+                  data-testid="resume-preview-textarea"
+                  className="w-full rounded-md border border-gray-200 bg-white px-4 py-3 font-mono text-sm text-gray-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </CardContent>
             </Card>
 

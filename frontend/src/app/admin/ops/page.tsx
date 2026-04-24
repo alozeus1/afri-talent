@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,23 +34,12 @@ export default function OpsPage() {
         }
     }, [user, isLoading, router]);
 
-    useEffect(() => {
-        if (user?.role === "ADMIN") {
-            loadAlerts();
-        }
-    }, [user, filterStatus]);
-
-    const loadAlerts = async () => {
+    const loadAlerts = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch(
-                `/api/admin/alerts?status=${filterStatus}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-                    },
-                }
-            );
+            const response = await fetch(`/api/admin/alerts?status=${filterStatus}`, {
+                credentials: "include",
+            });
             const data = await response.json();
             setAlerts(data.alerts || []);
         } catch (error) {
@@ -58,14 +47,20 @@ export default function OpsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [filterStatus]);
+
+    useEffect(() => {
+        if (user?.role === "ADMIN") {
+            void loadAlerts();
+        }
+    }, [user, loadAlerts]);
 
     const handleResolveAlert = async (alertId: string, resolution: string) => {
         try {
             await fetch(`/api/admin/alerts/${alertId}/resolve`, {
                 method: "POST",
+                credentials: "include",
                 headers: {
-                    Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({ resolution }),
@@ -107,7 +102,7 @@ export default function OpsPage() {
                         <label className="text-sm font-medium">Filter by Status</label>
                         <select
                             value={filterStatus}
-                            onChange={(e: any) => setFilterStatus(e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value)}
                             className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                         >
                             <option value="ACTIVE">Active</option>

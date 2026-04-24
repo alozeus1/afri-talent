@@ -11,7 +11,7 @@
 // POST /api/autopilot/apply          — trigger on-demand apply pack for a job
 // ─────────────────────────────────────────────────────────────────────────────
 import { Router } from "express";
-import { z } from "zod";
+import { z } from "zod/v4";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { authenticate, authorize } from "../middleware/auth.js";
@@ -22,6 +22,15 @@ import { buildFollowUpDraft, buildInterviewPrepPack, buildResumeVersion, buildTa
 const router = Router();
 const applySchema = z.object({
     jobId: z.string().uuid(),
+    /**
+     * Explicit candidate consent to submit an AI-assembled application pack.
+     * Must be true. Absent/false → 400 CONSENT_REQUIRED.
+     */
+    confirm: z.literal(true, "Consent required: set confirm=true to submit."),
+});
+const batchApplySchema = z.object({
+    jobIds: z.array(z.string()).min(1).max(50),
+    customMessage: z.string().max(2000).optional(),
 });
 const settingsSchema = z.object({
     enabled: z.boolean().optional(),
@@ -461,6 +470,14 @@ router.post("/apply", authenticate, authorize(Role.CANDIDATE), async (req, res) 
     const userId = req.user.userId;
     const parsed = applySchema.safeParse(req.body);
     if (!parsed.success) {
+        const consentIssue = parsed.error.issues.find((i) => Array.isArray(i.path) && i.path.includes("confirm"));
+        if (consentIssue) {
+            res.status(400).json({
+                error: "Explicit consent is required before AfriTalent submits an application on your behalf.",
+                code: "CONSENT_REQUIRED",
+            });
+            return;
+        }
         res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
         return;
     }
@@ -606,5 +623,143 @@ router.post("/apply", authenticate, authorize(Role.CANDIDATE), async (req, res) 
         res.status(500).json({ error: "Failed to generate application" });
     }
 });
+// ── POST /api/autopilot/batch ────────────────────────────────────────────────
+router.post("/batch", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+    const userId = req.user.userId;
+    const parsed = batchApplySchema.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
+        return;
+    }
+    const { jobIds, customMessage } = parsed.data;
+    try {
+        const batch = await prisma.autoApplyBatch.create({
+            data: {
+                candidateId: userId,
+                jobsTargeted: jobIds.length,
+                status: "queued",
+                jobFilters: { jobIds },
+            },
+        });
+        void processBatch(batch.id, userId, jobIds, customMessage);
+        res.status(202).json({
+            batchId: batch.id,
+            jobsTargeted: jobIds.length,
+            status: "queued",
+            message: "Batch queued. Use GET /api/autopilot/batch/:batchId to track progress.",
+        });
+    }
+    catch (err) {
+        logger.error({ err, userId }, "[autopilot] batch create failed");
+        res.status(500).json({ error: "Failed to create batch" });
+    }
+});
+// ── GET /api/autopilot/batch/:batchId ────────────────────────────────────────
+router.get("/batch/:batchId", authenticate, authorize(Role.CANDIDATE), async (req, res) => {
+    const userId = req.user.userId;
+    const { batchId } = req.params;
+    try {
+        const batch = await prisma.autoApplyBatch.findFirst({
+            where: { id: batchId, candidateId: userId },
+        });
+        if (!batch) {
+            res.status(404).json({ error: "Batch not found" });
+            return;
+        }
+        res.json({
+            id: batch.id,
+            status: batch.status,
+            jobsTargeted: batch.jobsTargeted,
+            jobsApplied: batch.jobsApplied,
+            jobsFailed: batch.jobsFailed,
+            creditsUsed: batch.creditsUsed,
+            startedAt: batch.startedAt,
+            completedAt: batch.completedAt,
+            createdAt: batch.createdAt,
+        });
+    }
+    catch (err) {
+        logger.error({ err, userId, batchId }, "[autopilot] batch status failed");
+        res.status(500).json({ error: "Failed to fetch batch status" });
+    }
+});
+async function processBatch(batchId, userId, jobIds, customMessage) {
+    try {
+        await prisma.autoApplyBatch.update({
+            where: { id: batchId },
+            data: { status: "in_progress", startedAt: new Date() },
+        });
+        const { profile, user } = await loadCandidateContext(userId);
+        for (const jobId of jobIds) {
+            try {
+                const job = await prisma.job.findUnique({ where: { id: jobId } });
+                if (!job || job.status !== "PUBLISHED") {
+                    await prisma.autoApplyBatch.update({
+                        where: { id: batchId },
+                        data: { jobsFailed: { increment: 1 } },
+                    });
+                    continue;
+                }
+                const existing = await prisma.application.findFirst({
+                    where: { jobId, candidateId: userId },
+                });
+                if (existing) {
+                    await prisma.autoApplyBatch.update({
+                        where: { id: batchId },
+                        data: { jobsFailed: { increment: 1 } },
+                    });
+                    continue;
+                }
+                const companyName = job.employerId
+                    ? (await prisma.employer.findUnique({ where: { id: job.employerId }, select: { companyName: true } }))?.companyName ?? job.sourceName ?? "the company"
+                    : job.sourceName ?? "the company";
+                const clResult = await generateQuickCoverLetter({
+                    candidateName: user?.name ?? "Candidate",
+                    headline: profile?.headline ?? null,
+                    skills: profile?.skills ?? [],
+                    bio: profile?.bio ?? null,
+                    yearsExperience: profile?.yearsExperience ?? 0,
+                    jobTitle: job.title,
+                    companyName,
+                    jobDescription: customMessage
+                        ? `${job.description}\n\nCandidate note: ${customMessage}`
+                        : job.description,
+                });
+                await prisma.application.create({
+                    data: {
+                        jobId,
+                        candidateId: userId,
+                        cvUrl: profile?.resumes?.[0]?.s3Key ?? null,
+                        coverLetter: clResult.coverLetter,
+                        notes: `[Batch Application] Cover letter source: ${clResult.source}`,
+                        status: "PENDING",
+                    },
+                });
+                await prisma.autoApplyBatch.update({
+                    where: { id: batchId },
+                    data: { jobsApplied: { increment: 1 }, creditsUsed: { increment: 1 } },
+                });
+            }
+            catch (jobErr) {
+                logger.warn({ jobErr, jobId, batchId }, "[autopilot] batch job failed");
+                await prisma.autoApplyBatch.update({
+                    where: { id: batchId },
+                    data: { jobsFailed: { increment: 1 } },
+                }).catch(() => { });
+            }
+        }
+        await prisma.autoApplyBatch.update({
+            where: { id: batchId },
+            data: { status: "completed", completedAt: new Date() },
+        });
+    }
+    catch (err) {
+        logger.error({ err, batchId }, "[autopilot] batch processing failed");
+        await prisma.autoApplyBatch.update({
+            where: { id: batchId },
+            data: { status: "failed" },
+        }).catch(() => { });
+    }
+}
 export default router;
 //# sourceMappingURL=autopilot.js.map

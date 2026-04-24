@@ -25,6 +25,74 @@ export interface JobMatch {
   slug: string;
   score: number;
   matchMethod: "vector" | "keyword";
+  /**
+   * One-line human-readable reason the job surfaced for this candidate.
+   * Always deterministic — built from matched keywords/score — never fabricated.
+   */
+  explanation: string;
+  /**
+   * True if the linked employer has a trust profile past UNVERIFIED.
+   * Scraped/source jobs with no employerId always report `false`.
+   */
+  verifiedEmployer: boolean;
+  // ── Intelligence fields ──────────────────────────────────────────────────────
+  /** "YES" | "NO" | "UNKNOWN" */
+  visaSponsorship: string;
+  /** ISO country codes or region strings eligible for this role. */
+  eligibleCountries: string[];
+  /** 0–100 risk score for the posting (higher = riskier). */
+  riskScore: number;
+  /** "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" */
+  riskLevel: string;
+  /** 0–100 quality score for the posting. */
+  qualityScore: number;
+  /** "TRUSTED" | "SOLID" | "REVIEW" | "THIN" derived from qualityScore. */
+  qualityLabel: string;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function deriveQualityLabel(score: number): string {
+  if (score >= 75) return "TRUSTED";
+  if (score >= 50) return "SOLID";
+  if (score >= 25) return "REVIEW";
+  return "THIN";
+}
+
+function buildExplanation(opts: {
+  score: number;
+  method: "vector" | "keyword";
+  matchedKeywords: string[];
+  verifiedEmployer: boolean;
+  visaSponsorship: string;
+  riskLevel: string;
+  qualityScore: number;
+}): string {
+  const { score, method, matchedKeywords, verifiedEmployer, visaSponsorship, riskLevel, qualityScore } = opts;
+  const topKeywords = matchedKeywords.slice(0, 3).filter(Boolean);
+  const parts: string[] = [];
+
+  if (method === "vector") {
+    parts.push(
+      score >= 80
+        ? "Strong semantic match to your resume"
+        : score >= 60
+        ? "Good semantic alignment with your resume"
+        : "Partial semantic match to your resume"
+    );
+  } else {
+    parts.push(
+      topKeywords.length > 0
+        ? `Matches your skills: ${topKeywords.join(", ")}`
+        : "Recent opening aligned with your target role"
+    );
+  }
+
+  if (verifiedEmployer) parts.push("verified employer");
+  if (visaSponsorship === "YES") parts.push("visa sponsorship available");
+  if (riskLevel === "HIGH" || riskLevel === "CRITICAL") parts.push("warning: elevated risk signals detected");
+  if (qualityScore >= 75) parts.push("high-quality posting with strong employer signals");
+  return parts.join(" · ");
 }
 
 // ── Generate embedding vector for a text string ───────────────────────────────
@@ -115,6 +183,14 @@ async function vectorSearch(userId: string, limit: number): Promise<JobMatch[]> 
     seniority: string;
     slug: string;
     score: unknown;
+    verificationLevel: string | null;
+    matchedTags: string[] | null;
+    riskScore: unknown;
+    riskLevel: string | null;
+    qualityScore: unknown;
+    freshnessScore: unknown;
+    visaSponsorship: string | null;
+    eligibleCountries: string[] | null;
   }
 
   const rows = await prisma.$queryRaw<RawJobRow[]>`
@@ -126,8 +202,18 @@ async function vectorSearch(userId: string, limit: number): Promise<JobMatch[]> 
       j.type,
       j.seniority,
       j.slug,
-      1 - (j.embedding <=> ${resumeRows[0].embedding}::vector) AS score
+      1 - (j.embedding <=> ${resumeRows[0].embedding}::vector) AS score,
+      etp."verificationLevel"::text AS "verificationLevel",
+      j.tags AS "matchedTags",
+      j."riskScore",
+      j."riskLevel"::text AS "riskLevel",
+      j."qualityScore",
+      j."freshnessScore",
+      j."visaSponsorship"::text AS "visaSponsorship",
+      j."eligibleCountries"
     FROM "Job" j
+    LEFT JOIN "Employer" e ON e.id = j."employerId"
+    LEFT JOIN "EmployerTrustProfile" etp ON etp."employerId" = e.id
     WHERE
       j.status = 'PUBLISHED'
       AND j."isExpired" = false
@@ -136,17 +222,43 @@ async function vectorSearch(userId: string, limit: number): Promise<JobMatch[]> 
     LIMIT ${limit}
   `;
 
-  return rows.map((r) => ({
-    jobId: r.id,
-    title: r.title,
-    company: r.sourceName || "Company",
-    location: r.location,
-    type: r.type,
-    seniority: r.seniority,
-    slug: r.slug,
-    score: Math.round(Number(r.score) * 100),
-    matchMethod: "vector" as const,
-  }));
+  return rows.map((r) => {
+    const score = Math.round(Number(r.score) * 100);
+    const verifiedEmployer =
+      !!r.verificationLevel && r.verificationLevel !== "UNVERIFIED";
+    const riskScore = Number(r.riskScore) || 0;
+    const riskLevel = r.riskLevel || "LOW";
+    const qualityScore = Number(r.qualityScore) || 0;
+    const visaSponsorship = r.visaSponsorship || "UNKNOWN";
+    const eligibleCountries = Array.isArray(r.eligibleCountries) ? r.eligibleCountries : [];
+    return {
+      jobId: r.id,
+      title: r.title,
+      company: r.sourceName || "Company",
+      location: r.location,
+      type: r.type,
+      seniority: r.seniority,
+      slug: r.slug,
+      score,
+      matchMethod: "vector" as const,
+      verifiedEmployer,
+      explanation: buildExplanation({
+        score,
+        method: "vector",
+        matchedKeywords: Array.isArray(r.matchedTags) ? r.matchedTags : [],
+        verifiedEmployer,
+        visaSponsorship,
+        riskLevel,
+        qualityScore,
+      }),
+      visaSponsorship,
+      eligibleCountries,
+      riskScore,
+      riskLevel,
+      qualityScore,
+      qualityLabel: deriveQualityLabel(qualityScore),
+    };
+  });
 }
 
 async function keywordFallback(userId: string, limit: number): Promise<JobMatch[]> {
@@ -161,25 +273,72 @@ async function keywordFallback(userId: string, limit: number): Promise<JobMatch[
     ...(profile?.targetRoles || []).slice(0, 2),
   ];
 
+  const employerSelect = {
+    trustProfile: { select: { verificationLevel: true } },
+  };
+  const baseSelect = {
+    id: true,
+    title: true,
+    sourceName: true,
+    location: true,
+    type: true,
+    seniority: true,
+    slug: true,
+    tags: true,
+    riskScore: true,
+    riskLevel: true,
+    qualityScore: true,
+    freshnessScore: true,
+    visaSponsorship: true,
+    eligibleCountries: true,
+    employer: { select: employerSelect },
+  };
+
   if (keywords.length === 0) {
     // No profile — just return latest published jobs
     const latestJobs = await prisma.job.findMany({
       where: { status: "PUBLISHED", isExpired: false },
       orderBy: { publishedAt: "desc" },
       take: limit,
-      select: { id: true, title: true, sourceName: true, location: true, type: true, seniority: true, slug: true },
+      select: baseSelect,
     });
-    return latestJobs.map((j) => ({
-      jobId: j.id,
-      title: j.title,
-      company: j.sourceName || "Company",
-      location: j.location,
-      type: j.type,
-      seniority: j.seniority,
-      slug: j.slug,
-      score: 50,
-      matchMethod: "keyword" as const,
-    }));
+    return latestJobs.map((j) => {
+      const verifiedEmployer =
+        !!j.employer?.trustProfile?.verificationLevel &&
+        j.employer.trustProfile.verificationLevel !== "UNVERIFIED";
+      const riskScore = j.riskScore ?? 0;
+      const riskLevel = String(j.riskLevel ?? "LOW");
+      const qualityScore = j.qualityScore ?? 0;
+      const visaSponsorship = String(j.visaSponsorship ?? "UNKNOWN");
+      const eligibleCountries = Array.isArray(j.eligibleCountries) ? (j.eligibleCountries as string[]) : [];
+      return {
+        jobId: j.id,
+        title: j.title,
+        company: j.sourceName || "Company",
+        location: j.location,
+        type: j.type,
+        seniority: j.seniority,
+        slug: j.slug,
+        score: 50,
+        matchMethod: "keyword" as const,
+        verifiedEmployer,
+        explanation: buildExplanation({
+          score: 50,
+          method: "keyword",
+          matchedKeywords: [],
+          verifiedEmployer,
+          visaSponsorship,
+          riskLevel,
+          qualityScore,
+        }),
+        visaSponsorship,
+        eligibleCountries,
+        riskScore,
+        riskLevel,
+        qualityScore,
+        qualityLabel: deriveQualityLabel(qualityScore),
+      };
+    });
   }
 
   // Simple OR filter on title/description for first keyword
@@ -193,20 +352,49 @@ async function keywordFallback(userId: string, limit: number): Promise<JobMatch[
     },
     orderBy: { freshnessScore: "desc" },
     take: limit,
-    select: { id: true, title: true, sourceName: true, location: true, type: true, seniority: true, slug: true },
+    select: baseSelect,
   });
 
-  return jobs.map((j) => ({
-    jobId: j.id,
-    title: j.title,
-    company: j.sourceName || "Company",
-    location: j.location,
-    type: j.type,
-    seniority: j.seniority,
-    slug: j.slug,
-    score: 60,
-    matchMethod: "keyword" as const,
-  }));
+  return jobs.map((j) => {
+    const verifiedEmployer =
+      !!j.employer?.trustProfile?.verificationLevel &&
+      j.employer.trustProfile.verificationLevel !== "UNVERIFIED";
+    const matched = keywords.filter((k) =>
+      j.title.toLowerCase().includes(k.toLowerCase())
+    );
+    const riskScore = j.riskScore ?? 0;
+    const riskLevel = String(j.riskLevel ?? "LOW");
+    const qualityScore = j.qualityScore ?? 0;
+    const visaSponsorship = String(j.visaSponsorship ?? "UNKNOWN");
+    const eligibleCountries = Array.isArray(j.eligibleCountries) ? (j.eligibleCountries as string[]) : [];
+    return {
+      jobId: j.id,
+      title: j.title,
+      company: j.sourceName || "Company",
+      location: j.location,
+      type: j.type,
+      seniority: j.seniority,
+      slug: j.slug,
+      score: 60,
+      matchMethod: "keyword" as const,
+      verifiedEmployer,
+      explanation: buildExplanation({
+        score: 60,
+        method: "keyword",
+        matchedKeywords: matched,
+        verifiedEmployer,
+        visaSponsorship,
+        riskLevel,
+        qualityScore,
+      }),
+      visaSponsorship,
+      eligibleCountries,
+      riskScore,
+      riskLevel,
+      qualityScore,
+      qualityLabel: deriveQualityLabel(qualityScore),
+    };
+  });
 }
 
 // ── Embed all unembedded published jobs (called by semantic indexer) ──────────

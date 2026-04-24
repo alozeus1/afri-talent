@@ -19,6 +19,7 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [consented, setConsented] = useState(false);
 
   const isOnPlatformApply = job.discovery?.deliveryModel === "ON_PLATFORM" || job.jobSource === "EMPLOYER_POSTED";
   const externalApplyUrl = job.applicationUrl || job.sourceUrl || null;
@@ -37,6 +38,7 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
       setError(null);
       setSuccess(false);
       setEligibility(null);
+      setConsented(false);
 
       quickApply
         .checkEligibility(job.id)
@@ -53,11 +55,15 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
   }, [isOpen, isOnPlatformApply, job.id]);
 
   const handleApply = async () => {
+    if (!consented) {
+      setError("Please confirm you have reviewed this application before submitting.");
+      return;
+    }
     setApplying(true);
     setError(null);
 
     try {
-      await quickApply.apply(job.id);
+      await quickApply.apply(job.id, { confirm: true });
       setSuccess(true);
       setTimeout(() => {
         onSuccess();
@@ -207,11 +213,29 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                   </div>
                 )}
 
+                <label
+                  htmlFor="quick-apply-consent"
+                  className="flex items-start gap-3 p-3 mb-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <input
+                    id="quick-apply-consent"
+                    type="checkbox"
+                    data-testid="quick-apply-consent-checkbox"
+                    checked={consented}
+                    onChange={(e) => setConsented(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    I confirm I&apos;ve reviewed this application and want AfriTalent to submit it on my behalf.
+                  </span>
+                </label>
+
                 <Button
                   className="w-full"
                   size="lg"
                   onClick={handleApply}
-                  disabled={applying}
+                  disabled={applying || !consented}
+                  data-testid="quick-apply-submit"
                 >
                   {applying ? "Submitting..." : "Apply Now"}
                 </Button>
