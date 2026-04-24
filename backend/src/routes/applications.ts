@@ -4,6 +4,7 @@ import prisma from "../lib/prisma.js";
 import { authenticate, authorize, requireVerifiedEmail } from "../middleware/auth.js";
 import { ApplicationStatus, JobStatus, Role, TrustEntityType, TrustRiskLevel } from "@prisma/client";
 import { createUserNotification } from "../lib/notifications.js";
+import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import { requireAccountStanding } from "../middleware/account-standing.js";
 import { assessApplicationRisk } from "../lib/trust/risk.js";
 import {
@@ -348,7 +349,10 @@ router.put("/:id/status", authenticate, authorize(Role.EMPLOYER), async (req: Re
     // Verify application's job belongs to employer
     const application = await prisma.application.findUnique({
       where: { id: req.params.id },
-      include: { job: true },
+      include: {
+        job: { include: { employer: { select: { companyName: true } } } },
+        candidate: { select: { id: true, email: true, name: true } },
+      },
     });
 
     if (!application || application.job.employerId !== employer.id) {
@@ -373,17 +377,20 @@ router.put("/:id/status", authenticate, authorize(Role.EMPLOYER), async (req: Re
       message: syncError instanceof Error ? syncError.message : "ATS stage sync failed",
     }));
 
-    await createUserNotification({
-      userId: application.candidateId,
-      type: "APPLICATION_STATUS",
-      title: "Application status updated",
-      body: `Your application for ${application.job.title} is now ${data.status.toLowerCase()}.`,
-      channel: "applicationUpdates",
-      metadata: {
-        applicationId: updatedApplication.id,
-        jobId: application.jobId,
-        status: data.status,
+    const appBaseUrl = process.env.APP_URL || process.env.FRONTEND_URL || "https://afritalent.com";
+    await dispatchNotification({
+      kind: "APPLICATION_STATUS_CHANGED",
+      candidate: {
+        id: application.candidate.id,
+        email: application.candidate.email,
+        name: application.candidate.name,
       },
+      jobTitle: application.job.title,
+      companyName: application.job.employer?.companyName ?? "Employer",
+      status: data.status,
+      jobUrl: `${appBaseUrl}/candidate/applications/${updatedApplication.id}`,
+      applicationId: updatedApplication.id,
+      jobId: application.jobId,
     });
 
     res.json({

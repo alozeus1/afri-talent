@@ -285,6 +285,61 @@ export async function verificationEmail(opts: {
   });
 }
 
+export async function welcomeEmail(opts: {
+  to: string;
+  userName: string;
+  role: "CANDIDATE" | "EMPLOYER" | "ADMIN";
+  appUrl: string;
+}): Promise<void> {
+  const heading =
+    opts.role === "EMPLOYER"
+      ? "Welcome to AfriTalent — let's find you great talent"
+      : "Welcome to AfriTalent — your global career starts here";
+  const body =
+    opts.role === "EMPLOYER"
+      ? "Your employer account is ready. You can post roles, search verified candidates, and manage your hiring pipeline."
+      : "Your candidate account is ready. Build your profile, get matched to global roles, and apply with one click.";
+
+  await sendEmail({
+    to: opts.to,
+    subject: heading,
+    templateName: "welcome_account_registered",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.userName},</h2>
+        <p>${body}</p>
+        <p><a href="${opts.appUrl}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;">Go to AfriTalent</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: `Hi ${opts.userName},\n\n${body}\n\nGo to AfriTalent: ${opts.appUrl}`,
+  });
+}
+
+export async function accountClosedEmail(opts: {
+  to: string;
+  userName: string;
+  scheduledDeletionDays: number;
+  supportUrl: string;
+}): Promise<void> {
+  await sendEmail({
+    to: opts.to,
+    subject: "Your AfriTalent account closure request",
+    templateName: "account_closed",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.userName},</h2>
+        <p>We've received your request to close your AfriTalent account.</p>
+        <p>Your account and data will be permanently deleted in <strong>${opts.scheduledDeletionDays} days</strong>. You can sign in any time during that window to cancel the request.</p>
+        <p>If you didn't request this, contact our team right away:</p>
+        <p><a href="${opts.supportUrl}" style="background:#059669;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Contact Support</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: `Hi ${opts.userName},\n\nWe've received your request to close your AfriTalent account.\n\nYour account will be permanently deleted in ${opts.scheduledDeletionDays} days. Sign in any time during that window to cancel.\n\nIf you didn't request this, contact support: ${opts.supportUrl}`,
+  });
+}
+
 export async function accountEmailVerificationEmail(opts: {
   to: string;
   candidateName: string;

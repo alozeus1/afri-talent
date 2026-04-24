@@ -82,6 +82,9 @@ enum NotificationType {
   WEEKLY_DIGEST
   SALARY_INSIGHT
   INTERVIEW_PREP
+  ACCOUNT_REGISTERED
+  ACCOUNT_CLOSED
+  SECURITY_ALERT
 }
 
 enum NotificationStatus {
@@ -689,6 +692,8 @@ model User {
   accountRestrictionStatus AccountRestrictionStatus @default(ACTIVE)
   accountRestrictionReason String?                  @db.VarChar(160)
   accountRestrictedAt      DateTime?
+  deletionRequestedAt      DateTime?
+  deletedAt                DateTime?
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 
@@ -1044,6 +1049,7 @@ model CandidateProfile {
   certifications      Json?
   openToWork          Boolean  @default(false)
   profileCompleteness Int      @default(0)
+  profileVisible      Boolean  @default(true)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

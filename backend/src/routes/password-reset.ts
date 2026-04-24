@@ -4,7 +4,7 @@ import bcrypt from "bcrypt";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { passwordResetLimiter } from "../middleware/security.js";
-import { passwordResetEmail } from "../lib/email.js";
+import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import logger from "../lib/logger.js";
 
 const router = Router();
@@ -61,12 +61,12 @@ router.post("/forgot-password", passwordResetLimiter, async (req: Request, res: 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
 
-    void passwordResetEmail({
-      to: user.email,
-      userName: user.name,
+    void dispatchNotification({
+      kind: "PASSWORD_RESET_REQUESTED",
+      user: { id: user.id, email: user.email, name: user.name },
       resetUrl,
       expiresInHours: RESET_TOKEN_EXPIRY_HOURS,
-    }).catch((err) => logger.error({ err }, "Failed to send password reset email"));
+    }).catch((err) => logger.error({ err }, "Failed to dispatch password reset notification"));
 
     logger.info({ userId: user.id.slice(0, 8) }, "Password reset token generated");
     res.json(successResponse);
