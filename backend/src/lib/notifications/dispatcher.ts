@@ -16,12 +16,14 @@ import {
   accountClosedEmail,
   applicationStatusEmail,
   passwordResetEmail,
+  phoneVerifiedEmail,
   welcomeEmail,
 } from "../email.js";
 import {
   createUserNotification,
   type NotificationChannel,
 } from "../notifications.js";
+import { sendSms } from "../sms/africasTalking.js";
 
 export type DispatchableEvent =
   | {
@@ -50,10 +52,22 @@ export type DispatchableEvent =
       jobUrl: string;
       applicationId: string;
       jobId: string;
+    }
+  | {
+      kind: "PHONE_OTP_REQUESTED";
+      user: { id: string; name: string };
+      phoneNumber: string;
+      otpCode: string;
+      expiresInMinutes: number;
+    }
+  | {
+      kind: "PHONE_VERIFIED";
+      user: { id: string; email: string; name: string };
+      phoneNumber: string;
     };
 
 interface ChannelOutcome {
-  channel: "email" | "in_app" | "push";
+  channel: "email" | "in_app" | "push" | "sms";
   delivered: boolean;
   reason?: string;
 }
@@ -83,7 +97,21 @@ const EVENT_POLICY: Record<DispatchableEvent["kind"], EventPolicy> = {
     inAppChannel: "applicationUpdates",
     isSecurityEvent: false,
   },
+  PHONE_OTP_REQUESTED: {
+    isSecurityEvent: true,
+  },
+  PHONE_VERIFIED: {
+    notificationType: "PHONE_VERIFIED",
+    inAppChannel: "applicationUpdates",
+    isSecurityEvent: true,
+  },
 };
+
+function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length <= 4) return phone;
+  return digits.slice(-4);
+}
 
 async function safeSend<T>(
   channel: ChannelOutcome["channel"],
@@ -206,6 +234,65 @@ export async function dispatch(
                 jobId: event.jobId,
                 status: event.status,
               },
+            }),
+          ),
+        );
+      }
+      break;
+    }
+    case "PHONE_OTP_REQUESTED": {
+      const message = `Your AfriTalent verification code is ${event.otpCode}. It expires in ${event.expiresInMinutes} minutes. Do not share this code.`;
+      outcomes.push(
+        await safeSend("sms", async () => {
+          const result = await sendSms({
+            to: event.phoneNumber,
+            message,
+            template: "phone_otp",
+            userId: event.user.id,
+            metadata: { expiresInMinutes: event.expiresInMinutes },
+          });
+          if (!result.delivered) {
+            throw new Error(result.errorMessage ?? result.errorCode ?? "sms_not_delivered");
+          }
+        }),
+      );
+      break;
+    }
+    case "PHONE_VERIFIED": {
+      const masked = maskPhone(event.phoneNumber);
+      outcomes.push(
+        await safeSend("sms", async () => {
+          const result = await sendSms({
+            to: event.phoneNumber,
+            message:
+              "Your AfriTalent phone number is verified. If this wasn't you, reset your password and contact support.",
+            template: "phone_verified",
+            userId: event.user.id,
+          });
+          if (!result.delivered && result.status !== "SKIPPED") {
+            throw new Error(result.errorMessage ?? result.errorCode ?? "sms_not_delivered");
+          }
+        }),
+      );
+      outcomes.push(
+        await safeSend("email", () =>
+          phoneVerifiedEmail({
+            to: event.user.email,
+            userName: event.user.name,
+            phoneMasked: masked,
+          }),
+        ),
+      );
+      if (policy.notificationType && policy.inAppChannel) {
+        outcomes.push(
+          await safeSend("in_app", () =>
+            createUserNotification({
+              userId: event.user.id,
+              type: policy.notificationType!,
+              title: "Phone number verified",
+              body: `Your phone number ending in ${masked} is now verified.`,
+              channel: policy.inAppChannel,
+              metadata: { phoneMasked: masked },
             }),
           ),
         );

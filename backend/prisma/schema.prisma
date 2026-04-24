@@ -85,6 +85,8 @@ enum NotificationType {
   ACCOUNT_REGISTERED
   ACCOUNT_CLOSED
   SECURITY_ALERT
+  PHONE_VERIFICATION
+  PHONE_VERIFIED
 }
 
 enum NotificationStatus {
@@ -388,13 +390,13 @@ enum AdminPermission {
   MANAGE_USER_ACCOUNTS
   RESET_USER_PASSWORD
   RESTRICT_USER_ACCOUNT
-  
+
   // Content moderation
   REVIEW_JOBS
   REVIEW_APPLICATIONS
   REVIEW_RESOURCES
   REVIEW_COMPANY_DATA
-  
+
   // Trust & Safety
   VIEW_TRUST_CASES
   MANAGE_TRUST_CASES
@@ -402,18 +404,18 @@ enum AdminPermission {
   MANAGE_ABUSE_REPORTS
   VIEW_VERIFICATION_ARTIFACTS
   APPROVE_VERIFICATION
-  
+
   // Platform operations
   VIEW_AUDIT_LOGS
   VIEW_HEALTH_STATUS
   MANAGE_ALERTS
   VIEW_SYSTEMS_METRICS
-  
+
   // Billing & Finance
   VIEW_BILLING_DATA
   MANAGE_BILLING_DISPUTES
   VIEW_REVENUE_REPORTS
-  
+
   // Data operations
   EXPORT_DATA
   RUN_BULK_OPERATIONS
@@ -694,17 +696,19 @@ model User {
   accountRestrictedAt      DateTime?
   deletionRequestedAt      DateTime?
   deletedAt                DateTime?
+  phoneNumber              String?                  @db.VarChar(30)
+  phoneVerifiedAt          DateTime?
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 
   employer                      Employer?
   applications                  Application[]
-  adminReviews                  AdminReview[]              @relation("AdminReviewer")
+  adminReviews                  AdminReview[]                 @relation("AdminReviewer")
   candidateProfile              CandidateProfile?
   subscription                  Subscription?
   notifications                 Notification[]
   threadParticipants            ThreadParticipant[]
-  sentMessages                  Message[]                  @relation("MessageSender")
+  sentMessages                  Message[]                     @relation("MessageSender")
   aiRuns                        AiRun[]
   savedSearches                 SavedSearch[]
   jobAlerts                     JobAlert[]
@@ -715,8 +719,8 @@ model User {
   interviewExperiences          InterviewExperience[]
   salaryReports                 SalaryReport[]
   immigrationProcesses          ImmigrationProcess[]
-  referralsMade                 Referral[]                 @relation("ReferralsMade")
-  referralsReceived             Referral[]                 @relation("ReferralsReceived")
+  referralsMade                 Referral[]                    @relation("ReferralsMade")
+  referralsReceived             Referral[]                    @relation("ReferralsReceived")
   calendarEvents                CalendarEvent[]
   chatConsent                   ChatConsent?
   chatConversations             ChatConversation[]
@@ -730,30 +734,30 @@ model User {
   candidateLifecycleState       CandidateLifecycleState?
   candidateLifecycleEvents      CandidateLifecycleEvent[]
   socialProfile                 SocialProfile?
-  socialConnectionsSent         SocialConnection[]         @relation("SocialConnectionRequester")
-  socialConnectionsRecv         SocialConnection[]         @relation("SocialConnectionRecipient")
+  socialConnectionsSent         SocialConnection[]            @relation("SocialConnectionRequester")
+  socialConnectionsRecv         SocialConnection[]            @relation("SocialConnectionRecipient")
   salaryNegotiations            SalaryNegotiationSession[]
   botSubscriptions              BotSubscription[]
-  employerAiTasksCreated        EmployerAiTask[]           @relation("EmployerAiTaskCreator")
-  employerAiTasksReviewed       EmployerAiTask[]           @relation("EmployerAiTaskReviewer")
+  employerAiTasksCreated        EmployerAiTask[]              @relation("EmployerAiTaskCreator")
+  employerAiTasksReviewed       EmployerAiTask[]              @relation("EmployerAiTaskReviewer")
   billingEvents                 BillingEventAudit[]
   billingDiscrepancies          BillingDiscrepancy[]
   billingEntitlementState       BillingEntitlementState?
   candidateTrustProfile         CandidateTrustProfile?
-  billingSupportActions         BillingSupportAction[]     @relation("BillingSupportTarget")
-  billingSupportActionsTaken    BillingSupportAction[]     @relation("BillingSupportActor")
-  verificationArtifacts         VerificationArtifact[]     @relation("UserVerificationArtifacts")
-  reviewedVerificationArtifacts VerificationArtifact[]     @relation("VerificationArtifactReviewer")
-  verifiedSkills                CandidateVerifiedSkill[]   @relation("CandidateVerifiedSkillOwner")
-  reviewedCandidateSkills       CandidateVerifiedSkill[]   @relation("CandidateVerifiedSkillReviewer")
-  partnerMarkers                CandidatePartnerMarker[]   @relation("CandidatePartnerMarkerOwner")
-  reviewedPartnerMarkers        CandidatePartnerMarker[]   @relation("CandidatePartnerMarkerReviewer")
+  billingSupportActions         BillingSupportAction[]        @relation("BillingSupportTarget")
+  billingSupportActionsTaken    BillingSupportAction[]        @relation("BillingSupportActor")
+  verificationArtifacts         VerificationArtifact[]        @relation("UserVerificationArtifacts")
+  reviewedVerificationArtifacts VerificationArtifact[]        @relation("VerificationArtifactReviewer")
+  verifiedSkills                CandidateVerifiedSkill[]      @relation("CandidateVerifiedSkillOwner")
+  reviewedCandidateSkills       CandidateVerifiedSkill[]      @relation("CandidateVerifiedSkillReviewer")
+  partnerMarkers                CandidatePartnerMarker[]      @relation("CandidatePartnerMarkerOwner")
+  reviewedPartnerMarkers        CandidatePartnerMarker[]      @relation("CandidatePartnerMarkerReviewer")
   trustRiskEvents               TrustRiskEvent[]
-  abuseReportsFiled             AbuseReport[]              @relation("AbuseReportReporter")
-  abuseReportsAgainst           AbuseReport[]              @relation("AbuseReportTargetUser")
-  abuseReportsAssigned          AbuseReport[]              @relation("AbuseReportAssignee")
-  trustCasesAssigned            TrustCase[]                @relation("TrustCaseAssignee")
-  trustCaseActions              TrustCaseAction[]          @relation("TrustCaseActionActor")
+  abuseReportsFiled             AbuseReport[]                 @relation("AbuseReportReporter")
+  abuseReportsAgainst           AbuseReport[]                 @relation("AbuseReportTargetUser")
+  abuseReportsAssigned          AbuseReport[]                 @relation("AbuseReportAssignee")
+  trustCasesAssigned            TrustCase[]                   @relation("TrustCaseAssignee")
+  trustCaseActions              TrustCaseAction[]             @relation("TrustCaseActionActor")
   talentPoolMemberships         EmployerTalentPoolCandidate[] @relation("TalentPoolCandidateUser")
   talentPoolCandidatesAdded     EmployerTalentPoolCandidate[] @relation("TalentPoolCandidateAdder")
   candidateAutopilotProfile     CandidateAutopilotProfile?
@@ -763,6 +767,8 @@ model User {
   autoApplyBatches              AutoApplyBatch[]
   careerGapSessions             CareerGapSession[]
   adminRole                     AdminRole?
+  userPhoneOtps                 UserPhoneOtp[]
+  smsDeliveryLogs               SmsDeliveryLog[]
 
   @@index([role])
   @@index([createdAt])
@@ -823,20 +829,20 @@ model EmployerTalentPool {
 }
 
 model EmployerTalentPoolCandidate {
-  id                   String             @id @default(uuid())
-  poolId               String
-  pool                 EmployerTalentPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
-  candidateUserId      String
-  candidate            User               @relation("TalentPoolCandidateUser", fields: [candidateUserId], references: [id], onDelete: Cascade)
-  addedByUserId        String
-  addedByUser          User               @relation("TalentPoolCandidateAdder", fields: [addedByUserId], references: [id], onDelete: Cascade)
-  stage                String             @default("SOURCED") @db.VarChar(40)
-  notes                String?            @db.Text
-  semanticScore        Int?
-  trustScoreSnapshot   Int?
+  id                    String             @id @default(uuid())
+  poolId                String
+  pool                  EmployerTalentPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  candidateUserId       String
+  candidate             User               @relation("TalentPoolCandidateUser", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  addedByUserId         String
+  addedByUser           User               @relation("TalentPoolCandidateAdder", fields: [addedByUserId], references: [id], onDelete: Cascade)
+  stage                 String             @default("SOURCED") @db.VarChar(40)
+  notes                 String?            @db.Text
+  semanticScore         Int?
+  trustScoreSnapshot    Int?
   mobilityScoreSnapshot Int?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   @@unique([poolId, candidateUserId])
   @@index([candidateUserId, updatedAt(sort: Desc)])
@@ -942,12 +948,12 @@ model Application {
   candidateId String
   candidate   User   @relation(fields: [candidateId], references: [id])
 
-  adminReviews    AdminReview[]       @relation("ApplicationReviews")
-  thread          MessageThread?
-  trustRiskEvents TrustRiskEvent[]
-  abuseReports    AbuseReport[]
-  trustCases      TrustCase[]
-  atsLink         ATSApplicationLink?
+  adminReviews        AdminReview[]        @relation("ApplicationReviews")
+  thread              MessageThread?
+  trustRiskEvents     TrustRiskEvent[]
+  abuseReports        AbuseReport[]
+  trustCases          TrustCase[]
+  atsLink             ATSApplicationLink?
   candidateAgentTasks CandidateAgentTask[]
 
   @@unique([jobId, candidateId])
@@ -1053,7 +1059,7 @@ model CandidateProfile {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  resumes Resume[]
+  resumes        Resume[]
   resumeVersions CandidateResumeVersion[]
 
   @@index([userId])
@@ -1354,30 +1360,30 @@ model CandidateAutopilotProfile {
 }
 
 model CandidateResumeVersion {
-  id                 String              @id @default(uuid())
+  id                 String                     @id @default(uuid())
   userId             String
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   autopilotProfileId String?
   autopilotProfile   CandidateAutopilotProfile? @relation(fields: [autopilotProfileId], references: [id], onDelete: SetNull)
   profileId          String?
-  profile            CandidateProfile?   @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  profile            CandidateProfile?          @relation(fields: [profileId], references: [id], onDelete: SetNull)
   jobId              String?
-  job                Job?                @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  job                Job?                       @relation(fields: [jobId], references: [id], onDelete: SetNull)
   aiRunId            String?
-  aiRun              AiRun?              @relation(fields: [aiRunId], references: [id], onDelete: SetNull)
+  aiRun              AiRun?                     @relation(fields: [aiRunId], references: [id], onDelete: SetNull)
   source             ResumeVersionSource
-  status             ResumeVersionStatus @default(READY)
-  title              String              @db.VarChar(160)
-  targetRole         String?             @db.VarChar(120)
-  summary            String?             @db.Text
+  status             ResumeVersionStatus        @default(READY)
+  title              String                     @db.VarChar(160)
+  targetRole         String?                    @db.VarChar(120)
+  summary            String?                    @db.Text
   content            Json
-  plainText          String              @db.Text
+  plainText          String                     @db.Text
   keywords           String[]
   score              Int?
   notes              String[]
-  isPrimary          Boolean             @default(false)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  isPrimary          Boolean                    @default(false)
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 
   agentTasks CandidateAgentTask[]
 
@@ -1388,34 +1394,34 @@ model CandidateResumeVersion {
 }
 
 model CandidateAgentTask {
-  id                 String                   @id @default(uuid())
+  id                 String                     @id @default(uuid())
   userId             String
-  user               User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   autopilotProfileId String?
   autopilotProfile   CandidateAutopilotProfile? @relation(fields: [autopilotProfileId], references: [id], onDelete: SetNull)
   applicationId      String?
-  application        Application?             @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  application        Application?               @relation(fields: [applicationId], references: [id], onDelete: SetNull)
   jobId              String?
-  job                Job?                     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  job                Job?                       @relation(fields: [jobId], references: [id], onDelete: SetNull)
   aiRunId            String?
-  aiRun              AiRun?                   @relation(fields: [aiRunId], references: [id], onDelete: SetNull)
+  aiRun              AiRun?                     @relation(fields: [aiRunId], references: [id], onDelete: SetNull)
   resumeVersionId    String?
-  resumeVersion      CandidateResumeVersion?  @relation(fields: [resumeVersionId], references: [id], onDelete: SetNull)
+  resumeVersion      CandidateResumeVersion?    @relation(fields: [resumeVersionId], references: [id], onDelete: SetNull)
   type               CandidateAgentTaskType
-  status             CandidateAgentTaskStatus @default(QUEUED)
-  priority           Int                      @default(50)
-  title              String                   @db.VarChar(180)
-  summary            String?                  @db.Text
+  status             CandidateAgentTaskStatus   @default(QUEUED)
+  priority           Int                        @default(50)
+  title              String                     @db.VarChar(180)
+  summary            String?                    @db.Text
   inputSnapshot      Json?
   outputSummary      Json?
   outputPayload      Json?
-  reviewNotes        String?                  @db.Text
+  reviewNotes        String?                    @db.Text
   scheduledFor       DateTime?
   startedAt          DateTime?
   completedAt        DateTime?
-  lastError          String?                  @db.VarChar(500)
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
+  lastError          String?                    @db.VarChar(500)
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 
   @@index([userId, status, scheduledFor])
   @@index([applicationId, type, createdAt(sort: Desc)])
@@ -1529,6 +1535,8 @@ model NotificationPreference {
   applicationUpdates               Boolean  @default(true)
   subscriptionNotices              Boolean  @default(true)
   marketing                        Boolean  @default(false)
+  smsEnabled                       Boolean  @default(true)
+  securityAlerts                   Boolean  @default(true)
   maxNotificationsPerWeek          Int      @default(6)
   minimumHoursBetweenNotifications Int      @default(18)
   createdAt                        DateTime @default(now())
@@ -1998,19 +2006,19 @@ model BotSubscription {
 }
 
 model Subscription {
-  id               String             @id @default(uuid())
-  userId           String             @unique
-  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan             SubscriptionPlan   @default(FREE)
-  status           SubscriptionStatus @default(INACTIVE)
-  billingProvider  BillingProvider?
-  providerCustomerId String?          @db.VarChar(255)
-  providerSubscriptionId String?      @db.VarChar(255)
-  stripeCustomerId String?            @db.VarChar(255)
-  stripeSubId      String?            @db.VarChar(255)
-  currentPeriodEnd DateTime?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  id                     String             @id @default(uuid())
+  userId                 String             @unique
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                   SubscriptionPlan   @default(FREE)
+  status                 SubscriptionStatus @default(INACTIVE)
+  billingProvider        BillingProvider?
+  providerCustomerId     String?            @db.VarChar(255)
+  providerSubscriptionId String?            @db.VarChar(255)
+  stripeCustomerId       String?            @db.VarChar(255)
+  stripeSubId            String?            @db.VarChar(255)
+  currentPeriodEnd       DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   billingEvents         BillingEventAudit[]
   billingDiscrepancies  BillingDiscrepancy[]
@@ -2673,48 +2681,48 @@ model SemanticDocument {
 // ──────────────── Phase 2 New Models — Database Agent ────────────────
 
 model AtsReport {
-  id                String    @id @default(cuid())
-  resumeId          String
-  jobDescriptionId  String?
+  id               String  @id @default(cuid())
+  resumeId         String
+  jobDescriptionId String?
 
   // Scores
-  score             Float     @default(0) // 0.0 to 1.0
+  score Float @default(0) // 0.0 to 1.0
 
   // Missing elements
-  missingKeywords   String[]  @default([])
-  presentKeywords   String[]  @default([])
+  missingKeywords String[] @default([])
+  presentKeywords String[] @default([])
 
   // Formatting issues
-  formatting        Json?     // { "pageBreaks": true, "columns": false, ... }
-  suggestions       String[]  @default([])
+  formatting  Json? // { "pageBreaks": true, "columns": false, ... }
+  suggestions String[] @default([])
 
   // Tracking
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  resume            UserResume? @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  resume UserResume? @relation(fields: [resumeId], references: [id], onDelete: Cascade)
 
   @@index([resumeId])
   @@index([createdAt])
 }
 
 model CoverLetterVersion {
-  id                String    @id @default(cuid())
-  candidateId       String
-  jobId             String
+  id          String @id @default(cuid())
+  candidateId String
+  jobId       String
 
   // Content
-  content           String    @db.Text
-  tone              String?   // "formal" | "conversational" | "executive"
+  content String  @db.Text
+  tone    String? // "formal" | "conversational" | "executive"
 
   // Tracking
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  candidate         User      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  job               Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate User @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([candidateId])
   @@index([jobId])
@@ -2722,29 +2730,29 @@ model CoverLetterVersion {
 }
 
 model AutoApplyBatch {
-  id                String    @id @default(cuid())
-  candidateId       String
+  id          String @id @default(cuid())
+  candidateId String
 
   // Batch metadata
-  jobFilters        Json?     // Filter criteria used (visaSponsorship, salaryMin, etc.)
-  jobsTargeted      Int       @default(0)
+  jobFilters   Json? // Filter criteria used (visaSponsorship, salaryMin, etc.)
+  jobsTargeted Int   @default(0)
 
   // Progress tracking
-  jobsApplied       Int       @default(0)
-  jobsFailed        Int       @default(0)
-  creditsUsed       Int       @default(0)
+  jobsApplied Int @default(0)
+  jobsFailed  Int @default(0)
+  creditsUsed Int @default(0)
 
   // Status
-  status            String    @default("queued") // "queued" | "in_progress" | "completed" | "failed"
+  status String @default("queued") // "queued" | "in_progress" | "completed" | "failed"
 
   // Timestamps
-  startedAt         DateTime?
-  completedAt       DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Relations
-  candidate         User      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  candidate User @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 
   @@index([candidateId])
   @@index([status])
@@ -2752,26 +2760,26 @@ model AutoApplyBatch {
 }
 
 model SalaryBenchmark {
-  id                String    @id @default(cuid())
+  id String @id @default(cuid())
 
   // Classification
-  role              String    // "Software Engineer", "Data Analyst", etc.
-  level             String    // "entry" | "mid" | "senior" | "lead"
-  country           String    // "NG" | "KE" | "ZA" | "EG" | "GH" etc.
-  currency          String    @default("USD")
+  role     String // "Software Engineer", "Data Analyst", etc.
+  level    String // "entry" | "mid" | "senior" | "lead"
+  country  String // "NG" | "KE" | "ZA" | "EG" | "GH" etc.
+  currency String @default("USD")
 
   // Data
-  salaryMin         Float
-  salaryMedian      Float
-  salaryMax         Float
+  salaryMin    Float
+  salaryMedian Float
+  salaryMax    Float
 
   // Metadata
-  sampleSize        Int       @default(0)
-  lastUpdated       DateTime  @default(now())
-  source            String?   // "crowdsourced" | "glassdoor" | "payscale" etc.
+  sampleSize  Int      @default(0)
+  lastUpdated DateTime @default(now())
+  source      String? // "crowdsourced" | "glassdoor" | "payscale" etc.
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([role, level, country, currency])
   @@index([country])
@@ -2779,25 +2787,25 @@ model SalaryBenchmark {
 }
 
 model CareerGapSession {
-  id                String    @id @default(cuid())
-  candidateId       String
+  id          String @id @default(cuid())
+  candidateId String
 
   // Gap details
-  startDate         DateTime
-  endDate           DateTime
-  reason            String?   @db.Text // User-provided reason
+  startDate DateTime
+  endDate   DateTime
+  reason    String?  @db.Text // User-provided reason
 
   // Analysis
-  analysis          String    @db.Text // AI-generated analysis
-  reframing         String    @db.Text // How to frame it positively
-  talkingPoints     String[]  @default([])
+  analysis      String   @db.Text // AI-generated analysis
+  reframing     String   @db.Text // How to frame it positively
+  talkingPoints String[] @default([])
 
   // Metadata
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  candidate         User      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  candidate User @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 
   @@index([candidateId])
   @@index([createdAt])
@@ -2806,39 +2814,39 @@ model CareerGapSession {
 // ──────────────── Admin Control Plane ────────────────
 
 model AdminRole {
-  id              String                 @id @default(uuid())
-  adminId         String                 @unique
-  admin           User                   @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  title           String                 @db.VarChar(100)
-  description     String?                @db.VarChar(500)
-  permissions     AdminPermission[]
-  isActive        Boolean                @default(true)
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  id          String            @id @default(uuid())
+  adminId     String            @unique
+  admin       User              @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  title       String            @db.VarChar(100)
+  description String?           @db.VarChar(500)
+  permissions AdminPermission[]
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
-  auditLogs       AuditLog[]             @relation("AuditLogAdmin")
+  auditLogs AuditLog[] @relation("AuditLogAdmin")
 
   @@index([isActive])
 }
 
 model AuditLog {
-  id              String                 @id @default(uuid())
-  adminId         String?
-  admin           AdminRole?             @relation("AuditLogAdmin", fields: [adminId], references: [id], onDelete: SetNull)
-  action          AdminAction
-  targetType      String                 @db.VarChar(50)
-  targetId        String?
-  targetName      String?                @db.VarChar(200)
-  resourceType    String?                @db.VarChar(50)
-  resourceId      String?
-  changes         Json?
-  reason          String?                @db.VarChar(500)
-  metadata        Json?
-  ipAddress       String?                @db.VarChar(50)
-  userAgent       String?                @db.VarChar(500)
-  status          String                 @default("SUCCESS") @db.VarChar(20)
-  errorDetails    String?                @db.Text
-  createdAt       DateTime               @default(now())
+  id           String      @id @default(uuid())
+  adminId      String?
+  admin        AdminRole?  @relation("AuditLogAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+  action       AdminAction
+  targetType   String      @db.VarChar(50)
+  targetId     String?
+  targetName   String?     @db.VarChar(200)
+  resourceType String?     @db.VarChar(50)
+  resourceId   String?
+  changes      Json?
+  reason       String?     @db.VarChar(500)
+  metadata     Json?
+  ipAddress    String?     @db.VarChar(50)
+  userAgent    String?     @db.VarChar(500)
+  status       String      @default("SUCCESS") @db.VarChar(20)
+  errorDetails String?     @db.Text
+  createdAt    DateTime    @default(now())
 
   @@index([adminId, createdAt(sort: Desc)])
   @@index([action, createdAt(sort: Desc)])
@@ -2847,22 +2855,22 @@ model AuditLog {
 }
 
 model PlatformAlert {
-  id              String                 @id @default(uuid())
-  title           String                 @db.VarChar(200)
-  description     String                 @db.Text
+  id              String        @id @default(uuid())
+  title           String        @db.VarChar(200)
+  description     String        @db.Text
   severity        AlertSeverity
-  status          AlertStatus            @default(ACTIVE)
-  category        String                 @db.VarChar(50)
+  status          AlertStatus   @default(ACTIVE)
+  category        String        @db.VarChar(50)
   metrics         Json?
   affectedUsers   Int?
   affectedJobs    Int?
   affectedApps    Int?
-  firstOccurredAt DateTime               @default(now())
-  lastOccurredAt  DateTime               @updatedAt
+  firstOccurredAt DateTime      @default(now())
+  lastOccurredAt  DateTime      @updatedAt
   resolvedAt      DateTime?
-  resolution      String?                @db.Text
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  resolution      String?       @db.Text
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([severity, status, createdAt(sort: Desc)])
   @@index([category, status])
@@ -2870,22 +2878,79 @@ model PlatformAlert {
 }
 
 model BulkOperation {
-  id              String                 @id @default(uuid())
-  operationType   BulkOperationType
-  status          BulkOperationStatus    @default(QUEUED)
-  initiatedBy     String?                @db.VarChar(100)
-  query           Json?
-  filters         Json?
-  targetCount     Int                    @default(0)
-  successCount    Int                    @default(0)
-  failureCount    Int                    @default(0)
-  results         Json?
-  errorLog        String?                @db.Text
-  startedAt       DateTime?
-  completedAt     DateTime?
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  id            String              @id @default(uuid())
+  operationType BulkOperationType
+  status        BulkOperationStatus @default(QUEUED)
+  initiatedBy   String?             @db.VarChar(100)
+  query         Json?
+  filters       Json?
+  targetCount   Int                 @default(0)
+  successCount  Int                 @default(0)
+  failureCount  Int                 @default(0)
+  results       Json?
+  errorLog      String?             @db.Text
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   @@index([status, createdAt(sort: Desc)])
   @@index([operationType, createdAt(sort: Desc)])
+}
+
+// ──────────────── SMS / Phone Verification ────────────────
+
+enum UserPhoneOtpStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  CONSUMED
+}
+
+enum SmsDeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  SKIPPED
+}
+
+model UserPhoneOtp {
+  id          String             @id @default(uuid())
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phoneNumber String             @db.VarChar(30)
+  otpHash     String             @db.VarChar(128)
+  expiresAt   DateTime
+  attempts    Int                @default(0)
+  status      UserPhoneOtpStatus @default(PENDING)
+  consumedAt  DateTime?
+  ipAddress   String?            @db.VarChar(45)
+  userAgent   String?            @db.VarChar(500)
+  createdAt   DateTime           @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, expiresAt])
+  @@index([phoneNumber, status])
+}
+
+model SmsDeliveryLog {
+  id            String            @id @default(uuid())
+  userId        String?
+  user          User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  phoneNumber   String            @db.VarChar(30)
+  provider      String            @default("africastalking") @db.VarChar(40)
+  providerMsgId String?           @db.VarChar(120)
+  template      String            @db.VarChar(80)
+  status        SmsDeliveryStatus @default(QUEUED)
+  errorCode     String?           @db.VarChar(80)
+  errorMessage  String?           @db.VarChar(500)
+  metadata      Json?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([phoneNumber, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([template, createdAt(sort: Desc)])
 }

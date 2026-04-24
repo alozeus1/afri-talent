@@ -5,6 +5,7 @@ const emailMocks = vi.hoisted(() => ({
   accountClosedEmail: vi.fn(async (_opts: any) => undefined),
   applicationStatusEmail: vi.fn(async (_opts: any) => undefined),
   passwordResetEmail: vi.fn(async (_opts: any) => undefined),
+  phoneVerifiedEmail: vi.fn(async (_opts: any) => undefined),
 }));
 const notificationMocks = vi.hoisted(() => ({
   createUserNotification: vi.fn(async (_input: any) => ({ id: "n1" })),
@@ -12,10 +13,29 @@ const notificationMocks = vi.hoisted(() => ({
 const opsMocks = vi.hoisted(() => ({
   recordOpsEvent: vi.fn(),
 }));
+type SmsResult = {
+  delivered: boolean;
+  status: string;
+  providerMsgId?: string;
+  errorCode?: string;
+  errorMessage?: string;
+};
+const smsMocks = vi.hoisted(() => ({
+  sendSms: vi.fn(
+    async (_opts: any): Promise<{
+      delivered: boolean;
+      status: string;
+      providerMsgId?: string;
+      errorCode?: string;
+      errorMessage?: string;
+    }> => ({ delivered: true, status: "SENT", providerMsgId: "msg1" }),
+  ),
+}));
 
 vi.mock("../lib/email.js", () => emailMocks);
 vi.mock("../lib/notifications.js", () => notificationMocks);
 vi.mock("../lib/ops/events.js", () => opsMocks);
+vi.mock("../lib/sms/africasTalking.js", () => smsMocks);
 vi.mock("../lib/logger.js", () => ({
   default: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -26,6 +46,12 @@ beforeEach(() => {
   Object.values(emailMocks).forEach((m) => m.mockClear());
   notificationMocks.createUserNotification.mockClear();
   opsMocks.recordOpsEvent.mockClear();
+  smsMocks.sendSms.mockClear();
+  smsMocks.sendSms.mockImplementation(async (_opts: any) => ({
+    delivered: true,
+    status: "SENT",
+    providerMsgId: "msg1",
+  }));
 });
 
 afterEach(() => {
@@ -106,6 +132,80 @@ describe("notification dispatcher", () => {
       jobId: "job-1",
       status: "SHORTLISTED",
     });
+  });
+
+  it("PHONE_OTP_REQUESTED sends only an SMS containing the code", async () => {
+    const result = await dispatch({
+      kind: "PHONE_OTP_REQUESTED",
+      user: { id: "u7", name: "Fola" },
+      phoneNumber: "+2348012345678",
+      otpCode: "123456",
+      expiresInMinutes: 10,
+    });
+
+    expect(smsMocks.sendSms).toHaveBeenCalledOnce();
+    const args = smsMocks.sendSms.mock.calls[0]?.[0];
+    expect(args.template).toBe("phone_otp");
+    expect(args.message).toContain("123456");
+    expect(args.userId).toBe("u7");
+    expect(emailMocks.welcomeEmail).not.toHaveBeenCalled();
+    expect(notificationMocks.createUserNotification).not.toHaveBeenCalled();
+    expect(result.outcomes.find((o) => o.channel === "sms")?.delivered).toBe(true);
+  });
+
+  it("PHONE_OTP_REQUESTED marks the SMS channel as failed when delivery fails", async () => {
+    smsMocks.sendSms.mockImplementationOnce(async () => ({
+      delivered: false,
+      status: "FAILED",
+      errorCode: "PROVIDER_REJECTED",
+      errorMessage: "bad number",
+    }));
+
+    const result = await dispatch({
+      kind: "PHONE_OTP_REQUESTED",
+      user: { id: "u8", name: "Gabe" },
+      phoneNumber: "+2348012345679",
+      otpCode: "654321",
+      expiresInMinutes: 10,
+    });
+
+    const sms = result.outcomes.find((o) => o.channel === "sms");
+    expect(sms?.delivered).toBe(false);
+    expect(sms?.reason).toContain("bad number");
+  });
+
+  it("PHONE_VERIFIED fans out to SMS, email, and in-app", async () => {
+    const result = await dispatch({
+      kind: "PHONE_VERIFIED",
+      user: { id: "u9", email: "h@b.com", name: "Hadiza" },
+      phoneNumber: "+2348011112233",
+    });
+
+    expect(smsMocks.sendSms).toHaveBeenCalledOnce();
+    expect(smsMocks.sendSms.mock.calls[0]?.[0].template).toBe("phone_verified");
+    expect(emailMocks.phoneVerifiedEmail).toHaveBeenCalledOnce();
+    expect(emailMocks.phoneVerifiedEmail.mock.calls[0]?.[0].phoneMasked).toBe("2233");
+    expect(notificationMocks.createUserNotification).toHaveBeenCalledOnce();
+    expect(notificationMocks.createUserNotification.mock.calls[0]?.[0].type).toBe("PHONE_VERIFIED");
+    expect(result.outcomes.length).toBe(3);
+  });
+
+  it("PHONE_VERIFIED treats SKIPPED SMS (provider unconfigured) as a non-error", async () => {
+    smsMocks.sendSms.mockImplementationOnce(async () => ({
+      delivered: false,
+      status: "SKIPPED",
+      errorCode: "PROVIDER_UNCONFIGURED",
+    }));
+
+    const result = await dispatch({
+      kind: "PHONE_VERIFIED",
+      user: { id: "u10", email: "i@b.com", name: "Idris" },
+      phoneNumber: "+2348099887766",
+    });
+
+    const sms = result.outcomes.find((o) => o.channel === "sms");
+    expect(sms?.delivered).toBe(true); // SKIPPED is not treated as failure
+    expect(emailMocks.phoneVerifiedEmail).toHaveBeenCalledOnce();
   });
 
   it("returns successfully even when a channel throws", async () => {

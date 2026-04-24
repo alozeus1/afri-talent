@@ -364,3 +364,25 @@ export async function accountEmailVerificationEmail(opts: {
     text: `Welcome to AfriTalent, ${opts.candidateName}!\n\nVerify your email here: ${opts.verifyUrl}\n\nThis link expires in ${opts.expiresInHours} hours.`,
   });
 }
+
+export async function phoneVerifiedEmail(opts: {
+  to: string;
+  userName: string;
+  phoneMasked: string;
+}): Promise<void> {
+  await sendEmail({
+    to: opts.to,
+    subject: "Your AfriTalent phone number is verified",
+    templateName: "phone_verified",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.userName},</h2>
+        <p>Your phone number ending in <strong>${opts.phoneMasked}</strong> is now verified.</p>
+        <p>This adds a trust signal to your AfriTalent profile and unlocks SMS-based security alerts.</p>
+        <p>If you didn't perform this verification, please reset your password and contact support immediately.</p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: `Hi ${opts.userName},\n\nYour phone number ending in ${opts.phoneMasked} is now verified.\n\nIf you didn't perform this verification, reset your password and contact support immediately.`,
+  });
+}

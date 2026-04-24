@@ -88,6 +88,46 @@ export const passwordResetLimiter = rateLimit({
   message: { error: "Too many password reset attempts, please try again later" },
 });
 
+// Phone OTP request limiter — per user/IP, 3 OTPs per hour to control SMS spend.
+export const phoneOtpRequestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: isTestEnv ? 1000 : 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request): string => {
+    const userId = (req as Request & { user?: { userId: string } }).user?.userId;
+    return userId ?? getRateLimitKey(req);
+  },
+  message: {
+    error: "phone_otp_rate_limited",
+    code: "PHONE_OTP_RATE_LIMITED",
+    message: "Too many OTP requests. Please wait an hour before requesting another code.",
+  },
+  handler: (_req, res, _next, options) => {
+    res.status(429).json(options.message);
+  },
+});
+
+// Phone OTP verify limiter — 5 verification attempts per 15 minutes per user/IP.
+export const phoneOtpVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isTestEnv ? 1000 : 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request): string => {
+    const userId = (req as Request & { user?: { userId: string } }).user?.userId;
+    return userId ?? getRateLimitKey(req);
+  },
+  message: {
+    error: "phone_otp_verify_rate_limited",
+    code: "PHONE_OTP_VERIFY_RATE_LIMITED",
+    message: "Too many verification attempts. Please wait before trying again.",
+  },
+  handler: (_req, res, _next, options) => {
+    res.status(429).json(options.message);
+  },
+});
+
 // Request sanitization middleware
 export function sanitizeRequest(req: Request, _res: Response, next: NextFunction): void {
   // Remove potentially dangerous characters from string inputs
