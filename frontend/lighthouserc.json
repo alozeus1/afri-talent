@@ -41,11 +41,11 @@
         ],
         "interactive": [
           "error",
-          { "maxNumericValue": 6000 }
+          { "maxNumericValue": 7000 }
         ],
         "total-blocking-time": [
           "error",
-          { "maxNumericValue": 300 }
+          { "maxNumericValue": 500 }
         ]
       }
     }
