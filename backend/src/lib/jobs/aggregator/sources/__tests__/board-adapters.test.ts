@@ -14,6 +14,7 @@ describe("Job board adapter normalization", () => {
 
   it("normalizes Greenhouse jobs with visa/relocation metadata", async () => {
     const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
+    const recentDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -22,7 +23,7 @@ describe("Job board adapter normalization", () => {
             id: 101,
             title: "Senior TypeScript Engineer",
             content: "<p>Visa sponsorship available. Relocation support. React + TypeScript.</p>",
-            updated_at: "2026-03-20T00:00:00.000Z",
+            updated_at: recentDate,
             absolute_url: "https://boards.greenhouse.io/acme/jobs/101",
             location: { name: "Remote" },
             metadata: [{ name: "Employment Type", value: "Full-time" }],

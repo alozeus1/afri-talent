@@ -23,7 +23,7 @@ interface AuditLog {
         id: string | null;
         name: string | null;
     };
-    changes: any;
+    changes: Record<string, unknown> | null;
     reason: string | null;
     status: string;
     timestamp: string;
