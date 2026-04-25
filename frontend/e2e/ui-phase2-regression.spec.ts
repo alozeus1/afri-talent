@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 const APP_URL = process.env.APP_BASE_URL ?? "http://localhost:3000";
 const API_URL = process.env.API_BASE_URL ?? "http://localhost:4000";
 
@@ -68,10 +72,11 @@ test("jobs page shows loading skeleton and job detail emits JobPosting schema", 
   await expect(
     page.getByText(/Search ranking prioritizes relevance, recent refreshes, verified employers/i),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: new RegExp(firstJob.title, "i") }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: new RegExp(firstJob.title, "i") }).first()).toHaveAttribute(
+  const titlePattern = new RegExp(escapeRegExp(firstJob.title.trim()), "i");
+  await expect(page.getByRole("link", { name: titlePattern }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: titlePattern }).first()).toHaveAttribute(
     "href",
-    new RegExp(`/((en|fr|pt|ar)/)?jobs/${firstJob.slug}$`),
+    new RegExp(`/((en|fr|pt|ar)/)?jobs/${escapeRegExp(firstJob.slug)}$`),
   );
 
   const nextButton = page.getByRole("link", { name: "Next" });
