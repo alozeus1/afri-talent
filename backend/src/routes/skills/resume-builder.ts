@@ -9,6 +9,7 @@ import { z } from "zod";
 import { Prisma, Role, SubscriptionPlan } from "@prisma/client";
 import { authenticate, authorize } from "../../middleware/auth.js";
 import { requirePlan } from "../../middleware/subscription.js";
+import { generateLimiter } from "../../middleware/security.js";
 import prisma from "../../lib/prisma.js";
 import logger from "../../lib/logger.js";
 import { buildResume } from "../../lib/ai/skills/resume-builder.js";
@@ -60,6 +61,7 @@ const generateResumeSchema = z.object({
 // ── POST /api/skills/resume-builder/generate ──────────────────────────────────
 router.post(
   "/generate",
+  generateLimiter,
   authenticate,
   authorize(Role.CANDIDATE),
   requirePlan(SubscriptionPlan.PROFESSIONAL),
@@ -157,6 +159,7 @@ router.get(
 // ── POST /api/skills/resume-builder/scan-ats ─────────────────────────────────
 router.post(
   "/scan-ats",
+  generateLimiter,
   authenticate,
   authorize(Role.CANDIDATE),
   requirePlan(SubscriptionPlan.PROFESSIONAL),

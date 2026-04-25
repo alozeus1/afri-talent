@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Router, Request, Response } from "express";
-import { z } from "zod";
+import { z } from "zod/v4";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { authenticate, authorize } from "../middleware/auth.js";
@@ -39,6 +39,11 @@ const router = Router();
 
 const applySchema = z.object({
   jobId: z.string().uuid(),
+  /**
+   * Explicit candidate consent to submit an AI-assembled application pack.
+   * Must be true. Absent/false → 400 CONSENT_REQUIRED.
+   */
+  confirm: z.literal(true, "Consent required: set confirm=true to submit."),
 });
 
 const batchApplySchema = z.object({
@@ -598,6 +603,17 @@ router.post(
     const parsed = applySchema.safeParse(req.body);
 
     if (!parsed.success) {
+      const consentIssue = parsed.error.issues.find(
+        (i) => Array.isArray(i.path) && i.path.includes("confirm")
+      );
+      if (consentIssue) {
+        res.status(400).json({
+          error:
+            "Explicit consent is required before AfriTalent submits an application on your behalf.",
+          code: "CONSENT_REQUIRED",
+        });
+        return;
+      }
       res.status(400).json({ error: "Invalid input", details: parsed.error.issues });
       return;
     }

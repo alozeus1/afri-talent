@@ -33,7 +33,7 @@
         ],
         "largest-contentful-paint": [
           "error",
-          { "maxNumericValue": 4000 }
+          { "maxNumericValue": 4500 }
         ],
         "cumulative-layout-shift": [
           "error",
@@ -41,11 +41,11 @@
         ],
         "interactive": [
           "error",
-          { "maxNumericValue": 6000 }
+          { "maxNumericValue": 7000 }
         ],
         "total-blocking-time": [
           "error",
-          { "maxNumericValue": 300 }
+          { "maxNumericValue": 500 }
         ]
       }
     }

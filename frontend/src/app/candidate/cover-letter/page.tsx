@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/ui/loading-state";
+import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
 
 type Tone = "professional" | "conversational" | "executive";
 
@@ -26,8 +27,9 @@ export default function CoverLetterPage() {
   const [coverLetter, setCoverLetter] = useState<string | null>(null);
   const [source, setSource] = useState<"ai" | "template" | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyError | null>(null);
   const [copied, setCopied] = useState(false);
+  const [edited, setEdited] = useState(false);
 
   if (!user) {
     router.push("/login");
@@ -36,18 +38,23 @@ export default function CoverLetterPage() {
 
   async function handleGenerate() {
     if (!jobId.trim()) {
-      setError("Please enter a Job ID to generate a cover letter.");
+      setError({
+        title: "Missing job id",
+        description: "Paste the job UUID from the listing to generate a cover letter.",
+        tone: "info",
+      });
       return;
     }
     setLoading(true);
     setError(null);
     setCoverLetter(null);
+    setEdited(false);
     try {
-      const result = await skills.generateCoverLetter({ jobId: jobId.trim() });
+      const result = await skills.generateCoverLetter({ jobId: jobId.trim(), tone });
       setCoverLetter(result.coverLetter);
       setSource(result.source);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate cover letter");
+      setError(toFriendlyError(err));
     } finally {
       setLoading(false);
     }
@@ -74,8 +81,20 @@ export default function CoverLetterPage() {
         </div>
 
         {error && (
-          <div className="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-700">
-            {error}
+          <div
+            role="alert"
+            aria-live="assertive"
+            data-testid="cover-letter-error"
+            className={`rounded-md border p-4 text-sm ${
+              error.tone === "error"
+                ? "bg-red-50 border-red-200 text-red-800"
+                : error.tone === "warning"
+                  ? "bg-amber-50 border-amber-200 text-amber-900"
+                  : "bg-blue-50 border-blue-200 text-blue-900"
+            }`}
+          >
+            <p className="font-medium">{error.title}</p>
+            <p className="mt-0.5">{error.description}</p>
           </div>
         )}
 
@@ -85,10 +104,11 @@ export default function CoverLetterPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="cover-letter-job-id" className="block text-sm font-medium text-gray-700 mb-1">
                 Job ID <span className="text-gray-400 text-xs">(from the job listing)</span>
               </label>
               <input
+                id="cover-letter-job-id"
                 type="text"
                 value={jobId}
                 onChange={(e) => setJobId(e.target.value)}
@@ -97,13 +117,15 @@ export default function CoverLetterPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tone</label>
+            <div role="radiogroup" aria-label="Cover letter tone">
+              <p className="block text-sm font-medium text-gray-700 mb-2">Tone</p>
               <div className="grid grid-cols-3 gap-3">
                 {TONES.map((t) => (
                   <button
                     key={t.value}
                     type="button"
+                    role="radio"
+                    aria-checked={tone === t.value}
                     onClick={() => setTone(t.value)}
                     className={`rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
                       tone === t.value
@@ -164,15 +186,27 @@ export default function CoverLetterPage() {
               </div>
             </CardHeader>
             <CardContent>
+              <label htmlFor="cover-letter-textarea" className="block text-sm font-medium text-gray-700 mb-2">
+                Cover Letter{" "}
+                <span className="text-gray-400 font-normal">
+                  (editable — personalise before sending)
+                </span>
+              </label>
               <textarea
-                readOnly
+                id="cover-letter-textarea"
                 value={coverLetter}
+                onChange={(e) => {
+                  setCoverLetter(e.target.value);
+                  setEdited(true);
+                }}
                 rows={18}
-                className="w-full rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none"
+                data-testid="cover-letter-textarea"
+                className="w-full rounded-md border border-gray-300 px-4 py-3 text-sm text-gray-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-xs text-gray-400 mt-2">
-                Review and personalise before sending. AI-generated letters should always be
-                reviewed.
+                {edited
+                  ? "Your edits are preserved. Copy or paste into the application when ready."
+                  : "Review and personalise before sending. AI-generated letters should always be reviewed."}
               </p>
             </CardContent>
           </Card>

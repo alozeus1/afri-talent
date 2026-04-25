@@ -1,10 +1,14 @@
 import { Router, Request, Response } from "express";
-import { z } from "zod";
+import { z } from "zod/v4";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { Role } from "@prisma/client";
 import { computeProfileCompleteness } from "../lib/profile-completeness.js";
 import { refreshCandidateTrustProfile } from "../lib/trust/service.js";
+import logger from "../lib/logger.js";
+import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
+
+const ACCOUNT_DELETION_WINDOW_DAYS = 30;
 
 const router = Router();
 
@@ -290,6 +294,103 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
     console.error("Create resume error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// GET /api/profile/privacy — get privacy settings
+router.get("/privacy", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response): Promise<void> => {
+  const userId = req.user!.userId;
+  const profile = await prisma.candidateProfile.findUnique({
+    where: { userId },
+    select: { profileVisible: true },
+  });
+  res.json({ profileVisible: profile?.profileVisible ?? true });
+});
+
+// PUT /api/profile/privacy — update privacy settings
+const privacySchema = z.object({ profileVisible: z.boolean() });
+
+router.put("/privacy", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response): Promise<void> => {
+  const result = privacySchema.safeParse(req.body);
+  if (!result.success) {
+    res.status(400).json({ error: "Invalid request", issues: result.error.issues });
+    return;
+  }
+  const userId = req.user!.userId;
+  await prisma.candidateProfile.upsert({
+    where: { userId },
+    update: { profileVisible: result.data.profileVisible },
+    create: { userId, profileVisible: result.data.profileVisible },
+  });
+  res.json({ message: "Privacy settings updated", profileVisible: result.data.profileVisible });
+});
+
+// POST /api/profile/delete-request — request account deletion (soft delete)
+router.post("/delete-request", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response): Promise<void> => {
+  const userId = req.user!.userId;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, name: true, deletionRequestedAt: true, deletedAt: true },
+  });
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (user.deletedAt) {
+    res.status(400).json({ error: "Account is already scheduled for deletion" });
+    return;
+  }
+  await prisma.user.update({
+    where: { id: userId },
+    data: { deletionRequestedAt: new Date() },
+  });
+  logger.info({ userId: userId.slice(0, 8) }, "[privacy] account deletion requested");
+
+  if (process.env.NODE_ENV !== "test") {
+    const supportUrl =
+      process.env.SUPPORT_URL ||
+      `${process.env.APP_URL || process.env.FRONTEND_URL || "https://afritalent.com"}/support`;
+    void dispatchNotification({
+      kind: "ACCOUNT_CLOSED",
+      user: { id: user.id, email: user.email, name: user.name },
+      scheduledDeletionDays: ACCOUNT_DELETION_WINDOW_DAYS,
+      supportUrl,
+    }).catch((dispatchError) => {
+      logger.warn(
+        {
+          userId: userId.slice(0, 8),
+          error: dispatchError instanceof Error ? dispatchError.message : "unknown",
+        },
+        "[privacy] account-closed dispatch failed",
+      );
+    });
+  }
+
+  res.json({
+    message: `Deletion request received. Your account will be deleted within ${ACCOUNT_DELETION_WINDOW_DAYS} days.`,
+    requestedAt: new Date().toISOString(),
+  });
+});
+
+// GET /api/profile/export — export all user data
+router.get("/export", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response): Promise<void> => {
+  const userId = req.user!.userId;
+  const [profile, resume, applications] = await Promise.all([
+    prisma.candidateProfile.findUnique({ where: { userId } }),
+    prisma.userResume.findUnique({ where: { userId }, select: { createdAt: true, updatedAt: true } }),
+    prisma.application.findMany({
+      where: { candidateId: userId },
+      select: { id: true, status: true, createdAt: true },
+      take: 100,
+    }),
+  ]);
+  res.json({
+    exportedAt: new Date().toISOString(),
+    userId,
+    profile: profile ? { ...profile, embedding: "[omitted]" } : null,
+    resume: resume ? { hasResume: true, updatedAt: resume.updatedAt } : null,
+    applicationCount: applications.length,
+    applicationStatuses: applications.map((a) => ({ id: a.id, status: a.status, createdAt: a.createdAt })),
+  });
 });
 
 // GET /api/profile/analytics — candidate profile view analytics

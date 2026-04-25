@@ -4,7 +4,7 @@ import bcrypt from "bcrypt";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { passwordResetLimiter } from "../middleware/security.js";
-import { passwordResetEmail } from "../lib/email.js";
+import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import logger from "../lib/logger.js";
 
 const router = Router();
@@ -61,12 +61,12 @@ router.post("/forgot-password", passwordResetLimiter, async (req: Request, res: 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
 
-    void passwordResetEmail({
-      to: user.email,
-      userName: user.name,
+    void dispatchNotification({
+      kind: "PASSWORD_RESET_REQUESTED",
+      user: { id: user.id, email: user.email, name: user.name },
       resetUrl,
       expiresInHours: RESET_TOKEN_EXPIRY_HOURS,
-    }).catch((err) => logger.error({ err }, "Failed to send password reset email"));
+    }).catch((err) => logger.error({ err }, "Failed to dispatch password reset notification"));
 
     logger.info({ userId: user.id.slice(0, 8) }, "Password reset token generated");
     res.json(successResponse);
@@ -132,6 +132,24 @@ router.post("/reset-password", passwordResetLimiter, async (req: Request, res: R
     ]);
 
     logger.info({ userId: resetToken.userId.slice(0, 8) }, "Password reset successful");
+
+    // Phase 3: notify the user that their password was changed (security event).
+    const fullUser = await prisma.user.findUnique({
+      where: { id: resetToken.userId },
+      select: { id: true, email: true, name: true },
+    });
+    if (fullUser) {
+      const supportUrl =
+        process.env.SUPPORT_URL ||
+        `${process.env.FRONTEND_URL || "https://afritalent.com"}/support`;
+      void dispatchNotification({
+        kind: "PASSWORD_CHANGED",
+        user: { id: fullUser.id, email: fullUser.email, name: fullUser.name },
+        changedAt: new Date(),
+        supportUrl,
+      }).catch((err) => logger.error({ err }, "Failed to dispatch password changed notification"));
+    }
+
     res.json({ message: "Password has been reset successfully. You can now log in with your new password." });
   } catch (error) {
     if (error instanceof z.ZodError) {

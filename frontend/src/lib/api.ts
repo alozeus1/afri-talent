@@ -2491,8 +2491,16 @@ export const immigration = {
 
 // Quick Apply
 export const quickApply = {
-  apply: (jobId: string) =>
-    fetchAPI<Application>("/api/quick-apply", { method: "POST", body: JSON.stringify({ jobId }) }),
+  /**
+   * Submits a quick-apply request.
+   * The backend requires `confirm: true` to enforce explicit candidate
+   * consent before AfriTalent submits an application on their behalf.
+   */
+  apply: (jobId: string, opts: { confirm: true } = { confirm: true }) =>
+    fetchAPI<Application>("/api/quick-apply", {
+      method: "POST",
+      body: JSON.stringify({ jobId, confirm: opts.confirm }),
+    }),
   checkEligibility: (jobId: string) =>
     fetchAPI<QuickApplyEligibility>(`/api/quick-apply/eligible/${jobId}`),
 };
@@ -3079,6 +3087,15 @@ export interface JobMatch {
   slug: string;
   score: number;
   matchMethod: "vector" | "keyword";
+  explanation: string;
+  verifiedEmployer: boolean;
+  // Intelligence fields
+  visaSponsorship?: string;
+  eligibleCountries?: string[];
+  riskScore?: number;
+  riskLevel?: string;
+  qualityScore?: number;
+  qualityLabel?: string;
 }
 
 export interface SkillGap {
@@ -3135,11 +3152,29 @@ export const skills = {
   getJobMatches: (limit = 10) =>
     fetchAPI<{ matches: JobMatch[]; total: number; matchMethod: string }>(`/api/skills/job-matcher/matches?limit=${limit}`),
 
+  // Application readiness check
+  getApplicationReadiness: (jobId: string) =>
+    fetchAPI<{
+      jobId: string;
+      jobTitle: string;
+      status: "READY" | "NEEDS_IMPROVEMENT" | "HIGH_RISK";
+      resumeScore: number;
+      resumeGrade: "PASS" | "WARN" | "FAIL";
+      resumeIssues: Array<{ code: string; severity: string; message: string }>;
+      keywordCoverage: number;
+      missingKeywords: string[];
+      recommendation: string;
+    }>(`/api/skills/application-writer/readiness?jobId=${encodeURIComponent(jobId)}`),
+
   embedResume: () =>
     fetchAPI<{ message: string }>("/api/skills/job-matcher/embed-resume", { method: "POST" }),
 
   // Application Writer
-  generateCoverLetter: (data: { jobId: string; resumeText?: string }) =>
+  generateCoverLetter: (data: {
+    jobId: string;
+    resumeText?: string;
+    tone?: "professional" | "conversational" | "executive";
+  }) =>
     fetchAPI<{ coverLetter: string; source: "ai" | "template" }>("/api/skills/application-writer/generate", {
       method: "POST",
       body: JSON.stringify(data),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -9,11 +9,26 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
 
 const scoreVariant = (score: number): "success" | "info" | "warning" | "danger" | "default" => {
   if (score >= 80) return "success";
   if (score >= 60) return "info";
   if (score >= 40) return "warning";
+  return "default";
+};
+
+const riskVariant = (level?: string): "danger" | "warning" | "default" => {
+  if (level === "HIGH" || level === "CRITICAL") return "danger";
+  if (level === "MEDIUM") return "warning";
+  return "default";
+};
+
+const qualityVariant = (label?: string): "success" | "info" | "warning" | "default" => {
+  if (label === "TRUSTED") return "success";
+  if (label === "SOLID") return "info";
+  if (label === "REVIEW") return "warning";
   return "default";
 };
 
@@ -24,8 +39,29 @@ export default function JobMatchesPage() {
   const [matches, setMatches] = useState<JobMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [embedding, setEmbedding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyError | null>(null);
   const [embedMsg, setEmbedMsg] = useState<string | null>(null);
+  const [filterVisa, setFilterVisa] = useState(false);
+  const [filterRemote, setFilterRemote] = useState(false);
+
+  const filteredMatches = matches.filter((m) => {
+    if (filterVisa && m.visaSponsorship !== "YES") return false;
+    if (filterRemote && !m.location?.toLowerCase().includes("remote")) return false;
+    return true;
+  });
+
+  const loadMatches = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await skills.getJobMatches(10);
+      setMatches(data.matches);
+    } catch (err) {
+      setError(toFriendlyError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -33,20 +69,7 @@ export default function JobMatchesPage() {
       return;
     }
     void loadMatches();
-  }, [user]);
-
-  async function loadMatches() {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await skills.getJobMatches(10);
-      setMatches(data.matches);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load matches");
-    } finally {
-      setLoading(false);
-    }
-  }
+  }, [user, loadMatches, router]);
 
   async function handleReEmbed() {
     setEmbedding(true);
@@ -73,6 +96,20 @@ export default function JobMatchesPage() {
             <p className="text-sm text-gray-500 mt-1">
               Jobs ranked by semantic similarity to your resume
             </p>
+            <div className="flex items-center gap-2 flex-wrap mt-2">
+              <button
+                onClick={() => setFilterVisa(!filterVisa)}
+                className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterVisa ? "bg-green-100 border-green-400 text-green-800" : "border-gray-300 text-gray-600"}`}
+              >
+                Visa Sponsorship
+              </button>
+              <button
+                onClick={() => setFilterRemote(!filterRemote)}
+                className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterRemote ? "bg-blue-100 border-blue-400 text-blue-800" : "border-gray-300 text-gray-600"}`}
+              >
+                Remote Only
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="info">Premium</Badge>
@@ -87,17 +124,20 @@ export default function JobMatchesPage() {
         </div>
 
         {error && (
-          <div className="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-700">
-            {error === "No resume found. Generate one first." ? (
-              <span>
-                {error}{" "}
-                <Link href="/candidate/resume-builder" className="font-medium underline">
-                  Build your resume →
-                </Link>
-              </span>
-            ) : (
-              error
-            )}
+          <div
+            role="alert"
+            aria-live="assertive"
+            data-testid="job-matches-error"
+            className={`rounded-md border p-4 text-sm ${
+              error.tone === "error"
+                ? "bg-red-50 border-red-200 text-red-800"
+                : error.tone === "warning"
+                  ? "bg-amber-50 border-amber-200 text-amber-900"
+                  : "bg-blue-50 border-blue-200 text-blue-900"
+            }`}
+          >
+            <p className="font-medium">{error.title}</p>
+            <p className="mt-0.5">{error.description}</p>
           </div>
         )}
 
@@ -107,23 +147,36 @@ export default function JobMatchesPage() {
           </div>
         )}
 
-        {matches.length === 0 && !error ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-gray-500">No matches yet.</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Save a resume first, then click{" "}
-                <span className="font-medium">Refresh Matches</span>.
-              </p>
-              <Link href="/candidate/resume-builder">
-                <Button className="mt-4">Build Resume</Button>
-              </Link>
-            </CardContent>
-          </Card>
+        {filteredMatches.length === 0 && !error ? (
+          matches.length > 0 ? (
+            <EmptyState
+              testId="job-matches-empty-filtered"
+              title="No matches for the active filters"
+              description="Try removing a filter above to see more opportunities."
+              primaryAction={{
+                label: "Clear filters",
+                onClick: () => {
+                  setFilterVisa(false);
+                  setFilterRemote(false);
+                },
+              }}
+            />
+          ) : (
+            <EmptyState
+              testId="job-matches-empty"
+              title="No matches yet"
+              description="Save a resume first, then tap Refresh Matches and we will rank roles by fit."
+              primaryAction={{ label: "Build your resume", href: "/candidate/resume-builder" }}
+              secondaryAction={{
+                label: "Refresh matches",
+                onClick: () => void handleReEmbed(),
+              }}
+            />
+          )
         ) : (
           <div className="space-y-3">
-            {matches.map((match) => (
-              <Card key={match.jobId}>
+            {filteredMatches.map((match) => (
+              <Card key={match.jobId} data-testid="job-match-card">
                 <CardContent className="py-4 px-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
@@ -142,7 +195,37 @@ export default function JobMatchesPage() {
                         {match.matchMethod === "vector" && (
                           <Badge variant="info">Semantic match</Badge>
                         )}
+                        {match.verifiedEmployer && (
+                          <Badge
+                            variant="success"
+                            data-testid="verified-employer-badge"
+                          >
+                            ✓ Verified employer
+                          </Badge>
+                        )}
                       </div>
+                      {/* Risk + Quality indicators */}
+                      <div className="flex items-center gap-2 flex-wrap mt-1">
+                        {match.riskLevel && (match.riskLevel === "HIGH" || match.riskLevel === "CRITICAL") && (
+                          <Badge variant={riskVariant(match.riskLevel)} className="text-xs">Risk: {match.riskLevel}</Badge>
+                        )}
+                        {match.qualityLabel && (
+                          <Badge variant={qualityVariant(match.qualityLabel)} className="text-xs">{match.qualityLabel}</Badge>
+                        )}
+                        {match.visaSponsorship === "YES" && (
+                          <Badge variant="success" className="text-xs">Visa OK</Badge>
+                        )}
+                      </div>
+
+                      {/* AI Explanation */}
+                      {match.explanation && (
+                        <p
+                          className="mt-2 text-xs text-gray-500 italic"
+                          data-testid="match-explanation"
+                        >
+                          {match.explanation}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <Badge variant={scoreVariant(match.score)}>

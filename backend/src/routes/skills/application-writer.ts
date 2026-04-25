@@ -5,13 +5,15 @@
 // All routes require PROFESSIONAL subscription.
 
 import { Router, Request, Response } from "express";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { Role, SubscriptionPlan, ApplicationStatus } from "@prisma/client";
 import { authenticate, authorize } from "../../middleware/auth.js";
 import { requirePlan } from "../../middleware/subscription.js";
+import { generateLimiter } from "../../middleware/security.js";
 import prisma from "../../lib/prisma.js";
 import logger from "../../lib/logger.js";
 import { writeCoverLetter } from "../../lib/ai/skills/application-writer.js";
+import { gradeAiOutput } from "../../lib/ai/quality/quality-rubric.js";
 
 const router = Router();
 
@@ -40,6 +42,7 @@ const submitSchema = z.object({
 // ── POST /api/skills/application-writer/generate ─────────────────────────────
 router.post(
   "/generate",
+  generateLimiter,
   authenticate,
   authorize(Role.CANDIDATE),
   requirePlan(SubscriptionPlan.PROFESSIONAL),
@@ -224,6 +227,107 @@ router.get(
     } catch (error) {
       logger.error({ error, userId: req.user?.userId }, "[application-writer] list failed");
       res.status(500).json({ error: "Failed to fetch applications" });
+    }
+  }
+);
+
+// ── GET /api/skills/application-writer/readiness?jobId=<uuid> ─────────────────
+// Returns pre-application quality assessment for the candidate's saved resume
+// against a specific job. No AI calls — fully deterministic.
+router.get(
+  "/readiness",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  requirePlan(SubscriptionPlan.PROFESSIONAL),
+  async (req: Request, res: Response): Promise<void> => {
+    if (!checkSkillsEnabled(res)) return;
+
+    try {
+      const querySchema = z.object({ jobId: z.string().uuid() });
+      const parseResult = querySchema.safeParse(req.query);
+
+      if (!parseResult.success) {
+        res.status(400).json({ error: "Validation failed", details: parseResult.error.issues });
+        return;
+      }
+
+      const { jobId } = parseResult.data;
+      const userId = req.user!.userId;
+
+      // Fetch resume and job in parallel
+      const [resume, job] = await Promise.all([
+        prisma.userResume.findUnique({ where: { userId }, select: { rawText: true } }),
+        prisma.job.findUnique({
+          where: { id: jobId },
+          select: { title: true, description: true, tags: true },
+        }),
+      ]);
+
+      if (!resume?.rawText) {
+        res.status(400).json({ error: "Please save a resume first", code: "NO_RESUME" });
+        return;
+      }
+
+      if (!job) {
+        res.status(404).json({ error: "Job not found" });
+        return;
+      }
+
+      // Grade the resume
+      const report = gradeAiOutput({ text: resume.rawText, kind: "resume" });
+
+      // Keyword coverage: job title + first 500 chars of description
+      const jobText = `${job.title} ${(job.description || "").slice(0, 500)}`;
+      const allJobWords = jobText
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((w) => w.length > 4);
+      const uniqueJobWords = [...new Set(allJobWords)];
+
+      const resumeLower = resume.rawText.toLowerCase();
+      const matchedWords = uniqueJobWords.filter((w) => resumeLower.includes(w));
+      const missingKeywords = uniqueJobWords.filter((w) => !resumeLower.includes(w));
+
+      const keywordCoverage =
+        uniqueJobWords.length > 0
+          ? Math.round((matchedWords.length / uniqueJobWords.length) * 100)
+          : 0;
+
+      // Determine readiness status
+      type ReadinessStatus = "READY" | "NEEDS_IMPROVEMENT" | "HIGH_RISK";
+      let status: ReadinessStatus;
+      let recommendation: string;
+
+      if (report.grade === "FAIL" || keywordCoverage < 20) {
+        status = "HIGH_RISK";
+        recommendation =
+          "Your resume has significant issues that may hurt your application. Review and improve before applying.";
+      } else if (report.grade === "WARN" || keywordCoverage < 40) {
+        status = "NEEDS_IMPROVEMENT";
+        recommendation = "Your resume needs some improvements before applying to this role.";
+      } else {
+        status = "READY";
+        recommendation = "Your resume is well-prepared for this role. Apply with confidence.";
+      }
+
+      res.json({
+        jobId,
+        jobTitle: job.title,
+        status,
+        resumeScore: report.score,
+        resumeGrade: report.grade,
+        resumeIssues: report.issues.map(({ code, severity, message }) => ({
+          code,
+          severity,
+          message,
+        })),
+        keywordCoverage,
+        missingKeywords: missingKeywords.slice(0, 20), // cap list length
+        recommendation,
+      });
+    } catch (error) {
+      logger.error({ error, userId: req.user?.userId }, "[application-writer] readiness failed");
+      res.status(500).json({ error: "Failed to assess readiness" });
     }
   }
 );

@@ -285,6 +285,61 @@ export async function verificationEmail(opts: {
   });
 }
 
+export async function welcomeEmail(opts: {
+  to: string;
+  userName: string;
+  role: "CANDIDATE" | "EMPLOYER" | "ADMIN";
+  appUrl: string;
+}): Promise<void> {
+  const heading =
+    opts.role === "EMPLOYER"
+      ? "Welcome to AfriTalent — let's find you great talent"
+      : "Welcome to AfriTalent — your global career starts here";
+  const body =
+    opts.role === "EMPLOYER"
+      ? "Your employer account is ready. You can post roles, search verified candidates, and manage your hiring pipeline."
+      : "Your candidate account is ready. Build your profile, get matched to global roles, and apply with one click.";
+
+  await sendEmail({
+    to: opts.to,
+    subject: heading,
+    templateName: "welcome_account_registered",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.userName},</h2>
+        <p>${body}</p>
+        <p><a href="${opts.appUrl}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;">Go to AfriTalent</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: `Hi ${opts.userName},\n\n${body}\n\nGo to AfriTalent: ${opts.appUrl}`,
+  });
+}
+
+export async function accountClosedEmail(opts: {
+  to: string;
+  userName: string;
+  scheduledDeletionDays: number;
+  supportUrl: string;
+}): Promise<void> {
+  await sendEmail({
+    to: opts.to,
+    subject: "Your AfriTalent account closure request",
+    templateName: "account_closed",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.userName},</h2>
+        <p>We've received your request to close your AfriTalent account.</p>
+        <p>Your account and data will be permanently deleted in <strong>${opts.scheduledDeletionDays} days</strong>. You can sign in any time during that window to cancel the request.</p>
+        <p>If you didn't request this, contact our team right away:</p>
+        <p><a href="${opts.supportUrl}" style="background:#059669;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Contact Support</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: `Hi ${opts.userName},\n\nWe've received your request to close your AfriTalent account.\n\nYour account will be permanently deleted in ${opts.scheduledDeletionDays} days. Sign in any time during that window to cancel.\n\nIf you didn't request this, contact support: ${opts.supportUrl}`,
+  });
+}
+
 export async function accountEmailVerificationEmail(opts: {
   to: string;
   candidateName: string;
@@ -307,5 +362,121 @@ export async function accountEmailVerificationEmail(opts: {
       </div>
     `,
     text: `Welcome to AfriTalent, ${opts.candidateName}!\n\nVerify your email here: ${opts.verifyUrl}\n\nThis link expires in ${opts.expiresInHours} hours.`,
+  });
+}
+
+export async function passwordChangedEmail(opts: {
+  to: string;
+  userName: string;
+  changedAt: Date;
+  supportUrl: string;
+}): Promise<void> {
+  const when = opts.changedAt.toUTCString();
+  await sendEmail({
+    to: opts.to,
+    subject: "Your AfriTalent password was changed",
+    templateName: "password_changed",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.userName},</h2>
+        <p>Your AfriTalent account password was changed on <strong>${when}</strong>.</p>
+        <p>If this was you, no further action is needed.</p>
+        <p>If you didn't make this change, your account may be compromised. Reset your password immediately and contact support:</p>
+        <p><a href="${opts.supportUrl}" style="background:#dc2626;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Contact Support</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Security notification</p>
+      </div>
+    `,
+    text: `Hi ${opts.userName},\n\nYour AfriTalent password was changed on ${when}.\n\nIf this was you, no further action is needed.\n\nIf you didn't make this change, contact support immediately: ${opts.supportUrl}`,
+  });
+}
+
+export async function emailVerifiedEmail(opts: {
+  to: string;
+  userName: string;
+  appUrl: string;
+}): Promise<void> {
+  await sendEmail({
+    to: opts.to,
+    subject: "Your AfriTalent email is verified",
+    templateName: "email_verified",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.userName},</h2>
+        <p>Your email address is now verified on AfriTalent.</p>
+        <p>You now have full access to applications, messages, and verified-only opportunities.</p>
+        <p><a href="${opts.appUrl}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;">Continue to AfriTalent</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: `Hi ${opts.userName},\n\nYour email address is now verified on AfriTalent.\n\nContinue: ${opts.appUrl}`,
+  });
+}
+
+export async function newApplicationEmail(opts: {
+  to: string;
+  employerName: string;
+  candidateName: string;
+  jobTitle: string;
+  applicationUrl: string;
+}): Promise<void> {
+  await sendEmail({
+    to: opts.to,
+    subject: `New application: ${opts.jobTitle}`,
+    templateName: "new_application",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.employerName},</h2>
+        <p><strong>${opts.candidateName}</strong> has applied for <strong>${opts.jobTitle}</strong>.</p>
+        <p>Review their profile and move them through your pipeline.</p>
+        <p><a href="${opts.applicationUrl}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;">Review Application</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: `Hi ${opts.employerName},\n\n${opts.candidateName} has applied for ${opts.jobTitle}.\n\nReview: ${opts.applicationUrl}`,
+  });
+}
+
+export async function jobPublishedEmail(opts: {
+  to: string;
+  employerName: string;
+  jobTitle: string;
+  jobUrl: string;
+}): Promise<void> {
+  await sendEmail({
+    to: opts.to,
+    subject: `Your job is live: ${opts.jobTitle}`,
+    templateName: "job_published",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.employerName},</h2>
+        <p>Your job <strong>${opts.jobTitle}</strong> is now published and visible to candidates on AfriTalent.</p>
+        <p>We'll notify you as applications come in. You can promote, edit, or close the job at any time from your dashboard.</p>
+        <p><a href="${opts.jobUrl}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600;">View Job</a></p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: `Hi ${opts.employerName},\n\nYour job ${opts.jobTitle} is now published.\n\nView: ${opts.jobUrl}`,
+  });
+}
+
+export async function phoneVerifiedEmail(opts: {
+  to: string;
+  userName: string;
+  phoneMasked: string;
+}): Promise<void> {
+  await sendEmail({
+    to: opts.to,
+    subject: "Your AfriTalent phone number is verified",
+    templateName: "phone_verified",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${opts.userName},</h2>
+        <p>Your phone number ending in <strong>${opts.phoneMasked}</strong> is now verified.</p>
+        <p>This adds a trust signal to your AfriTalent profile and unlocks SMS-based security alerts.</p>
+        <p>If you didn't perform this verification, please reset your password and contact support immediately.</p>
+        <p style="color:#6b7280;font-size:12px;">AfriTalent — Connecting African professionals to global opportunities</p>
+      </div>
+    `,
+    text: `Hi ${opts.userName},\n\nYour phone number ending in ${opts.phoneMasked} is now verified.\n\nIf you didn't perform this verification, reset your password and contact support immediately.`,
   });
 }

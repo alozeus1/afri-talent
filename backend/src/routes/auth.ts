@@ -15,6 +15,8 @@ import {
   refreshEmployerTrustProfile,
 } from "../lib/trust/service.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
+import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
+import logger from "../lib/logger.js";
 
 const router = Router();
 
@@ -181,6 +183,19 @@ router.post("/register", registerLimiter, validateHumanAuthSubmission, async (re
             source: "register",
           },
         });
+      });
+
+      // Welcome email + in-app notification (best-effort, non-blocking).
+      const appUrl = process.env.APP_URL || process.env.FRONTEND_URL || "https://afritalent.com";
+      void dispatchNotification({
+        kind: "ACCOUNT_REGISTERED",
+        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        appUrl,
+      }).catch((welcomeError) => {
+        logger.warn(
+          { userId: user.id.slice(0, 8), error: welcomeError instanceof Error ? welcomeError.message : "unknown" },
+          "[auth.register] welcome dispatch failed",
+        );
       });
     }
 

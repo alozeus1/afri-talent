@@ -24,6 +24,8 @@ import {
   refreshEmployerTrustProfile,
 } from "../lib/trust/service.js";
 import { recordLatencyMetric, recordOpsEvent } from "../lib/ops/events.js";
+import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
+import logger from "../lib/logger.js";
 
 const router = Router();
 
@@ -453,6 +455,29 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
           flags: jobRisk.flags,
         },
       });
+    }
+
+    if (!requiresModeration && job.status === JobStatus.PUBLISHED) {
+      const employerUser = await prisma.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { email: true, name: true },
+      });
+      if (employerUser) {
+        const appBaseUrl = process.env.APP_URL || process.env.FRONTEND_URL || "https://afritalent.com";
+        void dispatchNotification({
+          kind: "JOB_PUBLISHED",
+          employer: {
+            userId: req.user!.userId,
+            email: employerUser.email,
+            name: employerUser.name || employer.companyName,
+          },
+          jobTitle: job.title,
+          jobId: job.id,
+          jobUrl: `${appBaseUrl}/jobs/${job.slug}`,
+        }).catch((err) =>
+          logger.warn({ err }, "[jobs.create] JOB_PUBLISHED dispatch failed"),
+        );
+      }
     }
 
     res.status(201).json({

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Job, quickApply, QuickApplyEligibility } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
 
 interface QuickApplyModalProps {
   job: Job;
@@ -17,8 +18,11 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
   const [eligibility, setEligibility] = useState<QuickApplyEligibility | null>(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyError | null>(null);
   const [success, setSuccess] = useState(false);
+  const [consented, setConsented] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   const isOnPlatformApply = job.discovery?.deliveryModel === "ON_PLATFORM" || job.jobSource === "EMPLOYER_POSTED";
   const externalApplyUrl = job.applicationUrl || job.sourceUrl || null;
@@ -37,6 +41,7 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
       setError(null);
       setSuccess(false);
       setEligibility(null);
+      setConsented(false);
 
       quickApply
         .checkEligibility(job.id)
@@ -44,7 +49,7 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
           setEligibility(data);
         })
         .catch((err) => {
-          setError(err instanceof Error ? err.message : "Failed to check eligibility");
+          setError(toFriendlyError(err));
         })
         .finally(() => {
           setLoading(false);
@@ -52,18 +57,47 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
     }
   }, [isOpen, isOnPlatformApply, job.id]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusTimer = window.setTimeout(() => {
+      closeButtonRef.current?.focus();
+    }, 0);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = prevOverflow;
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [isOpen, onClose]);
+
   const handleApply = async () => {
+    if (!consented) {
+      setError({
+        title: "Please confirm before submitting",
+        description:
+          "Tick the consent box so we know you have reviewed this application.",
+        tone: "info",
+      });
+      return;
+    }
     setApplying(true);
     setError(null);
 
     try {
-      await quickApply.apply(job.id);
+      await quickApply.apply(job.id, { confirm: true });
       setSuccess(true);
       setTimeout(() => {
         onSuccess();
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to apply");
+      setError(toFriendlyError(err));
     } finally {
       setApplying(false);
     }
@@ -72,20 +106,29 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="quick-apply-title"
+      className="fixed inset-0 z-50 flex items-center justify-center"
+    >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
       <div className="relative w-full max-w-md mx-4">
+        <h2 id="quick-apply-title" className="sr-only">Quick Apply to {job.title}</h2>
         <Card className="shadow-xl">
           <CardContent className="p-6">
             {/* Close button */}
             <button
+              ref={closeButtonRef}
+              type="button"
+              aria-label="Close Quick Apply"
               onClick={onClose}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -142,8 +185,20 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
             {/* Error */}
             {isOnPlatformApply && !loading && error && !eligibility && (
               <div className="py-6">
-                <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
-                  {error}
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  data-testid="quick-apply-error"
+                  className={`p-4 rounded-lg mb-4 border text-sm ${
+                    error.tone === "error"
+                      ? "bg-red-50 border-red-200 text-red-800"
+                      : error.tone === "warning"
+                        ? "bg-amber-50 border-amber-200 text-amber-900"
+                        : "bg-blue-50 border-blue-200 text-blue-900"
+                  }`}
+                >
+                  <p className="font-medium">{error.title}</p>
+                  <p className="mt-0.5">{error.description}</p>
                 </div>
                 <Button variant="outline" className="w-full" onClick={onClose}>
                   Close
@@ -202,16 +257,46 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                 </div>
 
                 {error && (
-                  <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
-                    {error}
+                  <div
+                    role="alert"
+                    aria-live="assertive"
+                    data-testid="quick-apply-inline-error"
+                    className={`p-3 rounded-lg mb-4 border text-sm ${
+                      error.tone === "error"
+                        ? "bg-red-50 border-red-200 text-red-800"
+                        : error.tone === "warning"
+                          ? "bg-amber-50 border-amber-200 text-amber-900"
+                          : "bg-blue-50 border-blue-200 text-blue-900"
+                    }`}
+                  >
+                    <p className="font-medium">{error.title}</p>
+                    <p className="mt-0.5">{error.description}</p>
                   </div>
                 )}
+
+                <label
+                  htmlFor="quick-apply-consent"
+                  className="flex items-start gap-3 p-3 mb-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <input
+                    id="quick-apply-consent"
+                    type="checkbox"
+                    data-testid="quick-apply-consent-checkbox"
+                    checked={consented}
+                    onChange={(e) => setConsented(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    I confirm I&apos;ve reviewed this application and want AfriTalent to submit it on my behalf.
+                  </span>
+                </label>
 
                 <Button
                   className="w-full"
                   size="lg"
                   onClick={handleApply}
-                  disabled={applying}
+                  disabled={applying || !consented}
+                  data-testid="quick-apply-submit"
                 >
                   {applying ? "Submitting..." : "Apply Now"}
                 </Button>

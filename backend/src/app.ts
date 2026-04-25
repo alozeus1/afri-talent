@@ -20,6 +20,7 @@ import {
 
 import authRoutes from "./routes/auth.js";
 import passwordResetRoutes from "./routes/password-reset.js";
+import phoneVerificationRoutes from "./routes/phone-verification.js";
 import jobsRoutes from "./routes/jobs.js";
 import applicationsRoutes from "./routes/applications.js";
 import resourcesRoutes from "./routes/resources.js";
@@ -302,6 +303,7 @@ app.get("/api/live", liveHandler);
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/auth", passwordResetRoutes);
+app.use("/api/auth/phone", phoneVerificationRoutes);
 app.use("/api/jobs", jobsRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/resources", resourcesRoutes);
