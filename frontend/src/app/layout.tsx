@@ -30,12 +30,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${jakarta.variable} ${spaceGrotesk.variable} antialiased app-shell`}>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-4 focus:bg-emerald-600 focus:text-white focus:rounded-md focus:m-4 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+        >
+          Skip to main content
+        </a>
         <ThemeProvider>
           <AuthProvider>
             <div className="min-h-screen flex flex-col">
               <Header />
               <NetworkStatusBanner />
-              <main className="flex-1">{children}</main>
+              <main id="main-content" className="flex-1">{children}</main>
               <Footer />
             </div>
           </AuthProvider>

@@ -34,6 +34,42 @@ interface CompanyListResponse {
   };
 }
 
+const FEATURED_COMPANIES: Company[] = [
+  {
+    id: "featured-1",
+    companyName: "Paystack",
+    industry: "Financial Services",
+    headquarters: "Lagos, Nigeria",
+    website: "https://paystack.com",
+    size: "501-1000",
+    hiresFromAfrica: true,
+    verified: true,
+    ratingAggregate: { averageOverall: 4.8, reviewCount: 124 }
+  },
+  {
+    id: "featured-2",
+    companyName: "Andela",
+    industry: "Technology",
+    headquarters: "New York, USA",
+    website: "https://andela.com",
+    size: "1000+",
+    hiresFromAfrica: true,
+    verified: true,
+    ratingAggregate: { averageOverall: 4.5, reviewCount: 312 }
+  },
+  {
+    id: "featured-3",
+    companyName: "Flutterwave",
+    industry: "Financial Services",
+    headquarters: "San Francisco, USA",
+    website: "https://flutterwave.com",
+    size: "501-1000",
+    hiresFromAfrica: true,
+    verified: true,
+    ratingAggregate: { averageOverall: 4.6, reviewCount: 208 }
+  }
+];
+
 function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex items-center gap-0.5">
@@ -128,23 +164,91 @@ export default function CompaniesPage() {
           </div>
 
           {data.companies.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-600 mb-4">No companies found matching your criteria</p>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearch("");
-                  setPage(1);
-                }}
-              >
-                Clear search
-              </Button>
+            <div className="py-8">
+              <div className="text-center py-16 px-4 surface-panel bg-white shadow-sm border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-2xl mb-12">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 mb-6 dark:bg-emerald-500/10 dark:text-emerald-400">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+                  {search ? "No companies found" : "Directory is being updated"}
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-8">
+                  {search 
+                    ? `We couldn't find any companies matching "${search}". Try adjusting your search terms.`
+                    : "We're currently onboarding new partners to the AfriTalent platform. Check out some of our featured companies below."}
+                </p>
+                {search && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearch("");
+                      setPage(1);
+                    }}
+                    aria-label="Clear current search query to view all companies"
+                  >
+                    Clear search
+                  </Button>
+                )}
+              </div>
+
+              {!search && (
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-6">Featured Companies</h3>
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    {FEATURED_COMPANIES.map((company) => (
+                      <Link key={company.id} href={`/companies/${company.id}`}>
+                        <Card className="h-full hover:shadow-md transition-all duration-200 hover:-translate-y-1 cursor-pointer">
+                          <CardContent className="p-6">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-gray-900 text-lg truncate">
+                                  {company.companyName}
+                                </h3>
+                                {company.industry && (
+                                  <p className="text-sm text-gray-600">{company.industry}</p>
+                                )}
+                              </div>
+                              {company.verified && (
+                                <Badge variant="info" className="ml-2 shrink-0">Verified</Badge>
+                              )}
+                            </div>
+
+                            {company.headquarters && (
+                              <p className="text-sm text-gray-500 mb-3">
+                                📍 {company.headquarters}
+                              </p>
+                            )}
+
+                            {company.ratingAggregate && company.ratingAggregate.reviewCount > 0 && (
+                              <div className="mb-3">
+                                <StarRating rating={company.ratingAggregate.averageOverall} />
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {company.ratingAggregate.reviewCount} review
+                                  {company.ratingAggregate.reviewCount !== 1 ? "s" : ""}
+                                </p>
+                              </div>
+                            )}
+
+                            <div className="flex flex-wrap gap-2 mt-auto pt-4">
+                              {company.hiresFromAfrica && (
+                                <Badge variant="success">Hires from Africa</Badge>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {data.companies.map((company) => (
                 <Link key={company.id} href={`/companies/${company.id}`}>
-                  <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+                  <Card className="h-full hover:shadow-md transition-all duration-200 hover:-translate-y-1 cursor-pointer">
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1 min-w-0">
