@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { salaryReports, SalaryReportResponse, SalaryComparison, TopPayingJob } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -151,10 +152,7 @@ export default function SalariesPage() {
     }).format(amount);
   };
 
-  // Find max salary for bar chart scaling
-  const maxCompareSalary = compareData
-    ? Math.max(...compareData.map((c) => c.avgSalary), 1)
-    : 1;
+
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -333,31 +331,52 @@ export default function SalariesPage() {
           )}
 
           {compareData && compareData.length > 0 && (
-            <div className="space-y-3">
-              {compareData
-                .sort((a, b) => b.avgSalary - a.avgSalary)
-                .map((item) => (
-                  <div key={item.country} className="flex items-center gap-4">
-                    <span className="w-28 text-sm font-medium text-gray-700 shrink-0">
-                      {item.country}
-                    </span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-8 relative overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                        style={{
-                          width: `${(item.avgSalary / maxCompareSalary) * 100}%`,
-                          minWidth: item.avgSalary > 0 ? "2rem" : "0",
-                        }}
-                      />
-                    </div>
-                    <span className="w-28 text-sm font-bold text-gray-900 text-right shrink-0">
-                      {formatCurrency(item.avgSalary)}
-                    </span>
-                    <span className="w-16 text-xs text-gray-400 text-right shrink-0">
-                      ({item.count})
-                    </span>
-                  </div>
-                ))}
+            <div className="h-[400px] w-full mt-8">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={compareData.sort((a, b) => b.avgSalary - a.avgSalary)}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <XAxis type="number" hide />
+                  <YAxis
+                    dataKey="country"
+                    type="category"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#374151', fontSize: 14, fontWeight: 500 }}
+                    width={100}
+                  />
+                  <Tooltip
+                    cursor={{ fill: '#f3f4f6' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-white p-4 rounded-xl shadow-xl border border-gray-100">
+                            <p className="font-bold text-gray-900 mb-1">{data.country}</p>
+                            <p className="text-emerald-600 font-bold text-lg">
+                              {formatCurrency(data.avgSalary)}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">Based on {data.count} reports</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar
+                    dataKey="avgSalary"
+                    radius={[0, 4, 4, 0]}
+                    animationDuration={1500}
+                    barSize={24}
+                  >
+                    {compareData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill="#10b981" className="hover:fill-emerald-500 transition-colors duration-300" />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           )}
 
@@ -391,7 +410,8 @@ export default function SalariesPage() {
               {topPaying.slice(0, 10).map((job, index) => (
                 <div
                   key={job.jobTitle}
-                  className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0"
+                  className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 animate-in fade-in slide-in-from-bottom-4 duration-700"
+                  style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-sm font-bold">

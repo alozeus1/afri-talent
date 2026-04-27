@@ -28,7 +28,7 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
 
   return (
     <div className="page-frame py-10 md:py-14">
-      <div className="relative overflow-hidden rounded-[2.5rem] border border-[var(--border-soft)] bg-[linear-gradient(135deg,rgba(12,24,36,0.96),rgba(10,92,94,0.88),rgba(245,158,11,0.72))] px-6 py-12 text-white shadow-[0_30px_110px_rgba(11,20,32,0.2)] md:px-10">
+      <div className="relative overflow-hidden rounded-[2.5rem] border border-[var(--border-soft)] bg-gradient-to-br from-[#0c1824] via-[#0a5c5e] to-[#f59e0b] animate-gradient-breath px-6 py-12 text-white shadow-[0_30px_110px_rgba(11,20,32,0.2)] md:px-10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_28%),radial-gradient(circle_at_75%_25%,rgba(255,255,255,0.1),transparent_20%)]" />
         <div className="relative grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
           <div>

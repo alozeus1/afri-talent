@@ -95,7 +95,7 @@ export function Header() {
 
   const getDashboardLink = () => {
     if (!user) return "/login";
-    switch (user.role) {
+    switch (user.role?.toUpperCase()) {
       case "ADMIN":
         return "/admin";
       case "EMPLOYER":

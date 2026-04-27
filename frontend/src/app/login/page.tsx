@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -31,6 +31,14 @@ function LoginForm() {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (user && !loading) {
+      const rolePath = user.role ? `/${user.role.toLowerCase()}` : "/";
+      const redirect = searchParams.get("redirect") || localizePath(rolePath, locale);
+      router.push(redirect);
+    }
+  }, [user, loading, router, searchParams, locale]);
+
   const validateForm = () => {
     const errors: { email?: string; password?: string } = {};
     
@@ -60,8 +68,7 @@ function LoginForm() {
       await login(email, password, {
         botShield: createBotShieldPayload(formStartedAt, honeypot),
       });
-      const redirect = searchParams.get("redirect") || localizePath("/", locale);
-      router.push(redirect);
+      // The useEffect will handle the redirect once the user object is populated
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

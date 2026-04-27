@@ -88,7 +88,7 @@ export default function CandidateDashboard() {
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== "CANDIDATE")) {
+    if (!isLoading && (!user || user.role?.toUpperCase() !== "CANDIDATE")) {
       router.push(localizePath("/login", locale));
     }
   }, [user, isLoading, router, locale]);
@@ -589,14 +589,21 @@ export default function CandidateDashboard() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center py-8">
+            <div className="flex items-center justify-center py-12 text-emerald-600">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
+              <span className="ml-3 text-sm font-medium">Loading your applications...</span>
             </div>
           ) : myApplications.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">You haven&apos;t applied to any jobs yet</p>
+            <div className="text-center py-12 px-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 dark:bg-zinc-900/50 dark:border-zinc-800">
+              <div className="flex justify-center mb-4 text-gray-400 dark:text-zinc-500">
+                <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <p className="text-gray-900 dark:text-zinc-100 font-semibold mb-1">No applications yet</p>
+              <p className="text-gray-500 dark:text-zinc-400 text-sm mb-6 max-w-sm mx-auto">When you apply to roles, you can track their status and trust-safety reviews here.</p>
               <Link href={localizePath("/jobs", locale)}>
-                <Button>Find Jobs</Button>
+                <Button>Explore Verified Jobs</Button>
               </Link>
             </div>
           ) : (

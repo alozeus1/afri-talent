@@ -126,3 +126,20 @@ h4,
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
+
+@keyframes gradient-breath {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-breath {
+  background-size: 200% 200%;
+  animation: gradient-breath 15s ease infinite;
+}
