@@ -3,7 +3,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { AbuseReportStatus, JobStatus, ReviewStatus, ReviewTargetType, Role, TrustCaseStatus, VerificationArtifactStatus } from "@prisma/client";
-import { getIngestionReliabilityState, getLastSyncTime } from "../workers/aggregator-cron.js";
+import { getLastSyncTime } from "../workers/aggregator-cron.js";
 import { summarizeDeadLetters, getWorkerStates, listDeadLetters } from "../lib/ops/resilience.js";
 import { redisHealthStatus } from "../lib/redis.js";
 const router = Router();
@@ -43,7 +43,7 @@ router.get("/stats", async (_req, res) => {
 // GET /api/admin/operations/overview - Platform operational state
 router.get("/operations/overview", async (_req, res) => {
     try {
-        const [lastSyncAt, pendingJobs, verificationBacklog, trustCaseBacklog, abuseReportBacklog, fraudDetectionsLast24h, ingestionReliability, workerStates, deadLettersBySource, redisStatus,] = await Promise.all([
+        const [lastSyncAt, pendingJobs, verificationBacklog, trustCaseBacklog, abuseReportBacklog, fraudDetectionsLast24h, workerStates, deadLettersBySource, redisStatus,] = await Promise.all([
             getLastSyncTime(),
             prisma.job.count({ where: { status: JobStatus.PENDING_REVIEW } }),
             prisma.verificationArtifact.count({
@@ -74,7 +74,6 @@ router.get("/operations/overview", async (_req, res) => {
                     },
                 },
             }),
-            getIngestionReliabilityState(),
             getWorkerStates(),
             summarizeDeadLetters(),
             redisHealthStatus(),
@@ -91,11 +90,6 @@ router.get("/operations/overview", async (_req, res) => {
                 lastSyncAt,
                 minutesSinceLastSync,
                 stale: minutesSinceLastSync === null ? true : minutesSinceLastSync > 180,
-                cycleStatus: ingestionReliability.lastCycleStatus,
-                lastCycleAt: ingestionReliability.lastCycleAt,
-                consecutiveFailureCount: ingestionReliability.consecutiveFailureCount,
-                consecutiveZeroResultCount: ingestionReliability.consecutiveZeroResultCount,
-                lastJobsIngested: ingestionReliability.lastJobsIngested,
             },
             backlogs: {
                 pendingJobs,
