@@ -110,6 +110,20 @@ variable "adzuna_api_key" {
   default     = ""
 }
 
+variable "google_client_id" {
+  type        = string
+  description = "Google OAuth client ID for social login"
+  sensitive   = true
+  default     = ""
+}
+
+variable "google_client_secret" {
+  type        = string
+  description = "Google OAuth client secret for social login"
+  sensitive   = true
+  default     = ""
+}
+
 variable "apify_token" {
   type        = string
   description = "Apify API token for job task execution"

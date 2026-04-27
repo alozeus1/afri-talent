@@ -346,6 +346,37 @@ describe("Phase 1/2 quality integration suite", () => {
     prismaMock.user.update.mockResolvedValue({});
   });
 
+  it("only advertises Google OAuth when both client id and secret exist", async () => {
+    const prevGoogle = process.env.GOOGLE_CLIENT_ID;
+    const prevGoogleSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    process.env.GOOGLE_CLIENT_ID = "google-client-id";
+    delete process.env.GOOGLE_CLIENT_SECRET;
+
+    const missingSecretRes = await request(app).get("/api/auth/oauth/providers");
+    expect(missingSecretRes.status).toBe(200);
+    expect(missingSecretRes.body.providers).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ provider: "google" })]),
+    );
+
+    process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
+
+    const enabledRes = await request(app).get("/api/auth/oauth/providers");
+    expect(enabledRes.status).toBe(200);
+    expect(enabledRes.body.providers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          provider: "google",
+          clientId: "google-client-id",
+          enabled: true,
+        }),
+      ]),
+    );
+
+    process.env.GOOGLE_CLIENT_ID = prevGoogle;
+    process.env.GOOGLE_CLIENT_SECRET = prevGoogleSecret;
+  });
+
   it("serves OpenAPI docs and includes key Phase 1 paths", async () => {
     const res = await request(app).get("/api/docs/spec.json");
     expect(res.status).toBe(200);

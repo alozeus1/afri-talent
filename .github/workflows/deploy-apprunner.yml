@@ -154,6 +154,8 @@ jobs:
           FLUTTERWAVE_PAYMENT_OPTIONS: ${{ secrets.FLUTTERWAVE_PAYMENT_OPTIONS }}
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_API_KEY: ${{ secrets.ADZUNA_API_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           APIFY_JOB_TASKS_JSON: ${{ secrets.APIFY_JOB_TASKS_JSON }}
           GREENHOUSE_BOARD_TOKENS: ${{ secrets.GREENHOUSE_BOARD_TOKENS }}
@@ -182,6 +184,8 @@ jobs:
             --arg flutterwaveOptions "$FLUTTERWAVE_PAYMENT_OPTIONS" \
             --arg adzunaId "$ADZUNA_APP_ID" \
             --arg adzunaKey "$ADZUNA_API_KEY" \
+            --arg googleClientId "$GOOGLE_CLIENT_ID" \
+            --arg googleClientSecret "$GOOGLE_CLIENT_SECRET" \
             --arg apifyToken "$APIFY_TOKEN" \
             --arg apifyTasks "$APIFY_JOB_TASKS_JSON" \
             --arg greenhouseBoards "$GREENHOUSE_BOARD_TOKENS" \
@@ -207,6 +211,8 @@ jobs:
               FLUTTERWAVE_PAYMENT_OPTIONS: prefer_input($flutterwaveOptions; "FLUTTERWAVE_PAYMENT_OPTIONS"),
               ADZUNA_APP_ID: prefer_input($adzunaId; "ADZUNA_APP_ID"),
               ADZUNA_API_KEY: prefer_input($adzunaKey; "ADZUNA_API_KEY"),
+              GOOGLE_CLIENT_ID: prefer_input($googleClientId; "GOOGLE_CLIENT_ID"),
+              GOOGLE_CLIENT_SECRET: prefer_input($googleClientSecret; "GOOGLE_CLIENT_SECRET"),
               APIFY_TOKEN: prefer_input($apifyToken; "APIFY_TOKEN"),
               APIFY_JOB_TASKS_JSON: prefer_input($apifyTasks; "APIFY_JOB_TASKS_JSON"),
               GREENHOUSE_BOARD_TOKENS: prefer_input($greenhouseBoards; "GREENHOUSE_BOARD_TOKENS"),

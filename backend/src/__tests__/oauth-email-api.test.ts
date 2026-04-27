@@ -61,20 +61,23 @@ describe("OAuth + Email Verification API", () => {
 
   it("lists enabled OAuth providers", async () => {
     const previousGoogle = process.env.GOOGLE_CLIENT_ID;
+    const previousGoogleSecret = process.env.GOOGLE_CLIENT_SECRET;
     const previousApple = process.env.APPLE_CLIENT_ID;
     process.env.GOOGLE_CLIENT_ID = "google-client-id";
+    process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
     process.env.APPLE_CLIENT_ID = "apple-client-id";
 
     const res = await request(app).get("/api/auth/oauth/providers");
     expect(res.status).toBe(200);
     expect(res.body.providers).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ provider: "google", enabled: true }),
+        expect.objectContaining({ provider: "google", clientId: "google-client-id", enabled: true }),
         expect.objectContaining({ provider: "apple", enabled: true }),
       ]),
     );
 
     process.env.GOOGLE_CLIENT_ID = previousGoogle;
+    process.env.GOOGLE_CLIENT_SECRET = previousGoogleSecret;
     process.env.APPLE_CLIENT_ID = previousApple;
   });
 

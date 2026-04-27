@@ -86,6 +86,8 @@ resource "aws_secretsmanager_secret_version" "app" {
     FLUTTERWAVE_PAYMENT_OPTIONS   = var.flutterwave_payment_options
     ADZUNA_APP_ID                 = var.adzuna_app_id
     ADZUNA_API_KEY                = var.adzuna_api_key
+    GOOGLE_CLIENT_ID              = var.google_client_id
+    GOOGLE_CLIENT_SECRET          = var.google_client_secret
     APIFY_TOKEN                   = var.apify_token
     APIFY_JOB_TASKS_JSON          = var.apify_job_tasks_json
     GREENHOUSE_BOARD_TOKENS       = var.greenhouse_board_tokens
