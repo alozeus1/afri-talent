@@ -507,6 +507,18 @@ variable "ai_disabled" {
   default     = false
 }
 
+variable "blog_automation_enabled" {
+  type        = bool
+  description = "Enable the 5-agent weekly blog automation pipeline"
+  default     = true
+}
+
+variable "blog_automation_interval_days" {
+  type        = number
+  description = "Interval in days between blog pipeline runs"
+  default     = 7
+}
+
 variable "daily_apply_pack_limit" {
   type        = number
   description = "Per-user daily limit for apply pack generation"

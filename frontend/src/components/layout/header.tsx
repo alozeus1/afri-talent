@@ -164,6 +164,9 @@ export function Header() {
               <Link href={href("/interviews")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 {t("nav.interviews")}
               </Link>
+              <Link href={href("/blog")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+                Blog
+              </Link>
               <Link href={href("/learning")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 {t("nav.learn")}
               </Link>
@@ -290,6 +293,7 @@ export function Header() {
                 { href: "/companies", label: t("nav.companies") },
                 { href: "/salaries", label: t("nav.salaries") },
                 { href: "/interviews", label: t("nav.interviews") },
+                { href: "/blog", label: "Blog" },
                 { href: "/learning", label: t("nav.learn") },
                 { href: "/pricing", label: t("nav.pricing") },
                 { href: "/trust", label: "Trust" },

@@ -166,6 +166,8 @@ module "apprunner" {
       DAILY_JOB_MATCH_LIMIT             = tostring(var.daily_job_match_limit)
       DAILY_RESUME_REVIEW_LIMIT         = tostring(var.daily_resume_review_limit)
       AGGREGATOR_INTERVAL_MINUTES       = tostring(var.aggregator_interval_minutes)
+      BLOG_AUTOMATION_ENABLED           = var.blog_automation_enabled ? "1" : "0"
+      BLOG_AUTOMATION_INTERVAL_DAYS     = tostring(var.blog_automation_interval_days)
       STRIPE_PRICE_BASIC_MONTHLY        = var.stripe_price_basic_monthly
       STRIPE_PRICE_PROFESSIONAL_MONTHLY = var.stripe_price_professional_monthly
     } : key => value if value != null
@@ -190,7 +192,11 @@ module "apprunner" {
     "LEVER_SITE_TOKENS",
     "WORKABLE_COMPANY_TOKENS",
     "REDIS_URL",
-    "SENTRY_DSN"
+    "SENTRY_DSN",
+    "NEWS_API_KEY",
+    "UNSPLASH_ACCESS_KEY",
+    "PEXELS_API_KEY",
+    "BLOG_ADMIN_NOTIFICATION_EMAIL"
   ]
 
   # Frontend configuration
