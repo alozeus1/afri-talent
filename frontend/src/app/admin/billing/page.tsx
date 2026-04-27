@@ -12,6 +12,7 @@ import {
   AdminBillingDashboard,
   AdminBillingDiscrepancy,
   AdminBillingReconciliationRun,
+  PlanEntitlements,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -23,6 +24,13 @@ const initialSupportForm = {
   reasonCode: "support_note",
   notes: "",
   invoiceId: "",
+};
+
+const initialCapabilityForm = {
+  capability: "CANDIDATE_AI" as "CANDIDATE_PREMIUM" | "CANDIDATE_AI" | "EMPLOYER_PREMIUM",
+  action: "GRANT" as "GRANT" | "REVOKE",
+  reasonCode: "admin_capability_access_update",
+  notes: "",
 };
 
 const candidatePlanOptions: BillingStatus["plan"][] = ["FREE", "BASIC", "PROFESSIONAL"];
@@ -66,6 +74,13 @@ function toDatetimeLocalValue(value: string | null) {
   return offsetDate.toISOString().slice(0, 16);
 }
 
+function formatEntitlementLimit(value: number | null | boolean | undefined) {
+  if (value === null) return "Unlimited";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (value === undefined) return "n/a";
+  return value.toString();
+}
+
 export default function AdminBillingPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
@@ -76,7 +91,9 @@ export default function AdminBillingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<AdminBillingCustomerSearchResult[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<AdminBillingCustomerDetail | null>(null);
+  const [selectedPlanEntitlements, setSelectedPlanEntitlements] = useState<PlanEntitlements[]>([]);
   const [supportForm, setSupportForm] = useState(initialSupportForm);
+  const [capabilityForm, setCapabilityForm] = useState(initialCapabilityForm);
   const [subscriptionAccessForm, setSubscriptionAccessForm] = useState(buildInitialSubscriptionAccessForm(null));
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -97,12 +114,18 @@ export default function AdminBillingPage() {
 
   useEffect(() => {
     setSubscriptionAccessForm(buildInitialSubscriptionAccessForm(selectedCustomer));
+    setCapabilityForm((current) => ({
+      ...current,
+      capability: selectedCustomer?.role === "EMPLOYER" ? "EMPLOYER_PREMIUM" : "CANDIDATE_AI",
+    }));
   }, [selectedCustomer]);
 
   const openDiscrepancies = useMemo(
     () => discrepancies.filter((item) => item.status !== "RESOLVED"),
     [discrepancies],
   );
+
+  const effectiveEntitlements = selectedCustomer?.billingEntitlementState?.entitlements ?? null;
 
   async function loadOverview() {
     setLoading(true);
@@ -129,6 +152,7 @@ export default function AdminBillingPage() {
     try {
       const response = await adminBilling.customer(userId);
       setSelectedCustomer(response.customer);
+      setSelectedPlanEntitlements(response.planEntitlements);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load customer billing details.");
     } finally {
@@ -213,6 +237,34 @@ export default function AdminBillingPage() {
       );
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Failed to update subscription access.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleCapabilityAccess(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedCustomer) return;
+    setBusy("capability-access");
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await adminBilling.updateCapabilityAccess(selectedCustomer.id, {
+        capability: capabilityForm.capability,
+        action: capabilityForm.action,
+        reasonCode: capabilityForm.reasonCode,
+        notes: capabilityForm.notes || undefined,
+      });
+      await Promise.all([loadOverview(), loadCustomer(selectedCustomer.id)]);
+      setCapabilityForm((current) => ({ ...current, notes: "" }));
+      setSuccess(
+        response.warnings[0]
+          ? `Capability access updated. Effective plan is ${response.state.effectivePlan}. Warning: ${response.warnings[0]}`
+          : `Capability access updated. Effective plan is ${response.state.effectivePlan}.`,
+      );
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to update capability access.");
     } finally {
       setBusy(null);
     }
@@ -538,6 +590,137 @@ export default function AdminBillingPage() {
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200">
+            <CardHeader>
+              <h3 className="text-xl font-semibold text-gray-900">Premium and AI capability control</h3>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-4 lg:grid-cols-[0.9fr,1.1fr]">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Current effective capabilities</p>
+                  <div className="mt-3 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
+                    <p>AI resume reviews: {formatEntitlementLimit(effectiveEntitlements?.aiResumeReviews)}</p>
+                    <p>AI job matches: {formatEntitlementLimit(effectiveEntitlements?.aiJobMatches)}</p>
+                    <p>AI apply packs: {formatEntitlementLimit(effectiveEntitlements?.aiApplyPacks)}</p>
+                    <p>Chat access: {formatEntitlementLimit(effectiveEntitlements?.chatAccess)}</p>
+                    <p>Autopilot: {formatEntitlementLimit(effectiveEntitlements?.autopilot)}</p>
+                    <p>Priority support: {formatEntitlementLimit(effectiveEntitlements?.prioritySupport)}</p>
+                    <p>Talent search: {formatEntitlementLimit(effectiveEntitlements?.talentSearch)}</p>
+                    <p>API access: {formatEntitlementLimit(effectiveEntitlements?.apiAccess)}</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleCapabilityAccess} className="space-y-4 rounded-2xl border border-slate-200 p-4">
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    Scoped controls map to approved plans, sync BillingEntitlementState, and write support/audit events. Use the raw subscription override only for non-standard cases.
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <label className="text-sm text-gray-700">
+                      <span className="mb-1 block">Capability</span>
+                      <select
+                        className="w-full rounded-xl border border-gray-300 px-3 py-2"
+                        value={capabilityForm.capability}
+                        onChange={(event) =>
+                          setCapabilityForm((current) => ({
+                            ...current,
+                            capability: event.target.value as typeof capabilityForm.capability,
+                          }))
+                        }
+                      >
+                        {selectedCustomer.role === "EMPLOYER" ? (
+                          <option value="EMPLOYER_PREMIUM">Employer premium and AI tools</option>
+                        ) : (
+                          <>
+                            <option value="CANDIDATE_PREMIUM">Candidate premium</option>
+                            <option value="CANDIDATE_AI">Candidate AI tools</option>
+                          </>
+                        )}
+                      </select>
+                    </label>
+                    <label className="text-sm text-gray-700">
+                      <span className="mb-1 block">Action</span>
+                      <select
+                        className="w-full rounded-xl border border-gray-300 px-3 py-2"
+                        value={capabilityForm.action}
+                        onChange={(event) =>
+                          setCapabilityForm((current) => ({
+                            ...current,
+                            action: event.target.value as typeof capabilityForm.action,
+                          }))
+                        }
+                      >
+                        <option value="GRANT">Grant</option>
+                        <option value="REVOKE">Revoke</option>
+                      </select>
+                    </label>
+                    <label className="text-sm text-gray-700">
+                      <span className="mb-1 block">Reason code</span>
+                      <Input
+                        value={capabilityForm.reasonCode}
+                        onChange={(event) =>
+                          setCapabilityForm((current) => ({
+                            ...current,
+                            reasonCode: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <label className="block text-sm text-gray-700">
+                    <span className="mb-1 block">Audit notes</span>
+                    <textarea
+                      className="min-h-[100px] w-full rounded-2xl border border-gray-300 px-3 py-3"
+                      value={capabilityForm.notes}
+                      onChange={(event) =>
+                        setCapabilityForm((current) => ({
+                          ...current,
+                          notes: event.target.value,
+                        }))
+                      }
+                      placeholder="Document the customer request, support ticket, or risk rationale."
+                    />
+                  </label>
+                  <Button type="submit" disabled={busy === "capability-access"}>
+                    {busy === "capability-access" ? "Updating..." : "Apply capability change"}
+                  </Button>
+                </form>
+              </div>
+
+              {selectedPlanEntitlements.length > 0 && (
+                <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3">Plan</th>
+                        <th className="px-4 py-3">AI reviews</th>
+                        <th className="px-4 py-3">AI matches</th>
+                        <th className="px-4 py-3">Apply packs</th>
+                        <th className="px-4 py-3">Chat</th>
+                        <th className="px-4 py-3">Autopilot</th>
+                        <th className="px-4 py-3">Employer premium</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white text-gray-700">
+                      {selectedPlanEntitlements.map((plan) => (
+                        <tr key={plan.plan}>
+                          <td className="px-4 py-3 font-semibold text-gray-900">{plan.plan}</td>
+                          <td className="px-4 py-3">{formatEntitlementLimit(plan.aiResumeReviews)}</td>
+                          <td className="px-4 py-3">{formatEntitlementLimit(plan.aiJobMatches)}</td>
+                          <td className="px-4 py-3">{formatEntitlementLimit(plan.aiApplyPacks)}</td>
+                          <td className="px-4 py-3">{formatEntitlementLimit(plan.chatAccess)}</td>
+                          <td className="px-4 py-3">{formatEntitlementLimit(plan.autopilot)}</td>
+                          <td className="px-4 py-3">
+                            {formatEntitlementLimit(plan.apiAccess || plan.pipelineExports || plan.advancedFunnelMetrics)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
 

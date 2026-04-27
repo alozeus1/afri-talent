@@ -15,6 +15,7 @@ import { authenticate } from "../middleware/auth.js";
 import { checkPermission, enforceAdminRbac } from "../middleware/admin-rbac.js";
 import {
   createBillingSupportAction,
+  getEntitlements,
   recordBillingEvent,
   runBillingReconciliationCycle,
   syncBillingEntitlementState,
@@ -46,6 +47,13 @@ const subscriptionAccessSchema = z.object({
   notes: z.string().trim().max(2000).optional(),
 });
 
+const premiumAiCapabilitySchema = z.object({
+  capability: z.enum(["CANDIDATE_PREMIUM", "CANDIDATE_AI", "EMPLOYER_PREMIUM"]),
+  action: z.enum(["GRANT", "REVOKE"]),
+  reasonCode: z.string().trim().min(3).max(120),
+  notes: z.string().trim().max(2000).optional(),
+});
+
 const discrepancyStatusValues = ["ALL", ...Object.values(BillingDiscrepancyStatus)] as const;
 const candidatePlanValues = [SubscriptionPlan.FREE, SubscriptionPlan.BASIC, SubscriptionPlan.PROFESSIONAL] as const;
 const employerPlanValues = [
@@ -60,6 +68,45 @@ function isPlanAllowedForRole(role: Role, plan: SubscriptionPlan) {
   }
 
   return candidatePlanValues.includes(plan as typeof candidatePlanValues[number]);
+}
+
+function resolveCapabilityTarget(
+  role: Role,
+  currentPlan: SubscriptionPlan,
+  capability: z.infer<typeof premiumAiCapabilitySchema>["capability"],
+  action: z.infer<typeof premiumAiCapabilitySchema>["action"],
+) {
+  if (role === Role.EMPLOYER) {
+    if (capability !== "EMPLOYER_PREMIUM") {
+      return null;
+    }
+
+    if (action === "GRANT") {
+      return SubscriptionPlan.EMPLOYER_PREMIUM;
+    }
+
+    return currentPlan === SubscriptionPlan.EMPLOYER_PREMIUM ? SubscriptionPlan.EMPLOYER_BASIC : currentPlan;
+  }
+
+  if (capability === "EMPLOYER_PREMIUM") {
+    return null;
+  }
+
+  if (capability === "CANDIDATE_AI") {
+    if (action === "GRANT") {
+      return SubscriptionPlan.PROFESSIONAL;
+    }
+
+    return currentPlan === SubscriptionPlan.PROFESSIONAL ? SubscriptionPlan.BASIC : currentPlan;
+  }
+
+  if (capability === "CANDIDATE_PREMIUM") {
+    return action === "GRANT"
+      ? currentPlan === SubscriptionPlan.PROFESSIONAL ? SubscriptionPlan.PROFESSIONAL : SubscriptionPlan.BASIC
+      : SubscriptionPlan.FREE;
+  }
+
+  return null;
 }
 
 router.get("/dashboard", checkPermission(AdminPermission.VIEW_BILLING_DATA), async (_req: Request, res: Response) => {
@@ -336,7 +383,11 @@ router.get("/customers/:userId", checkPermission(AdminPermission.VIEW_BILLING_DA
       return;
     }
 
-    res.json({ customer });
+    const planEntitlements = await Promise.all(
+      (customer.role === Role.EMPLOYER ? employerPlanValues : candidatePlanValues).map((plan) => getEntitlements(plan)),
+    );
+
+    res.json({ customer, planEntitlements });
   } catch (error) {
     console.error("Admin billing customer detail error:", error);
     res.status(500).json({ error: "Internal server error" });
@@ -501,6 +552,168 @@ router.post("/customers/:userId/subscription-access", checkPermission(AdminPermi
     }
     console.error("Admin billing subscription access error:", error);
     res.status(500).json({ error: "Failed to update subscription access" });
+  }
+});
+
+router.post("/customers/:userId/capability-access", checkPermission(AdminPermission.MANAGE_BILLING_DISPUTES), async (req: Request, res: Response) => {
+  try {
+    const data = premiumAiCapabilitySchema.parse(req.body);
+    const customer = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: {
+        id: true,
+        role: true,
+        subscription: {
+          select: {
+            id: true,
+            plan: true,
+            status: true,
+            billingProvider: true,
+            providerCustomerId: true,
+            providerSubscriptionId: true,
+            stripeCustomerId: true,
+            stripeSubId: true,
+            currentPeriodEnd: true,
+          },
+        },
+        billingEntitlementState: {
+          select: {
+            effectivePlan: true,
+            effectiveStatus: true,
+          },
+        },
+      },
+    });
+
+    if (!customer) {
+      res.status(404).json({ error: "Customer not found" });
+      return;
+    }
+
+    const currentPlan = customer.subscription?.plan ?? (
+      customer.role === Role.EMPLOYER ? SubscriptionPlan.EMPLOYER_FREE : SubscriptionPlan.FREE
+    );
+    const targetPlan = resolveCapabilityTarget(customer.role, currentPlan, data.capability, data.action);
+
+    if (!targetPlan) {
+      res.status(400).json({
+        error: customer.role === Role.EMPLOYER
+          ? "Employer accounts can only receive employer premium capability controls."
+          : "Candidate and admin accounts can only receive candidate premium or AI capability controls.",
+      });
+      return;
+    }
+
+    const targetStatus = SubscriptionStatus.ACTIVE;
+
+    const previousState = {
+      subscriptionPlan: currentPlan,
+      subscriptionStatus: customer.subscription?.status ?? SubscriptionStatus.INACTIVE,
+      currentPeriodEnd: customer.subscription?.currentPeriodEnd?.toISOString() ?? null,
+      effectivePlan: customer.billingEntitlementState?.effectivePlan ?? SubscriptionPlan.FREE,
+      effectiveStatus: customer.billingEntitlementState?.effectiveStatus ?? SubscriptionStatus.INACTIVE,
+    };
+
+    const subscription = await prisma.subscription.upsert({
+      where: { userId: customer.id },
+      create: {
+        userId: customer.id,
+        plan: targetPlan,
+        status: targetStatus,
+      },
+      update: {
+        plan: targetPlan,
+        status: targetStatus,
+      },
+      select: {
+        id: true,
+        plan: true,
+        status: true,
+        billingProvider: true,
+        providerCustomerId: true,
+        providerSubscriptionId: true,
+        stripeCustomerId: true,
+        stripeSubId: true,
+        currentPeriodEnd: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const syncResult = await syncBillingEntitlementState(customer.id, `admin:${req.user!.userId}:capability_access`);
+    const providerLinked = Boolean(
+      subscription.providerSubscriptionId
+      || subscription.stripeSubId
+      || subscription.providerCustomerId
+      || subscription.stripeCustomerId,
+    );
+
+    const action = await createBillingSupportAction({
+      actorId: req.user!.userId,
+      userId: customer.id,
+      subscriptionId: subscription.id,
+      actionType: BillingSupportActionType.UPGRADE_DOWNGRADE_CORRECTION,
+      reasonCode: data.reasonCode,
+      notes: data.notes ?? null,
+      metadata: {
+        capability: data.capability,
+        capabilityAction: data.action,
+        previousSubscriptionPlan: previousState.subscriptionPlan,
+        previousSubscriptionStatus: previousState.subscriptionStatus,
+        previousCurrentPeriodEnd: previousState.currentPeriodEnd,
+        previousEffectivePlan: previousState.effectivePlan,
+        previousEffectiveStatus: previousState.effectiveStatus,
+        nextSubscriptionPlan: subscription.plan,
+        nextSubscriptionStatus: subscription.status,
+        nextEffectivePlan: syncResult.state.effectivePlan,
+        nextEffectiveStatus: syncResult.state.effectiveStatus,
+        providerLinked,
+        billingProvider: subscription.billingProvider ?? null,
+      },
+    });
+
+    await recordBillingEvent({
+      userId: customer.id,
+      subscriptionId: subscription.id,
+      source: "ADMIN_BILLING",
+      eventType: "admin.capability_access.updated",
+      outcome: BillingEventOutcome.PROCESSED,
+      plan: subscription.plan,
+      status: subscription.status,
+      billingRegion: syncResult.state.billingRegion ?? null,
+      currency: syncResult.state.currency ?? null,
+      reasonCode: data.reasonCode,
+      message: `Admin ${data.action === "GRANT" ? "granted" : "revoked"} ${data.capability} via ${subscription.plan}/${subscription.status}`,
+      metadata: {
+        actorId: req.user!.userId,
+        capability: data.capability,
+        capabilityAction: data.action,
+        notes: data.notes ?? null,
+        providerLinked,
+        previousPlan: previousState.subscriptionPlan,
+        previousStatus: previousState.subscriptionStatus,
+        previousEffectivePlan: previousState.effectivePlan,
+        previousEffectiveStatus: previousState.effectiveStatus,
+      },
+      processedAt: new Date(),
+    });
+
+    res.json({
+      subscription,
+      state: syncResult.state,
+      validation: syncResult.validation,
+      action,
+      warnings: providerLinked
+        ? ["This account still has a linked billing provider subscription. Future provider webhooks may overwrite local capability changes."]
+        : [],
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Validation failed", details: error.issues });
+      return;
+    }
+    console.error("Admin billing capability access error:", error);
+    res.status(500).json({ error: "Failed to update capability access" });
   }
 });
 

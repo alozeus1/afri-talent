@@ -201,14 +201,49 @@ export const admin = {
       token,
     }),
 
-  users: (token?: string, params?: { role?: string; page?: number }) => {
+  users: (token?: string, params?: { role?: string; status?: string; search?: string; page?: number; limit?: number }) => {
     const searchParams = new URLSearchParams();
     if (params?.role) searchParams.set("role", params.role);
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.search) searchParams.set("search", params.search);
     if (params?.page) searchParams.set("page", params.page.toString());
+    if (params?.limit) searchParams.set("limit", params.limit.toString());
 
     const query = searchParams.toString();
     return fetchAPI<UserListResponse>(`/api/admin/users${query ? `?${query}` : ""}`, { token });
   },
+
+  user: (id: string, token?: string) =>
+    fetchAPI<AdminUserDetailResponse>(`/api/admin/users/${id}`, { token }),
+
+  updateUserRole: (
+    id: string,
+    data: {
+      role: User["role"];
+      permissions?: AdminPermission[];
+      adminTitle?: string;
+      adminDescription?: string;
+      adminRoleActive?: boolean;
+      reason?: string;
+    },
+    token?: string
+  ) =>
+    fetchAPI<{ user: AdminUserListItem }>(`/api/admin/users/${id}/role`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  updateUserStatus: (
+    id: string,
+    data: { status: AccountRestrictionStatus; reason?: string },
+    token?: string
+  ) =>
+    fetchAPI<{ user: AdminUserListItem }>(`/api/admin/users/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+      token,
+    }),
 };
 
 export const adminBlog = {
@@ -301,7 +336,7 @@ export const adminBilling = {
   searchCustomers: (query: string) =>
     fetchAPI<{ customers: AdminBillingCustomerSearchResult[] }>(`/api/admin/billing/customers/search?query=${encodeURIComponent(query)}`),
   customer: (userId: string) =>
-    fetchAPI<{ customer: AdminBillingCustomerDetail }>(`/api/admin/billing/customers/${userId}`),
+    fetchAPI<{ customer: AdminBillingCustomerDetail; planEntitlements: PlanEntitlements[] }>(`/api/admin/billing/customers/${userId}`),
   resyncEntitlements: (userId: string) =>
     fetchAPI<{
       state: BillingEntitlementState;
@@ -327,6 +362,25 @@ export const adminBilling = {
       action: BillingSupportActionRecord;
       warnings: string[];
     }>(`/api/admin/billing/customers/${userId}/subscription-access`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateCapabilityAccess: (
+    userId: string,
+    data: {
+      capability: "CANDIDATE_PREMIUM" | "CANDIDATE_AI" | "EMPLOYER_PREMIUM";
+      action: "GRANT" | "REVOKE";
+      reasonCode: string;
+      notes?: string;
+    },
+  ) =>
+    fetchAPI<{
+      subscription: AdminBillingCustomerDetail["subscription"];
+      state: BillingEntitlementState;
+      validation: BillingEntitlementValidation;
+      action: BillingSupportActionRecord;
+      warnings: string[];
+    }>(`/api/admin/billing/customers/${userId}/capability-access`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
@@ -1439,8 +1493,94 @@ export interface PublicStats {
   lastUpdated: string;
 }
 
+export type AccountRestrictionStatus = "ACTIVE" | "LIMITED" | "SUSPENDED";
+
+export type AdminPermission =
+  | "VIEW_USERS"
+  | "MANAGE_USER_ACCOUNTS"
+  | "RESET_USER_PASSWORD"
+  | "RESTRICT_USER_ACCOUNT"
+  | "REVIEW_JOBS"
+  | "REVIEW_APPLICATIONS"
+  | "REVIEW_RESOURCES"
+  | "REVIEW_COMPANY_DATA"
+  | "VIEW_TRUST_CASES"
+  | "MANAGE_TRUST_CASES"
+  | "VIEW_ABUSE_REPORTS"
+  | "MANAGE_ABUSE_REPORTS"
+  | "VIEW_VERIFICATION_ARTIFACTS"
+  | "APPROVE_VERIFICATION"
+  | "VIEW_AUDIT_LOGS"
+  | "VIEW_HEALTH_STATUS"
+  | "MANAGE_ALERTS"
+  | "VIEW_SYSTEMS_METRICS"
+  | "VIEW_BILLING_DATA"
+  | "MANAGE_BILLING_DISPUTES"
+  | "VIEW_REVENUE_REPORTS"
+  | "EXPORT_DATA"
+  | "RUN_BULK_OPERATIONS"
+  | "MODIFY_BULK_DATA";
+
+export interface AdminUserListItem extends User {
+  createdAt: string;
+  emailVerified?: boolean;
+  accountRestrictionStatus: AccountRestrictionStatus;
+  accountRestrictionReason: string | null;
+  accountRestrictedAt: string | null;
+  adminRole: {
+    id: string;
+    title: string;
+    description?: string | null;
+    permissions: AdminPermission[];
+    isActive: boolean;
+  } | null;
+  _count: {
+    applications: number;
+    companyReviews: number;
+    sentMessages: number;
+  };
+}
+
+export interface AdminUserDetailResponse {
+  user: AdminUserListItem & {
+    preferredLocale: string;
+    emailVerifiedAt: string | null;
+    deletionRequestedAt: string | null;
+    deletedAt: string | null;
+    phoneVerifiedAt: string | null;
+    updatedAt: string;
+    candidateProfile: {
+      id: string;
+      headline: string | null;
+      targetCountries: string[];
+      yearsExperience: number | null;
+    } | null;
+    subscription: {
+      plan: string;
+      status: string;
+      currentPeriodEnd: string | null;
+    } | null;
+    _count: AdminUserListItem["_count"] & {
+      savedSearches: number;
+      notifications: number;
+    };
+  };
+  auditLogs: Array<{
+    id: string;
+    action: string;
+    changes: unknown;
+    reason: string | null;
+    status: string;
+    createdAt: string;
+    admin: {
+      title: string;
+      admin: { id: string; name: string; email: string };
+    } | null;
+  }>;
+}
+
 export interface UserListResponse {
-  users: Array<User & { createdAt: string; _count: { applications: number } }>;
+  users: AdminUserListItem[];
   pagination: {
     page: number;
     limit: number;
@@ -1465,6 +1605,7 @@ export interface BillingEntitlementState {
   billingRegion: "AFRICA" | "EUROPE" | "ROW" | null;
   currency: string | null;
   pricingVersion: number | null;
+  entitlements: PlanEntitlements;
   checksum: string;
   isInSync: boolean;
   source: string;

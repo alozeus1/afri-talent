@@ -34,7 +34,9 @@ function LoginForm() {
   useEffect(() => {
     if (user && !loading) {
       const rolePath = user.role ? `/${user.role.toLowerCase()}` : "/";
-      const redirect = searchParams.get("redirect") || localizePath(rolePath, locale);
+      const redirect =
+        searchParams.get("redirect") ||
+        (user.role === "ADMIN" ? rolePath : localizePath(rolePath, locale));
       router.push(redirect);
     }
   }, [user, loading, router, searchParams, locale]);
