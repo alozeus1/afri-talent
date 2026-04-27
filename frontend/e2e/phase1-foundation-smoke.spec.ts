@@ -39,7 +39,7 @@ test("smoke: active job detail page includes JobPosting schema", async ({ reques
   test.skip(!jobsData.jobs || jobsData.jobs.length === 0, "No published jobs available for schema smoke test");
 
   const slug = jobsData.jobs[0].slug as string;
-  await page.goto(`${APP_URL}/jobs/${slug}`, { waitUntil: "networkidle" });
+  await page.goto(`${APP_URL}/jobs/${slug}`, { waitUntil: "domcontentloaded" });
 
   const schemaScript = page.locator("script[type='application/ld+json']").first();
   await expect(schemaScript).toHaveCount(1);

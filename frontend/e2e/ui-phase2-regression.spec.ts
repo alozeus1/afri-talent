@@ -86,7 +86,7 @@ test("jobs page shows loading skeleton and job detail emits JobPosting schema", 
     await expect(page.getByText(/Page 2 of/i)).toBeVisible();
   }
 
-  await page.goto(`${APP_URL}/jobs/${firstJob.slug}`, { waitUntil: "networkidle" });
+  await page.goto(`${APP_URL}/jobs/${firstJob.slug}`, { waitUntil: "domcontentloaded" });
   const schemaText = await page
     .locator("script[type='application/ld+json']")
     .first()
@@ -105,7 +105,7 @@ test("jobs page shows loading skeleton and job detail emits JobPosting schema", 
 
 test("custom 404 route behaves correctly", async ({ page }) => {
   await page.goto(`${APP_URL}/this-route-should-not-exist-${Date.now()}`, {
-    waitUntil: "networkidle",
+    waitUntil: "domcontentloaded",
   });
 
   await expect(page.getByRole("heading", { name: "Page Not Found" })).toBeVisible();
