@@ -1,8 +1,10 @@
 import { BaseJobSource, type JobQuery } from "./base.js";
 import type { AggregatedJob, AggregatorResult } from "../types.js";
+import type { CareerProvider } from "../../smart-search/normalized-job.js";
+import { isCareerProvider, providerImplemented } from "../../smart-search/provider-adapters.js";
 import * as cheerio from "cheerio";
 
-export type CompanyCareerProvider = "GREENHOUSE" | "LEVER" | "ASHBY" | "SMARTRECRUITERS" | "RECRUITEE" | "GENERIC";
+export type CompanyCareerProvider = CareerProvider;
 
 export interface CompanyCareerSourceConfig {
   id?: string;
@@ -75,7 +77,7 @@ function parseJsonArray(value: string | undefined): unknown[] {
 }
 
 function isCompanyCareerProvider(value: string): value is CompanyCareerProvider {
-  return ["GREENHOUSE", "LEVER", "ASHBY", "SMARTRECRUITERS", "RECRUITEE", "GENERIC"].includes(value);
+  return isCareerProvider(value);
 }
 
 function normalizeCompanyConfig(value: unknown): CompanyCareerSourceConfig | null {
@@ -112,6 +114,8 @@ function fallbackCareersUrl(provider: CompanyCareerProvider, providerKey: string
     case "RECRUITEE":
       return `https://${providerKey}.recruitee.com`;
     case "GENERIC":
+      return providerKey.startsWith("http") ? providerKey : `https://${providerKey}`;
+    default:
       return providerKey.startsWith("http") ? providerKey : `https://${providerKey}`;
   }
 }
@@ -185,6 +189,13 @@ export class CompanyCareerApiSource extends BaseJobSource {
         return this.fetchRecruitee(company);
       case "GENERIC":
         return this.fetchGenericCareerPage(company);
+      default:
+        // TODO: Implement provider-specific API adapters before crawling these ATS platforms.
+        if (!providerImplemented(company.provider)) {
+          this.log("Skipping unsupported provider stub", { provider: company.provider, providerKey: company.providerKey });
+          return [];
+        }
+        return [];
     }
   }
 

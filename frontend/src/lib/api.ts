@@ -1384,17 +1384,23 @@ export interface Job {
 
 export interface JobListParams {
   search?: string;
+  query?: string;
   location?: string;
   type?: string;
+  employmentType?: string;
   jobField?: string;
   workplaceType?: string;
   seniority?: string;
   visaSponsorship?: string;
   relocationAssistance?: string;
   remote?: string;
+  remoteOnly?: string;
   salaryMin?: number;
   salaryMax?: number;
   country?: string;
+  provider?: string;
+  includeExpandedKeywords?: string;
+  sortBy?: "relevance" | "newest" | "salary" | "companyQuality";
   page?: number;
   limit?: number;
 }

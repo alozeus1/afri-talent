@@ -11,11 +11,14 @@ import {
 } from "./discovery.js";
 import { buildJobSemanticContent } from "../rag/job-documents.js";
 import { semanticTextScore } from "../rag/embedding.js";
+import { expandSearchKeywords } from "./smart-search/keywords.js";
 
 export interface JobSearchFilters {
   search?: string;
+  expandedKeywords?: string[];
   location?: string;
   type?: string;
+  employmentType?: string;
   jobField?: string;
   workplaceType?: string;
   seniority?: string;
@@ -25,6 +28,9 @@ export interface JobSearchFilters {
   salaryMin?: number | null;
   salaryMax?: number | null;
   country?: string;
+  provider?: string;
+  includeExpandedKeywords?: boolean;
+  sortBy?: "relevance" | "newest" | "salary" | "companyQuality";
 }
 
 export const publicJobInclude = Prisma.validator<Prisma.JobInclude>()({
@@ -110,13 +116,19 @@ export function buildJobSearchWhere(filters: JobSearchFilters): Prisma.JobWhereI
   ];
 
   if (filters.search) {
+    const searchTerms = filters.expandedKeywords?.length
+      ? [filters.search, ...filters.expandedKeywords]
+      : expandSearchKeywords({
+          query: filters.search,
+          includeExpandedKeywords: filters.includeExpandedKeywords,
+        }).all;
     conditions.push({
-      OR: [
-        { title: { contains: filters.search, mode: "insensitive" } },
-        { description: { contains: filters.search, mode: "insensitive" } },
-        { sourceName: { contains: filters.search, mode: "insensitive" } },
-        { tags: { has: filters.search.toLowerCase() } },
-      ],
+      OR: searchTerms.flatMap((term) => [
+        { title: { contains: term, mode: "insensitive" as const } },
+        { description: { contains: term, mode: "insensitive" as const } },
+        { sourceName: { contains: term, mode: "insensitive" as const } },
+        { tags: { has: term.toLowerCase() } },
+      ]),
     });
   }
 
@@ -126,8 +138,8 @@ export function buildJobSearchWhere(filters: JobSearchFilters): Prisma.JobWhereI
     });
   }
 
-  if (filters.type) {
-    conditions.push({ type: filters.type });
+  if (filters.type || filters.employmentType) {
+    conditions.push({ type: filters.type ?? filters.employmentType });
   }
 
   if (filters.jobField) {
@@ -176,6 +188,15 @@ export function buildJobSearchWhere(filters: JobSearchFilters): Prisma.JobWhereI
     });
   }
 
+  if (filters.provider) {
+    conditions.push({
+      OR: [
+        { sourceName: { contains: filters.provider, mode: "insensitive" } },
+        { sourceUrl: { contains: filters.provider, mode: "insensitive" } },
+      ],
+    });
+  }
+
   return { AND: conditions };
 }
 
@@ -214,8 +235,8 @@ export function buildPreferenceContext(
     ...base,
     query: filters.search,
     locations: filters.location ? [filters.location] : base?.locations,
-    keywords: filters.search ? [filters.search] : base?.keywords,
-    jobTypes: filters.type ? [filters.type] : base?.jobTypes,
+    keywords: filters.search ? [filters.search, ...(filters.expandedKeywords ?? [])] : base?.keywords,
+    jobTypes: filters.type || filters.employmentType ? [filters.type ?? filters.employmentType!] : base?.jobTypes,
     seniorities: filters.seniority ? [filters.seniority] : base?.seniorities,
     remoteOnly: filters.remote ?? base?.remoteOnly,
     requiresVisaSponsorship:
@@ -236,9 +257,16 @@ export async function fetchRankedJobs(input: {
   limit: number;
   preferenceContext?: CandidatePreferenceContext;
   take?: number;
+  sortBy?: JobSearchFilters["sortBy"];
 }): Promise<{
   jobs: RankedPublicJob[];
   total: number;
+  diagnostics: {
+    rawCandidateCount: number;
+    deduplicatedCount: number;
+    duplicatesRemoved: number;
+    providerCounts: Record<string, number>;
+  };
 }> {
   const maxCandidates = input.take ?? Math.max(150, input.page * input.limit * 8);
   const jobs = await prisma.job.findMany({
@@ -251,9 +279,14 @@ export async function fetchRankedJobs(input: {
     take: Math.min(maxCandidates, 500),
   });
 
-  const ranked = boostSemanticRanking(collapseDuplicateRankedJobs(
+  const collapsed = collapseDuplicateRankedJobs(
     jobs.map((job) => scoreJobForSearch(job, input.preferenceContext)),
-  ), input.preferenceContext?.query).map((result) => ({
+  );
+  const sorted = sortRankedResults(
+    boostSemanticRanking(collapsed, input.preferenceContext?.query),
+    input.sortBy ?? "relevance",
+  );
+  const ranked = sorted.map((result) => ({
     ...result.job,
     discovery: result.discovery,
     rankingExplanation: result.explanation,
@@ -266,5 +299,43 @@ export async function fetchRankedJobs(input: {
   return {
     jobs: ranked.slice(start, end),
     total: ranked.length,
+    diagnostics: {
+      rawCandidateCount: jobs.length,
+      deduplicatedCount: ranked.length,
+      duplicatesRemoved: Math.max(0, jobs.length - ranked.length),
+      providerCounts: buildProviderCounts(ranked),
+    },
   };
+}
+
+function sortRankedResults<TJob extends PublicJobRecord>(
+  results: ReturnType<typeof scoreJobForSearch<TJob>>[],
+  sortBy: NonNullable<JobSearchFilters["sortBy"]>,
+): ReturnType<typeof scoreJobForSearch<TJob>>[] {
+  if (sortBy === "newest") {
+    return [...results].sort((left, right) =>
+      (right.job.publishedAt?.getTime() ?? 0) - (left.job.publishedAt?.getTime() ?? 0),
+    );
+  }
+  if (sortBy === "salary") {
+    return [...results].sort((left, right) =>
+      (right.job.salaryMax ?? right.job.salaryMin ?? 0) - (left.job.salaryMax ?? left.job.salaryMin ?? 0),
+    );
+  }
+  if (sortBy === "companyQuality") {
+    return [...results].sort((left, right) => {
+      const leftScore = left.job.employer?.trustProfile?.authenticityScore ?? left.job.qualityScore ?? 0;
+      const rightScore = right.job.employer?.trustProfile?.authenticityScore ?? right.job.qualityScore ?? 0;
+      return rightScore - leftScore;
+    });
+  }
+  return results;
+}
+
+function buildProviderCounts(jobs: Array<Pick<PublicJobRecord, "sourceName" | "jobSource">>): Record<string, number> {
+  return jobs.reduce<Record<string, number>>((counts, job) => {
+    const provider = job.sourceName ?? job.jobSource ?? "unknown";
+    counts[provider] = (counts[provider] ?? 0) + 1;
+    return counts;
+  }, {});
 }
