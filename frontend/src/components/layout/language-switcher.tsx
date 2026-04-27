@@ -7,6 +7,7 @@ import { preferences } from "@/lib/api";
 
 const OPTIONS: Array<{ value: SupportedLocale; label: string }> = [
   { value: "en", label: "EN" },
+  { value: "es", label: "ES" },
   { value: "fr", label: "FR" },
   { value: "pt", label: "PT" },
   { value: "ar", label: "AR" },
@@ -19,7 +20,7 @@ export function LanguageSwitcher() {
 
   const onChange = async (nextLocale: SupportedLocale) => {
     document.cookie = `${LOCALE_COOKIE}=${nextLocale}; path=/; max-age=31536000; SameSite=Lax`;
-    const apiLocale = nextLocale.toUpperCase() as "EN" | "FR" | "PT" | "AR";
+    const apiLocale = nextLocale.toUpperCase() as "EN" | "ES" | "FR" | "PT" | "AR";
     try {
       await preferences.setLocale(apiLocale);
     } catch {

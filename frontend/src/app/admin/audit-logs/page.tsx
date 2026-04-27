@@ -43,7 +43,7 @@ export default function AuditLogsPage() {
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "ADMIN")) {
-            router.push("/login");
+            router.push(`/login?redirect=${encodeURIComponent("/admin/audit-logs")}`);
         }
     }, [user, isLoading, router]);
 

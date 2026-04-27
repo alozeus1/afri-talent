@@ -21,6 +21,7 @@ enum Role {
 
 enum SupportedLocale {
   EN
+  ES
   FR
   PT
   AR

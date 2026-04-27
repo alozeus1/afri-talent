@@ -1,15 +1,21 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import {
+  AdminPermission,
+  BillingEventOutcome,
   BillingDiscrepancyStatus,
   BillingDiscrepancyType,
   BillingSupportActionType,
   Role,
+  SubscriptionPlan,
+  SubscriptionStatus,
 } from "@prisma/client";
 import prisma from "../lib/prisma.js";
-import { authenticate, authorize } from "../middleware/auth.js";
+import { authenticate } from "../middleware/auth.js";
+import { checkPermission, enforceAdminRbac } from "../middleware/admin-rbac.js";
 import {
   createBillingSupportAction,
+  recordBillingEvent,
   runBillingReconciliationCycle,
   syncBillingEntitlementState,
 } from "../lib/billing/index.js";
@@ -17,7 +23,7 @@ import { getStripe, isStripeConfigured } from "../lib/stripe.js";
 
 const router = Router();
 
-router.use(authenticate, authorize(Role.ADMIN));
+router.use(authenticate, enforceAdminRbac);
 
 const supportActionSchema = z.object({
   actionType: z.nativeEnum(BillingSupportActionType),
@@ -32,9 +38,31 @@ const supportActionSchema = z.object({
   ).optional(),
 });
 
-const discrepancyStatusValues = ["ALL", ...Object.values(BillingDiscrepancyStatus)] as const;
+const subscriptionAccessSchema = z.object({
+  plan: z.nativeEnum(SubscriptionPlan),
+  status: z.nativeEnum(SubscriptionStatus),
+  currentPeriodEnd: z.string().datetime({ offset: true }).nullable().optional(),
+  reasonCode: z.string().trim().min(3).max(120),
+  notes: z.string().trim().max(2000).optional(),
+});
 
-router.get("/dashboard", async (_req: Request, res: Response) => {
+const discrepancyStatusValues = ["ALL", ...Object.values(BillingDiscrepancyStatus)] as const;
+const candidatePlanValues = [SubscriptionPlan.FREE, SubscriptionPlan.BASIC, SubscriptionPlan.PROFESSIONAL] as const;
+const employerPlanValues = [
+  SubscriptionPlan.EMPLOYER_FREE,
+  SubscriptionPlan.EMPLOYER_BASIC,
+  SubscriptionPlan.EMPLOYER_PREMIUM,
+] as const;
+
+function isPlanAllowedForRole(role: Role, plan: SubscriptionPlan) {
+  if (role === Role.EMPLOYER) {
+    return employerPlanValues.includes(plan as typeof employerPlanValues[number]);
+  }
+
+  return candidatePlanValues.includes(plan as typeof candidatePlanValues[number]);
+}
+
+router.get("/dashboard", checkPermission(AdminPermission.VIEW_BILLING_DATA), async (_req: Request, res: Response) => {
   try {
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
@@ -135,7 +163,7 @@ router.get("/dashboard", async (_req: Request, res: Response) => {
   }
 });
 
-router.get("/discrepancies", async (req: Request, res: Response) => {
+router.get("/discrepancies", checkPermission(AdminPermission.VIEW_BILLING_DATA), async (req: Request, res: Response) => {
   try {
     const rawStatus = typeof req.query.status === "string" ? req.query.status.toUpperCase() : "OPEN";
     const status = discrepancyStatusValues.includes(rawStatus as typeof discrepancyStatusValues[number])
@@ -164,7 +192,7 @@ router.get("/discrepancies", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/reconciliation-runs", async (req: Request, res: Response) => {
+router.get("/reconciliation-runs", checkPermission(AdminPermission.VIEW_BILLING_DATA), async (req: Request, res: Response) => {
   try {
     const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "20"), 10) || 20, 1), 100);
     const runs = await prisma.billingReconciliationRun.findMany({
@@ -178,7 +206,7 @@ router.get("/reconciliation-runs", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/reconcile", async (req: Request, res: Response) => {
+router.post("/reconcile", checkPermission(AdminPermission.MANAGE_BILLING_DISPUTES), async (req: Request, res: Response) => {
   try {
     const result = await runBillingReconciliationCycle(`admin:${req.user!.userId}`);
     res.json({ result });
@@ -188,7 +216,7 @@ router.post("/reconcile", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/customers/search", async (req: Request, res: Response) => {
+router.get("/customers/search", checkPermission(AdminPermission.VIEW_BILLING_DATA), async (req: Request, res: Response) => {
   try {
     const query = typeof req.query.query === "string" ? req.query.query.trim() : "";
     if (!query) {
@@ -241,7 +269,7 @@ router.get("/customers/search", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/customers/:userId", async (req: Request, res: Response) => {
+router.get("/customers/:userId", checkPermission(AdminPermission.VIEW_BILLING_DATA), async (req: Request, res: Response) => {
   try {
     const customer = await prisma.user.findUnique({
       where: { id: req.params.userId },
@@ -256,6 +284,9 @@ router.get("/customers/:userId", async (req: Request, res: Response) => {
             id: true,
             plan: true,
             status: true,
+            billingProvider: true,
+            providerCustomerId: true,
+            providerSubscriptionId: true,
             stripeCustomerId: true,
             stripeSubId: true,
             currentPeriodEnd: true,
@@ -312,7 +343,168 @@ router.get("/customers/:userId", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/customers/:userId/resync-entitlements", async (req: Request, res: Response) => {
+router.post("/customers/:userId/subscription-access", checkPermission(AdminPermission.MANAGE_BILLING_DISPUTES), async (req: Request, res: Response) => {
+  try {
+    const data = subscriptionAccessSchema.parse(req.body);
+    const customer = await prisma.user.findUnique({
+      where: { id: req.params.userId },
+      select: {
+        id: true,
+        role: true,
+        subscription: {
+          select: {
+            id: true,
+            plan: true,
+            status: true,
+            billingProvider: true,
+            providerCustomerId: true,
+            providerSubscriptionId: true,
+            stripeCustomerId: true,
+            stripeSubId: true,
+            currentPeriodEnd: true,
+          },
+        },
+        billingEntitlementState: {
+          select: {
+            effectivePlan: true,
+            effectiveStatus: true,
+          },
+        },
+      },
+    });
+
+    if (!customer) {
+      res.status(404).json({ error: "Customer not found" });
+      return;
+    }
+
+    if (!isPlanAllowedForRole(customer.role, data.plan)) {
+      res.status(400).json({
+        error: customer.role === Role.EMPLOYER
+          ? "Employer accounts can only be assigned employer subscription plans."
+          : "Candidate and admin accounts can only be assigned candidate subscription plans.",
+      });
+      return;
+    }
+
+    const currentPeriodEnd = data.currentPeriodEnd === undefined
+      ? customer.subscription?.currentPeriodEnd ?? null
+      : data.currentPeriodEnd
+        ? new Date(data.currentPeriodEnd)
+        : null;
+
+    const previousState = {
+      subscriptionPlan: customer.subscription?.plan ?? SubscriptionPlan.FREE,
+      subscriptionStatus: customer.subscription?.status ?? SubscriptionStatus.INACTIVE,
+      currentPeriodEnd: customer.subscription?.currentPeriodEnd?.toISOString() ?? null,
+      effectivePlan: customer.billingEntitlementState?.effectivePlan ?? SubscriptionPlan.FREE,
+      effectiveStatus: customer.billingEntitlementState?.effectiveStatus ?? SubscriptionStatus.INACTIVE,
+    };
+
+    const subscription = await prisma.subscription.upsert({
+      where: { userId: customer.id },
+      create: {
+        userId: customer.id,
+        plan: data.plan,
+        status: data.status,
+        currentPeriodEnd: currentPeriodEnd ?? undefined,
+      },
+      update: {
+        plan: data.plan,
+        status: data.status,
+        currentPeriodEnd,
+      },
+      select: {
+        id: true,
+        plan: true,
+        status: true,
+        billingProvider: true,
+        providerCustomerId: true,
+        providerSubscriptionId: true,
+        stripeCustomerId: true,
+        stripeSubId: true,
+        currentPeriodEnd: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const syncResult = await syncBillingEntitlementState(customer.id, `admin:${req.user!.userId}:subscription_access`);
+
+    const providerLinked = Boolean(
+      subscription.providerSubscriptionId
+      || subscription.stripeSubId
+      || subscription.providerCustomerId
+      || subscription.stripeCustomerId,
+    );
+
+    const action = await createBillingSupportAction({
+      actorId: req.user!.userId,
+      userId: customer.id,
+      subscriptionId: subscription.id,
+      actionType: BillingSupportActionType.UPGRADE_DOWNGRADE_CORRECTION,
+      reasonCode: data.reasonCode,
+      notes: data.notes ?? null,
+      metadata: {
+        previousSubscriptionPlan: previousState.subscriptionPlan,
+        previousSubscriptionStatus: previousState.subscriptionStatus,
+        previousCurrentPeriodEnd: previousState.currentPeriodEnd,
+        previousEffectivePlan: previousState.effectivePlan,
+        previousEffectiveStatus: previousState.effectiveStatus,
+        nextSubscriptionPlan: subscription.plan,
+        nextSubscriptionStatus: subscription.status,
+        nextCurrentPeriodEnd: subscription.currentPeriodEnd?.toISOString() ?? null,
+        nextEffectivePlan: syncResult.state.effectivePlan,
+        nextEffectiveStatus: syncResult.state.effectiveStatus,
+        providerLinked,
+        billingProvider: subscription.billingProvider ?? null,
+      },
+    });
+
+    await recordBillingEvent({
+      userId: customer.id,
+      subscriptionId: subscription.id,
+      source: "ADMIN_BILLING",
+      eventType: "admin.subscription_access.updated",
+      outcome: BillingEventOutcome.PROCESSED,
+      plan: subscription.plan,
+      status: subscription.status,
+      billingRegion: syncResult.state.billingRegion ?? null,
+      currency: syncResult.state.currency ?? null,
+      reasonCode: data.reasonCode,
+      message: `Admin updated subscription access to ${subscription.plan}/${subscription.status}`,
+      metadata: {
+        actorId: req.user!.userId,
+        notes: data.notes ?? null,
+        providerLinked,
+        previousPlan: previousState.subscriptionPlan,
+        previousStatus: previousState.subscriptionStatus,
+        previousEffectivePlan: previousState.effectivePlan,
+        previousEffectiveStatus: previousState.effectiveStatus,
+      },
+      processedAt: new Date(),
+    });
+
+    res.json({
+      subscription,
+      state: syncResult.state,
+      validation: syncResult.validation,
+      action,
+      warnings: providerLinked
+        ? ["This account still has a linked billing provider subscription. Future provider webhooks may overwrite local plan or status changes."]
+        : [],
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Validation failed", details: error.issues });
+      return;
+    }
+    console.error("Admin billing subscription access error:", error);
+    res.status(500).json({ error: "Failed to update subscription access" });
+  }
+});
+
+router.post("/customers/:userId/resync-entitlements", checkPermission(AdminPermission.MANAGE_BILLING_DISPUTES), async (req: Request, res: Response) => {
   try {
     const customer = await prisma.user.findUnique({
       where: { id: req.params.userId },
@@ -362,7 +554,7 @@ router.post("/customers/:userId/resync-entitlements", async (req: Request, res: 
   }
 });
 
-router.post("/customers/:userId/actions", async (req: Request, res: Response) => {
+router.post("/customers/:userId/actions", checkPermission(AdminPermission.MANAGE_BILLING_DISPUTES), async (req: Request, res: Response) => {
   try {
     const data = supportActionSchema.parse(req.body);
     const customer = await prisma.user.findUnique({

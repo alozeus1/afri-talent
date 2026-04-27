@@ -1,5 +1,7 @@
 // backend/prisma/seed.ts
 import {
+  AdminPermission,
+  AccountRestrictionStatus,
   PrismaClient,
   Role,
   JobStatus,
@@ -54,6 +56,17 @@ async function main() {
       name: "Admin User",
       emailVerified: true,
       emailVerifiedAt: new Date(),
+      accountRestrictionStatus: AccountRestrictionStatus.ACTIVE,
+    },
+  });
+
+  await prisma.adminRole.create({
+    data: {
+      adminId: adminUser.id,
+      title: "Bootstrap Administrator",
+      description: "System-managed bootstrap administrator with full control-plane permissions.",
+      permissions: Object.values(AdminPermission),
+      isActive: true,
     },
   });
 

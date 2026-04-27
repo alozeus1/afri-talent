@@ -310,6 +310,26 @@ export const adminBilling = {
     }>(`/api/admin/billing/customers/${userId}/resync-entitlements`, {
       method: "POST",
     }),
+  updateSubscriptionAccess: (
+    userId: string,
+    data: {
+      plan: BillingStatus["plan"];
+      status: BillingStatus["status"];
+      currentPeriodEnd?: string | null;
+      reasonCode: string;
+      notes?: string;
+    },
+  ) =>
+    fetchAPI<{
+      subscription: AdminBillingCustomerDetail["subscription"];
+      state: BillingEntitlementState;
+      validation: BillingEntitlementValidation;
+      action: BillingSupportActionRecord;
+      warnings: string[];
+    }>(`/api/admin/billing/customers/${userId}/subscription-access`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   supportAction: (
     userId: string,
     data: {
@@ -705,7 +725,7 @@ export const mockInterviews = {
   create: (data: {
     title: string;
     targetRole: string;
-    promptLanguage?: "EN" | "FR" | "PT" | "AR";
+    promptLanguage?: "EN" | "ES" | "FR" | "PT" | "AR";
     questionSet?: string[];
     visibility?: "PRIVATE" | "TEAM_SHARED";
     retentionDays?: number;
@@ -1610,6 +1630,9 @@ export interface AdminBillingCustomerDetail {
     id: string;
     plan: BillingStatus["plan"];
     status: BillingStatus["status"];
+    billingProvider: "STRIPE" | "FLUTTERWAVE" | null;
+    providerCustomerId: string | null;
+    providerSubscriptionId: string | null;
     stripeCustomerId: string | null;
     stripeSubId: string | null;
     currentPeriodEnd: string | null;
@@ -2164,7 +2187,7 @@ export interface MockInterviewSession {
   userId: string;
   title: string;
   targetRole: string;
-  promptLanguage: "EN" | "FR" | "PT" | "AR";
+  promptLanguage: "EN" | "ES" | "FR" | "PT" | "AR";
   questionSet: unknown;
   transcript: unknown;
   feedbackSummary: string | null;
@@ -2383,9 +2406,9 @@ export const notifications = {
 };
 
 export const preferences = {
-  getLocale: () => fetchAPI<{ preferredLocale: "EN" | "FR" | "PT" | "AR" }>("/api/preferences/locale"),
-  setLocale: (preferredLocale: "EN" | "FR" | "PT" | "AR") =>
-    fetchAPI<{ preferredLocale: "EN" | "FR" | "PT" | "AR" }>("/api/preferences/locale", {
+  getLocale: () => fetchAPI<{ preferredLocale: "EN" | "ES" | "FR" | "PT" | "AR" }>("/api/preferences/locale"),
+  setLocale: (preferredLocale: "EN" | "ES" | "FR" | "PT" | "AR") =>
+    fetchAPI<{ preferredLocale: "EN" | "ES" | "FR" | "PT" | "AR" }>("/api/preferences/locale", {
       method: "PUT",
       body: JSON.stringify({ preferredLocale }),
     }),

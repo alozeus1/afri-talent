@@ -32,7 +32,7 @@ export default function BulkPage() {
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "ADMIN")) {
-            router.push("/login");
+            router.push(`/login?redirect=${encodeURIComponent("/admin/bulk")}`);
         }
     }, [user, isLoading, router]);
 

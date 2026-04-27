@@ -1,4 +1,4 @@
-export const SUPPORTED_LOCALES = ["en", "fr", "pt", "ar"] as const;
+export const SUPPORTED_LOCALES = ["en", "es", "fr", "pt", "ar"] as const;
 
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
@@ -12,6 +12,7 @@ export function isSupportedLocale(value: string | null | undefined): value is Su
 export function normalizeLocale(input: string | null | undefined): SupportedLocale {
   if (!input) return DEFAULT_LOCALE;
   const lower = input.toLowerCase();
+  if (lower.startsWith("es")) return "es";
   if (lower.startsWith("fr")) return "fr";
   if (lower.startsWith("pt")) return "pt";
   if (lower.startsWith("ar")) return "ar";
