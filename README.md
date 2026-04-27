@@ -281,6 +281,26 @@ afri-tech/
 | `NEXT_PUBLIC_API_URL` | Backend API URL |
 | `NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS` | Show seeded demo credentials in local/non-prod UI |
 
+## GitHub Actions Runner Mode
+
+This repository supports two GitHub Actions runner modes:
+
+- Default: `ubuntu-latest`
+  When no custom runner variable is set, workflows use standard GitHub-hosted Ubuntu runners. Because the repository is public as of April 27, 2026, those standard hosted runners should be free to use.
+- Self-hosted: `ACTIONS_RUNNER_LABELS_JSON`
+  For a no-billing path independent of repository visibility, set a repository Actions variable containing a JSON array of runner labels, for example `["self-hosted","linux","x64"]`.
+
+To enable self-hosted runners:
+
+1. In GitHub, open `Repo -> Settings -> Actions -> Runners -> New self-hosted runner`.
+2. Register a Linux `x64` runner on a machine you control.
+3. Make sure Docker is installed and usable on that machine. The CI and deploy workflows use Docker builds and service containers.
+4. In `Repo -> Settings -> Secrets and variables -> Actions -> Variables`, create:
+   `ACTIONS_RUNNER_LABELS_JSON = ["self-hosted","linux","x64"]`
+5. Re-run the workflows.
+
+To switch back to GitHub-hosted runners, remove that variable or leave it empty.
+
 ## Additional Docs
 
 - OpenAPI/Swagger: `GET /api/docs` and raw spec at `GET /api/docs/spec.json`

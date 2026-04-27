@@ -18,7 +18,7 @@ env:
 jobs:
   changes:
     name: Detect Terraform Changes
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     outputs:
       infra_changed: ${{ steps.filter.outputs.infra }}
 
@@ -38,7 +38,7 @@ jobs:
 
   validate:
     name: Terraform Validate
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [changes]
     defaults:
       run:
@@ -82,7 +82,7 @@ jobs:
 
   checkov:
     name: Checkov
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [changes]
     steps:
       - name: Checkout code
@@ -100,7 +100,7 @@ jobs:
 
   plan:
     name: Terraform Plan
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [changes, validate, checkov]
     if: github.event_name == 'pull_request' && needs.changes.outputs.infra_changed == 'true' && vars.AWS_ROLE_ARN != '' && github.event.pull_request.head.repo.full_name == github.repository
     env:

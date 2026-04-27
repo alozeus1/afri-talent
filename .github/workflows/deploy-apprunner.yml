@@ -38,7 +38,7 @@ env:
 jobs:
   validate-ref:
     name: Validate Deployment Ref
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     steps:
       - name: Enforce protected deployment refs
         run: |
@@ -66,7 +66,7 @@ jobs:
 
   prod-gate:
     name: Production Approval Gate
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [validate-ref]
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod'
     environment: production
@@ -76,7 +76,7 @@ jobs:
 
   provision-infra:
     name: Provision Base Infrastructure
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [validate-ref, prod-gate]
     if: always() && needs.validate-ref.result == 'success' && (needs.prod-gate.result == 'success' || needs.prod-gate.result == 'skipped')
     permissions:
@@ -228,7 +228,7 @@ jobs:
 
   build-and-push:
     name: Build & Push Images
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [provision-infra]
     if: always() && needs.provision-infra.result == 'success'
     permissions:
@@ -304,7 +304,7 @@ jobs:
 
   finalize-infra:
     name: Finalize Infrastructure
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [provision-infra, build-and-push]
     if: always() && needs.provision-infra.result == 'success' && needs.build-and-push.result == 'success'
     permissions:
@@ -376,7 +376,7 @@ jobs:
 
   deploy-apprunner:
     name: Deploy to App Runner
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [finalize-infra]
     if: always() && needs.finalize-infra.result == 'success'
     permissions:
@@ -490,7 +490,7 @@ jobs:
 
   health-check:
     name: Post-Deploy Health Check
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [deploy-apprunner, finalize-infra]
     if: always() && needs.deploy-apprunner.result == 'success' && needs.finalize-infra.result == 'success'
 

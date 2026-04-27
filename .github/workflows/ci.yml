@@ -21,14 +21,14 @@ env:
 jobs:
   workflow-lint:
     name: Workflow Lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: rhysd/actionlint@v1.7.8
 
   backend-lint:
     name: Backend Lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     defaults:
       run:
         working-directory: ./backend
@@ -44,7 +44,7 @@ jobs:
 
   backend-typecheck:
     name: Backend Typecheck
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     defaults:
       run:
         working-directory: ./backend
@@ -61,7 +61,7 @@ jobs:
 
   backend-test:
     name: Backend Tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     services:
       postgres:
         image: postgres:15
@@ -98,7 +98,7 @@ jobs:
 
   backend-build:
     name: Backend Build
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     defaults:
       run:
         working-directory: ./backend
@@ -115,7 +115,7 @@ jobs:
 
   frontend-lint:
     name: Frontend Lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     defaults:
       run:
         working-directory: ./frontend
@@ -131,7 +131,7 @@ jobs:
 
   frontend-typecheck:
     name: Frontend Typecheck
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     defaults:
       run:
         working-directory: ./frontend
@@ -147,7 +147,7 @@ jobs:
 
   frontend-unit-test:
     name: Frontend Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     defaults:
       run:
         working-directory: ./frontend
@@ -166,7 +166,7 @@ jobs:
 
   frontend-build:
     name: Frontend Build
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     defaults:
       run:
         working-directory: ./frontend
@@ -185,7 +185,7 @@ jobs:
 
   lighthouse-mobile:
     name: Lighthouse Mobile Performance
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [backend-test, frontend-unit-test]
     services:
       postgres:
@@ -260,7 +260,7 @@ jobs:
 
   e2e-tests:
     name: Playwright E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [backend-test, frontend-build, frontend-unit-test]
     services:
       postgres:
