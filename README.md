@@ -14,7 +14,7 @@ Agent-specific pointers:
 - Claude: reads [CLAUDE.md](./CLAUDE.md)
 - Droid or other agents: start with [AGENT_BOOTSTRAP.md](./AGENT_BOOTSTRAP.md)
 
----
+----
 
 ## MVP Scope (LOCKED)
 
