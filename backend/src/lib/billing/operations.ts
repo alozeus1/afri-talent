@@ -123,6 +123,14 @@ function hashEntitlements(value: unknown): string {
   return crypto.createHash("sha256").update(stableJson(value)).digest("hex");
 }
 
+function normalizeEntitlementStateSource(source: string): string {
+  return source.trim().slice(0, 50) || "system";
+}
+
+function normalizeBillingEventSource(source: string): string {
+  return source.trim().toUpperCase().slice(0, 40) || "SYSTEM";
+}
+
 export function mapStripeSubscriptionStatus(stripeStatus: string): SubscriptionStatus {
   switch (stripeStatus) {
     case "active":
@@ -250,7 +258,7 @@ export async function recordBillingEvent(input: BillingEventInput) {
       userId: input.userId ?? undefined,
       subscriptionId: input.subscriptionId ?? undefined,
       eventId: input.eventId ?? undefined,
-      source: input.source,
+      source: normalizeBillingEventSource(input.source),
       eventType: input.eventType,
       outcome: input.outcome ?? BillingEventOutcome.RECEIVED,
       plan: input.plan ?? undefined,
@@ -336,6 +344,8 @@ export async function syncBillingEntitlementState(
 ) {
   const validation = await validateBillingEntitlementState(userId);
   const expected = validation.expected;
+  const normalizedStateSource = normalizeEntitlementStateSource(source);
+  const normalizedEventSource = normalizeBillingEventSource(source);
 
   const state = await prisma.billingEntitlementState.upsert({
     where: { userId },
@@ -349,7 +359,7 @@ export async function syncBillingEntitlementState(
       pricingVersion: expected.pricingVersion ?? undefined,
       entitlements: expected.entitlements as unknown as Prisma.InputJsonValue,
       checksum: expected.checksum,
-      source,
+      source: normalizedStateSource,
       isInSync: true,
       mismatchReason: null,
       lastSyncedAt: new Date(),
@@ -364,7 +374,7 @@ export async function syncBillingEntitlementState(
       pricingVersion: expected.pricingVersion ?? undefined,
       entitlements: expected.entitlements as unknown as Prisma.InputJsonValue,
       checksum: expected.checksum,
-      source,
+      source: normalizedStateSource,
       isInSync: true,
       mismatchReason: null,
       lastSyncedAt: new Date(),
@@ -391,7 +401,7 @@ export async function syncBillingEntitlementState(
   await recordBillingEvent({
     userId,
     subscriptionId: expected.subscriptionId,
-    source: source.toUpperCase(),
+    source: normalizedEventSource,
     eventType: "entitlements.synced",
     outcome: validation.isStale ? BillingEventOutcome.PROCESSED : BillingEventOutcome.RECONCILED,
     plan: expected.effectivePlan,

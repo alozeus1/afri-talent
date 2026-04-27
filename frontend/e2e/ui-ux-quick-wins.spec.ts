@@ -23,19 +23,6 @@ test.describe('UI/UX Quick Wins Verification', () => {
   });
 
   test('Companies page empty state shows featured companies', async ({ page }) => {
-    await page.goto('/companies');
-    
-    // Wait for network/loading states to resolve
-    await page.waitForLoadState('networkidle');
-    
-    // Since we mocked this to show up when search is empty and no companies are returned by API
-    // We should see "Directory is being updated" OR "Featured Companies"
-    const heading = page.locator('h2', { hasText: 'Directory is being updated' });
-    const featuredHeading = page.locator('h3', { hasText: 'Featured Companies' });
-    
-    // If the API returns 0 companies, our new empty state appears
-    // Since it's a test environment, if there are NO companies, it shows the empty state.
-    // Let's intercept the API request to guarantee it returns 0 companies to test the empty state.
     await page.route('**/api/companies*', async route => {
       await route.fulfill({
         status: 200,
@@ -47,13 +34,14 @@ test.describe('UI/UX Quick Wins Verification', () => {
       });
     });
 
-    await page.goto('/companies');
-    
-    // Now we are guaranteed to hit the empty state
+    await page.goto('/companies', { waitUntil: 'domcontentloaded' });
+
+    const heading = page.locator('h2', { hasText: 'Directory is being updated' });
+    const featuredHeading = page.locator('h3', { hasText: 'Featured Companies' });
+
     await expect(heading).toBeVisible();
     await expect(featuredHeading).toBeVisible();
-    
-    // Verify mock companies are displayed
+
     await expect(page.locator('text=Paystack')).toBeVisible();
     await expect(page.locator('text=Andela')).toBeVisible();
     await expect(page.locator('text=Flutterwave')).toBeVisible();
