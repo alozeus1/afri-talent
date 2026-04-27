@@ -14,7 +14,7 @@ const aggregator = getJobAggregator(prisma);
 // POST /api/aggregator/sync - Trigger manual job sync (Admin only)
 router.post("/sync", authenticate, authorize("ADMIN"), async (req, res) => {
   const {
-    keywords = ["software engineer", "developer", "designer", "product manager"],
+    keywords = ["software engineer", "developer", "devops", "data scientist", "data analyst", "ux/ui", "graphic designer", "cloud engineer", "Devops engineer", "Devops Engineer", "software engineer", "software developer", "Data engineer", "Data Analyst", "Data Scientist", "AI Engineer", "AI Developer", "AI Scientist", "AI Analyst", "Machine learning Engineer", "Machine learning Developer", "Machine learning Scientist", "Machine learning Analyst", "platform engineer", "platform developer", "platform scientist", "platform analyst", "cybersecurity engineer", "cybersecurity analyst", "cybersecurity scientist", "cybersecurity developer", "site reliability engineer", "site reliability developer", "site reliability scientist", "site reliability analyst", "ML Engineer", "ML Developer", "ML Scientist", "ML Analyst", "Frontend Engineer", "Frontend Developer", "Frontend Scientist", "Frontend Analyst", "Backend Engineer", "Backend Developer", "Backend Scientist", "Backend Analyst", "Fullstack Engineer", "Fullstack Developer", "Fullstack Scientist", "Fullstack Analyst", "UI Engineer", "UI Developer", "UI Scientist", "UI Analyst", "UX Engineer", "UX Developer", "UX Scientist", "UX Analyst", "product designer", "product manager", "QA Engineer", "QA Developer", "QA Scientist", "QA Analyst"],
     postedWithinDays = 21,
     limit = 500,
   } = req.body as Partial<JobQuery & { limit: number }>;
