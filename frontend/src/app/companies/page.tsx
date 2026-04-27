@@ -134,7 +134,7 @@ export default function CompaniesPage() {
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
         <div className="relative z-10 max-w-3xl mx-auto">
           <Badge className="mb-6 bg-white/10 text-emerald-100 hover:bg-white/20 border-white/20 backdrop-blur-md">
-            Verified Tech Employers
+            Verified Global Employers
           </Badge>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 tracking-tight font-display">
             The World&apos;s Best Companies <br />
