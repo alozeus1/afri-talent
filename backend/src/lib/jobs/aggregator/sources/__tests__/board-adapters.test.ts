@@ -49,7 +49,7 @@ describe("Job board adapter normalization", () => {
     expect(result.jobs[0].skills).toEqual(expect.arrayContaining(["typescript", "react"]));
   });
 
-  it("does not import non-technical roles that only mention keywords in the description", async () => {
+  it("imports non-technical roles that match the broader keyword set", async () => {
     const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -71,13 +71,14 @@ describe("Job board adapter normalization", () => {
 
     const source = new GreenhouseSource(["acme"]);
     const result = await source.fetchJobs({
-      keywords: ["developer", "software engineer"],
+      keywords: ["accountant", "developer", "software engineer"],
       remote: true,
       postedWithinDays: 30,
       limit: 10,
     });
 
-    expect(result.jobs).toHaveLength(0);
+    expect(result.jobs).toHaveLength(1);
+    expect(result.jobs[0].title).toBe("Accountant");
   });
 
   it("normalizes Lever jobs and maps commitment into jobType", async () => {
