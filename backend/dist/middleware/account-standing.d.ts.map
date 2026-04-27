@@ -1,1 +1,0 @@
-{"version":3,"file":"account-standing.d.ts","sourceRoot":"","sources":["../../src/middleware/account-standing.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,QAAQ,EAAE,YAAY,EAAE,MAAM,SAAS,CAAC;AAG1D,wBAAgB,sBAAsB,CAAC,OAAO,CAAC,EAAE;IAAE,YAAY,CAAC,EAAE,OAAO,CAAA;CAAE,IAG3D,KAAK,OAAO,EAAE,KAAK,QAAQ,EAAE,MAAM,YAAY,KAAG,OAAO,CAAC,IAAI,CAAC,CAqC9E"}
