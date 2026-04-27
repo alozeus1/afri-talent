@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { CheckCircle2, Check } from "lucide-react";
 
 interface JobFiltersProps {
   search: string;
@@ -93,26 +94,39 @@ export function JobFilters({
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Input
-          type="search"
-          inputMode="search"
-          autoComplete="off"
-          aria-label="Search jobs"
-          placeholder="Search jobs..."
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-        <Input
-          inputMode="text"
-          autoComplete="country-name"
-          aria-label="Filter by location"
-          placeholder="Location"
-          value={location}
-          onChange={(e) => onLocationChange(e.target.value)}
-        />
+        <div className="relative">
+          <Input
+            type="search"
+            inputMode="search"
+            autoComplete="off"
+            aria-label="Search jobs"
+            placeholder="Search jobs..."
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className={search.length > 0 ? "border-emerald-500 focus:ring-emerald-500 pr-10" : ""}
+          />
+          {search.length > 0 && (
+            <CheckCircle2 className="absolute right-3 top-[14px] w-5 h-5 text-emerald-500 pointer-events-none" />
+          )}
+        </div>
+        <div className="relative">
+          <Input
+            inputMode="text"
+            autoComplete="country-name"
+            aria-label="Filter by location"
+            placeholder="Location"
+            value={location}
+            onChange={(e) => onLocationChange(e.target.value)}
+            className={location.length > 0 ? "border-emerald-500 focus:ring-emerald-500 pr-10" : ""}
+          />
+          {location.length > 0 && (
+            <CheckCircle2 className="absolute right-3 top-[14px] w-5 h-5 text-emerald-500 pointer-events-none" />
+          )}
+        </div>
         <select
           className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by job type"
+          aria-expanded={false}
           value={type}
           onChange={(e) => onTypeChange(e.target.value)}
         >
@@ -126,6 +140,7 @@ export function JobFilters({
         <select
           className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by job field"
+          aria-expanded={false}
           value={jobField}
           onChange={(e) => onJobFieldChange(e.target.value)}
         >
@@ -139,6 +154,7 @@ export function JobFilters({
         <select
           className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by workplace type"
+          aria-expanded={false}
           value={workplaceType}
           onChange={(e) => onWorkplaceTypeChange(e.target.value)}
         >
@@ -152,6 +168,7 @@ export function JobFilters({
         <select
           className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by seniority"
+          aria-expanded={false}
           value={seniority}
           onChange={(e) => onSeniorityChange(e.target.value)}
         >
@@ -169,10 +186,11 @@ export function JobFilters({
           onClick={() => onRemoteChange(remote ? "" : "true")}
           aria-pressed={Boolean(remote)}
           aria-label="Toggle remote only jobs"
-          className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
+          className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${
             remote ? "border-emerald-600 bg-emerald-600 text-white shadow-[0_12px_30px_rgba(15,143,120,0.24)]" : "bg-white/70 text-gray-700 border-[rgba(15,23,32,0.12)] hover:border-emerald-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
           }`}
         >
+          {remote && <Check className="w-4 h-4" />}
           Remote
         </button>
         <button
@@ -180,10 +198,11 @@ export function JobFilters({
           onClick={() => onVisaSponsorshipChange(visaSponsorship ? "" : "YES")}
           aria-pressed={Boolean(visaSponsorship)}
           aria-label="Toggle visa sponsored jobs"
-          className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
+          className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${
             visaSponsorship ? "border-blue-600 bg-blue-600 text-white shadow-[0_12px_30px_rgba(37,99,235,0.22)]" : "bg-white/70 text-gray-700 border-[rgba(15,23,32,0.12)] hover:border-blue-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
           }`}
         >
+          {visaSponsorship && <Check className="w-4 h-4" />}
           Visa Sponsored
         </button>
         <button
@@ -191,10 +210,11 @@ export function JobFilters({
           onClick={() => onRelocationChange(relocationAssistance ? "" : "true")}
           aria-pressed={Boolean(relocationAssistance)}
           aria-label="Toggle relocation support jobs"
-          className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
+          className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${
             relocationAssistance ? "border-purple-600 bg-purple-600 text-white shadow-[0_12px_30px_rgba(147,51,234,0.22)]" : "bg-white/70 text-gray-700 border-[rgba(15,23,32,0.12)] hover:border-purple-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
           }`}
         >
+          {relocationAssistance && <Check className="w-4 h-4" />}
           Relocation Support
         </button>
       </div>

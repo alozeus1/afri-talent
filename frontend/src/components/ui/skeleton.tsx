@@ -10,8 +10,8 @@ export function Skeleton({ className = "" }: SkeletonProps) {
 
 export function JobCardSkeleton() {
   return (
-    <div className="surface-panel gloss-card rounded-[1.75rem] border border-[var(--border-soft)] p-6">
-      <div className="relative z-10">
+    <div className="surface-panel rounded-2xl border border-[var(--border-soft)] p-6 h-full flex flex-col">
+      <div className="relative z-10 flex-1 flex flex-col">
       <div className="mb-3 flex items-start justify-between">
         <div className="flex-1">
           <Skeleton className="h-5 w-3/4 mb-2" />

@@ -13,15 +13,15 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variants = {
       primary:
-        "border-transparent bg-emerald-600 text-white shadow-sm hover:shadow-md hover:bg-emerald-700 focus-visible:ring-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-600",
+        "border-transparent bg-emerald-600 text-white shadow-sm hover:shadow-lg hover:bg-emerald-700 focus-visible:ring-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-600",
       secondary:
-        "border-zinc-200 bg-white text-zinc-900 shadow-sm hover:shadow-md hover:bg-zinc-50 focus-visible:ring-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800",
+        "border-zinc-200 bg-white text-zinc-900 shadow-sm hover:shadow-lg hover:bg-zinc-50 focus-visible:ring-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800",
       outline:
-        "border-zinc-200 bg-transparent text-zinc-900 shadow-sm hover:shadow-md hover:bg-zinc-100 hover:text-zinc-900 focus-visible:ring-zinc-500 dark:border-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-800",
+        "border-zinc-200 bg-transparent text-zinc-900 shadow-sm hover:shadow-lg hover:bg-zinc-100 hover:text-zinc-900 focus-visible:ring-zinc-500 dark:border-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-800",
       ghost:
         "border-transparent bg-transparent text-zinc-700 hover:bg-zinc-100 focus-visible:ring-zinc-500 dark:text-zinc-300 dark:hover:bg-zinc-800",
       danger:
-        "border-transparent bg-red-600 text-white shadow-sm hover:shadow-md hover:bg-red-700 focus-visible:ring-red-500 dark:bg-red-500 dark:hover:bg-red-600",
+        "border-transparent bg-red-600 text-white shadow-sm hover:shadow-lg hover:bg-red-700 focus-visible:ring-red-500 dark:bg-red-500 dark:hover:bg-red-600",
     };
 
     const sizes = {

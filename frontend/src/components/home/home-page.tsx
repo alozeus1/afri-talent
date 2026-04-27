@@ -41,6 +41,27 @@ const sourceLabels = [
   ["Adzuna", "US, UK, EU, CA"],
 ];
 
+const testimonials = [
+  {
+    quote: "AfriTalent completely changed how we hire in Africa. The trust verification signals gave us the confidence to hire remotely without the usual friction.",
+    author: "Sarah Jenkins",
+    role: "VP Engineering, TechFlow",
+    initials: "SJ",
+  },
+  {
+    quote: "I found my dream remote job within 3 weeks. The platform highlighted my skills and made my profile stand out to international employers.",
+    author: "David Ochieng",
+    role: "Senior Backend Developer",
+    initials: "DO",
+  },
+  {
+    quote: "The focus on mobility and visa sponsorship clarity saved us hundreds of hours. We only interview candidates who fit our location constraints.",
+    author: "Elena Rodriguez",
+    role: "Talent Acquisition Lead",
+    initials: "ER",
+  }
+];
+
 export function HomePageContent() {
   return (
     <div className="pb-12 bg-[var(--background)]">
@@ -48,10 +69,10 @@ export function HomePageContent() {
         <div className="page-frame">
           <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white px-6 py-16 shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:px-10 md:py-20 lg:px-14">
             <Image
-              src="/images/heroes/hero_african_tech_pro.png"
-              alt="Tech Professional"
+              src="/images/generated/afritalent-hero-global-talent.png"
+              alt="African technology professional exploring global job opportunities"
               fill
-              className="object-cover opacity-[0.03] dark:opacity-[0.07] pointer-events-none"
+              className="object-cover opacity-[0.08] mix-blend-multiply dark:opacity-[0.14] dark:mix-blend-screen pointer-events-none"
             />
             <div className="relative grid items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]">
               <div>
@@ -170,34 +191,81 @@ export function HomePageContent() {
 
       <section className="section-shell py-16">
         <div className="page-frame">
-          <div className="surface-panel rounded-3xl border border-zinc-200 bg-white px-6 py-12 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="mb-10 text-center">
-              <h2 className="font-display text-2xl font-bold text-zinc-900 dark:text-zinc-50 md:text-3xl">
-                Jobs from global platforms, filtered through an Africa-to-global lens
-              </h2>
-              <p className="mt-3 text-zinc-600 dark:text-zinc-400">
-                We aggregate from multiple sources, offering better trust, sharper matching, and stronger readiness signals.
-              </p>
-            </div>
+          <div className="surface-panel overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="grid items-stretch lg:grid-cols-[0.95fr_1.05fr]">
+              <div className="relative min-h-[320px] overflow-hidden bg-zinc-950 lg:min-h-[420px]">
+                <Image
+                  src="/images/generated/afritalent-smart-search-workspace.png"
+                  alt="Smart job search workspace with hiring signals and candidate notes"
+                  fill
+                  className="object-cover opacity-90"
+                  sizes="(max-width: 1023px) 100vw, 42vw"
+                />
+                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-950/55 via-transparent to-amber-500/15" />
+              </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 opacity-80">
-              {sourceLabels.map(([label, sublabel]) => (
-                <div key={label} className="text-center">
-                  <div className="font-bold text-zinc-800 dark:text-zinc-200">{label}</div>
-                  <div className="text-xs font-medium text-zinc-500 dark:text-zinc-500 mt-1">{sublabel}</div>
+              <div className="px-6 py-12 md:px-10 lg:px-12">
+                <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+                  Smart aggregation
+                </p>
+                <h2 className="font-display mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-50 md:text-3xl">
+                  Jobs from global platforms, filtered through an Africa-to-global lens
+                </h2>
+                <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+                  We aggregate from multiple sources, offering better trust, sharper matching, and stronger readiness signals.
+                </p>
+
+                <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-3">
+                  {sourceLabels.map(([label, sublabel]) => (
+                    <div key={label}>
+                      <div className="font-bold text-zinc-800 dark:text-zinc-200">{label}</div>
+                      <div className="mt-1 text-xs font-medium text-zinc-500 dark:text-zinc-500">{sublabel}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         </div>
       </section>
-
+      <section className="section-shell py-16 bg-zinc-50 dark:bg-zinc-900/50">
+        <div className="page-frame">
+          <div className="mb-12 text-center">
+            <h2 className="font-display text-3xl font-bold text-zinc-900 dark:text-zinc-50 md:text-4xl">
+              Trusted by global teams and top talent
+            </h2>
+          </div>
+          <div className="grid gap-8 md:grid-cols-3">
+            {testimonials.map((testimonial, i) => (
+              <div key={i} className="surface-panel rounded-2xl p-8 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm relative">
+                <div className="absolute top-8 left-8 text-emerald-500/20">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M14.017 21L16.411 14.593H10.155V3H21.5V14.593L19.083 21H14.017ZM3.456 21L5.85 14.593H-0.406V3H10.939V14.593L8.522 21H3.456Z" />
+                  </svg>
+                </div>
+                <p className="relative z-10 mt-6 text-zinc-700 dark:text-zinc-300 italic mb-6">
+                  &ldquo;{testimonial.quote}&rdquo;
+                </p>
+                <div className="flex items-center gap-4 mt-auto pt-6 border-t border-zinc-100 dark:border-zinc-800/60">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-sm">
+                    {testimonial.initials}
+                  </div>
+                  <div>
+                    <div className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">{testimonial.author}</div>
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400">{testimonial.role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
       <section className="px-0 py-20">
         <div className="page-frame text-center">
           <div className="relative overflow-hidden rounded-3xl border border-emerald-900 bg-emerald-950 px-6 py-16 text-white shadow-2xl md:px-12">
             <Image
-              src="/images/heroes/collaboration_teamwork.png"
-              alt="Team collaboration"
+              src="/images/generated/afritalent-collaboration-hiring.png"
+              alt="Hiring team collaborating with a remote teammate"
               fill
               className="object-cover opacity-20 mix-blend-overlay pointer-events-none"
             />

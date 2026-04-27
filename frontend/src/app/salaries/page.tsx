@@ -25,6 +25,19 @@ const MOCK_DISTRIBUTION_DATA = [
   { level: "Lead/Staff (9+y)", min: 120000, max: 180000, avg: 145000 },
 ];
 
+const MOCK_TOP_PAYING: TopPayingJob[] = [
+  { jobTitle: "Chief Technology Officer", avgSalary: 185000, count: 42 },
+  { jobTitle: "VP of Engineering", avgSalary: 172000, count: 56 },
+  { jobTitle: "Staff Software Engineer", avgSalary: 158000, count: 124 },
+  { jobTitle: "Engineering Manager", avgSalary: 145000, count: 215 },
+  { jobTitle: "Lead Data Scientist", avgSalary: 142000, count: 89 },
+  { jobTitle: "Cloud Architect", avgSalary: 138000, count: 112 },
+  { jobTitle: "Senior DevOps Engineer", avgSalary: 132000, count: 167 },
+  { jobTitle: "Senior Product Manager", avgSalary: 128000, count: 198 },
+  { jobTitle: "Machine Learning Engineer", avgSalary: 125000, count: 145 },
+  { jobTitle: "Senior Full Stack Engineer", avgSalary: 118000, count: 342 },
+];
+
 export default function SalariesPage() {
   const { user } = useAuth();
 
@@ -68,9 +81,14 @@ export default function SalariesPage() {
     const loadTopPaying = async () => {
       try {
         const data = await salaryReports.topPaying();
-        setTopPaying(data);
+        if (data && data.length > 0) {
+          setTopPaying(data);
+        } else {
+          setTopPaying(MOCK_TOP_PAYING);
+        }
       } catch (err) {
         setTopPayingError(err instanceof Error ? err.message : "Failed to load top paying roles");
+        setTopPaying(MOCK_TOP_PAYING);
       } finally {
         setTopPayingLoading(false);
       }

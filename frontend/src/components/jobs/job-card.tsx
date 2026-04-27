@@ -59,7 +59,7 @@ export function JobCard({ job }: JobCardProps) {
         });
       }}
     >
-      <Card className="isolate h-full cursor-pointer transition-all duration-300 border border-[var(--border-soft)] bg-white dark:bg-zinc-950 hover:bg-gradient-to-br hover:from-white hover:to-emerald-50/50 dark:hover:from-zinc-950 dark:hover:to-emerald-950/20 group-hover:-translate-y-1 hover:border-emerald-300 dark:hover:border-emerald-700 shadow-sm hover:shadow-[0_28px_72px_rgba(16,185,129,0.12)] relative overflow-hidden">
+      <Card className="isolate h-full cursor-pointer transition-all duration-300 border border-[var(--border-soft)] bg-white dark:bg-zinc-950 hover:bg-gradient-to-br hover:from-white hover:to-emerald-50/50 dark:hover:from-zinc-950 dark:hover:to-emerald-950/20 group-hover:-translate-y-1 hover:border-emerald-300 dark:hover:border-emerald-700 shadow-sm hover:shadow-[0_8px_24px_rgba(0,0,0,0.15)] relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/0 to-emerald-500/0 group-hover:via-emerald-500/5 transition-all duration-500 rounded-xl pointer-events-none" />
         <CardContent className="relative z-10 flex h-full flex-col p-6">
           <div className="flex justify-between items-start mb-3">
@@ -120,7 +120,7 @@ export function JobCard({ job }: JobCardProps) {
                     ? "bg-rose-50 text-rose-500 dark:bg-rose-500/10 dark:text-rose-400" 
                     : "bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:bg-zinc-800/50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                 }`}
-                aria-label={isSaved ? "Remove from saved jobs" : "Save job"}
+                aria-label={isSaved ? "Remove from saved jobs" : "Save this job"}
               >
                 <Heart className={`w-5 h-5 transition-transform duration-300 ${isSaved ? "fill-current scale-110" : "scale-100 active:scale-90"}`} />
               </button>

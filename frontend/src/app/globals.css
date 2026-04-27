@@ -45,7 +45,7 @@ body {
 }
 
 *:focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 3px solid #10b981; /* Tailwind emerald-500 */
   outline-offset: 2px;
   border-radius: 2px;
 }
