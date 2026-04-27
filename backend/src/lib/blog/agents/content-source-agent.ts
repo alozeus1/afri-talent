@@ -277,8 +277,11 @@ async function fetchInternalTrends(weekOf: Date): Promise<RawContent[]> {
 
     // Top job categories in the last 7 days
     const recentJobs = await prisma.job.findMany({
-      where: { createdAt: { gte: since }, published: true },
-      select: { title: true, location: true, skills: true },
+      where: {
+        createdAt: { gte: since },
+        publishedAt: { not: null },
+      },
+      select: { title: true, location: true, tags: true },
       take: 200,
     });
 
@@ -292,8 +295,8 @@ async function fetchInternalTrends(weekOf: Date): Promise<RawContent[]> {
       const loc = job.location?.toLowerCase() || "unknown";
       if (loc.includes("remote")) locationCounts["Remote"] = (locationCounts["Remote"] ?? 0) + 1;
 
-      if (Array.isArray(job.skills)) {
-        for (const skill of (job.skills as string[]).slice(0, 5)) {
+      if (Array.isArray(job.tags)) {
+        for (const skill of job.tags.slice(0, 5)) {
           skillCounts[skill] = (skillCounts[skill] ?? 0) + 1;
         }
       }

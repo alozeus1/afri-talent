@@ -201,3 +201,9 @@ variable "ssm_parameter_arns" {
   description = "All SSM Parameter ARNs the instance role must be allowed to read"
   default     = []
 }
+
+variable "ssm_kms_key_arns" {
+  type        = list(string)
+  description = "KMS key ARNs used to encrypt SSM parameters exposed to the service"
+  default     = []
+}

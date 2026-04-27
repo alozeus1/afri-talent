@@ -9,33 +9,69 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 
 // ── Prisma mock ───────────────────────────────────────────────────────────────
 
-const mockResource = {
-  id: "res-001",
-  title: "Weekly Remote Jobs Digest — May 5, 2025",
-  slug: "weekly-remote-jobs-may-5-2025-abc123",
-  excerpt: "Top trends in global remote hiring for African tech professionals.",
-  content: "## Introduction\nTest content.",
-  category: "Weekly Hiring Trends",
-  coverImage: null,
-  published: false,
-  publishedAt: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
+function makeMockResource() {
+  return {
+    id: "res-001",
+    title: "Weekly Remote Jobs Digest — May 5, 2025",
+    slug: "weekly-remote-jobs-may-5-2025-abc123",
+    excerpt: "Top trends in global remote hiring for African tech professionals.",
+    content: "## Introduction\nTest content.",
+    category: "Weekly Hiring Trends",
+    coverImage: null,
+    published: false,
+    publishedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
 
-const mockAdminReview = { id: "review-001", status: "PENDING" };
-const mockAdmin = { id: "admin-001" };
+const fixtures = vi.hoisted(() => {
+  const rawContent = [
+    {
+      title: "Remote work surges across Africa",
+      url: "https://techcabal.com/remote-work-africa",
+      excerpt: "African developers are increasingly sought by global companies.",
+      sourceName: "TechCabal",
+      sourceDomain: "techcabal.com",
+      publishedAt: new Date().toISOString(),
+      relevanceScore: 80,
+    },
+  ];
+
+  return {
+    mockAdminReview: { id: "review-001", status: "PENDING" },
+    mockAdmin: { id: "admin-001" },
+    rawContentFixture: rawContent,
+    verifiedContentFixture: rawContent.map((item) => ({
+      ...item,
+      credibilityScore: 75,
+      verificationNotes:
+        "Well-sourced article from a reputable African tech publication.",
+      keyFacts: ["70% of African developers work remotely at least part-time"],
+    })),
+    draftPostFixture: {
+      title: "Weekly Remote Jobs Digest — May 5, 2025",
+      slug: "weekly-remote-jobs-may-5-2025-abc123",
+      excerpt: "Top trends in global remote hiring for African tech professionals.",
+      content: "## Introduction\nTest content.",
+      category: "Weekly Hiring Trends",
+      sources: [{ name: "TechCabal", url: "https://techcabal.com" }],
+      topicKeywords: ["Africa remote work", "tech hiring"],
+      estimatedReadMinutes: 4,
+    },
+  };
+});
 
 vi.mock("../../prisma.js", () => ({
   default: {
     resource: {
-      create: vi.fn().mockResolvedValue(mockResource),
+      create: vi.fn().mockResolvedValue(makeMockResource()),
     },
     adminReview: {
-      create: vi.fn().mockResolvedValue(mockAdminReview),
+      create: vi.fn().mockResolvedValue(fixtures.mockAdminReview),
     },
     user: {
-      findFirst: vi.fn().mockResolvedValue(mockAdmin),
+      findFirst: vi.fn().mockResolvedValue(fixtures.mockAdmin),
     },
     job: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -70,46 +106,16 @@ vi.mock("../../logger.js", () => ({
 
 // ── Agent mocks ───────────────────────────────────────────────────────────────
 
-const rawContentFixture = [
-  {
-    title: "Remote work surges across Africa",
-    url: "https://techcabal.com/remote-work-africa",
-    excerpt: "African developers are increasingly sought by global companies.",
-    sourceName: "TechCabal",
-    sourceDomain: "techcabal.com",
-    publishedAt: new Date().toISOString(),
-    relevanceScore: 80,
-  },
-];
-
-const verifiedContentFixture = rawContentFixture.map((item) => ({
-  ...item,
-  credibilityScore: 75,
-  verificationNotes: "Well-sourced article from a reputable African tech publication.",
-  keyFacts: ["70% of African developers work remotely at least part-time"],
-}));
-
-const draftPostFixture = {
-  title: mockResource.title,
-  slug: mockResource.slug,
-  excerpt: mockResource.excerpt,
-  content: mockResource.content,
-  category: "Weekly Hiring Trends",
-  sources: [{ name: "TechCabal", url: "https://techcabal.com" }],
-  topicKeywords: ["Africa remote work", "tech hiring"],
-  estimatedReadMinutes: 4,
-};
-
 vi.mock("../agents/content-source-agent.js", () => ({
-  ContentSourceAgent: vi.fn().mockResolvedValue(rawContentFixture),
+  ContentSourceAgent: vi.fn().mockResolvedValue(fixtures.rawContentFixture),
 }));
 
 vi.mock("../agents/fact-check-agent.js", () => ({
-  FactCheckAgent: vi.fn().mockResolvedValue(verifiedContentFixture),
+  FactCheckAgent: vi.fn().mockResolvedValue(fixtures.verifiedContentFixture),
 }));
 
 vi.mock("../agents/blog-writer-agent.js", () => ({
-  BlogWriterAgent: vi.fn().mockResolvedValue(draftPostFixture),
+  BlogWriterAgent: vi.fn().mockResolvedValue(fixtures.draftPostFixture),
 }));
 
 vi.mock("../agents/image-sourcer.js", () => ({
@@ -128,13 +134,15 @@ vi.mock("@aws-sdk/client-ses", () => ({
 import { runBlogPipeline } from "../pipeline.js";
 import prisma from "../../prisma.js";
 
+const mockResource = makeMockResource();
+
 describe("runBlogPipeline", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Re-apply default resolved values after clear
-    (prisma.resource.create as ReturnType<typeof vi.fn>).mockResolvedValue(mockResource);
-    (prisma.adminReview.create as ReturnType<typeof vi.fn>).mockResolvedValue(mockAdminReview);
-    (prisma.user.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockAdmin);
+    (prisma.resource.create as ReturnType<typeof vi.fn>).mockResolvedValue(makeMockResource());
+    (prisma.adminReview.create as ReturnType<typeof vi.fn>).mockResolvedValue(fixtures.mockAdminReview);
+    (prisma.user.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(fixtures.mockAdmin);
   });
 
   it("returns success and creates Resource + AdminReview on happy path", async () => {

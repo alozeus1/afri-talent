@@ -3,11 +3,23 @@
 # AWS Console → Systems Manager → Parameter Store → edit each parameter.
 # Terraform will NOT overwrite your manual updates (ignore_changes on value).
 
+resource "aws_kms_key" "ssm_parameters" {
+  description             = "KMS key for ${var.name_prefix} blog SSM parameters"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+}
+
+resource "aws_kms_alias" "ssm_parameters" {
+  name          = "alias/${var.name_prefix}-blog-ssm"
+  target_key_id = aws_kms_key.ssm_parameters.key_id
+}
+
 resource "aws_ssm_parameter" "news_api_key" {
   name        = "/${var.name_prefix}/blog/NEWS_API_KEY"
   description = "NewsAPI.org key for blog content sourcing"
   type        = "SecureString"
   value       = "placeholder"
+  key_id      = aws_kms_key.ssm_parameters.arn
 
   lifecycle {
     ignore_changes = [value]
@@ -19,6 +31,7 @@ resource "aws_ssm_parameter" "unsplash_access_key" {
   description = "Unsplash API access key for blog cover images"
   type        = "SecureString"
   value       = "placeholder"
+  key_id      = aws_kms_key.ssm_parameters.arn
 
   lifecycle {
     ignore_changes = [value]
@@ -30,6 +43,7 @@ resource "aws_ssm_parameter" "pexels_api_key" {
   description = "Pexels API key — fallback cover image source"
   type        = "SecureString"
   value       = "placeholder"
+  key_id      = aws_kms_key.ssm_parameters.arn
 
   lifecycle {
     ignore_changes = [value]
@@ -39,8 +53,9 @@ resource "aws_ssm_parameter" "pexels_api_key" {
 resource "aws_ssm_parameter" "blog_admin_email" {
   name        = "/${var.name_prefix}/blog/BLOG_ADMIN_NOTIFICATION_EMAIL"
   description = "Email address to notify when a blog draft is ready for review"
-  type        = "String"
+  type        = "SecureString"
   value       = "placeholder"
+  key_id      = aws_kms_key.ssm_parameters.arn
 
   lifecycle {
     ignore_changes = [value]

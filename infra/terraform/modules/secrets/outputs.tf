@@ -12,3 +12,8 @@ output "blog_ssm_parameter_arns" {
     BLOG_ADMIN_NOTIFICATION_EMAIL = aws_ssm_parameter.blog_admin_email.arn
   }
 }
+
+output "blog_ssm_kms_key_arn" {
+  description = "KMS key ARN used to encrypt blog SSM parameters"
+  value       = aws_kms_key.ssm_parameters.arn
+}

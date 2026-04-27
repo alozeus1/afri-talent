@@ -83,11 +83,18 @@ resource "aws_iam_role_policy" "apprunner_ssm_access" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["ssm:GetParameters", "ssm:GetParameter"]
-      Resource = var.ssm_parameter_arns
-    }]
+    Statement = concat(
+      [{
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameters", "ssm:GetParameter"]
+        Resource = var.ssm_parameter_arns
+      }],
+      length(var.ssm_kms_key_arns) > 0 ? [{
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = var.ssm_kms_key_arns
+      }] : []
+    )
   })
 }
 

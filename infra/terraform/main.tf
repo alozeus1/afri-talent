@@ -131,15 +131,16 @@ module "acm" {
 module "apprunner" {
   source = "./modules/apprunner"
 
-  name_prefix        = local.name_prefix
-  environment        = var.environment
-  private_subnet_ids = module.network.private_subnet_ids
-  security_group_id  = module.security.ecs_sg_id # Reuse existing SG
-  secret_arn         = module.secrets.secret_arn
-  secret_arns        = [module.secrets.secret_arn]
-  s3_bucket_arns     = [module.s3.bucket_arn, "${module.s3.bucket_arn}/*"]
+  name_prefix         = local.name_prefix
+  environment         = var.environment
+  private_subnet_ids  = module.network.private_subnet_ids
+  security_group_id   = module.security.ecs_sg_id # Reuse existing SG
+  secret_arn          = module.secrets.secret_arn
+  secret_arns         = [module.secrets.secret_arn]
+  s3_bucket_arns      = [module.s3.bucket_arn, "${module.s3.bucket_arn}/*"]
   backend_ssm_secrets = module.secrets.blog_ssm_parameter_arns
   ssm_parameter_arns  = values(module.secrets.blog_ssm_parameter_arns)
+  ssm_kms_key_arns    = [module.secrets.blog_ssm_kms_key_arn]
 
   # Backend configuration
   backend_image           = var.backend_image
