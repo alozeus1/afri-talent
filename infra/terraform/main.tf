@@ -138,6 +138,8 @@ module "apprunner" {
   secret_arn         = module.secrets.secret_arn
   secret_arns        = [module.secrets.secret_arn]
   s3_bucket_arns     = [module.s3.bucket_arn, "${module.s3.bucket_arn}/*"]
+  backend_ssm_secrets = module.secrets.blog_ssm_parameter_arns
+  ssm_parameter_arns  = values(module.secrets.blog_ssm_parameter_arns)
 
   # Backend configuration
   backend_image           = var.backend_image
@@ -193,11 +195,10 @@ module "apprunner" {
     "WORKABLE_COMPANY_TOKENS",
     "REDIS_URL",
     "SENTRY_DSN",
-    "NEWS_API_KEY",
-    "UNSPLASH_ACCESS_KEY",
-    "PEXELS_API_KEY",
-    "BLOG_ADMIN_NOTIFICATION_EMAIL"
   ]
+  # NOTE: NEWS_API_KEY, UNSPLASH_ACCESS_KEY, PEXELS_API_KEY,
+  # BLOG_ADMIN_NOTIFICATION_EMAIL are sourced from SSM Parameter Store
+  # (see backend_ssm_secrets above) — not from Secrets Manager.
 
   # Frontend configuration
   frontend_image           = var.frontend_image

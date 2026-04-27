@@ -1,3 +1,54 @@
+# ── SSM Parameter Store — optional blog pipeline keys ────────────────────────
+# Created by Terraform with a placeholder value. Update the real value via
+# AWS Console → Systems Manager → Parameter Store → edit each parameter.
+# Terraform will NOT overwrite your manual updates (ignore_changes on value).
+
+resource "aws_ssm_parameter" "news_api_key" {
+  name        = "/${var.name_prefix}/blog/NEWS_API_KEY"
+  description = "NewsAPI.org key for blog content sourcing"
+  type        = "SecureString"
+  value       = "placeholder"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+resource "aws_ssm_parameter" "unsplash_access_key" {
+  name        = "/${var.name_prefix}/blog/UNSPLASH_ACCESS_KEY"
+  description = "Unsplash API access key for blog cover images"
+  type        = "SecureString"
+  value       = "placeholder"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+resource "aws_ssm_parameter" "pexels_api_key" {
+  name        = "/${var.name_prefix}/blog/PEXELS_API_KEY"
+  description = "Pexels API key — fallback cover image source"
+  type        = "SecureString"
+  value       = "placeholder"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+resource "aws_ssm_parameter" "blog_admin_email" {
+  name        = "/${var.name_prefix}/blog/BLOG_ADMIN_NOTIFICATION_EMAIL"
+  description = "Email address to notify when a blog draft is ready for review"
+  type        = "String"
+  value       = "placeholder"
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+# ── Secrets Manager — core application secrets ────────────────────────────────
+
 resource "aws_secretsmanager_secret" "app" {
   name        = "${var.name_prefix}/app-secrets"
   description = "Application secrets for AfriTalent"

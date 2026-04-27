@@ -75,6 +75,22 @@ resource "aws_iam_role_policy" "apprunner_secrets_access" {
   })
 }
 
+# SSM Parameter Store access — for optional blog pipeline keys
+resource "aws_iam_role_policy" "apprunner_ssm_access" {
+  count = length(var.ssm_parameter_arns) > 0 ? 1 : 0
+  name  = "${var.name_prefix}-ssm-access"
+  role  = aws_iam_role.apprunner_instance.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ssm:GetParameters", "ssm:GetParameter"]
+      Resource = var.ssm_parameter_arns
+    }]
+  })
+}
+
 # ── VPC Connector for RDS access ─────────────────────────────────────────────
 
 resource "aws_apprunner_vpc_connector" "main" {
@@ -105,9 +121,10 @@ resource "aws_apprunner_service" "backend" {
             FRONTEND_URL = var.frontend_url
           }, var.backend_environment_variables) : key => value if value != null
         }
-        runtime_environment_secrets = {
-          for name in var.backend_secret_names : name => "${var.secret_arn}:${name}::"
-        }
+        runtime_environment_secrets = merge(
+          { for name in var.backend_secret_names : name => "${var.secret_arn}:${name}::" },
+          var.backend_ssm_secrets
+        )
       }
     }
 
