@@ -23,6 +23,7 @@ import { DashboardSkeleton } from "@/components/ui/skeleton";
 import { PushOptInCard } from "@/components/notifications/push-opt-in";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { MapPin, ArrowRight } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -69,6 +70,13 @@ const planLabels: Record<string, string> = {
   BASIC: "Basic",
   PROFESSIONAL: "Professional",
 };
+
+const MOCK_RECOMMENDED_JOBS = [
+  { id: "1", title: "Senior Frontend Engineer", company: "Paystack", location: "Lagos (Hybrid)", salary: "$70k - $90k", type: "FULL-TIME" },
+  { id: "2", title: "Lead Product Designer", company: "Flutterwave", location: "Remote", salary: "$80k - $110k", type: "FULL-TIME" },
+  { id: "3", title: "Fullstack Developer", company: "Andela", location: "Remote", salary: "$60k - $85k", type: "CONTRACT" },
+  { id: "4", title: "Backend Engineer (Go)", company: "Monzo", location: "London (Relocation)", salary: "£85k - £105k", type: "FULL-TIME" },
+];
 
 export default function CandidateDashboard() {
   const locale = useLocale();
@@ -376,10 +384,10 @@ export default function CandidateDashboard() {
         </div>
       )}
 
-      {/* Profile Completeness + Open to Work + Subscription */}
-      <div className="grid md:grid-cols-3 gap-6 mb-8">
+      {/* Profile Completeness + Streak + Open to Work + Subscription */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Profile Completeness */}
-        <Card>
+        <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
           <CardContent className="p-6">
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Profile Completeness</h3>
             <div className="flex items-center gap-4 mb-3">
@@ -406,16 +414,19 @@ export default function CandidateDashboard() {
               </div>
               <div className="min-w-0">
                 {completeness >= 80 ? (
-                  <p className="text-sm text-emerald-700 font-medium">Profile looks great!</p>
+                  <p className="text-sm text-emerald-700 font-medium">Profile looks great! You&apos;re ready for premium matches.</p>
                 ) : (
-                  <Link href={localizePath("/candidate/profile", locale)}>
-                    <Button size="sm">Complete your profile</Button>
-                  </Link>
+                  <div className="space-y-2">
+                    <p className="text-xs text-amber-700 font-medium leading-tight">Complete your profile to unlock premium employer matches!</p>
+                    <Link href={localizePath("/candidate/profile", locale)}>
+                      <Button size="sm" className="w-full">Complete Profile</Button>
+                    </Link>
+                  </div>
                 )}
               </div>
             </div>
             {completeness < 80 && missingItems.length > 0 && (
-              <ul className="space-y-1">
+              <ul className="space-y-1 mt-2">
                 {missingItems.slice(0, 3).map((item) => (
                   <li key={item} className="text-xs text-gray-500 flex items-center gap-1">
                     <span className="text-amber-500">•</span> {item}
@@ -429,8 +440,28 @@ export default function CandidateDashboard() {
           </CardContent>
         </Card>
 
+        {/* Application Streak */}
+        <Card className="border-orange-200 bg-orange-50/40 dark:bg-orange-950/20 dark:border-orange-500/20 dark:shadow-[0_0_20px_rgba(249,115,22,0.05)] backdrop-blur-sm transition-all hover:dark:border-orange-500/40">
+          <CardContent className="p-6">
+            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Activity</h3>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 text-2xl shadow-sm dark:shadow-[0_0_10px_rgba(249,115,22,0.2)]">
+                🔥
+              </div>
+              <div>
+                <p className="text-lg font-bold text-gray-900 dark:text-orange-50">3-Day Streak!</p>
+                <p className="text-xs text-gray-600 dark:text-orange-200/60 mt-0.5">Keep applying to stay visible</p>
+              </div>
+            </div>
+            <div className="mt-4 w-full bg-orange-100 dark:bg-orange-950/50 rounded-full h-1.5 shadow-inner">
+              <div className="bg-orange-500 h-1.5 rounded-full dark:shadow-[0_0_8px_rgba(249,115,22,0.6)]" style={{ width: '40%' }}></div>
+            </div>
+            <p className="text-[10px] text-gray-500 dark:text-orange-200/50 mt-2 text-right">2 days until next milestone</p>
+          </CardContent>
+        </Card>
+
         {/* Open to Work Toggle */}
-        <Card>
+        <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
           <CardContent className="p-6">
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Job Visibility</h3>
             <div className="flex items-center gap-3 mb-2">
@@ -456,7 +487,7 @@ export default function CandidateDashboard() {
         </Card>
 
         {/* Subscription Status */}
-        <Card>
+        <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
           <CardContent className="p-6">
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Subscription</h3>
             {billingStatus ? (
@@ -575,6 +606,45 @@ export default function CandidateDashboard() {
             <div className="text-gray-600">Accepted</div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Recommended For You Section */}
+      <div className="mb-10">
+        <div className="flex justify-between items-end mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Recommended For You</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Based on your skills and target roles</p>
+          </div>
+          <Link href={localizePath("/jobs", locale)} className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+            View all <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+        
+        <div className="flex overflow-x-auto gap-4 pb-4 snap-x hide-scrollbar">
+          {MOCK_RECOMMENDED_JOBS.map((job) => (
+            <Link key={job.id} href={localizePath(`/jobs/${job.id}`, locale)} className="min-w-[300px] sm:min-w-[340px] snap-start group">
+              <Card className="h-full hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md transition-all duration-300 group-hover:-translate-y-1 bg-white dark:bg-zinc-950/50">
+                <CardContent className="p-5">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-1">{job.title}</h3>
+                      <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">{job.company}</p>
+                    </div>
+                    <Badge variant="default" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300">
+                      {job.type}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-4 mb-3">
+                    <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {job.location}</span>
+                  </div>
+                  <div className="font-semibold text-gray-900 dark:text-gray-100 border-t border-gray-100 dark:border-zinc-800 pt-3">
+                    {job.salary}
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* My Applications */}

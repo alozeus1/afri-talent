@@ -18,6 +18,13 @@ const CURRENCIES = ["USD", "EUR", "GBP", "NGN", "KES", "ZAR"];
 const SALARY_PERIODS = ["yearly", "monthly"];
 const EMPLOYMENT_TYPES = ["FULL_TIME", "PART_TIME", "CONTRACT", "FREELANCE"];
 
+const MOCK_DISTRIBUTION_DATA = [
+  { level: "Junior (0-2y)", min: 25000, max: 45000, avg: 35000 },
+  { level: "Mid-Level (3-5y)", min: 45000, max: 80000, avg: 65000 },
+  { level: "Senior (6-8y)", min: 80000, max: 130000, avg: 105000 },
+  { level: "Lead/Staff (9+y)", min: 120000, max: 180000, avg: 145000 },
+];
+
 export default function SalariesPage() {
   const { user } = useAuth();
 
@@ -388,6 +395,44 @@ export default function SalariesPage() {
         </CardContent>
       </Card>
 
+      {/* Salary Distribution by Level */}
+      <Card className="mb-10">
+        <CardHeader>
+          <h2 className="text-xl font-bold text-gray-900">Salary Distribution by Level</h2>
+          <p className="text-sm text-gray-500">Global average compensation bands across tech roles</p>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] w-full mt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={MOCK_DISTRIBUTION_DATA}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <XAxis dataKey="level" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 13 }} />
+                <YAxis hide />
+                <Tooltip
+                  cursor={{ fill: '#f3f4f6' }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-white p-4 rounded-xl shadow-xl border border-gray-100 dark:bg-zinc-900 dark:border-zinc-800">
+                          <p className="font-bold text-gray-900 dark:text-gray-100 mb-1">{data.level}</p>
+                          <p className="text-emerald-600 font-bold">Avg: {formatCurrency(data.avg)}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Range: {formatCurrency(data.min)} - {formatCurrency(data.max)}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="avg" fill="#10b981" radius={[4, 4, 0, 0]} barSize={60} className="hover:fill-emerald-500 transition-colors" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Top Paying Roles */}
       <Card className="mb-10">
         <CardHeader>
@@ -423,6 +468,9 @@ export default function SalariesPage() {
                     <span className="font-bold text-emerald-600">
                       {formatCurrency(job.avgSalary)}
                     </span>
+                    <svg className="w-16 h-6 text-emerald-500 opacity-60 hidden sm:block" viewBox="0 0 50 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={`M 0 ${15 - (job.jobTitle.length % 5)} Q 10 ${20 - (job.jobTitle.length % 10)}, 20 ${10 - (job.jobTitle.length % 3)} T 40 ${5 + (job.jobTitle.length % 5)} L 50 2`} />
+                    </svg>
                     <span className="text-xs text-gray-400">({job.count} reports)</span>
                   </div>
                 </div>

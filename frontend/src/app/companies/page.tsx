@@ -129,22 +129,34 @@ export default function CompaniesPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Company Directory</h1>
-        <p className="text-gray-600">
-          Discover companies hiring African talent and read employee reviews
-        </p>
-      </div>
-
-      <div className="mb-8">
-        <Input
-          placeholder="Search companies by name or industry..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
+      {/* Hero Section */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-950 via-emerald-900 to-zinc-950 px-6 py-20 text-center shadow-2xl mb-12 animate-gradient-breath">
+        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
+        <div className="relative z-10 max-w-3xl mx-auto">
+          <Badge className="mb-6 bg-white/10 text-emerald-100 hover:bg-white/20 border-white/20 backdrop-blur-md">
+            Verified Tech Employers
+          </Badge>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 tracking-tight font-display">
+            The World&apos;s Best Companies <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-200">
+              Hire African Talent
+            </span>
+          </h1>
+          <p className="text-lg md:text-xl text-emerald-50/80 mb-8 max-w-2xl mx-auto">
+            Discover verified companies that offer visa sponsorship, remote flexibility, and transparent compensation.
+          </p>
+          <div className="max-w-xl mx-auto">
+            <Input
+              placeholder="Search companies by name or industry..."
+              value={search}
+              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 h-12 rounded-xl focus:bg-white/20 focus:ring-emerald-400 backdrop-blur-md"
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {loading && (
@@ -293,7 +305,7 @@ export default function CompaniesPage() {
           )}
 
           {data.pagination.totalPages > 1 && (
-            <div className="flex justify-center gap-2">
+            <div className="flex justify-center gap-2 mb-16">
               <Button
                 variant="outline"
                 disabled={page === 1}
@@ -311,6 +323,70 @@ export default function CompaniesPage() {
               >
                 Next
               </Button>
+            </div>
+          )}
+
+          {/* Wall of Love / Testimonials */}
+          {!search && (
+            <div className="mt-16 pt-16 border-t border-gray-100 dark:border-zinc-800">
+              <div className="text-center mb-12">
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4 font-display">
+                  Loved by Global Teams
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                  See what engineering leaders and founders say about scaling their teams with AfriTalent.
+                </p>
+              </div>
+              
+              <div className="grid md:grid-cols-3 gap-6">
+                <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:shadow-lg transition-shadow">
+                  <CardContent className="p-8">
+                    <StarRating rating={5} />
+                    <p className="text-gray-700 dark:text-gray-300 my-6 italic leading-relaxed">
+                      &quot;The caliber of senior engineers we found through AfriTalent exceeded our expectations. Our Lagos hub is now our fastest-growing engineering center globally.&quot;
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">SJ</div>
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Sarah Jenkins</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">VP Engineering, FintechX</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:shadow-lg transition-shadow">
+                  <CardContent className="p-8">
+                    <StarRating rating={5} />
+                    <p className="text-gray-700 dark:text-gray-300 my-6 italic leading-relaxed">
+                      &quot;We struggled with visa sponsorships and relocations before. AfriTalent&apos;s verified partners made building our distributed team in Kenya completely frictionless.&quot;
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">MD</div>
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Marcus Dawson</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">CTO, CloudScale</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:shadow-lg transition-shadow">
+                  <CardContent className="p-8">
+                    <StarRating rating={5} />
+                    <p className="text-gray-700 dark:text-gray-300 my-6 italic leading-relaxed">
+                      &quot;Not only did we hire two incredible staff-level backend engineers, but the salary transparency tools helped us create fair, globally competitive compensation packages.&quot;
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold">AK</div>
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Aisha K.</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Head of Talent, NextWeb</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           )}
         </>

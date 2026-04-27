@@ -2,27 +2,32 @@ import Image from "next/image";
 import Link from "next/link";
 import { HeroStats } from "@/components/home/hero-stats";
 import { Button } from "@/components/ui/button";
+import { Globe, Plane, ShieldCheck, Sparkles } from "lucide-react";
 
 const productSignals = [
   {
     title: "Remote-first jobs",
     description: "Global roles filtered through an Africa-to-global lens instead of a generic listings feed.",
     tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+    icon: Globe,
   },
   {
     title: "Visa sponsorship clarity",
     description: "Support signals and mobility context that reduce ambiguity before you commit to a role.",
     tone: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+    icon: Plane,
   },
   {
     title: "Relocation readiness",
     description: "A product direction that treats cross-border readiness like part of hiring quality, not an afterthought.",
     tone: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300",
+    icon: ShieldCheck,
   },
   {
     title: "AI-assisted workflow",
     description: "Candidate support, matching direction, and apply-pack thinking designed for faster, sharper applications.",
     tone: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+    icon: Sparkles,
   },
 ];
 
@@ -42,6 +47,12 @@ export function HomePageContent() {
       <section className="section-shell relative overflow-hidden px-0 pt-8 md:pt-12">
         <div className="page-frame">
           <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white px-6 py-16 shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:px-10 md:py-20 lg:px-14">
+            <Image
+              src="/images/heroes/hero_african_tech_pro.png"
+              alt="Tech Professional"
+              fill
+              className="object-cover opacity-[0.03] dark:opacity-[0.07] pointer-events-none"
+            />
             <div className="relative grid items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]">
               <div>
                 <div className="eyebrow-pill mb-6 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
@@ -145,9 +156,9 @@ export function HomePageContent() {
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {productSignals.map((item) => (
-              <div key={item.title} className="surface-panel rounded-2xl p-6 transition-transform hover:-translate-y-1 hover:shadow-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+              <div key={item.title} className="surface-panel rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
                 <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl font-bold text-lg ${item.tone}`}>
-                  {item.title.charAt(0)}
+                  <item.icon className="w-6 h-6" strokeWidth={2.5} />
                 </div>
                 <h3 className="mb-2 text-lg font-bold text-zinc-900 dark:text-zinc-100">{item.title}</h3>
                 <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{item.description}</p>
@@ -184,7 +195,13 @@ export function HomePageContent() {
       <section className="px-0 py-20">
         <div className="page-frame text-center">
           <div className="relative overflow-hidden rounded-3xl border border-emerald-900 bg-emerald-950 px-6 py-16 text-white shadow-2xl md:px-12">
-            <div className="relative text-center">
+            <Image
+              src="/images/heroes/collaboration_teamwork.png"
+              alt="Team collaboration"
+              fill
+              className="object-cover opacity-20 mix-blend-overlay pointer-events-none"
+            />
+            <div className="relative text-center z-10">
               <p className="text-sm font-semibold uppercase tracking-widest text-emerald-300">
                 A new standard for hiring
               </p>
