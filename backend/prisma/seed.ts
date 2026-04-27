@@ -19,6 +19,8 @@ const prisma = new PrismaClient();
 
 async function main() {
   console.log("Starting seed...");
+  const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase() || "admin@example.com";
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD?.trim() || "Password123!";
 
   // Tear down in dependency order
   await prisma.message.deleteMany();
@@ -40,16 +42,18 @@ async function main() {
   await prisma.resource.deleteMany();
   await prisma.user.deleteMany();
 
-  const passwordHash = await bcrypt.hash("Password123!", 10);
+  const passwordHash = await bcrypt.hash(adminPassword, 10);
 
   // ── Users ──────────────────────────────────────────────
 
   const adminUser = await prisma.user.create({
     data: {
-      email: "admin@example.com",
+      email: adminEmail,
       password: passwordHash,
       role: Role.ADMIN,
       name: "Admin User",
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
     },
   });
 
@@ -403,7 +407,7 @@ async function main() {
   });
 
   console.log("✅ Seed completed successfully");
-  console.log("   Demo credentials (password: Password123!):");
+  console.log(`   Demo credentials (password: ${adminPassword}):`);
   console.log(`   Admin:     ${adminUser.email}`);
   console.log(`   Candidate: ${candidateUser.email}`);
   console.log(`   Employer:  ${employerUser.email}`);

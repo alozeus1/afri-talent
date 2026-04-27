@@ -159,6 +159,8 @@ jobs:
           GREENHOUSE_BOARD_TOKENS: ${{ secrets.GREENHOUSE_BOARD_TOKENS }}
           LEVER_SITE_TOKENS: ${{ secrets.LEVER_SITE_TOKENS }}
           WORKABLE_COMPANY_TOKENS: ${{ secrets.WORKABLE_COMPANY_TOKENS }}
+          ADMIN_BOOTSTRAP_EMAIL: ${{ secrets.ADMIN_BOOTSTRAP_EMAIL }}
+          ADMIN_BOOTSTRAP_PASSWORD: ${{ secrets.ADMIN_BOOTSTRAP_PASSWORD }}
         run: |
           CURRENT=$(aws secretsmanager get-secret-value \
             --secret-id "$SECRET_NAME" \
@@ -185,6 +187,8 @@ jobs:
             --arg greenhouseBoards "$GREENHOUSE_BOARD_TOKENS" \
             --arg leverSites "$LEVER_SITE_TOKENS" \
             --arg workableCompanies "$WORKABLE_COMPANY_TOKENS" \
+            --arg adminBootstrapEmail "$ADMIN_BOOTSTRAP_EMAIL" \
+            --arg adminBootstrapPassword "$ADMIN_BOOTSTRAP_PASSWORD" \
             '
             def prefer_input($value; $key):
               if ($value | length) > 0 then $value else ($current[$key] // "") end;
@@ -207,7 +211,9 @@ jobs:
               APIFY_JOB_TASKS_JSON: prefer_input($apifyTasks; "APIFY_JOB_TASKS_JSON"),
               GREENHOUSE_BOARD_TOKENS: prefer_input($greenhouseBoards; "GREENHOUSE_BOARD_TOKENS"),
               LEVER_SITE_TOKENS: prefer_input($leverSites; "LEVER_SITE_TOKENS"),
-              WORKABLE_COMPANY_TOKENS: prefer_input($workableCompanies; "WORKABLE_COMPANY_TOKENS")
+              WORKABLE_COMPANY_TOKENS: prefer_input($workableCompanies; "WORKABLE_COMPANY_TOKENS"),
+              ADMIN_BOOTSTRAP_EMAIL: prefer_input($adminBootstrapEmail; "ADMIN_BOOTSTRAP_EMAIL"),
+              ADMIN_BOOTSTRAP_PASSWORD: prefer_input($adminBootstrapPassword; "ADMIN_BOOTSTRAP_PASSWORD")
             }')
 
           aws secretsmanager put-secret-value \

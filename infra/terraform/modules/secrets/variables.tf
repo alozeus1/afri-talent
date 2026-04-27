@@ -156,3 +156,17 @@ variable "sentry_dsn" {
   sensitive   = true
   default     = ""
 }
+
+variable "admin_bootstrap_email" {
+  type        = string
+  description = "Optional bootstrap admin email for runtime account repair"
+  sensitive   = true
+  default     = ""
+}
+
+variable "admin_bootstrap_password" {
+  type        = string
+  description = "Optional bootstrap admin password for runtime account repair"
+  sensitive   = true
+  default     = ""
+}

@@ -93,6 +93,8 @@ resource "aws_secretsmanager_secret_version" "app" {
     WORKABLE_COMPANY_TOKENS       = var.workable_company_tokens
     REDIS_URL                     = var.redis_url
     SENTRY_DSN                    = var.sentry_dsn
+    ADMIN_BOOTSTRAP_EMAIL         = var.admin_bootstrap_email
+    ADMIN_BOOTSTRAP_PASSWORD      = var.admin_bootstrap_password
   })
 
   lifecycle {

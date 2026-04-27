@@ -1,16 +1,22 @@
 import app from "./app.js";
 import prisma from "./lib/prisma.js";
 import logger from "./lib/logger.js";
+import { ensureBootstrapAdmin } from "./lib/admin-bootstrap.js";
 import { captureException, flushSentry } from "./lib/sentry.js";
 import { startScheduler, stopScheduler } from "./workers/scheduler.js";
 
 const PORT = process.env.PORT || 4000;
 
-// Start the server
-const server = app.listen(PORT, () => {
-  logger.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "Server started");
-  startScheduler();
-});
+async function startServer() {
+  await ensureBootstrapAdmin();
+
+  return app.listen(PORT, () => {
+    logger.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "Server started");
+    startScheduler();
+  });
+}
+
+const server = await startServer();
 
 async function closeServer(signal: NodeJS.Signals): Promise<void> {
   logger.info({ signal }, `${signal} received, shutting down gracefully`);
