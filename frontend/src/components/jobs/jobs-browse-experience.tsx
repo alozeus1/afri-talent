@@ -80,6 +80,8 @@ export function JobsBrowseExperience({
     search: "",
     location: "",
     type: "",
+    jobField: "",
+    workplaceType: "",
     seniority: "",
     visaSponsorship: "",
     relocationAssistance: "",

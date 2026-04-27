@@ -34,6 +34,8 @@ const createJobSchema = z.object({
   description: z.string().min(10),
   location: z.string(),
   type: z.string(),
+  jobField: z.string().max(80).optional(),
+  workplaceType: z.string().max(32).optional(),
   seniority: z.string(),
   salaryMin: z.coerce.number().optional(),
   salaryMax: z.coerce.number().optional(),
@@ -199,7 +201,7 @@ router.get("/", optionalAuth, anonymousJobsLimiter, blockAnonymousJobsAutomation
     }
 
     const {
-      search, query: queryAlias, location, type, seniority,
+      search, query: queryAlias, location, type, jobField, workplaceType, seniority,
       visaSponsorship, relocationAssistance, remote,
       salaryMin, salaryMax, country,
       page = "1", limit = "10", forAI,
@@ -211,6 +213,8 @@ router.get("/", optionalAuth, anonymousJobsLimiter, blockAnonymousJobsAutomation
       search: searchTerm,
       location: location as string | undefined,
       type: type as string | undefined,
+      jobField: jobField as string | undefined,
+      workplaceType: workplaceType as string | undefined,
       seniority: seniority as string | undefined,
       visaSponsorship: visaSponsorship as string | undefined,
       relocationAssistance: relocationAssistance === "true",
@@ -382,6 +386,8 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
       description: data.description,
       location: data.location,
       type: data.type,
+      jobField: data.jobField ?? null,
+      workplaceType: data.workplaceType ?? null,
       seniority: data.seniority,
       salaryMin: data.salaryMin ?? null,
       salaryMax: data.salaryMax ?? null,

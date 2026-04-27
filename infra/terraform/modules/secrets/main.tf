@@ -93,6 +93,7 @@ resource "aws_secretsmanager_secret_version" "app" {
     GREENHOUSE_BOARD_TOKENS       = var.greenhouse_board_tokens
     LEVER_SITE_TOKENS             = var.lever_site_tokens
     WORKABLE_COMPANY_TOKENS       = var.workable_company_tokens
+    COMPANY_CAREER_SOURCES_JSON   = var.company_career_sources_json
     REDIS_URL                     = var.redis_url
     SENTRY_DSN                    = var.sentry_dsn
     ADMIN_BOOTSTRAP_EMAIL         = var.admin_bootstrap_email

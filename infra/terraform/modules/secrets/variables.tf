@@ -157,6 +157,13 @@ variable "workable_company_tokens" {
   default     = ""
 }
 
+variable "company_career_sources_json" {
+  type        = string
+  description = "JSON array of direct company career source configs"
+  sensitive   = true
+  default     = ""
+}
+
 variable "redis_url" {
   type        = string
   description = "Optional Redis connection string"

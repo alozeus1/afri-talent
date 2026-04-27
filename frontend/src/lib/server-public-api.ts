@@ -47,6 +47,8 @@ function buildJobsQuery(params: JobListParams) {
   if (params.search) searchParams.set("search", params.search);
   if (params.location) searchParams.set("location", params.location);
   if (params.type) searchParams.set("type", params.type);
+  if (params.jobField) searchParams.set("jobField", params.jobField);
+  if (params.workplaceType) searchParams.set("workplaceType", params.workplaceType);
   if (params.seniority) searchParams.set("seniority", params.seniority);
   if (params.visaSponsorship) searchParams.set("visaSponsorship", params.visaSponsorship);
   if (params.relocationAssistance) searchParams.set("relocationAssistance", params.relocationAssistance);

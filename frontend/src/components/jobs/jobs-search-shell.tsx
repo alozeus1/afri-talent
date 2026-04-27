@@ -88,6 +88,8 @@ export function JobsSearchShell({ filters, isPending = false, onNavigate, result
         search={draft.search}
         location={draft.location}
         type={draft.type}
+        jobField={draft.jobField}
+        workplaceType={draft.workplaceType}
         seniority={draft.seniority}
         visaSponsorship={draft.visaSponsorship}
         relocationAssistance={draft.relocationAssistance}
@@ -95,6 +97,8 @@ export function JobsSearchShell({ filters, isPending = false, onNavigate, result
         onSearchChange={(value) => updateDraft({ search: value })}
         onLocationChange={(value) => updateDraft({ location: value })}
         onTypeChange={(value) => updateDraft({ type: value })}
+        onJobFieldChange={(value) => updateDraft({ jobField: value })}
+        onWorkplaceTypeChange={(value) => updateDraft({ workplaceType: value })}
         onSeniorityChange={(value) => updateDraft({ seniority: value })}
         onVisaSponsorshipChange={(value) => updateDraft({ visaSponsorship: value })}
         onRelocationChange={(value) => updateDraft({ relocationAssistance: value })}
@@ -104,6 +108,8 @@ export function JobsSearchShell({ filters, isPending = false, onNavigate, result
             search: "",
             location: "",
             type: "",
+            jobField: "",
+            workplaceType: "",
             seniority: "",
             visaSponsorship: "",
             relocationAssistance: "",

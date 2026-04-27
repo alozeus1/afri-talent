@@ -52,6 +52,8 @@ export interface JobDocumentLike {
   description: string;
   location: string;
   type?: string | null;
+  jobField?: string | null;
+  workplaceType?: string | null;
   seniority?: string | null;
   tags?: string[];
   salaryMin?: number | null;

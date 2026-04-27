@@ -97,6 +97,7 @@ module "secrets" {
   greenhouse_board_tokens       = var.greenhouse_board_tokens
   lever_site_tokens             = var.lever_site_tokens
   workable_company_tokens       = var.workable_company_tokens
+  company_career_sources_json   = var.company_career_sources_json
   redis_url                     = var.redis_url
   sentry_dsn                    = var.sentry_dsn
 }
@@ -196,6 +197,7 @@ module "apprunner" {
     "GREENHOUSE_BOARD_TOKENS",
     "LEVER_SITE_TOKENS",
     "WORKABLE_COMPANY_TOKENS",
+    "COMPANY_CAREER_SOURCES_JSON",
     "REDIS_URL",
     "SENTRY_DSN",
     "ADMIN_BOOTSTRAP_EMAIL",

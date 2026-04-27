@@ -125,13 +125,14 @@ export function JobCard({ job }: JobCardProps) {
                 <Heart className={`w-5 h-5 transition-transform duration-300 ${isSaved ? "fill-current scale-110" : "scale-100 active:scale-90"}`} />
               </button>
               <Badge variant="success">{job.type}</Badge>
+              {job.jobField && <Badge variant="default">{job.jobField}</Badge>}
             </div>
           </div>
 
           <div className="flex flex-wrap gap-4 mb-4">
             <span className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300">
               <MapPin className="w-4 h-4 mr-1.5 text-emerald-600 dark:text-emerald-400" />
-              {job.location}
+              {job.workplaceType ? `${job.location} · ${job.workplaceType.toLowerCase()}` : job.location}
             </span>
             <span className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300">
               <Briefcase className="w-4 h-4 mr-1.5 text-emerald-600 dark:text-emerald-400" />

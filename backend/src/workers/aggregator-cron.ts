@@ -8,9 +8,10 @@
 
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
-import { getJobAggregator } from "../lib/jobs/aggregator/index.js";
+import { JobAggregator, getJobAggregator } from "../lib/jobs/aggregator/index.js";
 import type { AggregationDiagnostics, JobSource } from "../lib/jobs/aggregator/types.js";
 import type { JobQuery } from "../lib/jobs/aggregator/sources/base.js";
+import type { CompanyCareerProvider, CompanyCareerSourceConfig } from "../lib/jobs/aggregator/sources/company-careers.js";
 import { redisClient } from "../lib/redis.js";
 import { recordOpsSnapshotMetric } from "../lib/ops/events.js";
 
@@ -40,6 +41,21 @@ if (DEFAULT_KEYWORDS.length === 0) {
     "product manager",
     "product designer",
     "ui ux designer",
+    "nurse",
+    "clinical",
+    "accountant",
+    "finance analyst",
+    "sales manager",
+    "customer support",
+    "marketing specialist",
+    "operations manager",
+    "human resources",
+    "legal counsel",
+    "teacher",
+    "mechanical engineer",
+    "technician",
+    "supply chain",
+    "hospitality",
     "cloud engineer",
     "mobile developer",
     "react developer",
@@ -50,6 +66,7 @@ if (DEFAULT_KEYWORDS.length === 0) {
 
 const MAX_JOBS_PER_SYNC = parseInt(process.env.AGGREGATOR_MAX_JOBS || "500", 10);
 const POSTED_WITHIN_DAYS = parseInt(process.env.AGGREGATOR_POSTED_DAYS || "21", 10);
+const REMOTE_ONLY_SYNC = process.env.AGGREGATOR_REMOTE_ONLY === "1";
 
 interface IngestionMemoryState {
   lastSuccessfulIngestionAt: Date | null;
@@ -99,6 +116,38 @@ function parseConfiguredCriticalSources(): JobSource[] {
     .filter(Boolean);
 
   return raw as JobSource[];
+}
+
+function isCompanyCareerProvider(value: string): value is CompanyCareerProvider {
+  return ["GREENHOUSE", "LEVER", "ASHBY", "SMARTRECRUITERS", "RECRUITEE", "GENERIC"].includes(value);
+}
+
+async function loadActiveCompanyCareerSources(): Promise<CompanyCareerSourceConfig[]> {
+  const sources = await prisma.companyCareerSource.findMany({
+    where: {
+      active: true,
+      allowedToCrawl: true,
+    },
+    orderBy: [
+      { priority: "asc" },
+      { companyName: "asc" },
+    ],
+  });
+
+  return sources.flatMap((source) => {
+    if (!source.providerKey || !isCompanyCareerProvider(source.provider)) {
+      return [];
+    }
+    return [{
+      id: source.id,
+      provider: source.provider,
+      providerKey: source.providerKey,
+      companyName: source.companyName,
+      careersUrl: source.careersUrl,
+      targetFields: source.targetFields,
+      enabled: source.active && source.allowedToCrawl,
+    }];
+  });
 }
 
 function resolveCriticalSources(enabledSources: JobSource[]): JobSource[] {
@@ -249,13 +298,17 @@ async function persistIngestionReliabilityState(
 }
 
 export async function runAggregatorCycle(): Promise<void> {
-  const aggregator = getJobAggregator(prisma);
+  const dbCompanySources = await loadActiveCompanyCareerSources();
+  const aggregator = dbCompanySources.length > 0
+    ? new JobAggregator(prisma, dbCompanySources)
+    : getJobAggregator(prisma);
 
   const query: JobQuery = {
     keywords: DEFAULT_KEYWORDS,
+    includeAllCompanyJobs: true,
     postedWithinDays: POSTED_WITHIN_DAYS,
     limit: MAX_JOBS_PER_SYNC,
-    remote: true,
+    remote: REMOTE_ONLY_SYNC ? true : undefined,
   };
 
   const result = await aggregator.syncJobsToDatabase(query);

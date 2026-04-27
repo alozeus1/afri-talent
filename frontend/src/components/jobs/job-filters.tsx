@@ -7,6 +7,8 @@ interface JobFiltersProps {
   search: string;
   location: string;
   type: string;
+  jobField: string;
+  workplaceType: string;
   seniority: string;
   visaSponsorship: string;
   relocationAssistance: string;
@@ -14,6 +16,8 @@ interface JobFiltersProps {
   onSearchChange: (value: string) => void;
   onLocationChange: (value: string) => void;
   onTypeChange: (value: string) => void;
+  onJobFieldChange: (value: string) => void;
+  onWorkplaceTypeChange: (value: string) => void;
   onSeniorityChange: (value: string) => void;
   onVisaSponsorshipChange: (value: string) => void;
   onRelocationChange: (value: string) => void;
@@ -23,11 +27,41 @@ interface JobFiltersProps {
 
 const jobTypes = ["Full-time", "Part-time", "Contract", "Freelance", "Internship"];
 const seniorityLevels = ["Junior", "Mid-level", "Senior", "Lead", "Executive"];
+const jobFields = [
+  "Technology",
+  "Healthcare",
+  "Finance",
+  "Accounting",
+  "Sales",
+  "Marketing",
+  "Customer Support",
+  "Operations",
+  "Human Resources",
+  "Legal",
+  "Education",
+  "Design",
+  "Product",
+  "Data",
+  "Cybersecurity",
+  "Engineering Non-Software",
+  "Skilled Trades",
+  "Logistics",
+  "Hospitality",
+  "Nonprofit",
+  "Executive",
+];
+const workplaceTypes = [
+  { label: "Remote", value: "REMOTE" },
+  { label: "Hybrid", value: "HYBRID" },
+  { label: "Onsite", value: "ONSITE" },
+];
 
 export function JobFilters({
   search,
   location,
   type,
+  jobField,
+  workplaceType,
   seniority,
   visaSponsorship,
   relocationAssistance,
@@ -35,13 +69,15 @@ export function JobFilters({
   onSearchChange,
   onLocationChange,
   onTypeChange,
+  onJobFieldChange,
+  onWorkplaceTypeChange,
   onSeniorityChange,
   onVisaSponsorshipChange,
   onRelocationChange,
   onRemoteChange,
   onClear,
 }: JobFiltersProps) {
-  const hasFilters = search || location || type || seniority || visaSponsorship || relocationAssistance || remote;
+  const hasFilters = search || location || type || jobField || workplaceType || seniority || visaSponsorship || relocationAssistance || remote;
 
   return (
     <div className="surface-panel-strong gloss-card mb-8 rounded-[2rem] p-6">
@@ -84,6 +120,32 @@ export function JobFilters({
           {jobTypes.map((t) => (
             <option key={t} value={t}>
               {t}
+            </option>
+          ))}
+        </select>
+        <select
+          className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
+          aria-label="Filter by job field"
+          value={jobField}
+          onChange={(e) => onJobFieldChange(e.target.value)}
+        >
+          <option value="">All Fields</option>
+          {jobFields.map((field) => (
+            <option key={field} value={field}>
+              {field}
+            </option>
+          ))}
+        </select>
+        <select
+          className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
+          aria-label="Filter by workplace type"
+          value={workplaceType}
+          onChange={(e) => onWorkplaceTypeChange(e.target.value)}
+        >
+          <option value="">All Workplaces</option>
+          {workplaceTypes.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>

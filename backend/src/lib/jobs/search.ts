@@ -16,6 +16,8 @@ export interface JobSearchFilters {
   search?: string;
   location?: string;
   type?: string;
+  jobField?: string;
+  workplaceType?: string;
   seniority?: string;
   visaSponsorship?: string;
   relocationAssistance?: boolean;
@@ -126,6 +128,14 @@ export function buildJobSearchWhere(filters: JobSearchFilters): Prisma.JobWhereI
 
   if (filters.type) {
     conditions.push({ type: filters.type });
+  }
+
+  if (filters.jobField) {
+    conditions.push({ jobField: filters.jobField });
+  }
+
+  if (filters.workplaceType) {
+    conditions.push({ workplaceType: filters.workplaceType });
   }
 
   if (filters.seniority) {

@@ -1345,6 +1345,8 @@ export interface Job {
   description: string;
   location: string;
   type: string;
+  jobField?: string | null;
+  workplaceType?: string | null;
   seniority: string;
   salaryMin?: number;
   salaryMax?: number;
@@ -1384,6 +1386,8 @@ export interface JobListParams {
   search?: string;
   location?: string;
   type?: string;
+  jobField?: string;
+  workplaceType?: string;
   seniority?: string;
   visaSponsorship?: string;
   relocationAssistance?: string;
