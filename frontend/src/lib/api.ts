@@ -211,6 +211,29 @@ export const admin = {
   },
 };
 
+export const adminBlog = {
+  list: (params?: { status?: "pending" | "published" | "all"; page?: number; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.page) searchParams.set("page", params.page.toString());
+    if (params?.limit) searchParams.set("limit", params.limit.toString());
+    const query = searchParams.toString();
+    return fetchAPI<{ posts: BlogPost[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
+      `/api/admin/blog${query ? `?${query}` : ""}`
+    );
+  },
+  get: (id: string) => fetchAPI<BlogPost & { wordCount: number }>(`/api/admin/blog/${id}`),
+  approve: (id: string) =>
+    fetchAPI<{ success: boolean }>(`/api/admin/blog/${id}/approve`, { method: "PUT" }),
+  reject: (id: string, notes: string) =>
+    fetchAPI<{ success: boolean }>(`/api/admin/blog/${id}/reject`, {
+      method: "PUT",
+      body: JSON.stringify({ notes }),
+    }),
+  trigger: () =>
+    fetchAPI<{ success: boolean; message: string }>("/api/admin/blog/trigger", { method: "POST" }),
+};
+
 export const adminTrust = {
   dashboard: () => fetchAPI<AdminTrustDashboard>("/api/admin/trust/dashboard"),
   verificationQueue: (params?: { subject?: "ALL" | "EMPLOYER" | "CANDIDATE"; status?: "ALL" | "PENDING" | "APPROVED" | "REJECTED" | "NEEDS_MORE_INFO" }) => {
@@ -1355,6 +1378,19 @@ export interface Resource {
   category: string;
   coverImage?: string;
   publishedAt?: string;
+}
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  coverImage: string | null;
+  published: boolean;
+  publishedAt: string | null;
+  createdAt: string;
+  reviewStatus: "PENDING" | "APPROVED" | "REJECTED" | "REVIEWED";
+  reviewNotes: string | null;
 }
 
 export interface ResourceListResponse {

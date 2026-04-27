@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import ReactMarkdown from "react-markdown";
 import { resources, Resource } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,10 +94,8 @@ export default function ResourceDetailPage() {
             {resource.excerpt}
           </p>
 
-          <div className="prose max-w-none">
-            <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-              {resource.content}
-            </div>
+          <div className="prose prose-emerald max-w-none prose-headings:font-bold prose-headings:text-gray-900 prose-p:text-gray-700 prose-p:leading-relaxed prose-a:text-emerald-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-gray-900 prose-li:text-gray-700">
+            <ReactMarkdown>{resource.content}</ReactMarkdown>
           </div>
         </div>
       </article>
