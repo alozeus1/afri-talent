@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
 import { PushOptInCard } from "@/components/notifications/push-opt-in";
 import { TrustBadge } from "@/components/trust/trust-badge";
+import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 import { MapPin, ArrowRight } from "lucide-react";
 
@@ -77,6 +78,29 @@ const MOCK_RECOMMENDED_JOBS = [
   { id: "3", title: "Fullstack Developer", company: "Andela", location: "Remote", salary: "$60k - $85k", type: "CONTRACT" },
   { id: "4", title: "Backend Engineer (Go)", company: "Monzo", location: "London (Relocation)", salary: "£85k - £105k", type: "FULL-TIME" },
 ];
+
+function buildFallbackNextActions(params: {
+  completeness: number;
+  applicationCount: number;
+  hasTrustWarnings: boolean;
+}) {
+  const actions = [];
+  if (params.completeness < 80) {
+    actions.push({ title: "Complete your profile", description: "Add missing skills, target roles, and portfolio links so match explanations are more useful.", href: "/candidate/profile", cta: "Complete profile" });
+  }
+  actions.push({ title: "Build or update your resume", description: "Create an ATS-friendly version before generating cover letters or applying.", href: "/candidate/resume-builder", cta: "Open resume builder" });
+  actions.push({ title: "Review your top job matches", description: "Use trust labels, salary visibility, visa signals, and missing skills before applying.", href: "/candidate/job-matches", cta: "Review matches" });
+  if (params.applicationCount === 0) {
+    actions.push({ title: "Prepare your first application", description: "Save one role, tailor your resume, generate a reviewed cover letter, then apply through the verified path.", href: "/jobs", cta: "Browse jobs" });
+  } else {
+    actions.push({ title: "Follow up on active applications", description: "Update statuses, add notes, and set reminders for applications in progress.", href: "/candidate/applications", cta: "Open tracker" });
+  }
+  actions.push({ title: "Practice a global interview", description: "Run a DevOps, cloud, security, product, data, or support mock interview.", href: "/candidate/interview-prep", cta: "Practice interview" });
+  if (params.hasTrustWarnings) {
+    actions.push({ title: "Resolve trust profile warnings", description: "Trust signals improve candidate confidence and future employer verification.", href: "/candidate/trust", cta: "Review trust profile" });
+  }
+  return actions.slice(0, 4);
+}
 
 export default function CandidateDashboard() {
   const locale = useLocale();
@@ -196,6 +220,11 @@ export default function CandidateDashboard() {
 
   const completeness = profile?.profileCompleteness ?? 0;
   const missingItems = profile ? getMissingItems(profile) : [];
+  const fallbackNextActions = buildFallbackNextActions({
+    completeness,
+    applicationCount: myApplications.length,
+    hasTrustWarnings: Boolean(trustDashboard?.trust.warnings.length),
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -382,6 +411,28 @@ export default function CandidateDashboard() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {!retentionSummary && (
+        <Card className="mb-8 border-emerald-200 bg-emerald-50/40">
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-gray-900">Next best actions</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Early tester guidance based on profile completeness, resume readiness, applications, and trust signals.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {fallbackNextActions.map((action) => (
+              <div key={action.title} className="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-sm">
+                <p className="text-sm font-semibold text-gray-900">{action.title}</p>
+                <p className="mt-1 text-xs text-gray-600">{action.description}</p>
+                <Link href={localizePath(action.href, locale)} className="mt-3 inline-block">
+                  <Button size="sm" variant="outline">{action.cta}</Button>
+                </Link>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       )}
 
       {/* Profile Completeness + Streak + Open to Work + Subscription */}
@@ -613,7 +664,7 @@ export default function CandidateDashboard() {
         <div className="flex justify-between items-end mb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Recommended For You</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Based on your skills and target roles</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sample early-tester matches. Real recommendations appear as profile and job data improve.</p>
           </div>
           <Link href={localizePath("/jobs", locale)} className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
             View all <ArrowRight className="w-4 h-4" />
@@ -629,6 +680,7 @@ export default function CandidateDashboard() {
                     <div>
                       <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-1">{job.title}</h3>
                       <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">{job.company}</p>
+                      <p className="mt-1 text-[11px] font-medium text-amber-700">Demo sample</p>
                     </div>
                     <Badge variant="default" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300">
                       {job.type}
@@ -640,6 +692,9 @@ export default function CandidateDashboard() {
                   <div className="font-semibold text-gray-900 dark:text-gray-100 border-t border-gray-100 dark:border-zinc-800 pt-3">
                     {job.salary}
                   </div>
+                  <p className="mt-3 text-xs text-gray-500">
+                    Possible match: role, remote/global signal, and salary visibility should be verified before applying.
+                  </p>
                 </CardContent>
               </Card>
             </Link>
@@ -713,6 +768,9 @@ export default function CandidateDashboard() {
           )}
         </CardContent>
       </Card>
+      <div className="mt-8">
+        <EarlyTesterFeedback area="Job match quality" />
+      </div>
     </div>
   );
 }

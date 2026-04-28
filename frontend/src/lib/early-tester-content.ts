@@ -37,6 +37,44 @@ export interface InterviewInsight {
   bullets: string[];
 }
 
+export interface ResumeInputForReview {
+  fullName: string;
+  email: string;
+  targetRole: string;
+  skills: string;
+  summary: string;
+  workHistory: Array<{ company: string; title: string; period: string; description: string }>;
+  educationHistory: Array<{ institution: string; degree: string; period: string }>;
+}
+
+export interface ResumeReadinessCheck {
+  missing: string[];
+  suggestions: string[];
+  warnings: string[];
+  ready: boolean;
+}
+
+export const EARLY_TESTER_FEEDBACK_AREAS = [
+  "Resume review",
+  "Job match quality",
+  "Cover letter quality",
+  "Interview prep usefulness",
+  "Learning content usefulness",
+  "Application tracker usefulness",
+];
+
+export const APPLICATION_ASSISTANT_STATUSES = [
+  "Saved",
+  "Preparing",
+  "Applied",
+  "Interviewing",
+  "Assessment",
+  "Offer",
+  "Rejected",
+  "Withdrawn",
+  "Follow-up needed",
+];
+
 const baseLesson = (
   id: string,
   title: string,
@@ -285,6 +323,55 @@ export const JOB_SEARCH_STRATEGY_TIPS = [
   "Review rejection patterns monthly and improve skills or targeting accordingly.",
 ];
 
+export function reviewResumeInput(input: ResumeInputForReview): ResumeReadinessCheck {
+  const missing: string[] = [];
+  const suggestions: string[] = [];
+  const warnings: string[] = [];
+  const completedWork = input.workHistory.filter((item) => item.company && item.title);
+  const completedEducation = input.educationHistory.filter((item) => item.institution && item.degree);
+  const skillCount = input.skills.split(",").map((skill) => skill.trim()).filter(Boolean).length;
+
+  if (!input.fullName.trim()) missing.push("Full name");
+  if (!input.email.trim()) missing.push("Email");
+  if (!input.targetRole.trim()) missing.push("Target role");
+  if (skillCount < 4) suggestions.push("Add at least 4 to 8 relevant skills for the role.");
+  if (!input.summary.trim()) suggestions.push("Add a short professional summary or let the builder draft one from your real experience.");
+  if (completedWork.length === 0) suggestions.push("Add at least one work, project, internship, volunteer, or freelance experience.");
+  if (completedEducation.length === 0) suggestions.push("Add education, certification, bootcamp, or self-study evidence if relevant.");
+  if (completedWork.some((item) => item.description && !/\d/.test(item.description))) {
+    suggestions.push("Where truthful, add measurable impact such as users supported, incidents resolved, uptime, cost saved, or project scope.");
+  }
+  warnings.push("Do not add tools, employers, certifications, or outcomes you cannot honestly explain in an interview.");
+  warnings.push("Use simple headings, readable dates, and plain bullets for ATS-friendly formatting.");
+
+  return {
+    missing,
+    suggestions,
+    warnings,
+    ready: missing.length === 0 && skillCount > 0,
+  };
+}
+
+export function buildFallbackCoverLetter(params: {
+  toneLabel: string;
+  jobId: string;
+  candidateName?: string | null;
+}): string {
+  const name = params.candidateName || "Candidate";
+  return `Dear Hiring Team,
+
+I am interested in this role and would like to be considered for the opportunity. My background, skills, and career goals appear relevant to the position, and I would welcome the chance to explain how my experience can support your team.
+
+Because AfriTalent could not generate a fully tailored AI draft right now, please replace this paragraph with two or three truthful examples from your resume. Focus on relevant skills, measurable outcomes, and why the company or role is a strong fit.
+
+I have reviewed this letter for accuracy and understand that I should not include experience, certifications, employers, or achievements that I cannot verify.
+
+Sincerely,
+${name}
+
+Draft notes: ${params.toneLabel} tone requested. Job reference: ${params.jobId}.`;
+}
+
 export function getInterviewRoleNames(): string[] {
   return INTERVIEW_ROLE_TRACKS.map((track) => track.role);
 }
@@ -334,4 +421,3 @@ export function evaluateInterviewAnswerLocally(question: InterviewPracticeQuesti
     source: "heuristic" as const,
   };
 }
-

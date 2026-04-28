@@ -9,13 +9,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/ui/loading-state";
 import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
+import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
+import { buildFallbackCoverLetter } from "@/lib/early-tester-content";
 
-type Tone = "professional" | "conversational" | "executive";
+type Tone = "professional" | "conversational" | "executive" | "confident" | "short" | "entry" | "senior";
 
-const TONES: { value: Tone; label: string; description: string }[] = [
-  { value: "professional", label: "Professional", description: "Formal and polished" },
-  { value: "conversational", label: "Conversational", description: "Warm and approachable" },
-  { value: "executive", label: "Executive", description: "Strategic and senior" },
+const TONES: { value: Tone; apiTone: "professional" | "conversational" | "executive"; label: string; description: string }[] = [
+  { value: "professional", apiTone: "professional", label: "Professional", description: "Formal and polished" },
+  { value: "conversational", apiTone: "conversational", label: "Warm and human", description: "Approachable and sincere" },
+  { value: "confident", apiTone: "professional", label: "Confident", description: "Direct without exaggeration" },
+  { value: "short", apiTone: "professional", label: "Short and direct", description: "Concise application note" },
+  { value: "entry", apiTone: "conversational", label: "Entry-level", description: "Growth-focused and honest" },
+  { value: "senior", apiTone: "executive", label: "Senior-level", description: "Strategic and experienced" },
+  { value: "executive", apiTone: "executive", label: "Executive", description: "Leadership-oriented" },
 ];
 
 export default function CoverLetterPage() {
@@ -50,11 +56,22 @@ export default function CoverLetterPage() {
     setCoverLetter(null);
     setEdited(false);
     try {
-      const result = await skills.generateCoverLetter({ jobId: jobId.trim(), tone });
+      const selectedTone = TONES.find((item) => item.value === tone) ?? TONES[0];
+      const result = await skills.generateCoverLetter({ jobId: jobId.trim(), tone: selectedTone.apiTone });
       setCoverLetter(result.coverLetter);
       setSource(result.source);
     } catch (err) {
-      setError(toFriendlyError(err));
+      const friendly = toFriendlyError(err);
+      setError({
+        ...friendly,
+        description: `${friendly.description} A safe editable fallback template is shown below so you can continue drafting without inventing experience.`,
+      });
+      setCoverLetter(buildFallbackCoverLetter({
+        toneLabel: TONES.find((item) => item.value === tone)?.label ?? "Professional",
+        jobId: jobId.trim(),
+        candidateName: user?.name || user?.email,
+      }));
+      setSource("template");
     } finally {
       setLoading(false);
     }
@@ -74,7 +91,7 @@ export default function CoverLetterPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">AI Cover Letter Generator</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Generate a personalised cover letter tailored to any job in seconds
+              Generate an editable draft from your profile, resume, and a selected job without inventing experience.
             </p>
           </div>
           <Badge variant="info">Premium</Badge>
@@ -103,6 +120,9 @@ export default function CoverLetterPage() {
             <h2 className="text-lg font-semibold">Job Details</h2>
           </CardHeader>
           <CardContent className="space-y-5">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              Use this as an application assistant, not an auto-submit tool. Review every claim before sending and replace placeholders if fallback mode is used.
+            </div>
             <div>
               <label htmlFor="cover-letter-job-id" className="block text-sm font-medium text-gray-700 mb-1">
                 Job ID <span className="text-gray-400 text-xs">(from the job listing)</span>
@@ -119,7 +139,7 @@ export default function CoverLetterPage() {
 
             <div role="radiogroup" aria-label="Cover letter tone">
               <p className="block text-sm font-medium text-gray-700 mb-2">Tone</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {TONES.map((t) => (
                   <button
                     key={t.value}
@@ -145,7 +165,7 @@ export default function CoverLetterPage() {
               disabled={loading || !jobId.trim()}
               className="w-full"
             >
-              {loading ? "Generating with Claude..." : "Generate Cover Letter"}
+              {loading ? "Generating..." : "Generate Cover Letter"}
             </Button>
           </CardContent>
         </Card>
@@ -206,11 +226,13 @@ export default function CoverLetterPage() {
               <p className="text-xs text-gray-400 mt-2">
                 {edited
                   ? "Your edits are preserved. Copy or paste into the application when ready."
-                  : "Review and personalise before sending. AI-generated letters should always be reviewed."}
+                  : "Review and personalise before sending. Do not include experience, employers, certifications, or outcomes you cannot verify."}
               </p>
             </CardContent>
           </Card>
         )}
+
+        <EarlyTesterFeedback area="Cover letter quality" />
       </div>
     </div>
   );

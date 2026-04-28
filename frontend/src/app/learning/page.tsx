@@ -12,6 +12,7 @@ import {
   EarlyLearningLesson,
 } from "@/lib/early-tester-content";
 import { trackEvent } from "@/lib/analytics";
+import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
 
 const difficultyVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
   BEGINNER: "success",
@@ -544,6 +545,7 @@ export default function LearningPage() {
           </Card>
         </div>
       )}
+      <EarlyTesterFeedback area="Learning content usefulness" />
     </div>
   );
 }

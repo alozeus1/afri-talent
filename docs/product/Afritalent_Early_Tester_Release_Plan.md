@@ -8,6 +8,10 @@ Date: 2026-04-28
 - Interview prep now includes role-based tracks, realistic question categories, starter insights, and fallback feedback.
 - Interview helpful voting now works for demo/fallback content and logged-in API content without unlimited repeat votes from the same browser.
 - Product documentation now separates functional, beta/demo, and pending areas.
+- Resume builder now includes readiness guidance, ATS-safe warnings, and early-tester feedback capture.
+- Cover letter generation now includes expanded tone choices, editable fallback templates, and review warnings.
+- Candidate dashboard now shows fallback next-best-action guidance and labels sample recommendations honestly.
+- Application tracker now supports local notes, follow-up dates, and expanded candidate-facing statuses.
 
 ## Now Functional Enough For Early Testers
 
@@ -17,11 +21,14 @@ Date: 2026-04-28
 - Practice mock interview questions for high-priority global roles.
 - Receive structured interview answer feedback, with an AI path and local fallback path.
 - Mark interview experiences as helpful with loading, error, and accessibility support.
+- Capture early-tester feedback locally after key workflows.
+- Track application notes, reminders, and statuses locally during pre-market testing.
 
 ## Still Mocked, Beta, Or Pending
 
 - Learning completion is local-only until backend progress tracking is added.
 - Interview helpful votes prevent repeat local votes, but backend per-user vote persistence is still needed.
+- Early-tester feedback, application tracker notes, expanded statuses, and follow-up dates are local-only until backend persistence is added.
 - AI feedback depends on configured AI service availability.
 - Employer directory should remain honest if real verified employers are not present.
 - Email/push notifications should remain future-facing unless infrastructure is verified.
@@ -46,7 +53,7 @@ Date: 2026-04-28
 
 - Add early tester feedback capture and admin review.
 - Add dashboard next-best-action panel.
-- Add backend persistence for learning progress and helpful votes.
+- Add backend persistence for learning progress, helpful votes, early feedback, and application tracker notes/reminders.
 - Add smoke tests for resume, cover letter, job save/apply, and interview prep.
 
 ### 60 Days
@@ -62,4 +69,3 @@ Date: 2026-04-28
 - Add calibrated recommendation analytics.
 - Add email notification integration if engagement signals justify it.
 - Expand AI application assistant with stronger audit logs and candidate consent checkpoints.
-

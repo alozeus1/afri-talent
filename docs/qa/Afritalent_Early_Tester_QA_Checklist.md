@@ -10,11 +10,15 @@ Date: 2026-04-28
 - Open `/learning`, search for `AWS`, filter by category and difficulty, start a lesson, and mark it complete.
 - Open `/interviews`, expand an interview card, click Helpful once, refresh, and confirm it cannot be clicked repeatedly from the same browser.
 - Open `/candidate/interview-prep`, choose `DevOps Engineer`, answer a question, and confirm feedback appears.
+- Open `/candidate/resume-builder`, confirm weak inputs show guidance, generate or fallback gracefully, and confirm warnings against false claims are visible.
+- Open `/candidate/cover-letter`, select each tone family, force an invalid or unavailable generation path, and confirm an editable fallback template appears.
+- Submit a local early-tester feedback rating on Learning, Resume, Cover Letter, Interview Prep, Job Match, and Application Tracker surfaces.
 - Open job search, apply filters, save a job if authenticated, and confirm the UI does not crash.
 - Open a job detail/card and confirm match/trust information is visible where available.
 - Open resume builder/review pages and confirm empty states guide the user.
 - Open cover letter page and confirm generated or fallback content is editable and copyable.
 - Open application tracker and manually update at least one status if test data exists.
+- Add a local application note and follow-up date; refresh and confirm local state remains in the same browser.
 
 ## Critical Workflow QA
 
@@ -25,6 +29,7 @@ Date: 2026-04-28
 - Application assistant: user consent must be explicit before any external submission.
 - Trust workflow: scam warnings should be understandable and not overclaim verification.
 - Feedback capture: when implemented, submissions should be visible to admins or documented as local-only.
+- Application tracker: local-only notes and reminders must be clearly labeled until backend persistence exists.
 
 ## Mobile Checks
 
@@ -45,6 +50,8 @@ Date: 2026-04-28
 ## Known Limitations
 
 - Learning progress is local-only in early tester mode.
+- Early-tester feedback is local-only in this pass.
+- Application notes, follow-up dates, and expanded candidate-facing statuses are local-only in this pass.
 - Interview helpful vote backend does not yet enforce one vote per user.
 - Some AI workflows depend on external model/service configuration.
 - Email/push notification behavior is not validated in this pass.
@@ -57,4 +64,3 @@ Date: 2026-04-28
 - Add mocked API tests for cover letter fallback behavior.
 - Add mocked API tests for resume AI failure fallback.
 - Add job-search test that verifies match explanation rendering.
-

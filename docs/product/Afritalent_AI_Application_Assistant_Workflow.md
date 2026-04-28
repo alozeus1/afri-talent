@@ -44,11 +44,17 @@ If AI is unavailable:
 - Let the user manually track status.
 - Keep external apply link available.
 
+Current early-tester implementation:
+
+- Cover letter fallback templates are frontend-safe and editable.
+- Application tracker notes, reminders, and expanded candidate-facing statuses are stored locally.
+- The backend application status enum is unchanged in this pass.
+
 ## Future Backend Work
 
 - Persist application assistant sessions.
 - Store generated document versions.
 - Add consent records for assisted submission.
 - Add reminder scheduling.
+- Add persisted application tracker notes, local status labels, and follow-up dates.
 - Add admin visibility into failed or risky application-assistant events.
-

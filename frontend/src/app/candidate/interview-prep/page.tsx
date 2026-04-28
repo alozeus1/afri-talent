@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/ui/loading-state";
 import { trackEvent } from "@/lib/analytics";
+import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
 import {
   INTERVIEW_INSIGHTS,
   INTERVIEW_ROLE_TRACKS,
@@ -421,6 +422,7 @@ export default function InterviewPrepPage() {
             ))}
           </CardContent>
         </Card>
+        <EarlyTesterFeedback area="Interview prep usefulness" />
       </div>
     </div>
   );

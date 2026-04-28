@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { ATSScoreDisplay } from "@/components/ui/ats-score-display";
 import { LoadingState } from "@/components/ui/loading-state";
 import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
+import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
+import { RESUME_IMPROVEMENT_TIPS, reviewResumeInput } from "@/lib/early-tester-content";
 
 interface WorkEntry {
   company: string;
@@ -100,6 +102,15 @@ export default function ResumeBuilderPage() {
   }
 
   async function handleGenerate() {
+    const readiness = reviewResumeInput(form);
+    if (readiness.missing.length > 0) {
+      setError({
+        title: "Resume details missing",
+        description: `Add these required details before generating: ${readiness.missing.join(", ")}.`,
+        tone: "warning",
+      });
+      return;
+    }
     setLoading(true);
     setError(null);
     setSaved(false);
@@ -174,7 +185,7 @@ export default function ResumeBuilderPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">AI Resume Builder</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Generate an ATS-optimised resume tailored to your target role
+              Build an ATS-friendly resume draft from truthful profile, project, and work details.
             </p>
           </div>
           <Badge variant="info">Premium</Badge>
@@ -204,6 +215,28 @@ export default function ResumeBuilderPage() {
               <h2 className="text-lg font-semibold">Your Information</h2>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                <p className="font-semibold">Resume safety checklist</p>
+                <p className="mt-1">
+                  Keep every claim verifiable. AfriTalent can improve wording and structure, but it should not invent tools, employers, certifications, or results.
+                </p>
+              </div>
+
+              <div className="grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
+                {reviewResumeInput(form).suggestions.slice(0, 4).map((item) => (
+                  <div key={item} className="rounded-lg bg-white p-3 text-xs text-gray-700">
+                    {item}
+                  </div>
+                ))}
+                {reviewResumeInput(form).suggestions.length === 0 && (
+                  RESUME_IMPROVEMENT_TIPS.slice(0, 4).map((item) => (
+                    <div key={item} className="rounded-lg bg-white p-3 text-xs text-gray-700">
+                      {item}
+                    </div>
+                  ))
+                )}
+              </div>
+
               {/* Basic Info */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -302,7 +335,7 @@ export default function ResumeBuilderPage() {
                   onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))}
                   rows={3}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Optional — Claude will generate a compelling summary if left blank"
+                  placeholder="Optional — AfriTalent can draft this from your real experience if left blank"
                 />
               </div>
 
@@ -344,7 +377,7 @@ export default function ResumeBuilderPage() {
                       />
                     </div>
                     <textarea
-                      placeholder="Brief description of responsibilities and achievements"
+                      placeholder="Responsibilities and truthful achievements. Add metrics where available."
                       value={w.description}
                       onChange={(e) => updateWork(i, "description", e.target.value)}
                       rows={2}
@@ -442,6 +475,9 @@ export default function ResumeBuilderPage() {
                   data-testid="resume-preview-textarea"
                   className="w-full rounded-md border border-gray-200 bg-white px-4 py-3 font-mono text-sm text-gray-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  Review before saving. Remove any claim you cannot prove or explain in an interview. ATS-friendly does not mean guaranteed ATS approval.
+                </div>
               </CardContent>
             </Card>
 
@@ -541,7 +577,7 @@ export default function ResumeBuilderPage() {
                       </div>
                     )}
 
-                    {atsResult.suggestions.length > 0 && (
+                {atsResult.suggestions.length > 0 && (
                       <div>
                         <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">
                           Suggestions
@@ -557,8 +593,10 @@ export default function ResumeBuilderPage() {
                 )}
               </CardContent>
             </Card>
+            <EarlyTesterFeedback area="Resume review" />
           </div>
         )}
+        {!generated && <EarlyTesterFeedback area="Resume review" />}
       </div>
     </div>
   );

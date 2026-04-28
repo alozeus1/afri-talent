@@ -3,7 +3,9 @@ import {
   EARLY_LEARNING_LESSONS,
   INTERVIEW_ROLE_TRACKS,
   evaluateInterviewAnswerLocally,
+  buildFallbackCoverLetter,
   getInterviewQuestionsForRole,
+  reviewResumeInput,
 } from "../early-tester-content";
 
 describe("early tester content", () => {
@@ -51,5 +53,32 @@ describe("early tester content", () => {
     expect(feedback.score).toBeGreaterThan(50);
     expect(feedback.improvements.length).toBeGreaterThan(0);
   });
-});
 
+  it("flags weak resume inputs without blocking safe local guidance", () => {
+    const result = reviewResumeInput({
+      fullName: "Alozeus",
+      email: "alozeus1@gmail.com",
+      targetRole: "Cloud Engineer",
+      skills: "AWS, Terraform",
+      summary: "",
+      workHistory: [{ company: "", title: "", period: "", description: "" }],
+      educationHistory: [{ institution: "", degree: "", period: "" }],
+    });
+
+    expect(result.ready).toBe(true);
+    expect(result.suggestions.length).toBeGreaterThan(0);
+    expect(result.warnings.some((warning) => warning.includes("honestly"))).toBe(true);
+  });
+
+  it("builds a safe cover letter fallback template", () => {
+    const fallback = buildFallbackCoverLetter({
+      toneLabel: "Warm and human",
+      jobId: "job-123",
+      candidateName: "Alozeus",
+    });
+
+    expect(fallback).toContain("Alozeus");
+    expect(fallback).toContain("could not generate");
+    expect(fallback).toContain("cannot verify");
+  });
+});
