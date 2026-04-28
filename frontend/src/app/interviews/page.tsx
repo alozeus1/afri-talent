@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { trackEvent } from "@/lib/analytics";
 
 const DIFFICULTY_OPTIONS = ["EASY", "MEDIUM", "HARD"];
 const OUTCOME_OPTIONS = ["OFFERED", "REJECTED", "NO_RESPONSE", "IN_PROGRESS"];
@@ -24,6 +25,7 @@ const INTERVIEW_TYPES = [
   "ON_SITE",
   "OTHER",
 ];
+const HELPFUL_STORAGE_KEY = "afritalent_interview_helpful_votes";
 
 const MOCK_EXPERIENCES: InterviewExperienceItem[] = [
   {
@@ -163,6 +165,17 @@ export default function InterviewsPage() {
 
   // Helpful tracking
   const [helpfulSet, setHelpfulSet] = useState<Set<string>>(new Set());
+  const [helpfulLoadingId, setHelpfulLoadingId] = useState<string | null>(null);
+  const [helpfulError, setHelpfulError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(HELPFUL_STORAGE_KEY);
+      if (saved) setHelpfulSet(new Set(JSON.parse(saved) as string[]));
+    } catch {
+      setHelpfulSet(new Set());
+    }
+  }, []);
 
   const fetchExperiences = useCallback(async () => {
     setLoading(true);
@@ -200,21 +213,37 @@ export default function InterviewsPage() {
 
   const handleHelpful = async (id: string) => {
     if (helpfulSet.has(id)) return;
+    const isDemoExperience = id.startsWith("exp-");
+    const previousData = data;
+    const previousHelpfulSet = helpfulSet;
+    const nextHelpfulSet = new Set(helpfulSet).add(id);
+
+    setHelpfulError(null);
+    setHelpfulLoadingId(id);
+    setHelpfulSet(nextHelpfulSet);
+    window.localStorage.setItem(HELPFUL_STORAGE_KEY, JSON.stringify([...nextHelpfulSet]));
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        experiences: prev.experiences.map((exp) =>
+          exp.id === id ? { ...exp, helpfulCount: exp.helpfulCount + 1 } : exp
+        ),
+      };
+    });
+    trackEvent("interview_experience_helpful_clicked", { experience_id: id, demo: isDemoExperience });
+
     try {
-      await interviewExperiences.helpful(id);
-      setHelpfulSet((prev) => new Set(prev).add(id));
-      // Optimistic update
-      setData((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          experiences: prev.experiences.map((exp) =>
-            exp.id === id ? { ...exp, helpfulCount: exp.helpfulCount + 1 } : exp
-          ),
-        };
-      });
+      if (user && !isDemoExperience) {
+        await interviewExperiences.helpful(id);
+      }
     } catch {
-      // Silently fail
+      setData(previousData);
+      setHelpfulSet(previousHelpfulSet);
+      window.localStorage.setItem(HELPFUL_STORAGE_KEY, JSON.stringify([...previousHelpfulSet]));
+      setHelpfulError("Could not save your helpful vote. Please try again.");
+    } finally {
+      setHelpfulLoadingId(null);
     }
   };
 
@@ -380,6 +409,11 @@ export default function InterviewsPage() {
       {error && (
         <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-8">{error}</div>
       )}
+      {helpfulError && (
+        <div className="bg-amber-50 text-amber-800 border border-amber-200 p-4 rounded-lg mb-8 text-sm">
+          {helpfulError}
+        </div>
+      )}
 
       {/* Interview Cards */}
       {!loading && filteredExperiences && (
@@ -403,6 +437,7 @@ export default function InterviewsPage() {
                   }
                   onHelpful={() => handleHelpful(exp.id)}
                   isHelpfulMarked={helpfulSet.has(exp.id)}
+                  isHelpfulLoading={helpfulLoadingId === exp.id}
                 />
               ))}
             </div>
@@ -692,12 +727,14 @@ function InterviewCard({
   onToggle,
   onHelpful,
   isHelpfulMarked,
+  isHelpfulLoading,
 }: {
   experience: InterviewExperienceItem;
   isExpanded: boolean;
   onToggle: () => void;
   onHelpful: () => void;
   isHelpfulMarked: boolean;
+  isHelpfulLoading: boolean;
 }) {
   return (
     <Card
@@ -785,17 +822,25 @@ function InterviewCard({
             {new Date(experience.createdAt).toLocaleDateString()}
           </span>
           <button
-            className={`flex items-center gap-1 text-sm transition-colors ${
+            type="button"
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed ${
               isHelpfulMarked
                 ? "text-emerald-600 font-medium"
                 : "text-gray-400 hover:text-emerald-600"
             }`}
+            disabled={isHelpfulMarked || isHelpfulLoading}
+            aria-pressed={isHelpfulMarked}
+            aria-label={
+              isHelpfulMarked
+                ? `Marked helpful with ${experience.helpfulCount} helpful votes`
+                : `Mark ${experience.company?.name || "this"} interview experience as helpful`
+            }
             onClick={(e) => {
               e.stopPropagation();
               onHelpful();
             }}
           >
-            👍 Helpful ({experience.helpfulCount})
+            {isHelpfulLoading ? "Saving..." : "Helpful"} ({experience.helpfulCount})
           </button>
         </div>
       </CardContent>

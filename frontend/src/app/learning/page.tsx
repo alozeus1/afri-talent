@@ -3,9 +3,15 @@
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { learning, LearningResourceItem } from "@/lib/api";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  EARLY_LEARNING_CATEGORIES,
+  EARLY_LEARNING_LESSONS,
+  EarlyLearningLesson,
+} from "@/lib/early-tester-content";
+import { trackEvent } from "@/lib/analytics";
 
 const difficultyVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
   BEGINNER: "success",
@@ -14,16 +20,40 @@ const difficultyVariants: Record<string, "default" | "success" | "warning" | "da
 };
 
 const categoryGradients: Record<string, string> = {
-  "Software Development": "from-blue-500 to-indigo-600",
-  "Data Science": "from-purple-500 to-pink-600",
-  "Design": "from-pink-500 to-rose-600",
-  "Business": "from-amber-500 to-orange-600",
-  "Marketing": "from-green-500 to-teal-600",
-  "Leadership": "from-cyan-500 to-blue-600",
+  "AWS Cloud Demos": "from-sky-500 to-blue-700",
+  "Cybersecurity Demos": "from-slate-700 to-emerald-700",
+  "DevOps Demos": "from-orange-500 to-amber-600",
+  "AI Tools for Career Growth": "from-teal-500 to-cyan-700",
+  "Job Search Skills": "from-emerald-500 to-green-700",
 };
 
 function getGradient(category: string): string {
   return categoryGradients[category] || "from-emerald-500 to-green-600";
+}
+
+function isEarlyLesson(course: LearningResourceItem): course is EarlyLearningLesson {
+  return "steps" in course && Array.isArray((course as EarlyLearningLesson).steps);
+}
+
+function filterFallbackLessons(filters: {
+  category: string;
+  difficulty: string;
+  freeOnly: boolean;
+  query: string;
+}): EarlyLearningLesson[] {
+  const query = filters.query.trim().toLowerCase();
+  return EARLY_LEARNING_LESSONS.filter((lesson) => {
+    if (filters.category && lesson.category !== filters.category) return false;
+    if (filters.difficulty && lesson.difficulty !== filters.difficulty) return false;
+    if (filters.freeOnly && !lesson.isFree) return false;
+    if (!query) return true;
+    return [
+      lesson.title,
+      lesson.description ?? "",
+      lesson.category,
+      lesson.skills.join(" "),
+    ].join(" ").toLowerCase().includes(query);
+  });
 }
 
 export default function LearningPage() {
@@ -34,15 +64,28 @@ export default function LearningPage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [usingFallbackContent, setUsingFallbackContent] = useState(false);
+  const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
+  const [selectedLesson, setSelectedLesson] = useState<EarlyLearningLesson | null>(null);
 
   // Filters
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedDifficulty, setSelectedDifficulty] = useState("");
   const [freeOnly, setFreeOnly] = useState(false);
+  const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("afritalent_learning_completed_lessons");
+      if (saved) setCompletedLessons(new Set(JSON.parse(saved) as string[]));
+    } catch {
+      setCompletedLessons(new Set());
+    }
+  }, []);
 
   useEffect(() => {
     const loadInitial = async () => {
@@ -51,8 +94,11 @@ export default function LearningPage() {
           learning.categories(),
           learning.list({ featured: true }),
         ]);
-        setCategories(cats);
-        setFeatured(featuredRes.resources);
+        setCategories(cats.length ? cats : EARLY_LEARNING_CATEGORIES);
+        const featuredResources = featuredRes.resources.length
+          ? featuredRes.resources
+          : EARLY_LEARNING_LESSONS.filter((lesson) => lesson.featured).slice(0, 6);
+        setFeatured(featuredResources);
 
         if (user) {
           try {
@@ -64,6 +110,9 @@ export default function LearningPage() {
         }
       } catch (err) {
         console.error("Failed to load initial data:", err);
+        setUsingFallbackContent(true);
+        setCategories(EARLY_LEARNING_CATEGORIES);
+        setFeatured(EARLY_LEARNING_LESSONS.filter((lesson) => lesson.featured).slice(0, 6));
       }
     };
     loadInitial();
@@ -72,7 +121,7 @@ export default function LearningPage() {
   useEffect(() => {
     loadCourses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, selectedDifficulty, freeOnly, page]);
+  }, [selectedCategory, selectedDifficulty, freeOnly, page, query]);
 
   const loadCourses = async () => {
     setLoading(true);
@@ -84,10 +133,20 @@ export default function LearningPage() {
         isFree: freeOnly || undefined,
         page,
       });
-      setCourses(res.resources);
-      setTotalPages(res.pagination.totalPages);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load courses");
+      if (res.resources.length === 0) {
+        setUsingFallbackContent(true);
+        setCourses(filterFallbackLessons({ category: selectedCategory, difficulty: selectedDifficulty, freeOnly, query }));
+        setTotalPages(1);
+      } else {
+        setUsingFallbackContent(false);
+        setCourses(res.resources);
+        setTotalPages(res.pagination.totalPages);
+      }
+    } catch {
+      setUsingFallbackContent(true);
+      setCourses(filterFallbackLessons({ category: selectedCategory, difficulty: selectedDifficulty, freeOnly, query }));
+      setTotalPages(1);
+      setError("Live learning catalog is unavailable, so AfriTalent starter lessons are shown.");
     } finally {
       setLoading(false);
     }
@@ -97,8 +156,32 @@ export default function LearningPage() {
     setSelectedCategory("");
     setSelectedDifficulty("");
     setFreeOnly(false);
+    setQuery("");
     setPage(1);
   };
+
+  const toggleCompleted = (lessonId: string) => {
+    setCompletedLessons((prev) => {
+      const next = new Set(prev);
+      if (next.has(lessonId)) {
+        next.delete(lessonId);
+      } else {
+        next.add(lessonId);
+        trackEvent("lesson_completed", { lesson_id: lessonId });
+      }
+      window.localStorage.setItem("afritalent_learning_completed_lessons", JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const displayedCourses = query.trim() && !usingFallbackContent
+    ? courses.filter((course) =>
+        [course.title, course.description ?? "", course.category, course.skills.join(" ")]
+          .join(" ")
+          .toLowerCase()
+          .includes(query.trim().toLowerCase()),
+      )
+    : courses;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -106,7 +189,7 @@ export default function LearningPage() {
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-gray-900 mb-3">Level Up Your Career</h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Free and premium courses to grow your skills
+          Practical starter labs for cloud, security, DevOps, AI career workflows, and safer global job search.
         </p>
       </div>
 
@@ -115,6 +198,18 @@ export default function LearningPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-4">
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search lessons, skills, or topics..."
+                className="min-w-[220px] flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                aria-label="Search learning lessons"
+              />
+
               {/* Category Dropdown */}
               <select
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
@@ -162,7 +257,7 @@ export default function LearningPage() {
                 <span className="text-sm text-gray-700">Free only</span>
               </label>
 
-              {(selectedCategory || selectedDifficulty || freeOnly) && (
+              {(selectedCategory || selectedDifficulty || freeOnly || query) && (
                 <Button variant="ghost" size="sm" onClick={resetFilters}>
                   Clear filters
                 </Button>
@@ -197,7 +292,7 @@ export default function LearningPage() {
                     <p className="text-xs text-gray-500 mb-2">{course.durationHours}h</p>
                   )}
                   <a href={course.url} target="_blank" rel="noopener noreferrer">
-                    <Button size="sm" variant="outline" className="w-full">View Course</Button>
+                    <Button size="sm" variant="outline" className="w-full">View Lesson</Button>
                   </a>
                 </CardContent>
               </Card>
@@ -242,9 +337,13 @@ export default function LearningPage() {
                     {course.durationHours && (
                       <span className="text-xs text-gray-500">{course.durationHours}h</span>
                     )}
-                    <a href={course.url} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm">View Course</Button>
-                    </a>
+                    {isEarlyLesson(course) ? (
+                      <Button size="sm" onClick={() => setSelectedLesson(course)}>Start Lesson</Button>
+                    ) : (
+                      <a href={course.url} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm">View Course</Button>
+                      </a>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -255,7 +354,7 @@ export default function LearningPage() {
 
       {/* Error State */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
           {error}
         </div>
       )}
@@ -268,14 +367,14 @@ export default function LearningPage() {
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
           </div>
-        ) : courses.length === 0 ? (
+        ) : displayedCourses.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">📖</span>
             </div>
             <p className="text-gray-600 mb-2">No courses found</p>
             <p className="text-sm text-gray-500">Try adjusting your filters</p>
-            {(selectedCategory || selectedDifficulty || freeOnly) && (
+            {(selectedCategory || selectedDifficulty || freeOnly || query) && (
               <Button variant="outline" size="sm" className="mt-3" onClick={resetFilters}>
                 Clear filters
               </Button>
@@ -284,7 +383,7 @@ export default function LearningPage() {
         ) : (
           <>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {courses.map((course) => (
+              {displayedCourses.map((course) => (
                 <Card key={course.id} className="overflow-hidden">
                   <div className={`h-28 bg-gradient-to-br ${getGradient(course.category)} flex items-center justify-center`}>
                     <span className="text-white text-3xl">📚</span>
@@ -317,9 +416,27 @@ export default function LearningPage() {
                       ) : (
                         <span />
                       )}
-                      <a href={course.url} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" variant="outline">View Course</Button>
-                      </a>
+                      <div className="flex gap-2">
+                        {isEarlyLesson(course) ? (
+                          <>
+                            {completedLessons.has(course.id) && <Badge variant="success">Complete</Badge>}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedLesson(course);
+                                trackEvent("lesson_started", { lesson_id: course.id, category: course.category });
+                              }}
+                            >
+                              Start
+                            </Button>
+                          </>
+                        ) : (
+                          <a href={course.url} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" variant="outline">View</Button>
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -353,6 +470,80 @@ export default function LearningPage() {
           </>
         )}
       </div>
+
+      {selectedLesson && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-8">
+          <Card className="w-full max-w-3xl">
+            <CardHeader>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <Badge variant="info">{selectedLesson.category}</Badge>
+                  <h2 className="mt-3 text-2xl font-bold text-gray-900">{selectedLesson.title}</h2>
+                  <p className="mt-2 text-sm text-gray-600">{selectedLesson.description}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLesson(null)}
+                  className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                  aria-label="Close lesson"
+                >
+                  X
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={difficultyVariants[selectedLesson.difficulty] || "default"}>
+                  {selectedLesson.difficulty.charAt(0) + selectedLesson.difficulty.slice(1).toLowerCase()}
+                </Badge>
+                <Badge variant="success">Free</Badge>
+                <Badge>{selectedLesson.durationHours}h</Badge>
+              </div>
+
+              <section>
+                <h3 className="font-semibold text-gray-900">Learning outcomes</h3>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+                  {selectedLesson.outcomes.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900">Step-by-step practice</h3>
+                <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-gray-700">
+                  {selectedLesson.steps.map((step) => <li key={step}>{step}</li>)}
+                </ol>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900">Checklist</h3>
+                <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {selectedLesson.checklist.map((item) => (
+                    <li key={item} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              {selectedLesson.practiceTask && (
+                <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <h3 className="font-semibold text-emerald-900">Practice task</h3>
+                  <p className="mt-1 text-sm text-emerald-800">{selectedLesson.practiceTask}</p>
+                </section>
+              )}
+
+              <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-gray-500">
+                  Completion is stored locally for early tester mode until full progress tracking is enabled.
+                </p>
+                <Button onClick={() => toggleCompleted(selectedLesson.id)}>
+                  {completedLessons.has(selectedLesson.id) ? "Mark incomplete" : "Mark complete"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
