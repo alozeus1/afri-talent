@@ -37,6 +37,18 @@ export interface InterviewInsight {
   bullets: string[];
 }
 
+export interface TopPayingRoleGuidance {
+  role: string;
+  description: string;
+  commonSkills: string[];
+  experienceLevel: string;
+  remoteFriendliness: "High" | "Medium" | "Role-dependent";
+  marketEstimate: string;
+  salaryNote: string;
+  searchPath: string;
+  learningPath: string;
+}
+
 export interface ResumeInputForReview {
   fullName: string;
   email: string;
@@ -61,6 +73,163 @@ export const EARLY_TESTER_FEEDBACK_AREAS = [
   "Interview prep usefulness",
   "Learning content usefulness",
   "Application tracker usefulness",
+];
+
+export const TOP_PAYING_ROLE_GUIDANCE: TopPayingRoleGuidance[] = [
+  {
+    role: "Cloud Engineer",
+    description: "Builds and operates cloud infrastructure, monitoring, networking, and deployment foundations.",
+    commonSkills: ["AWS", "Linux", "Networking", "Terraform"],
+    experienceLevel: "Mid to senior",
+    remoteFriendliness: "High",
+    marketEstimate: "USD 75k-145k",
+    salaryNote: "General global-market guidance, not verified AfriTalent placement data.",
+    searchPath: "/jobs?query=Cloud%20Engineer",
+    learningPath: "/learning?category=AWS%20Cloud%20Demos",
+  },
+  {
+    role: "DevOps Engineer",
+    description: "Improves release pipelines, reliability, observability, automation, and rollback readiness.",
+    commonSkills: ["CI/CD", "Docker", "Kubernetes", "Monitoring"],
+    experienceLevel: "Mid to senior",
+    remoteFriendliness: "High",
+    marketEstimate: "USD 80k-155k",
+    salaryNote: "Educational estimate based on common global compensation bands.",
+    searchPath: "/jobs?query=DevOps%20Engineer",
+    learningPath: "/learning?category=DevOps%20Demos",
+  },
+  {
+    role: "DevSecOps Engineer",
+    description: "Adds security controls to cloud, CI/CD, container, and infrastructure workflows.",
+    commonSkills: ["SAST", "Cloud security", "Kubernetes", "Policy-as-code"],
+    experienceLevel: "Senior",
+    remoteFriendliness: "High",
+    marketEstimate: "USD 90k-165k",
+    salaryNote: "Sample market guidance only; verify by country, company, and seniority.",
+    searchPath: "/jobs?query=DevSecOps%20Engineer",
+    learningPath: "/learning?category=Cybersecurity%20Demos",
+  },
+  {
+    role: "Cybersecurity Analyst",
+    description: "Investigates alerts, reduces risk, validates controls, and helps protect users and systems.",
+    commonSkills: ["SIEM", "Incident response", "Risk", "Vulnerability management"],
+    experienceLevel: "Entry to mid",
+    remoteFriendliness: "Medium",
+    marketEstimate: "USD 55k-120k",
+    salaryNote: "Estimated guidance; security compensation varies strongly by clearance and region.",
+    searchPath: "/jobs?query=Cybersecurity%20Analyst",
+    learningPath: "/learning?category=Cybersecurity%20Demos",
+  },
+  {
+    role: "SOC Analyst",
+    description: "Monitors security events, triages alerts, writes escalation notes, and supports incident response.",
+    commonSkills: ["SIEM", "Log analysis", "Triage", "Escalation"],
+    experienceLevel: "Entry to mid",
+    remoteFriendliness: "Role-dependent",
+    marketEstimate: "USD 45k-95k",
+    salaryNote: "Market estimate only; shift work and region can change pay materially.",
+    searchPath: "/jobs?query=SOC%20Analyst",
+    learningPath: "/learning?category=Cybersecurity%20Demos",
+  },
+  {
+    role: "AWS Solutions Architect",
+    description: "Designs scalable, secure, cost-aware AWS systems and advises teams on architecture tradeoffs.",
+    commonSkills: ["AWS", "Architecture", "Security", "Cost optimization"],
+    experienceLevel: "Senior",
+    remoteFriendliness: "High",
+    marketEstimate: "USD 100k-180k",
+    salaryNote: "General market estimate, not an AfriTalent outcome claim.",
+    searchPath: "/jobs?query=AWS%20Solutions%20Architect",
+    learningPath: "/learning?category=AWS%20Cloud%20Demos",
+  },
+  {
+    role: "Backend Engineer",
+    description: "Builds APIs, services, data models, integrations, and production reliability foundations.",
+    commonSkills: ["APIs", "Databases", "Node.js", "Python"],
+    experienceLevel: "Mid to senior",
+    remoteFriendliness: "High",
+    marketEstimate: "USD 75k-155k",
+    salaryNote: "Educational estimate; stack, region, and company stage affect bands.",
+    searchPath: "/jobs?query=Backend%20Engineer",
+    learningPath: "/learning?category=DevOps%20Demos",
+  },
+  {
+    role: "Frontend Engineer",
+    description: "Creates accessible, performant interfaces and translates product workflows into usable UI.",
+    commonSkills: ["React", "TypeScript", "Accessibility", "Testing"],
+    experienceLevel: "Mid to senior",
+    remoteFriendliness: "High",
+    marketEstimate: "USD 65k-140k",
+    salaryNote: "Sample guidance only; verify market and seniority before negotiating.",
+    searchPath: "/jobs?query=Frontend%20Engineer",
+    learningPath: "/learning?category=AI%20Tools%20for%20Career%20Growth",
+  },
+  {
+    role: "Data Analyst",
+    description: "Turns data into insights, dashboards, experiments, and decision support for teams.",
+    commonSkills: ["SQL", "Dashboards", "Metrics", "Storytelling"],
+    experienceLevel: "Entry to mid",
+    remoteFriendliness: "High",
+    marketEstimate: "USD 50k-110k",
+    salaryNote: "General guidance; domain expertise and tooling depth can move ranges.",
+    searchPath: "/jobs?query=Data%20Analyst",
+    learningPath: "/learning?category=AI%20Tools%20for%20Career%20Growth",
+  },
+  {
+    role: "Data Engineer",
+    description: "Builds reliable pipelines, warehouses, data quality checks, and analytics infrastructure.",
+    commonSkills: ["SQL", "Python", "ETL", "Data warehouses"],
+    experienceLevel: "Mid to senior",
+    remoteFriendliness: "High",
+    marketEstimate: "USD 85k-165k",
+    salaryNote: "Market estimate only; cloud/data platform experience affects bands.",
+    searchPath: "/jobs?query=Data%20Engineer",
+    learningPath: "/learning?category=DevOps%20Demos",
+  },
+  {
+    role: "AI/ML Engineer",
+    description: "Builds, evaluates, and operates AI or machine-learning systems with safety and quality controls.",
+    commonSkills: ["Python", "LLMs", "Evaluation", "MLOps"],
+    experienceLevel: "Mid to senior",
+    remoteFriendliness: "High",
+    marketEstimate: "USD 95k-190k",
+    salaryNote: "Sample global estimate; verify by specialization and company stage.",
+    searchPath: "/jobs?query=AI%2FML%20Engineer",
+    learningPath: "/learning?category=AI%20Tools%20for%20Career%20Growth",
+  },
+  {
+    role: "Product Manager",
+    description: "Prioritizes user problems, aligns teams, validates solutions, and measures product outcomes.",
+    commonSkills: ["Discovery", "Roadmaps", "Analytics", "Stakeholder management"],
+    experienceLevel: "Mid to senior",
+    remoteFriendliness: "High",
+    marketEstimate: "USD 80k-165k",
+    salaryNote: "Educational estimate; domain, seniority, and scope matter heavily.",
+    searchPath: "/jobs?query=Product%20Manager",
+    learningPath: "/learning?category=Job%20Search%20Skills",
+  },
+  {
+    role: "QA Automation Engineer",
+    description: "Builds automated test coverage, quality gates, and release confidence for product teams.",
+    commonSkills: ["Playwright", "Test strategy", "CI", "Bug triage"],
+    experienceLevel: "Mid",
+    remoteFriendliness: "High",
+    marketEstimate: "USD 60k-125k",
+    salaryNote: "Market guidance only; automation depth and domain complexity affect pay.",
+    searchPath: "/jobs?query=QA%20Automation%20Engineer",
+    learningPath: "/learning?category=DevOps%20Demos",
+  },
+  {
+    role: "Technical Support Engineer",
+    description: "Troubleshoots customer issues, documents fixes, escalates product defects, and protects user trust.",
+    commonSkills: ["Debugging", "Communication", "SQL/logs", "Customer empathy"],
+    experienceLevel: "Entry to mid",
+    remoteFriendliness: "High",
+    marketEstimate: "USD 40k-95k",
+    salaryNote: "Estimated guidance; timezone coverage and technical depth shift compensation.",
+    searchPath: "/jobs?query=Technical%20Support%20Engineer",
+    learningPath: "/learning?category=Job%20Search%20Skills",
+  },
 ];
 
 export const APPLICATION_ASSISTANT_STATUSES = [

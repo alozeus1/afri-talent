@@ -4,7 +4,7 @@ interface SkeletonProps {
 
 export function Skeleton({ className = "" }: SkeletonProps) {
   return (
-    <div className={`animate-pulse bg-gray-200 dark:bg-gray-800 rounded ${className}`} />
+    <div className={`skeleton-shimmer animate-pulse bg-gray-200 dark:bg-gray-800 rounded ${className}`} />
   );
 }
 
@@ -136,6 +136,31 @@ export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: nu
               <Skeleton key={c} className="h-4 w-full" />
             ))}
           </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function CardGridSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="surface-panel rounded-2xl border border-[var(--border-soft)] p-6">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <Skeleton className="mb-3 h-5 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
+            <Skeleton className="h-8 w-8 rounded-full" />
+          </div>
+          <Skeleton className="mb-3 h-4 w-full" />
+          <Skeleton className="mb-5 h-4 w-5/6" />
+          <div className="mb-5 flex gap-2">
+            <Skeleton className="h-6 w-16 rounded-full" />
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+          <Skeleton className="h-10 w-full rounded-lg" />
         </div>
       ))}
     </div>

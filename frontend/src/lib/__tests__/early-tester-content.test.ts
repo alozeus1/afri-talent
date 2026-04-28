@@ -2,6 +2,7 @@ import {
   EARLY_LEARNING_CATEGORIES,
   EARLY_LEARNING_LESSONS,
   INTERVIEW_ROLE_TRACKS,
+  TOP_PAYING_ROLE_GUIDANCE,
   evaluateInterviewAnswerLocally,
   buildFallbackCoverLetter,
   getInterviewQuestionsForRole,
@@ -14,6 +15,18 @@ describe("early tester content", () => {
     for (const category of EARLY_LEARNING_CATEGORIES) {
       expect(EARLY_LEARNING_LESSONS.some((lesson) => lesson.category === category)).toBe(true);
     }
+  });
+
+  it("provides honest top-paying role guidance without claiming AfriTalent outcomes", () => {
+    expect(TOP_PAYING_ROLE_GUIDANCE.length).toBeGreaterThanOrEqual(14);
+    expect(TOP_PAYING_ROLE_GUIDANCE.map((role) => role.role)).toEqual(
+      expect.arrayContaining(["Cloud Engineer", "DevOps Engineer", "AI/ML Engineer", "Product Manager"]),
+    );
+    expect(
+      TOP_PAYING_ROLE_GUIDANCE.every((role) =>
+        /guidance|estimate|sample|not verified|not an AfriTalent outcome/i.test(role.salaryNote),
+      ),
+    ).toBe(true);
   });
 
   it("includes the required interview role tracks", () => {

@@ -19,6 +19,7 @@ interface JobCardProps {
 export function JobCard({ job }: JobCardProps) {
   const locale = useLocale();
   const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const tags = Array.isArray(job.tags) ? job.tags : [];
   const salary = formatSalaryRange({
     salaryMin: job.salaryMin,
@@ -113,14 +114,19 @@ export function JobCard({ job }: JobCardProps) {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setIsSaved(!isSaved);
+                  if (isSaving) return;
+                  setIsSaving(true);
+                  setIsSaved((current) => !current);
+                  window.setTimeout(() => setIsSaving(false), 250);
                 }}
-                className={`p-2 rounded-full transition-all duration-300 ${
+                disabled={isSaving}
+                className={`p-2 rounded-full transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70 ${
                   isSaved 
-                    ? "bg-rose-50 text-rose-500 dark:bg-rose-500/10 dark:text-rose-400" 
+                    ? "bg-rose-50 text-rose-500 shadow-sm ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-500/30"
                     : "bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:bg-zinc-800/50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                 }`}
-                aria-label={isSaved ? "Remove from saved jobs" : "Save this job"}
+                aria-pressed={isSaved}
+                aria-label={isSaved ? "Remove saved job" : "Save job"}
               >
                 <Heart className={`w-5 h-5 transition-transform duration-300 ${isSaved ? "fill-current scale-110" : "scale-100 active:scale-90"}`} />
               </button>
@@ -224,7 +230,7 @@ export function JobCard({ job }: JobCardProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
-              {job.title.length * 12 + 45} people viewed this
+              {job.discovery?.verifiedApplyPath ? "Verified application path" : "External listing, verify before applying"}
             </span>
             {job.discovery?.sourceCount && job.discovery.sourceCount > 1 && (
               <span>Cross-checked x{job.discovery.sourceCount}{lastSeenText && ` • ${lastSeenText}`}</span>

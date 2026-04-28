@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { EarlyAccessProof } from "@/components/home/early-access-proof";
 import { HeroStats } from "@/components/home/hero-stats";
 import { Button } from "@/components/ui/button";
 import { Globe, Plane, ShieldCheck, Sparkles } from "lucide-react";
@@ -39,27 +40,6 @@ const sourceLabels = [
   ["Arbeitnow", "Europe + visa"],
   ["Remotive", "Remote global"],
   ["Adzuna", "US, UK, EU, CA"],
-];
-
-const testimonials = [
-  {
-    quote: "AfriTalent completely changed how we hire in Africa. The trust verification signals gave us the confidence to hire remotely without the usual friction.",
-    author: "Sarah Jenkins",
-    role: "VP Engineering, TechFlow",
-    initials: "SJ",
-  },
-  {
-    quote: "I found my dream remote job within 3 weeks. The platform highlighted my skills and made my profile stand out to international employers.",
-    author: "David Ochieng",
-    role: "Senior Backend Developer",
-    initials: "DO",
-  },
-  {
-    quote: "The focus on mobility and visa sponsorship clarity saved us hundreds of hours. We only interview candidates who fit our location constraints.",
-    author: "Elena Rodriguez",
-    role: "Talent Acquisition Lead",
-    initials: "ER",
-  }
 ];
 
 export function HomePageContent() {
@@ -177,7 +157,7 @@ export function HomePageContent() {
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {productSignals.map((item) => (
-              <div key={item.title} className="surface-panel rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+              <div key={item.title} className="surface-panel interactive-card rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
                 <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl font-bold text-lg ${item.tone}`}>
                   <item.icon className="w-6 h-6" strokeWidth={2.5} />
                 </div>
@@ -228,38 +208,7 @@ export function HomePageContent() {
           </div>
         </div>
       </section>
-      <section className="section-shell py-16 bg-zinc-50 dark:bg-zinc-900/50">
-        <div className="page-frame">
-          <div className="mb-12 text-center">
-            <h2 className="font-display text-3xl font-bold text-zinc-900 dark:text-zinc-50 md:text-4xl">
-              Trusted by global teams and top talent
-            </h2>
-          </div>
-          <div className="grid gap-8 md:grid-cols-3">
-            {testimonials.map((testimonial, i) => (
-              <div key={i} className="surface-panel rounded-2xl p-8 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm relative">
-                <div className="absolute top-8 left-8 text-emerald-500/20">
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M14.017 21L16.411 14.593H10.155V3H21.5V14.593L19.083 21H14.017ZM3.456 21L5.85 14.593H-0.406V3H10.939V14.593L8.522 21H3.456Z" />
-                  </svg>
-                </div>
-                <p className="relative z-10 mt-6 text-zinc-700 dark:text-zinc-300 italic mb-6">
-                  &ldquo;{testimonial.quote}&rdquo;
-                </p>
-                <div className="flex items-center gap-4 mt-auto pt-6 border-t border-zinc-100 dark:border-zinc-800/60">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-sm">
-                    {testimonial.initials}
-                  </div>
-                  <div>
-                    <div className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">{testimonial.author}</div>
-                    <div className="text-xs text-zinc-500 dark:text-zinc-400">{testimonial.role}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <EarlyAccessProof />
       <section className="px-0 py-20">
         <div className="page-frame text-center">
           <div className="relative overflow-hidden rounded-3xl border border-emerald-900 bg-emerald-950 px-6 py-16 text-white shadow-2xl md:px-12">

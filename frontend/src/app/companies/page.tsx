@@ -34,39 +34,39 @@ interface CompanyListResponse {
   };
 }
 
-const FEATURED_COMPANIES: Company[] = [
+const DEMO_COMPANIES: Company[] = [
   {
-    id: "featured-1",
-    companyName: "Paystack",
+    id: "demo-1",
+    companyName: "Sample fintech employer profile",
     industry: "Financial Services",
     headquarters: "Lagos, Nigeria",
-    website: "https://paystack.com",
+    website: null,
     size: "501-1000",
-    hiresFromAfrica: true,
-    verified: true,
-    ratingAggregate: { averageOverall: 4.8, reviewCount: 124 }
+    hiresFromAfrica: false,
+    verified: false,
+    ratingAggregate: null
   },
   {
-    id: "featured-2",
-    companyName: "Andela",
+    id: "demo-2",
+    companyName: "Sample distributed engineering network",
     industry: "Technology",
-    headquarters: "New York, USA",
-    website: "https://andela.com",
+    headquarters: "Remote-first",
+    website: null,
     size: "1000+",
-    hiresFromAfrica: true,
-    verified: true,
-    ratingAggregate: { averageOverall: 4.5, reviewCount: 312 }
+    hiresFromAfrica: false,
+    verified: false,
+    ratingAggregate: null
   },
   {
-    id: "featured-3",
-    companyName: "Flutterwave",
+    id: "demo-3",
+    companyName: "Sample global payments company",
     industry: "Financial Services",
-    headquarters: "San Francisco, USA",
-    website: "https://flutterwave.com",
+    headquarters: "Global",
+    website: null,
     size: "501-1000",
-    hiresFromAfrica: true,
-    verified: true,
-    ratingAggregate: { averageOverall: 4.6, reviewCount: 208 }
+    hiresFromAfrica: false,
+    verified: false,
+    ratingAggregate: null
   }
 ];
 
@@ -134,16 +134,16 @@ export default function CompaniesPage() {
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
         <div className="relative z-10 max-w-3xl mx-auto">
           <Badge className="mb-6 bg-white/10 text-emerald-100 hover:bg-white/20 border-white/20 backdrop-blur-md">
-            Verified Global Employers
+            Employer directory beta
           </Badge>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 tracking-tight font-display">
-            The World&apos;s Best Companies <br />
+            Discover employer profiles as <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-200">
-              Hire African Talent
+              verification comes online
             </span>
           </h1>
           <p className="text-lg md:text-xl text-emerald-50/80 mb-8 max-w-2xl mx-auto">
-            Discover verified companies that offer visa sponsorship, remote flexibility, and transparent compensation.
+            AfriTalent is onboarding employer partners. Verified profiles, reviews, and hiring outcomes will appear only after real verification.
           </p>
           <div className="max-w-xl mx-auto">
             <Input
@@ -189,7 +189,7 @@ export default function CompaniesPage() {
                 <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-8">
                   {search 
                     ? `We couldn't find any companies matching "${search}". Try adjusting your search terms.`
-                    : "We're currently onboarding new partners to the AfriTalent platform. Check out some of our featured companies below."}
+                    : "We're currently onboarding employer partners. The preview cards below show the future profile structure without claiming verified partnerships."}
                 </p>
                 {search && (
                   <Button
@@ -207,11 +207,18 @@ export default function CompaniesPage() {
 
               {!search && (
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-6">Featured Companies</h3>
+                  <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Sample Employer Profile Structure</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Demo cards only. Real public company profiles will appear after verification.
+                      </p>
+                    </div>
+                    <Badge variant="warning">Demo content</Badge>
+                  </div>
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    {FEATURED_COMPANIES.map((company) => (
-                      <Link key={company.id} href={`/companies/${company.id}`}>
-                        <Card className="h-full hover:shadow-md transition-all duration-200 hover:-translate-y-1 cursor-pointer">
+                    {DEMO_COMPANIES.map((company) => (
+                        <Card key={company.id} className="h-full interactive-card transition-all duration-200">
                           <CardContent className="p-6">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex-1 min-w-0">
@@ -222,9 +229,7 @@ export default function CompaniesPage() {
                                   <p className="text-sm text-gray-600">{company.industry}</p>
                                 )}
                               </div>
-                              {company.verified && (
-                                <Badge variant="info" className="ml-2 shrink-0">Verified</Badge>
-                              )}
+                              <Badge variant="warning" className="ml-2 shrink-0">Demo</Badge>
                             </div>
 
                             {company.headquarters && (
@@ -244,13 +249,11 @@ export default function CompaniesPage() {
                             )}
 
                             <div className="flex flex-wrap gap-2 mt-auto pt-4">
-                              {company.hiresFromAfrica && (
-                                <Badge variant="success">Hires from Africa</Badge>
-                              )}
+                              <Badge variant="default">Verification pending</Badge>
+                              <Badge variant="info">Pilot profile format</Badge>
                             </div>
                           </CardContent>
                         </Card>
-                      </Link>
                     ))}
                   </div>
                 </div>
@@ -326,66 +329,34 @@ export default function CompaniesPage() {
             </div>
           )}
 
-          {/* Wall of Love / Testimonials */}
+          {/* Honest early-access employer proof */}
           {!search && (
             <div className="mt-16 pt-16 border-t border-gray-100 dark:border-zinc-800">
-              <div className="text-center mb-12">
+              <div className="text-center mb-8">
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4 font-display">
-                  Loved by Global Teams
+                  Employer trust proof is coming after verification
                 </h2>
                 <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-                  See what engineering leaders and founders say about scaling their teams with AfriTalent.
+                  AfriTalent will not publish fake employer testimonials, fake hiring outcomes, or invented partner counts.
+                  Pilot employer stories will appear after real onboarding, review, and permission.
                 </p>
               </div>
               
-              <div className="grid md:grid-cols-3 gap-6">
-                <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:shadow-lg transition-shadow">
-                  <CardContent className="p-8">
-                    <StarRating rating={5} />
-                    <p className="text-gray-700 dark:text-gray-300 my-6 italic leading-relaxed">
-                      &quot;The caliber of senior engineers we found through AfriTalent exceeded our expectations. Our Lagos hub is now our fastest-growing engineering center globally.&quot;
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">SJ</div>
-                      <div>
-                        <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Sarah Jenkins</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">VP Engineering, FintechX</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:shadow-lg transition-shadow">
-                  <CardContent className="p-8">
-                    <StarRating rating={5} />
-                    <p className="text-gray-700 dark:text-gray-300 my-6 italic leading-relaxed">
-                      &quot;We struggled with visa sponsorships and relocations before. AfriTalent&apos;s verified partners made building our distributed team in Kenya completely frictionless.&quot;
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">MD</div>
-                      <div>
-                        <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Marcus Dawson</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">CTO, CloudScale</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:shadow-lg transition-shadow">
-                  <CardContent className="p-8">
-                    <StarRating rating={5} />
-                    <p className="text-gray-700 dark:text-gray-300 my-6 italic leading-relaxed">
-                      &quot;Not only did we hire two incredible staff-level backend engineers, but the salary transparency tools helped us create fair, globally competitive compensation packages.&quot;
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold">AK</div>
-                      <div>
-                        <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Aisha K.</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Head of Talent, NextWeb</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="grid gap-4 md:grid-cols-3">
+                {["Employer verification", "Candidate safety", "Pilot stories"].map((item) => (
+                  <Card key={item} className="interactive-card bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
+                    <CardContent className="p-6">
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">{item}</h3>
+                      <p className="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-400">
+                        {item === "Employer verification"
+                          ? "Profiles should show verified domains, application paths, and hiring expectations before public promotion."
+                          : item === "Candidate safety"
+                            ? "Candidates should see source transparency, scam-risk guidance, and clear next steps before applying."
+                            : "Testimonials and case studies should require real workflow completion and explicit permission."}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             </div>
           )}

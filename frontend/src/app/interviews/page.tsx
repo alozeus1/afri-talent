@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CardGridSkeleton } from "@/components/ui/skeleton";
 import { trackEvent } from "@/lib/analytics";
 
 const DIFFICULTY_OPTIONS = ["EASY", "MEDIUM", "HARD"];
@@ -29,72 +30,72 @@ const HELPFUL_STORAGE_KEY = "afritalent_interview_helpful_votes";
 
 const MOCK_EXPERIENCES: InterviewExperienceItem[] = [
   {
-    id: "exp-1",
-    company: { id: "c-1", name: "Paystack" },
-    jobTitle: "Frontend Engineer",
+    id: "sample-aws-cloud-engineer",
+    company: { id: "sample-company-type-cloud", name: "Sample scenario: global cloud consulting team" },
+    jobTitle: "AWS Cloud Engineer",
     difficulty: "MEDIUM",
-    outcome: "OFFERED",
+    outcome: "IN_PROGRESS",
     interviewType: "TECHNICAL",
-    process: "The process took 3 weeks. It started with a recruiter call, followed by a take-home assignment which took about 4 hours. After passing the assignment, I had a 1-hour technical interview focusing on React and system design. The final round was a culture fit with the engineering manager.",
-    questions: ["Explain how React's reconciliation works.", "Design an auto-complete component.", "Tell me about a time you had a conflict with a designer."],
-    tips: "Focus heavily on component performance and state management. They really care about clean code.",
-    duration: "3 weeks",
+    process: "Practice scenario, not a real user-submitted interview. A typical flow could include a recruiter screen, AWS fundamentals round, troubleshooting exercise, and a short architecture discussion.",
+    questions: ["How would you troubleshoot an EC2 instance that cannot be reached over SSH?", "Explain public vs private subnets in a VPC.", "How would you monitor a small production API?"],
+    tips: "Prepare to explain IAM, VPC routing, security groups, CloudWatch, and one reliability story from your own experience.",
+    duration: "Practice flow: 3 to 4 rounds",
     helpfulCount: 42,
     createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
   },
   {
-    id: "exp-2",
-    company: { id: "c-2", name: "Andela" },
-    jobTitle: "Senior Full Stack Developer",
+    id: "sample-devops-engineer",
+    company: { id: "sample-company-type-saas", name: "Sample scenario: remote SaaS platform team" },
+    jobTitle: "DevOps Engineer",
     difficulty: "HARD",
     outcome: "IN_PROGRESS",
     interviewType: "SYSTEM_DESIGN",
-    process: "Standard technical screen followed by a rigorous 2-hour system design interview. The interviewer was very friendly but pushed deep on scalability and database indexing.",
-    questions: ["Design a URL shortener.", "How would you handle real-time chat sync across multiple devices?"],
-    tips: "Brush up on database sharding and caching strategies.",
-    duration: "2 weeks",
+    process: "Practice scenario, not a real user-submitted interview. The candidate is asked to design a deployment pipeline, debug a failed release, and explain rollback and observability choices.",
+    questions: ["Design a CI/CD pipeline from commit to production.", "A deployment passes tests but health checks fail. What do you do first?", "How do you manage secrets in CI/CD?"],
+    tips: "Use a structured answer: quality gates, deployment strategy, monitoring, rollback, and communication.",
+    duration: "Practice flow: 2 to 3 rounds",
     helpfulCount: 15,
     createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
   },
   {
-    id: "exp-3",
-    company: { id: "c-3", name: "Flutterwave" },
-    jobTitle: "Backend Engineer",
+    id: "sample-cybersecurity-analyst",
+    company: { id: "sample-company-type-fintech", name: "Sample scenario: regulated fintech security team" },
+    jobTitle: "Cybersecurity Analyst",
     difficulty: "HARD",
-    outcome: "REJECTED",
+    outcome: "IN_PROGRESS",
     interviewType: "TECHNICAL",
-    process: "Recruiter screen, then a live coding round on HackerRank. The problem was quite difficult and required dynamic programming.",
-    questions: ["Solve the word break problem using DP.", "Write a query to find the second highest salary."],
-    tips: "Practice medium to hard LeetCode problems. The time limit is strict.",
-    duration: "1 week",
+    process: "Practice scenario, not a real user-submitted interview. The flow includes a security fundamentals screen, phishing/risk discussion, and an incident response case.",
+    questions: ["How would you prioritize vulnerabilities when fixes exceed team capacity?", "What phishing indicators would you teach non-technical users?", "How would you document an incident escalation?"],
+    tips: "Think in evidence, impact, urgency, and practical risk reduction. Avoid guessing when facts are missing.",
+    duration: "Practice flow: 2 to 4 rounds",
     helpfulCount: 89,
     createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
   },
   {
-    id: "exp-4",
-    company: { id: "c-4", name: "Kuda Bank" },
-    jobTitle: "Product Designer",
+    id: "sample-backend-developer",
+    company: { id: "sample-company-type-marketplace", name: "Sample scenario: global marketplace engineering team" },
+    jobTitle: "Backend Developer",
     difficulty: "MEDIUM",
-    outcome: "OFFERED",
-    interviewType: "PANEL",
-    process: "Portfolio review with the design team. They asked detailed questions about my UX decisions. Next was an app redesign challenge.",
-    questions: ["Walk me through a project that failed.", "How do you hand off designs to engineering?"],
-    tips: "Be prepared to defend every design decision in your portfolio.",
-    duration: "4 weeks",
+    outcome: "IN_PROGRESS",
+    interviewType: "TECHNICAL",
+    process: "Practice scenario, not a real user-submitted interview. The candidate discusses API design, duplicate handling, data validation, and production debugging.",
+    questions: ["Design an API for saving and tracking job applications.", "How would you prevent duplicate jobs from multiple providers?", "A production endpoint is timing out. What is your debugging sequence?"],
+    tips: "Explain data models, status transitions, authorization, logs, metrics, and a safe mitigation path.",
+    duration: "Practice flow: 3 rounds",
     helpfulCount: 23,
     createdAt: new Date(Date.now() - 86400000 * 18).toISOString(),
   },
   {
-    id: "exp-5",
-    company: { id: "c-5", name: "Moniepoint" },
-    jobTitle: "DevOps Engineer",
+    id: "sample-product-manager",
+    company: { id: "sample-company-type-startup", name: "Sample scenario: early-stage product team" },
+    jobTitle: "Product Manager",
     difficulty: "MEDIUM",
-    outcome: "NO_RESPONSE",
-    interviewType: "TECHNICAL",
-    process: "First round was heavily focused on AWS and CI/CD pipelines. I was asked to debug a failing Kubernetes pod in real-time.",
-    questions: ["Explain the difference between a Deployment and StatefulSet.", "How do you handle secrets in CI/CD?"],
-    tips: "Know your Kubernetes concepts very well. They use it heavily.",
-    duration: "2 weeks",
+    outcome: "IN_PROGRESS",
+    interviewType: "BEHAVIORAL",
+    process: "Practice scenario, not a real user-submitted interview. The flow evaluates product judgment, prioritization, early-user feedback, and safety metrics.",
+    questions: ["How would you prioritize improvements for a pre-launch job platform?", "Tell me about a time you changed direction after user feedback.", "What metrics would you track for an application assistant feature?"],
+    tips: "Anchor answers in user value, risk, learning speed, and measurable product quality signals.",
+    duration: "Practice flow: 2 to 3 rounds",
     helpfulCount: 7,
     createdAt: new Date(Date.now() - 86400000 * 25).toISOString(),
   }
@@ -213,7 +214,7 @@ export default function InterviewsPage() {
 
   const handleHelpful = async (id: string) => {
     if (helpfulSet.has(id)) return;
-    const isDemoExperience = id.startsWith("exp-");
+    const isDemoExperience = id.startsWith("exp-") || id.startsWith("sample-");
     const previousData = data;
     const previousHelpfulSet = helpfulSet;
     const nextHelpfulSet = new Set(helpfulSet).add(id);
@@ -323,8 +324,8 @@ export default function InterviewsPage() {
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">Interview Insights</h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Learn from the community. Read real interview experiences from African
-          professionals and prepare for your next opportunity.
+          Practice with clearly labeled sample scenarios now. Real community interview
+          experiences will appear after early testers submit verified entries.
         </p>
       </div>
 
@@ -400,9 +401,7 @@ export default function InterviewsPage() {
 
       {/* Loading */}
       {loading && (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-        </div>
+        <CardGridSkeleton count={3} />
       )}
 
       {/* Error */}
@@ -419,10 +418,11 @@ export default function InterviewsPage() {
       {!loading && filteredExperiences && (
         <>
           {filteredExperiences.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-600 mb-2">No interview experiences found</p>
-              <p className="text-sm text-gray-400">
-                Be the first to share your experience!
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
+              <p className="text-lg font-semibold text-gray-900 mb-2">No matching interview scenarios yet</p>
+              <p className="mx-auto max-w-xl text-sm leading-6 text-gray-500">
+                Try clearing filters or use the sample scenarios to practice. Real community
+                examples will be added after early testers submit verified experiences.
               </p>
             </div>
           ) : (
@@ -736,9 +736,11 @@ function InterviewCard({
   isHelpfulMarked: boolean;
   isHelpfulLoading: boolean;
 }) {
+  const isSampleScenario = experience.id.startsWith("sample-") || experience.id.startsWith("exp-");
+
   return (
     <Card
-      className="cursor-pointer hover:shadow-md transition-shadow"
+      className="interactive-card cursor-pointer hover:shadow-md transition-shadow"
       onClick={onToggle}
     >
       <CardContent className="p-6">
@@ -750,11 +752,23 @@ function InterviewCard({
             <p className="text-sm text-gray-600">{experience.jobTitle}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {isSampleScenario && <Badge variant="warning">Sample interview scenario</Badge>}
             {difficultyBadge(experience.difficulty)}
             {outcomeBadge(experience.outcome)}
             <Badge variant="info">
               {experience.interviewType.replace(/_/g, " ")}
             </Badge>
+            <button
+              type="button"
+              className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+              aria-expanded={isExpanded}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggle();
+              }}
+            >
+              {isExpanded ? "Hide details" : "View details"}
+            </button>
           </div>
         </div>
 

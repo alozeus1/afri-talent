@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { salaryReports, SalaryReportResponse, SalaryComparison, TopPayingJob } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -8,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CardGridSkeleton } from "@/components/ui/skeleton";
+import { TOP_PAYING_ROLE_GUIDANCE } from "@/lib/early-tester-content";
 
 const COUNTRIES = [
   "USA", "UK", "Germany", "Canada", "Australia",
@@ -23,19 +26,6 @@ const MOCK_DISTRIBUTION_DATA = [
   { level: "Mid-Level (3-5y)", min: 45000, max: 80000, avg: 65000 },
   { level: "Senior (6-8y)", min: 80000, max: 130000, avg: 105000 },
   { level: "Lead/Staff (9+y)", min: 120000, max: 180000, avg: 145000 },
-];
-
-const MOCK_TOP_PAYING: TopPayingJob[] = [
-  { jobTitle: "Chief Technology Officer", avgSalary: 185000, count: 42 },
-  { jobTitle: "VP of Engineering", avgSalary: 172000, count: 56 },
-  { jobTitle: "Staff Software Engineer", avgSalary: 158000, count: 124 },
-  { jobTitle: "Engineering Manager", avgSalary: 145000, count: 215 },
-  { jobTitle: "Lead Data Scientist", avgSalary: 142000, count: 89 },
-  { jobTitle: "Cloud Architect", avgSalary: 138000, count: 112 },
-  { jobTitle: "Senior DevOps Engineer", avgSalary: 132000, count: 167 },
-  { jobTitle: "Senior Product Manager", avgSalary: 128000, count: 198 },
-  { jobTitle: "Machine Learning Engineer", avgSalary: 125000, count: 145 },
-  { jobTitle: "Senior Full Stack Engineer", avgSalary: 118000, count: 342 },
 ];
 
 export default function SalariesPage() {
@@ -84,11 +74,11 @@ export default function SalariesPage() {
         if (data && data.length > 0) {
           setTopPaying(data);
         } else {
-          setTopPaying(MOCK_TOP_PAYING);
+          setTopPaying([]);
         }
       } catch (err) {
         setTopPayingError(err instanceof Error ? err.message : "Failed to load top paying roles");
-        setTopPaying(MOCK_TOP_PAYING);
+        setTopPaying([]);
       } finally {
         setTopPayingLoading(false);
       }
@@ -185,8 +175,8 @@ export default function SalariesPage() {
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">Know Your Worth</h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Explore anonymous salary data from African professionals working globally.
-          Compare compensation across countries and roles to negotiate better.
+          Explore anonymous salary data where available, plus clearly labeled market guidance for global roles.
+          Verified AfriTalent salary reports will grow as early testers contribute real data.
         </p>
       </div>
 
@@ -216,6 +206,68 @@ export default function SalariesPage() {
             <Button onClick={handleSearch} disabled={!searchTitle.trim() || searchLoading}>
               {searchLoading ? "Searching..." : "Search"}
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Educational Role Guidance */}
+      <Card className="mb-10">
+        <CardHeader>
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Top Paying Roles: Market Guidance</h2>
+              <p className="text-sm text-gray-500">
+                Educational estimates for high-opportunity roles. These are not AfriTalent placement outcomes.
+              </p>
+            </div>
+            <Badge variant="warning">Sample market estimates</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+            Use these cards to plan learning and search strategy. Always verify compensation against the
+            country, employer, seniority, benefits, and contract type before negotiating.
+          </div>
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {TOP_PAYING_ROLE_GUIDANCE.map((role) => (
+              <article
+                key={role.role}
+                className="interactive-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">{role.role}</h3>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">{role.description}</p>
+                  </div>
+                  <Badge variant={role.remoteFriendliness === "High" ? "success" : "info"}>
+                    {role.remoteFriendliness} remote fit
+                  </Badge>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {role.commonSkills.map((skill) => (
+                    <span key={skill} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-5 rounded-xl bg-emerald-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
+                    Estimated global range
+                  </p>
+                  <p className="mt-1 text-xl font-bold text-emerald-800">{role.marketEstimate}</p>
+                  <p className="mt-2 text-xs leading-5 text-emerald-900">{role.salaryNote}</p>
+                </div>
+                <p className="mt-4 text-sm text-gray-600">Typical level: {role.experienceLevel}</p>
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                  <Link href={role.searchPath} className="flex-1">
+                    <Button size="sm" className="w-full">Search jobs</Button>
+                  </Link>
+                  <Link href={role.learningPath} className="flex-1">
+                    <Button size="sm" variant="outline" className="w-full">Learning path</Button>
+                  </Link>
+                </div>
+              </article>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -417,7 +469,9 @@ export default function SalariesPage() {
       <Card className="mb-10">
         <CardHeader>
           <h2 className="text-xl font-bold text-gray-900">Salary Distribution by Level</h2>
-          <p className="text-sm text-gray-500">Global average compensation bands across tech roles</p>
+          <p className="text-sm text-gray-500">
+            Sample compensation bands for education only. Not verified AfriTalent salary reports.
+          </p>
         </CardHeader>
         <CardContent>
           <div className="h-[300px] w-full mt-4">
@@ -455,13 +509,13 @@ export default function SalariesPage() {
       <Card className="mb-10">
         <CardHeader>
           <h2 className="text-xl font-bold text-gray-900">Top Paying Roles</h2>
-          <p className="text-sm text-gray-500">Highest-paying job titles based on community reports</p>
+          <p className="text-sm text-gray-500">
+            Live community salary reports when available. No fallback reports are invented.
+          </p>
         </CardHeader>
         <CardContent>
           {topPayingLoading && (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-            </div>
+            <CardGridSkeleton count={3} />
           )}
 
           {topPayingError && (
@@ -497,8 +551,12 @@ export default function SalariesPage() {
           )}
 
           {!topPayingLoading && topPaying.length === 0 && !topPayingError && (
-            <div className="text-center py-8 text-gray-500">
-              No data available yet. Be the first to submit your salary!
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-gray-600">
+              <h3 className="text-lg font-semibold text-gray-900">No verified community salary reports yet</h3>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6">
+                AfriTalent will show live top-paying roles after enough real salary submissions exist.
+                Until then, use the market guidance cards above as planning support, not verified platform data.
+              </p>
             </div>
           )}
         </CardContent>
