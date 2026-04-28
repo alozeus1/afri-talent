@@ -480,7 +480,10 @@ export default function CandidateDashboard() {
               <ul className="space-y-1 mt-2">
                 {missingItems.slice(0, 3).map((item) => (
                   <li key={item} className="text-xs text-gray-500 flex items-center gap-1">
-                    <span className="text-amber-500">•</span> {item}
+                    <span className="text-amber-500">•</span>
+                    <Link href={localizePath("/candidate/profile", locale)} className="hover:text-emerald-600 hover:underline">
+                      {item}
+                    </Link>
                   </li>
                 ))}
                 {missingItems.length > 3 && (

@@ -789,10 +789,17 @@ export default function CandidateTrustPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Linked authenticity signals</h2>
-            <p className="text-sm text-gray-600">
-              LinkedIn, GitHub, and portfolio links help employers cross-check that your work history and skill claims are real.
-            </p>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Linked authenticity signals</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  LinkedIn, GitHub, and portfolio links help employers cross-check that your work history and skill claims are real.
+                </p>
+              </div>
+              <Link href={localizePath("/candidate/profile", locale)}>
+                <Button size="sm" variant="outline">Edit links</Button>
+              </Link>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {dashboard.profile?.linkedinUrl && (

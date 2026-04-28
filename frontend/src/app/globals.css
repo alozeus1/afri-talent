@@ -57,6 +57,21 @@ body {
   box-shadow: 0 0 0 6px var(--focus-ring-soft);
 }
 
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--brand);
+  color: white;
+  padding: 8px;
+  z-index: 100;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
 button,
 [role="button"],
 a,

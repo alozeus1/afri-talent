@@ -34,7 +34,7 @@ export default function RootLayout({
       <body className={`${inter.variable} ${dmSans.variable} antialiased app-shell`}>
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-4 focus:bg-emerald-600 focus:text-white focus:rounded-md focus:m-4 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+          className="skip-link"
         >
           Skip to main content
         </a>

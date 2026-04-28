@@ -18,7 +18,7 @@ interface UserContext {
 }
 
 export async function buildChatContext(userId: string): Promise<UserContext> {
-  const [user, profile, recentApps, savedSearches, recentAlerts, upcomingEvents, subscription] =
+  const [user, profile, recentApps, savedSearches, recentAlerts, upcomingEvents, subscription, trustProfile] =
     await Promise.all([
       prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true, role: true, createdAt: true } }),
       prisma.candidateProfile.findUnique({ where: { userId }, select: { headline: true, skills: true, targetRoles: true, targetCountries: true, yearsExperience: true, visaStatus: true, openToWork: true, profileCompleteness: true, bio: true } }),
@@ -27,6 +27,7 @@ export async function buildChatContext(userId: string): Promise<UserContext> {
       prisma.jobAlert.findMany({ where: { userId, sentAt: { not: null } }, orderBy: { createdAt: "desc" }, take: MAX_ALERTS, include: { job: { select: { title: true, location: true, sourceName: true } } } }),
       prisma.calendarEvent.findMany({ where: { userId, startTime: { gte: new Date() } }, orderBy: { startTime: "asc" }, take: MAX_EVENTS, select: { title: true, eventType: true, startTime: true, location: true, meetingUrl: true } }),
       prisma.subscription.findUnique({ where: { userId }, select: { plan: true, status: true } }),
+      prisma.candidateTrustProfile.findUnique({ where: { userId }, select: { verificationLevel: true, authenticityScore: true } }),
     ]);
 
   if (!user) return { systemPrompt: "", tokenEstimate: 0 };
@@ -35,9 +36,14 @@ export async function buildChatContext(userId: string): Promise<UserContext> {
 
   sections.push(`You are Mara, the AfriTalent AI Job Assistant — a warm, knowledgeable career coach built for African tech professionals seeking global opportunities. You speak with encouragement and practical specificity. Today is ${new Date().toISOString().split("T")[0]}.
 
+AFRITALENT PLATFORM CONTEXT:
+- Trust Center & Verification: AfriTalent relies on an 'authenticity score' and 'verification level' (e.g. UNVERIFIED, VERIFIED_BASIC, VERIFIED_STRONG). Candidates verify identity, skills, and links (GitHub, LinkedIn) to boost their score and stand out to global employers.
+- AI Job Matches: Candidates can use the 'AI Matches' feature on their dashboard to match their embedded resume against global job descriptions.
+- AI Assistant (Orchestrator): Candidates can generate tailored resumes and cover letters for specific job matches right here in the AI assistant.
+
 IMPORTANT RULES:
 - You have access to this user's real data below. Reference it naturally.
-- Give specific, actionable advice. No generic platitudes.
+- Give specific, actionable advice based on AfriTalent workflows. Encourage users to use the Trust Center and AI Matches.
 - When discussing applications, reference actual job titles and statuses.
 - If the user asks about something you don't have data for, say so honestly.
 - Keep responses concise (2-4 paragraphs max unless they ask for detail).
@@ -48,6 +54,14 @@ IMPORTANT RULES:
 Name: ${user.name}
 Member since: ${user.createdAt.toISOString().split("T")[0]}
 Plan: ${subscription?.plan || "FREE"} (${subscription?.status || "INACTIVE"})`);
+
+  if (trustProfile) {
+    sections.push(`Trust Center Status: ${trustProfile.verificationLevel}
+Authenticity Score: ${trustProfile.authenticityScore}`);
+  } else {
+    sections.push(`Trust Center Status: UNVERIFIED
+Authenticity Score: 0`);
+  }
 
   if (profile) {
     sections.push(`Headline: ${profile.headline || "Not set"}

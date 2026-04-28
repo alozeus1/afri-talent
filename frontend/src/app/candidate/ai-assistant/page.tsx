@@ -718,6 +718,9 @@ export default function AIAssistantPage() {
       } else {
         setPackResult(result);
       }
+
+      // Refresh run history after a successful run
+      getRunHistory(10).then(setRunHistory).catch(console.error);
     } catch (err) {
       if (err instanceof OrchestratorError) {
         setError(err.message);
@@ -844,6 +847,31 @@ export default function AIAssistantPage() {
               </div>
             </CardHeader>
             <CardContent>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload Resume (.txt or .md)
+                </label>
+                <input
+                  type="file"
+                  accept=".txt,.md"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      if (typeof event.target?.result === "string") {
+                        setResumeText(event.target.result);
+                      }
+                    };
+                    reader.readAsText(file);
+                  }}
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                />
+                <p className="mt-1.5 text-xs text-gray-500">
+                  Your resume is parsed securely in your browser. Or, you can paste the text manually below.
+                </p>
+              </div>
+
               <textarea
                 value={resumeText}
                 onChange={(e) => setResumeText(e.target.value)}
@@ -1111,7 +1139,7 @@ export default function AIAssistantPage() {
                     {activeOp !== null && (
                       <Spinner className="h-4 w-4 text-emerald-600" />
                     )}
-                    {activeOp === null && latestResult && (
+                    {activeOp === null && !error && latestResult && (
                       <Badge
                         variant={
                           latestResult.status === "ok"

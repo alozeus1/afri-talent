@@ -235,12 +235,15 @@ function mapPartnerMarker(marker: {
 }
 
 async function deliverPhoneOtp(phoneNumber: string, code: string): Promise<{ previewCode?: string }> {
-  if (process.env.NODE_ENV === "production") {
+  // TODO: Check if Twilio/AWS SNS environment variables exist
+  const hasSmsProvider = !!process.env.TWILIO_ACCOUNT_SID || !!process.env.AWS_SNS_TOPIC_ARN;
+
+  if (process.env.NODE_ENV === "production" && !hasSmsProvider) {
     logger.warn(
       { phoneNumber },
       "Phone verification requested without an SMS provider configured. Integrate Twilio or a local SMS gateway before production rollout.",
     );
-    return {};
+    throw new Error("SMS_DISABLED");
   }
 
   logger.info({ phoneNumber, code }, "Phone verification OTP generated");
@@ -574,12 +577,20 @@ router.post(
         },
       });
 
-      const delivery = await deliverPhoneOtp(data.phoneNumber, code);
-      res.status(201).json({
-        message: "Verification code created.",
-        expiresAt,
-        ...(delivery.previewCode ? { previewCode: delivery.previewCode } : {}),
-      });
+      try {
+        const delivery = await deliverPhoneOtp(data.phoneNumber, code);
+        res.status(201).json({
+          message: "Verification code created.",
+          expiresAt,
+          ...(delivery.previewCode ? { previewCode: delivery.previewCode } : {}),
+        });
+      } catch (err: any) {
+        if (err.message === "SMS_DISABLED") {
+          res.status(503).json({ error: "Phone verification is currently disabled in this environment because no SMS provider is configured." });
+          return;
+        }
+        throw err;
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         validationFailure(res, error);
