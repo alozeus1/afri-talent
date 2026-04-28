@@ -12,10 +12,12 @@ const COOKIE_NAME = "auth_token";
 const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function setAuthCookie(res: Response, token: string): void {
+  const isProduction = process.env.NODE_ENV === "production";
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: isProduction,
+    // "none" required for cross-domain cookie sharing between separate App Runner services.
+    sameSite: isProduction ? "none" : "strict",
     maxAge: COOKIE_MAX_AGE_MS,
     path: "/",
   });

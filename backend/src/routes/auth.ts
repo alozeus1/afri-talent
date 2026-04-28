@@ -24,20 +24,25 @@ const COOKIE_NAME = "auth_token";
 const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
 function setAuthCookie(res: Response, token: string): void {
+  const isProduction = process.env.NODE_ENV === "production";
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: isProduction,
+    // "none" allows the cookie to be sent on cross-origin fetch() calls when
+    // the frontend and backend are on different domains (e.g. separate App Runner services).
+    // "strict" is used locally where both run on localhost.
+    sameSite: isProduction ? "none" : "strict",
     maxAge: COOKIE_MAX_AGE_MS,
     path: "/",
   });
 }
 
 function clearAuthCookie(res: Response): void {
+  const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "strict",
     path: "/",
   });
 }

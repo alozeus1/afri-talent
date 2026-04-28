@@ -13,6 +13,7 @@ import {
 } from "@/lib/early-tester-content";
 import { trackEvent } from "@/lib/analytics";
 import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
+import { useT } from "@/lib/i18n/client";
 
 const difficultyVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
   BEGINNER: "success",
@@ -58,6 +59,7 @@ function filterFallbackLessons(filters: {
 }
 
 export default function LearningPage() {
+  const t = useT();
   const { user } = useAuth();
   const [courses, setCourses] = useState<LearningResourceItem[]>([]);
   const [featured, setFeatured] = useState<LearningResourceItem[]>([]);
@@ -188,9 +190,9 @@ export default function LearningPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Hero */}
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-3">Level Up Your Career</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-3">{t("learning.title")}</h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Practical starter labs for cloud, security, DevOps, AI career workflows, and safer global job search.
+          {t("learning.practicalSubtitle")}
         </p>
       </div>
 
@@ -217,7 +219,7 @@ export default function LearningPage() {
                 value={selectedCategory}
                 onChange={(e) => { setSelectedCategory(e.target.value); setPage(1); }}
               >
-                <option value="">All Categories</option>
+                <option value="">{t("common.allCategories")}</option>
                 {categories.map((cat) => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
@@ -255,12 +257,12 @@ export default function LearningPage() {
                     freeOnly ? "translate-x-6" : "translate-x-1"
                   }`} />
                 </button>
-                <span className="text-sm text-gray-700">Free only</span>
+                <span className="text-sm text-gray-700">{t("common.freeOnly")}</span>
               </label>
 
               {(selectedCategory || selectedDifficulty || freeOnly || query) && (
                 <Button variant="ghost" size="sm" onClick={resetFilters}>
-                  Clear filters
+                  {t("common.clearFilters")}
                 </Button>
               )}
             </div>
@@ -271,7 +273,7 @@ export default function LearningPage() {
       {/* Recommended for You */}
       {user && recommended.length > 0 && (
         <div className="mb-10">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Recommended for You</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t("learning.recommendedForYou")}</h2>
           <div
             ref={scrollRef}
             className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300"
@@ -293,7 +295,7 @@ export default function LearningPage() {
                     <p className="text-xs text-gray-500 mb-2">{course.durationHours}h</p>
                   )}
                   <a href={course.url} target="_blank" rel="noopener noreferrer">
-                    <Button size="sm" variant="outline" className="w-full">View Lesson</Button>
+                    <Button size="sm" variant="outline" className="w-full">{t("learning.viewLesson")}</Button>
                   </a>
                 </CardContent>
               </Card>
@@ -305,7 +307,7 @@ export default function LearningPage() {
       {/* Featured Courses */}
       {featured.length > 0 && (
         <div className="mb-10">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Featured Courses</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">{t("learning.featuredCourses")}</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {featured.map((course) => (
               <Card key={course.id} className="overflow-hidden">
@@ -316,9 +318,9 @@ export default function LearningPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <Badge variant="info">{course.provider}</Badge>
                     {course.isFree ? (
-                      <Badge variant="success">Free</Badge>
+                      <Badge variant="success">{t("common.free")}</Badge>
                     ) : (
-                      <Badge variant="warning">Paid</Badge>
+                      <Badge variant="warning">{t("common.paid")}</Badge>
                     )}
                   </div>
                   <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-2">{course.title}</h3>
@@ -339,10 +341,10 @@ export default function LearningPage() {
                       <span className="text-xs text-gray-500">{course.durationHours}h</span>
                     )}
                     {isEarlyLesson(course) ? (
-                      <Button size="sm" onClick={() => setSelectedLesson(course)}>Start Lesson</Button>
+                      <Button size="sm" onClick={() => setSelectedLesson(course)}>{t("learning.startLesson")}</Button>
                     ) : (
                       <a href={course.url} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm">View Course</Button>
+                        <Button size="sm">{t("learning.viewCourse")}</Button>
                       </a>
                     )}
                   </div>
@@ -362,7 +364,7 @@ export default function LearningPage() {
 
       {/* All Courses */}
       <div className="mb-10">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">All Courses</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">{t("learning.allCourses")}</h2>
 
         {loading ? (
           <div className="flex justify-center py-12">
@@ -373,8 +375,8 @@ export default function LearningPage() {
             <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">📖</span>
             </div>
-            <p className="text-gray-600 mb-2">No courses found</p>
-            <p className="text-sm text-gray-500">Try adjusting your filters</p>
+            <p className="text-gray-600 mb-2">{t("learning.noResults")}</p>
+            <p className="text-sm text-gray-500">{t("common.tryAdjustingFilters")}</p>
             {(selectedCategory || selectedDifficulty || freeOnly || query) && (
               <Button variant="outline" size="sm" className="mt-3" onClick={resetFilters}>
                 Clear filters
@@ -393,9 +395,9 @@ export default function LearningPage() {
                     <div className="flex items-center gap-1.5 mb-2 flex-wrap">
                       <Badge variant="info">{course.provider}</Badge>
                       {course.isFree ? (
-                        <Badge variant="success">Free</Badge>
+                        <Badge variant="success">{t("common.free")}</Badge>
                       ) : (
-                        <Badge variant="warning">Paid</Badge>
+                        <Badge variant="warning">{t("common.paid")}</Badge>
                       )}
                       <Badge variant={difficultyVariants[course.difficulty] || "default"}>
                         {course.difficulty.charAt(0) + course.difficulty.slice(1).toLowerCase()}
@@ -453,7 +455,7 @@ export default function LearningPage() {
                   disabled={page <= 1}
                   onClick={() => setPage(page - 1)}
                 >
-                  Previous
+                  {t("common.previous")}
                 </Button>
                 <span className="flex items-center px-3 text-sm text-gray-600">
                   Page {page} of {totalPages}
@@ -464,7 +466,7 @@ export default function LearningPage() {
                   disabled={page >= totalPages}
                   onClick={() => setPage(page + 1)}
                 >
-                  Next
+                  {t("common.next")}
                 </Button>
               </div>
             )}
@@ -497,26 +499,26 @@ export default function LearningPage() {
                 <Badge variant={difficultyVariants[selectedLesson.difficulty] || "default"}>
                   {selectedLesson.difficulty.charAt(0) + selectedLesson.difficulty.slice(1).toLowerCase()}
                 </Badge>
-                <Badge variant="success">Free</Badge>
+                <Badge variant="success">{t("common.free")}</Badge>
                 <Badge>{selectedLesson.durationHours}h</Badge>
               </div>
 
               <section>
-                <h3 className="font-semibold text-gray-900">Learning outcomes</h3>
+                <h3 className="font-semibold text-gray-900">{t("learning.learningOutcomes")}</h3>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
                   {selectedLesson.outcomes.map((item) => <li key={item}>{item}</li>)}
                 </ul>
               </section>
 
               <section>
-                <h3 className="font-semibold text-gray-900">Step-by-step practice</h3>
+                <h3 className="font-semibold text-gray-900">{t("learning.stepByStep")}</h3>
                 <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-gray-700">
                   {selectedLesson.steps.map((step) => <li key={step}>{step}</li>)}
                 </ol>
               </section>
 
               <section>
-                <h3 className="font-semibold text-gray-900">Checklist</h3>
+                <h3 className="font-semibold text-gray-900">{t("learning.checklist")}</h3>
                 <ul className="mt-2 grid gap-2 sm:grid-cols-2">
                   {selectedLesson.checklist.map((item) => (
                     <li key={item} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
@@ -528,17 +530,17 @@ export default function LearningPage() {
 
               {selectedLesson.practiceTask && (
                 <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                  <h3 className="font-semibold text-emerald-900">Practice task</h3>
+                  <h3 className="font-semibold text-emerald-900">{t("learning.practiceTask")}</h3>
                   <p className="mt-1 text-sm text-emerald-800">{selectedLesson.practiceTask}</p>
                 </section>
               )}
 
               <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-gray-500">
-                  Completion is stored locally for early tester mode until full progress tracking is enabled.
+                  {t("learning.completionNote")}
                 </p>
                 <Button onClick={() => toggleCompleted(selectedLesson.id)}>
-                  {completedLessons.has(selectedLesson.id) ? "Mark incomplete" : "Mark complete"}
+                  {completedLessons.has(selectedLesson.id) ? t("learning.markIncomplete") : t("learning.markComplete")}
                 </Button>
               </div>
             </CardContent>

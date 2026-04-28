@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/lib/i18n/client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -91,6 +92,7 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 export default function CompaniesPage() {
+  const t = useT();
   const [data, setData] = useState<CompanyListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -134,20 +136,20 @@ export default function CompaniesPage() {
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
         <div className="relative z-10 max-w-3xl mx-auto">
           <Badge className="mb-6 bg-white/10 text-emerald-100 hover:bg-white/20 border-white/20 backdrop-blur-md">
-            Employer directory beta
+            {t("companies.employerDirBeta")}
           </Badge>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 tracking-tight font-display">
-            Discover employer profiles as <br />
+            {t("companies.heroHeading")} <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-200">
-              verification comes online
+              {t("companies.heroHighlight")}
             </span>
           </h1>
           <p className="text-lg md:text-xl text-emerald-50/80 mb-8 max-w-2xl mx-auto">
-            AfriTalent is onboarding employer partners. Verified profiles, reviews, and hiring outcomes will appear only after real verification.
+            {t("companies.heroDesc")}
           </p>
           <div className="max-w-xl mx-auto">
             <Input
-              placeholder="Search companies by name or industry..."
+              placeholder={t("companies.searchPlaceholder")}
               value={search}
               className="bg-white/10 border-white/20 text-white placeholder:text-white/50 h-12 rounded-xl focus:bg-white/20 focus:ring-emerald-400 backdrop-blur-md"
               onChange={(e) => {
@@ -184,12 +186,12 @@ export default function CompaniesPage() {
                   </svg>
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-                  {search ? "No companies found" : "Directory is being updated"}
+                  {search ? t("companies.noCompaniesFound") : t("companies.directoryUpdating")}
                 </h2>
                 <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-8">
-                  {search 
-                    ? `We couldn't find any companies matching "${search}". Try adjusting your search terms.`
-                    : "We're currently onboarding employer partners. The preview cards below show the future profile structure without claiming verified partnerships."}
+                  {search
+                    ? t("companies.noCompaniesDesc")
+                    : t("companies.directoryDesc")}
                 </p>
                 {search && (
                   <Button
@@ -200,7 +202,7 @@ export default function CompaniesPage() {
                     }}
                     aria-label="Clear current search query to view all companies"
                   >
-                    Clear search
+                    {t("companies.clearSearch")}
                   </Button>
                 )}
               </div>
@@ -209,12 +211,12 @@ export default function CompaniesPage() {
                 <div>
                   <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900">Sample Employer Profile Structure</h3>
+                      <h3 className="text-xl font-bold text-gray-900">{t("companies.sampleStructure")}</h3>
                       <p className="mt-1 text-sm text-gray-500">
-                        Demo cards only. Real public company profiles will appear after verification.
+                        {t("companies.sampleDesc")}
                       </p>
                     </div>
-                    <Badge variant="warning">Demo content</Badge>
+                    <Badge variant="warning">{t("companies.demoContent")}</Badge>
                   </div>
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                     {DEMO_COMPANIES.map((company) => (
@@ -314,7 +316,7 @@ export default function CompaniesPage() {
                 disabled={page === 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                Previous
+                {t("common.previous")}
               </Button>
               <span className="flex items-center px-4 text-gray-600">
                 Page {page} of {data.pagination.totalPages}
@@ -324,7 +326,7 @@ export default function CompaniesPage() {
                 disabled={page === data.pagination.totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           )}
@@ -334,11 +336,10 @@ export default function CompaniesPage() {
             <div className="mt-16 pt-16 border-t border-gray-100 dark:border-zinc-800">
               <div className="text-center mb-8">
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4 font-display">
-                  Employer trust proof is coming after verification
+                  {t("companies.trustComingTitle")}
                 </h2>
                 <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-                  AfriTalent will not publish fake employer testimonials, fake hiring outcomes, or invented partner counts.
-                  Pilot employer stories will appear after real onboarding, review, and permission.
+                  {t("companies.trustComingDesc")}
                 </p>
               </div>
               

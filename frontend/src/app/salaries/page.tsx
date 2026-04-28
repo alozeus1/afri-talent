@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CardGridSkeleton } from "@/components/ui/skeleton";
 import { TOP_PAYING_ROLE_GUIDANCE } from "@/lib/early-tester-content";
+import { useT } from "@/lib/i18n/client";
 
 const COUNTRIES = [
   "USA", "UK", "Germany", "Canada", "Australia",
@@ -29,6 +30,7 @@ const MOCK_DISTRIBUTION_DATA = [
 ];
 
 export default function SalariesPage() {
+  const t = useT();
   const { user } = useAuth();
 
   // Search state
@@ -173,17 +175,16 @@ export default function SalariesPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Hero Section */}
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Know Your Worth</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">{t("salaries.title")}</h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Explore anonymous salary data where available, plus clearly labeled market guidance for global roles.
-          Verified AfriTalent salary reports will grow as early testers contribute real data.
+          {t("salaries.practicalSubtitle")}
         </p>
       </div>
 
       {/* Search Section */}
       <Card className="mb-10">
         <CardContent className="p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Search Salaries</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">{t("salaries.searchSalaries")}</h2>
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <Input
@@ -198,13 +199,13 @@ export default function SalariesPage() {
               value={searchCountry}
               onChange={(e) => setSearchCountry(e.target.value)}
             >
-              <option value="">All Countries</option>
+              <option value="">{t("salaries.allCountries")}</option>
               {COUNTRIES.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
             <Button onClick={handleSearch} disabled={!searchTitle.trim() || searchLoading}>
-              {searchLoading ? "Searching..." : "Search"}
+              {searchLoading ? t("common.loading") : t("salaries.searchButton")}
             </Button>
           </div>
         </CardContent>
@@ -368,7 +369,7 @@ export default function SalariesPage() {
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500">
-              No salary reports found for this search. Be the first to contribute!
+              {t("salaries.noReportsFound")}
             </div>
           )}
         </div>
@@ -377,7 +378,7 @@ export default function SalariesPage() {
       {/* Compare Across Countries */}
       <Card className="mb-10">
         <CardHeader>
-          <h2 className="text-xl font-bold text-gray-900">Compare Across Countries</h2>
+          <h2 className="text-xl font-bold text-gray-900">{t("salaries.compareCountries")}</h2>
           <p className="text-sm text-gray-500">
             Select a job title to see average salaries across different countries
           </p>
@@ -393,7 +394,7 @@ export default function SalariesPage() {
               />
             </div>
             <Button onClick={handleCompare} disabled={!compareTitle.trim() || compareLoading}>
-              {compareLoading ? "Comparing..." : "Compare"}
+              {compareLoading ? t("common.loading") : t("salaries.compareButton")}
             </Button>
           </div>
 
@@ -459,7 +460,7 @@ export default function SalariesPage() {
 
           {compareData && compareData.length === 0 && (
             <div className="text-center py-8 text-gray-500">
-              No comparison data available for this job title.
+              {t("salaries.noCompareData")}
             </div>
           )}
         </CardContent>
@@ -468,7 +469,7 @@ export default function SalariesPage() {
       {/* Salary Distribution by Level */}
       <Card className="mb-10">
         <CardHeader>
-          <h2 className="text-xl font-bold text-gray-900">Salary Distribution by Level</h2>
+          <h2 className="text-xl font-bold text-gray-900">{t("salaries.distributionByLevel")}</h2>
           <p className="text-sm text-gray-500">
             Sample compensation bands for education only. Not verified AfriTalent salary reports.
           </p>
@@ -508,7 +509,7 @@ export default function SalariesPage() {
       {/* Top Paying Roles */}
       <Card className="mb-10">
         <CardHeader>
-          <h2 className="text-xl font-bold text-gray-900">Top Paying Roles</h2>
+          <h2 className="text-xl font-bold text-gray-900">{t("salaries.topPayingRoles")}</h2>
           <p className="text-sm text-gray-500">
             Live community salary reports when available. No fallback reports are invented.
           </p>
@@ -552,7 +553,7 @@ export default function SalariesPage() {
 
           {!topPayingLoading && topPaying.length === 0 && !topPayingError && (
             <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-gray-600">
-              <h3 className="text-lg font-semibold text-gray-900">No verified community salary reports yet</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{t("salaries.noVerifiedReports")}</h3>
               <p className="mx-auto mt-2 max-w-xl text-sm leading-6">
                 AfriTalent will show live top-paying roles after enough real salary submissions exist.
                 Until then, use the market guidance cards above as planning support, not verified platform data.
@@ -574,7 +575,7 @@ export default function SalariesPage() {
             setShowSubmitForm(!showSubmitForm);
           }}
         >
-          {showSubmitForm ? "Cancel" : "💰 Submit Your Salary"}
+          {showSubmitForm ? t("common.cancel") : `💰 ${t("salaries.submitSalary")}`}
         </Button>
       </div>
 
@@ -582,7 +583,7 @@ export default function SalariesPage() {
       {showSubmitForm && (
         <Card className="mb-10">
           <CardHeader>
-            <h2 className="text-xl font-bold text-gray-900">Submit Your Salary</h2>
+            <h2 className="text-xl font-bold text-gray-900">{t("salaries.submitSalary")}</h2>
             <p className="text-sm text-gray-500">
               All submissions are anonymous and help the community
             </p>
@@ -698,7 +699,7 @@ export default function SalariesPage() {
               </div>
               <div className="flex justify-end">
                 <Button type="submit" disabled={submitLoading}>
-                  {submitLoading ? "Submitting..." : "Submit Salary"}
+                  {submitLoading ? t("common.submitting") : t("salaries.submitButton")}
                 </Button>
               </div>
             </form>

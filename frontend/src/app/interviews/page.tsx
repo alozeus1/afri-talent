@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CardGridSkeleton } from "@/components/ui/skeleton";
 import { trackEvent } from "@/lib/analytics";
+import { useT } from "@/lib/i18n/client";
 
 const DIFFICULTY_OPTIONS = ["EASY", "MEDIUM", "HARD"];
 const OUTCOME_OPTIONS = ["OFFERED", "REJECTED", "NO_RESPONSE", "IN_PROGRESS"];
@@ -130,6 +131,7 @@ function outcomeBadge(outcome: string) {
 }
 
 export default function InterviewsPage() {
+  const t = useT();
   const { user } = useAuth();
 
   // List state
@@ -322,10 +324,9 @@ export default function InterviewsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Hero */}
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Interview Insights</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">{t("interviews.title")}</h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Practice with clearly labeled sample scenarios now. Real community interview
-          experiences will appear after early testers submit verified entries.
+          {t("interviews.practiceSubtitle")}
         </p>
       </div>
 
@@ -335,7 +336,7 @@ export default function InterviewsPage() {
           <div className="flex flex-col md:flex-row gap-4 mb-4">
             <div className="flex-1">
               <Input
-                placeholder="Search by company name or job title..."
+                placeholder={t("interviews.searchPlaceholder")}
                 value={searchText}
                 onChange={(e) => {
                   setSearchText(e.target.value);
@@ -347,7 +348,7 @@ export default function InterviewsPage() {
 
           {/* Filter Chips */}
           <div className="flex flex-wrap gap-2">
-            <span className="text-sm text-gray-500 self-center mr-2">Difficulty:</span>
+            <span className="text-sm text-gray-500 self-center mr-2">{t("common.difficulty")}:</span>
             {DIFFICULTY_OPTIONS.map((d) => (
               <button
                 key={d}
@@ -365,7 +366,7 @@ export default function InterviewsPage() {
               </button>
             ))}
 
-            <span className="text-sm text-gray-500 self-center ml-4 mr-2">Outcome:</span>
+            <span className="text-sm text-gray-500 self-center ml-4 mr-2">{t("common.outcome")}:</span>
             {["OFFERED", "REJECTED"].map((o) => (
               <button
                 key={o}
@@ -419,10 +420,9 @@ export default function InterviewsPage() {
         <>
           {filteredExperiences.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
-              <p className="text-lg font-semibold text-gray-900 mb-2">No matching interview scenarios yet</p>
+              <p className="text-lg font-semibold text-gray-900 mb-2">{t("interviews.noMatch")}</p>
               <p className="mx-auto max-w-xl text-sm leading-6 text-gray-500">
-                Try clearing filters or use the sample scenarios to practice. Real community
-                examples will be added after early testers submit verified experiences.
+                {t("interviews.noMatchDesc")}
               </p>
             </div>
           ) : (
@@ -451,7 +451,7 @@ export default function InterviewsPage() {
                 disabled={page === 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                Previous
+                {t("common.previous")}
               </Button>
               <span className="flex items-center px-4 text-gray-600">
                 Page {page} of {data.pagination.totalPages}
@@ -461,7 +461,7 @@ export default function InterviewsPage() {
                 disabled={page === data.pagination.totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           )}
@@ -481,7 +481,7 @@ export default function InterviewsPage() {
             setShowSubmitForm(true);
           }}
         >
-          ✍️ Share Your Experience
+          ✍️ {t("interviews.shareExperience")}
         </Button>
       </div>
 
@@ -492,7 +492,7 @@ export default function InterviewsPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-900">
-                  Share Your Interview Experience
+                  {t("interviews.shareExperience")}
                 </h2>
                 <button
                   className="text-gray-400 hover:text-gray-600 text-2xl"
@@ -509,7 +509,7 @@ export default function InterviewsPage() {
             <CardContent>
               {submitSuccess && (
                 <div className="bg-emerald-50 text-emerald-700 p-4 rounded-lg mb-4">
-                  ✅ Experience shared successfully! Thank you for helping the community.
+                  ✅ {t("interviews.shareSuccess")}
                 </div>
               )}
 
@@ -521,7 +521,7 @@ export default function InterviewsPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <Input
-                  label="Company ID"
+                  label={t("interviews.companyId")}
                   id="interview-companyId"
                   placeholder="Enter company ID"
                   value={formData.companyId}
@@ -531,7 +531,7 @@ export default function InterviewsPage() {
                   required
                 />
                 <Input
-                  label="Job Title"
+                  label={t("interviews.jobTitle")}
                   id="interview-jobTitle"
                   placeholder="e.g. Senior Frontend Developer"
                   value={formData.jobTitle}
@@ -620,7 +620,7 @@ export default function InterviewsPage() {
                     htmlFor="interview-process"
                     className="block text-sm font-medium text-gray-700 mb-1"
                   >
-                    Interview Process
+                    {t("interviews.interviewProcess")}
                   </label>
                   <textarea
                     id="interview-process"
@@ -637,7 +637,7 @@ export default function InterviewsPage() {
                 {/* Questions */}
                 <div className="w-full">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Interview Questions
+                    {t("interviews.interviewQuestions")}
                   </label>
                   {formData.questions.map((q, i) => (
                     <div key={i} className="flex gap-2 mb-2">
@@ -664,7 +664,7 @@ export default function InterviewsPage() {
                     size="sm"
                     onClick={addQuestion}
                   >
-                    + Add Question
+                    {t("interviews.addQuestion")}
                   </Button>
                 </div>
 
@@ -674,7 +674,7 @@ export default function InterviewsPage() {
                       htmlFor="interview-tips"
                       className="block text-sm font-medium text-gray-700 mb-1"
                     >
-                      Tips for Others
+                      {t("interviews.tipsForOthers")}
                     </label>
                     <textarea
                       id="interview-tips"
@@ -709,7 +709,7 @@ export default function InterviewsPage() {
                     Cancel
                   </Button>
                   <Button type="submit" disabled={submitLoading}>
-                    {submitLoading ? "Submitting..." : "Share Experience"}
+                    {submitLoading ? t("common.submitting") : t("interviews.shareButton")}
                   </Button>
                 </div>
               </form>
@@ -736,6 +736,7 @@ function InterviewCard({
   isHelpfulMarked: boolean;
   isHelpfulLoading: boolean;
 }) {
+  const t = useT();
   const isSampleScenario = experience.id.startsWith("sample-") || experience.id.startsWith("exp-");
 
   return (
@@ -752,7 +753,7 @@ function InterviewCard({
             <p className="text-sm text-gray-600">{experience.jobTitle}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isSampleScenario && <Badge variant="warning">Sample interview scenario</Badge>}
+            {isSampleScenario && <Badge variant="warning">{t("interviews.sampleScenario")}</Badge>}
             {difficultyBadge(experience.difficulty)}
             {outcomeBadge(experience.outcome)}
             <Badge variant="info">
@@ -767,7 +768,7 @@ function InterviewCard({
                 onToggle();
               }}
             >
-              {isExpanded ? "Hide details" : "View details"}
+              {isExpanded ? t("interviews.hideDetails") : t("interviews.viewDetails")}
             </button>
           </div>
         </div>
@@ -791,7 +792,7 @@ function InterviewCard({
           >
             <div>
               <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                Full Interview Process
+                {t("interviews.fullProcess")}
               </h4>
               <p className="text-sm text-gray-600 whitespace-pre-wrap">
                 {experience.process}
@@ -801,7 +802,7 @@ function InterviewCard({
             {experience.questions.length > 0 && (
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                  Interview Questions
+                  {t("interviews.questionsLabel")}
                 </h4>
                 <ul className="list-disc list-inside space-y-1">
                   {experience.questions.map((q, i) => (
@@ -816,7 +817,7 @@ function InterviewCard({
             {experience.tips && (
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                  Tips
+                  {t("interviews.tipsLabel")}
                 </h4>
                 <p className="text-sm text-gray-600">{experience.tips}</p>
               </div>
@@ -854,7 +855,7 @@ function InterviewCard({
               onHelpful();
             }}
           >
-            {isHelpfulLoading ? "Saving..." : "Helpful"} ({experience.helpfulCount})
+            {isHelpfulLoading ? "..." : t("common.helpfulLabel")} ({experience.helpfulCount})
           </button>
         </div>
       </CardContent>
