@@ -388,7 +388,7 @@ jobs:
           }
 
           extract_url() {
-            printf '%s\n' "$1" | grep -Eo 'https?://[^[:space:]]+' | head -n 1
+            printf '%s\n' "$1" | grep -Eo 'https?://[A-Za-z0-9.-]+' | head -n 1
           }
 
           normalize_url() {
