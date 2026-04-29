@@ -382,8 +382,58 @@ jobs:
         id: outputs
         working-directory: infra/terraform
         run: |
-          echo "backend_url=$(terraform output -raw backend_url)" >> "$GITHUB_OUTPUT"
-          echo "frontend_url=$(terraform output -raw frontend_url)" >> "$GITHUB_OUTPUT"
+          terraform_output() {
+            terraform output -raw "$1" 2>/dev/null || true
+          }
+
+          normalize_url() {
+            local value="$1"
+            if [ -z "$value" ] || [ "$value" = "None" ] || [ "$value" = "null" ]; then
+              return 0
+            fi
+
+            if [[ "$value" == http://* || "$value" == https://* ]]; then
+              echo "$value"
+            else
+              echo "https://$value"
+            fi
+          }
+
+          apprunner_url() {
+            local service_name="$1"
+            aws apprunner list-services \
+              --query "ServiceSummaryList[?ServiceName=='$service_name'].ServiceUrl | [0]" \
+              --output text
+          }
+
+          if [ "$DEPLOY_ENV" = "staging" ]; then
+            FRONTEND_SERVICE_NAME="afritalent-stg-fe-livefix"
+          else
+            FRONTEND_SERVICE_NAME="afritalent-${DEPLOY_ENV}-appr-frontend-managed"
+          fi
+
+          BACKEND_SERVICE_NAME="afritalent-${DEPLOY_ENV}-appr-backend-managed"
+
+          BACKEND_URL=$(normalize_url "$(terraform_output backend_url)")
+          FRONTEND_URL=$(normalize_url "$(terraform_output frontend_url)")
+
+          if [ -z "$BACKEND_URL" ]; then
+            BACKEND_URL=$(normalize_url "$(apprunner_url "$BACKEND_SERVICE_NAME")")
+          fi
+
+          if [ -z "$FRONTEND_URL" ]; then
+            FRONTEND_URL=$(normalize_url "$(apprunner_url "$FRONTEND_SERVICE_NAME")")
+          fi
+
+          if [ -z "$BACKEND_URL" ] || [ -z "$FRONTEND_URL" ]; then
+            echo "Failed to resolve App Runner URLs."
+            echo "backend_url=$BACKEND_URL"
+            echo "frontend_url=$FRONTEND_URL"
+            exit 1
+          fi
+
+          echo "backend_url=$BACKEND_URL" >> "$GITHUB_OUTPUT"
+          echo "frontend_url=$FRONTEND_URL" >> "$GITHUB_OUTPUT"
 
       - name: Apply frontend public URL override
         working-directory: infra/terraform
