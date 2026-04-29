@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { getPublicStatsServer } from "@/lib/server-public-api";
 import { EARLY_LEARNING_LESSONS, INTERVIEW_ROLE_TRACKS, SCAM_PROTECTION_TIPS } from "@/lib/early-tester-content";
 
@@ -11,8 +14,23 @@ function formatCompact(value: number): string {
   return compact.toUpperCase().replace(".0", "");
 }
 
-export async function HeroStats() {
-  const stats = await getPublicStatsServer();
+export function HeroStats() {
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof getPublicStatsServer>>>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void getPublicStatsServer().then((nextStats) => {
+      if (isMounted) {
+        setStats(nextStats);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const hasLiveStats = Boolean(stats);
   const interviewQuestionCount = INTERVIEW_ROLE_TRACKS.reduce(
     (total, track) => total + track.questions.length,

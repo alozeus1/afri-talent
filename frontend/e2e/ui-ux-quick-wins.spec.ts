@@ -37,13 +37,13 @@ test.describe('UI/UX Quick Wins Verification', () => {
     await page.goto('/companies', { waitUntil: 'domcontentloaded' });
 
     const heading = page.locator('h2', { hasText: 'Directory is being updated' });
-    const featuredHeading = page.locator('h3', { hasText: 'Featured Companies' });
+    const sampleHeading = page.locator('h3', { hasText: 'Sample Employer Profile Structure' });
 
     await expect(heading).toBeVisible();
-    await expect(featuredHeading).toBeVisible();
+    await expect(sampleHeading).toBeVisible();
 
-    await expect(page.locator('text=Paystack')).toBeVisible();
-    await expect(page.locator('text=Andela')).toBeVisible();
-    await expect(page.locator('text=Flutterwave')).toBeVisible();
+    await expect(page.locator('text=Sample fintech employer profile')).toBeVisible();
+    await expect(page.locator('text=Sample distributed engineering network')).toBeVisible();
+    await expect(page.locator('text=Sample global payments company')).toBeVisible();
   });
 });

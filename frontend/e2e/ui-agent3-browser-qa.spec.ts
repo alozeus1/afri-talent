@@ -38,6 +38,7 @@ async function loginViaUi(
   await page.waitForTimeout(1_300);
   await page.locator("#email").fill(creds.email);
   await page.locator("#password").fill(creds.password);
+  await page.waitForTimeout(1_300);
   const loginResponse = page.waitForResponse((response) =>
     response.url().includes("/api/auth/login"),
   );
@@ -62,10 +63,12 @@ test("public landing, jobs, and companies pages render core browse affordances",
       name: /Find the roles where your credibility and readiness compound/i,
     }),
   ).toBeVisible();
-  await expect(page.getByText(/Search ranking prioritizes relevance/i)).toBeVisible();
+  await expect(page.getByText(/Search ranking prioritizes relevance/i).first()).toBeVisible();
 
   await page.goto(`${APP_URL}/companies`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: /The World's Best Companies/i })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /Discover employer profiles as verification comes online/i }),
+  ).toBeVisible();
   await expect(page.getByPlaceholder("Search companies by name or industry...")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Directory is being updated" })).toBeVisible();
 });

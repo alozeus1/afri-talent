@@ -49,7 +49,8 @@ const SEMANTIC_INDEX_INTERVAL_MS = parseInt(process.env.SEMANTIC_INDEX_INTERVAL_
 const LOCK_TTL_SECONDS = 300; // 5 min lock
 
 const isTest = process.env.NODE_ENV === "test";
-const isSchedulerDisabled = process.env.DISABLE_SCHEDULER === "1";
+const isE2E = process.env.E2E === "1";
+const isSchedulerDisabled = process.env.DISABLE_SCHEDULER === "1" || isE2E;
 
 type IntervalRef = ReturnType<typeof setInterval>;
 

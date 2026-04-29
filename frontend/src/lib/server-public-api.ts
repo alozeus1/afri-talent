@@ -22,15 +22,18 @@ async function fetchServerPublicApi<T>(
   options: RequestInit & { timeoutMs?: number } = {},
 ): Promise<T> {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, headers, ...init } = options;
+  const requestHeaders = new Headers(headers);
+  requestHeaders.set("Accept", "application/json");
+
+  if (typeof window === "undefined") {
+    requestHeaders.set("x-afritalent-internal-fetch", "server-public-api");
+  }
+
   const response = await fetch(`${SERVER_API_URL}${path}`, {
     ...init,
     cache: "no-store",
     signal: buildTimeoutSignal(timeoutMs),
-    headers: {
-      Accept: "application/json",
-      "x-afritalent-internal-fetch": "server-public-api",
-      ...headers,
-    },
+    headers: requestHeaders,
   });
 
   if (!response.ok) {
