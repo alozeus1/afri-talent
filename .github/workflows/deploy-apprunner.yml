@@ -387,6 +387,10 @@ jobs:
             terraform output -raw "$1" 2>/dev/null || true
           }
 
+          extract_url() {
+            printf '%s\n' "$1" | grep -Eo 'https?://[^[:space:]]+' | head -n 1
+          }
+
           normalize_url() {
             value="$1"
             if [ -z "$value" ] || [ "$value" = "None" ] || [ "$value" = "null" ]; then
@@ -414,8 +418,11 @@ jobs:
 
           BACKEND_SERVICE_NAME="afritalent-${DEPLOY_ENV}-appr-backend-managed"
 
-          BACKEND_URL=$(normalize_url "$(terraform_output backend_url)")
-          FRONTEND_URL=$(normalize_url "$(terraform_output frontend_url)")
+          BACKEND_URL=$(extract_url "$(terraform_output backend_url)")
+          FRONTEND_URL=$(extract_url "$(terraform_output frontend_url)")
+
+          BACKEND_URL=$(normalize_url "$BACKEND_URL")
+          FRONTEND_URL=$(normalize_url "$FRONTEND_URL")
 
           if [ -z "$BACKEND_URL" ]; then
             BACKEND_URL=$(normalize_url "$(apprunner_url "$BACKEND_SERVICE_NAME")")
