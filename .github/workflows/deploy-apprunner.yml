@@ -164,6 +164,11 @@ jobs:
           COMPANY_CAREER_SOURCES_JSON: ${{ secrets.COMPANY_CAREER_SOURCES_JSON }}
           ADMIN_BOOTSTRAP_EMAIL: ${{ secrets.ADMIN_BOOTSTRAP_EMAIL }}
           ADMIN_BOOTSTRAP_PASSWORD: ${{ secrets.ADMIN_BOOTSTRAP_PASSWORD }}
+          AT_API_KEY: ${{ secrets.AT_API_KEY }}
+          AT_USERNAME: ${{ secrets.AT_USERNAME }}
+          AT_SANDBOX: ${{ secrets.AT_SANDBOX }}
+          AT_SENDER_ID: ${{ secrets.AT_SENDER_ID }}
+          SMS_ENABLED: ${{ secrets.SMS_ENABLED }}
         run: |
           CURRENT=$(aws secretsmanager get-secret-value \
             --secret-id "$SECRET_NAME" \
@@ -195,6 +200,11 @@ jobs:
             --arg companyCareerSources "$COMPANY_CAREER_SOURCES_JSON" \
             --arg adminBootstrapEmail "$ADMIN_BOOTSTRAP_EMAIL" \
             --arg adminBootstrapPassword "$ADMIN_BOOTSTRAP_PASSWORD" \
+            --arg atApiKey "$AT_API_KEY" \
+            --arg atUsername "$AT_USERNAME" \
+            --arg atSandbox "$AT_SANDBOX" \
+            --arg atSenderId "$AT_SENDER_ID" \
+            --arg smsEnabled "$SMS_ENABLED" \
             '
             def prefer_input($value; $key):
               if ($value | length) > 0 then $value else ($current[$key] // "") end;
@@ -222,7 +232,12 @@ jobs:
               WORKABLE_COMPANY_TOKENS: prefer_input($workableCompanies; "WORKABLE_COMPANY_TOKENS"),
               COMPANY_CAREER_SOURCES_JSON: prefer_input($companyCareerSources; "COMPANY_CAREER_SOURCES_JSON"),
               ADMIN_BOOTSTRAP_EMAIL: prefer_input($adminBootstrapEmail; "ADMIN_BOOTSTRAP_EMAIL"),
-              ADMIN_BOOTSTRAP_PASSWORD: prefer_input($adminBootstrapPassword; "ADMIN_BOOTSTRAP_PASSWORD")
+              ADMIN_BOOTSTRAP_PASSWORD: prefer_input($adminBootstrapPassword; "ADMIN_BOOTSTRAP_PASSWORD"),
+              AT_API_KEY: prefer_input($atApiKey; "AT_API_KEY"),
+              AT_USERNAME: prefer_input($atUsername; "AT_USERNAME"),
+              AT_SANDBOX: prefer_input($atSandbox; "AT_SANDBOX"),
+              AT_SENDER_ID: prefer_input($atSenderId; "AT_SENDER_ID"),
+              SMS_ENABLED: prefer_input($smsEnabled; "SMS_ENABLED")
             }')
 
           aws secretsmanager put-secret-value \
