@@ -381,26 +381,26 @@ jobs:
       - name: Capture Terraform outputs
         id: outputs
         working-directory: infra/terraform
+        shell: bash
         run: |
           terraform_output() {
             terraform output -raw "$1" 2>/dev/null || true
           }
 
           normalize_url() {
-            local value="$1"
+            value="$1"
             if [ -z "$value" ] || [ "$value" = "None" ] || [ "$value" = "null" ]; then
               return 0
             fi
 
-            if [[ "$value" == http://* || "$value" == https://* ]]; then
-              echo "$value"
-            else
-              echo "https://$value"
-            fi
+            case "$value" in
+              http://*|https://*) echo "$value" ;;
+              *) echo "https://$value" ;;
+            esac
           }
 
           apprunner_url() {
-            local service_name="$1"
+            service_name="$1"
             aws apprunner list-services \
               --query "ServiceSummaryList[?ServiceName=='$service_name'].ServiceUrl | [0]" \
               --output text
@@ -424,6 +424,9 @@ jobs:
           if [ -z "$FRONTEND_URL" ]; then
             FRONTEND_URL=$(normalize_url "$(apprunner_url "$FRONTEND_SERVICE_NAME")")
           fi
+
+          echo "Resolved backend_url=$BACKEND_URL"
+          echo "Resolved frontend_url=$FRONTEND_URL"
 
           if [ -z "$BACKEND_URL" ] || [ -z "$FRONTEND_URL" ]; then
             echo "Failed to resolve App Runner URLs."
