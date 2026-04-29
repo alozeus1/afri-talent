@@ -332,7 +332,9 @@ export default function CandidateDashboard() {
                   </p>
                 </div>
                 <Link href={localizePath("/candidate/preferences", locale)}>
-                  <Button variant="outline">Manage alerts</Button>
+                  <Button variant="outline" className="border-amber-400 text-amber-800 hover:bg-amber-100 hover:border-amber-500 focus-visible:ring-amber-500">
+                    🔔 Manage alerts
+                  </Button>
                 </Link>
               </div>
             </CardHeader>
