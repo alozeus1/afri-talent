@@ -298,6 +298,7 @@ export default function EmployerDashboard() {
               )}
             </div>
           </div>
+        </div>
         )}
         </Tabs.Content>
 

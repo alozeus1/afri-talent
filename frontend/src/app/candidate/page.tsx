@@ -26,7 +26,6 @@ import { PushOptInCard } from "@/components/notifications/push-opt-in";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
-import { MapPin, ArrowRight } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
