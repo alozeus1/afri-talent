@@ -29,8 +29,10 @@ export function JobCard({ job }: JobCardProps) {
   });
   const freshnessLabel = job.discovery?.freshnessLabel?.toLowerCase() ?? null;
   const discoverySummary = job.rankingExplanation?.summary || job.trust?.guidance;
+  // Use ISO date (YYYY-MM-DD) to keep server and client output identical and avoid
+  // React hydration mismatches caused by locale-sensitive formatters.
   const lastSeenText = job.discovery?.lastSeenAt
-    ? new Date(job.discovery.lastSeenAt).toLocaleDateString()
+    ? new Date(job.discovery.lastSeenAt).toISOString().slice(0, 10)
     : null;
   const trustReasons = [
     job.employer?.trust?.badge,
