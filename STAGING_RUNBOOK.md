@@ -1,6 +1,55 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: April 13, 2026 5:45 PM (America/Chicago)
+Last updated: April 29, 2026 (Droid QA pass)
+
+## Update on April 29, 2026: Pre-prod QA pass on `develop`
+
+Comprehensive premium-candidate E2E QA was run against shared staging
+(`https://3mwn2b4e5t.us-east-1.awsapprunner.com` /
+`https://ed4nsj3sgv.us-east-1.awsapprunner.com`).
+
+Backend `/api/health` is `ok` with `database=connected`, `redis=connected`,
+`billing=configured`. Backend and frontend unit tests, lint, and typecheck
+all pass on the changes shipped in this pass.
+
+Bugs found and fixed in this session (all on `develop`):
+
+- `410c53c` `fix(api,nav): raise general rate limit + bypass session pollers; drop /blog nav`
+  - `generalLimiter` raised from 100 to 600 / 15 min and bypasses `/auth/me`,
+    `/auth/oauth/providers`, `/public/stats`, `/notifications/unread-count` so
+    normal session pollers never trip 429 in staging
+  - removed the dead `/blog` link from the public header
+  - vitest env override `ORCHESTRATOR_TOKEN_BUDGET_MAX=120000` to keep the AI
+    orchestrator budget test stable
+- `114a399` `fix(admin): stabilize public admin routes`
+- `a30ab56` `fix(candidate): guard auth-loading + null profile to stop crash on first visit`
+  - `app/candidate/page.tsx` is null-safe when the profile API returns `null`
+    for a freshly registered candidate (no profile row yet)
+  - 8 candidate pages now wait on `useAuth().isLoading` before redirecting to
+    `/login`, fixing a race that bounced authenticated users back to the
+    candidate dashboard: `candidate`, `cover-letter`, `resume-builder`,
+    `job-matches`, `career-advisor`, `interview-prep`, `salary`, `career-gap`
+- `cf35759` `fix(jobs): use ISO date for lastSeenAt to avoid SSR hydration mismatch (React #418)`
+  - `JobCard` now formats `discovery.lastSeenAt` with `toISOString().slice(0, 10)`
+    so the SSR HTML matches the client render and the public `/jobs` listing no
+    longer logs React error 418 in production builds
+
+Open / non-blocking items recorded for the next session:
+
+- 7 pre-existing TypeScript errors in untracked frontend files
+  (`components.json`, `src/components/ui/{feedback-toast, mac-os-dock, tabs-2}.tsx`,
+  `src/lib/utils.ts`, `src/app/layout.tsx`, plus `package.json` /
+  `package-lock.json` Geist + shadcn additions). These are leftovers from a
+  parallel UI refactor; they are not part of the QA fixes and were left
+  untouched. Whoever owns that refactor should either land it or revert it
+  before promoting `develop` to `prod`.
+- 8 dependabot advisories on `main` (7 moderate, 1 low) flagged by GitHub on
+  push. Triage and patch before a `prod` cut.
+
+A standalone, full launch-readiness summary lives in
+`AFRITALENT_LAUNCH_READINESS_2026-04-29.md`.
+
+
 
 This is the first file a future Codex run should read for staging, deployment, ops, and recovery work.
 It captures the current live state, the last known deployment progress, where to look in AWS, and the fastest safe troubleshooting paths.

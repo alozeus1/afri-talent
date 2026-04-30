@@ -1,5 +1,6 @@
 "use client";
 
+import * as Tabs from "@radix-ui/react-tabs";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { billing, pricing, PricingData, BillingStatus, RegionalPriceInfo } from "@/lib/api";
@@ -141,28 +142,28 @@ export default function PricingPage() {
 
           {/* Plan type tabs */}
           <div className="flex justify-center">
-            <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-white shadow-sm">
-              <button
-                onClick={() => handleTabSwitch("candidate")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition ${
-                  tab === "candidate"
-                    ? "bg-gray-900 text-white shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
+            <Tabs.Root
+              value={tab}
+              onValueChange={(val) => handleTabSwitch(val as PlanTab)}
+            >
+              <Tabs.List
+                className="flex items-center gap-x-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm text-sm"
+                aria-label="Select Plan Type"
               >
-                For Candidates
-              </button>
-              <button
-                onClick={() => handleTabSwitch("employer")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition ${
-                  tab === "employer"
-                    ? "bg-gray-900 text-white shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                For Employers
-              </button>
-            </div>
+                <Tabs.Trigger
+                  value="candidate"
+                  className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-gray-500 hover:text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-medium"
+                >
+                  For Candidates
+                </Tabs.Trigger>
+                <Tabs.Trigger
+                  value="employer"
+                  className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-gray-500 hover:text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-medium"
+                >
+                  For Employers
+                </Tabs.Trigger>
+              </Tabs.List>
+            </Tabs.Root>
           </div>
 
           {/* Interval toggle */}

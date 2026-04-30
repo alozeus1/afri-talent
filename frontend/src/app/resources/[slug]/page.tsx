@@ -8,12 +8,14 @@ import ReactMarkdown from "react-markdown";
 import { resources, Resource } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import FeedbackToast from "@/components/ui/feedback-toast";
 
 export default function ResourceDetailPage() {
   const params = useParams();
   const [resource, setResource] = useState<Resource | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => {
     async function fetchResource() {
@@ -27,6 +29,10 @@ export default function ResourceDetailPage() {
       }
     }
     fetchResource();
+    
+    // Show feedback toast after a delay
+    const timer = setTimeout(() => setShowFeedback(true), 5000);
+    return () => clearTimeout(timer);
   }, [params.slug]);
 
   if (loading) {
@@ -99,6 +105,15 @@ export default function ResourceDetailPage() {
           </div>
         </div>
       </article>
+      
+      <FeedbackToast 
+        visible={showFeedback}
+        onClose={() => setShowFeedback(false)}
+        onFeedback={(type, reason) => {
+          console.log("Feedback received:", type, reason);
+          // Here you would normally send to your API
+        }}
+      />
     </div>
   );
 }

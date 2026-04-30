@@ -1,5 +1,6 @@
 "use client";
 
+import * as Tabs from "@radix-ui/react-tabs";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -158,20 +159,26 @@ export default function NotificationsPage() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 mb-6">
-        {(["ALL", "UNREAD"] as FilterTab[]).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => handleFilterChange(tab)}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              filter === tab
-                ? "bg-emerald-600 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
+      <div className="mb-6 flex">
+        <Tabs.Root
+          value={filter}
+          onValueChange={(val) => handleFilterChange(val as FilterTab)}
+        >
+          <Tabs.List
+            className="flex items-center gap-x-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm text-sm"
+            aria-label="Filter Notifications"
           >
-            {tab === "ALL" ? "All" : "Unread"}
-          </button>
-        ))}
+            {(["ALL", "UNREAD"] as FilterTab[]).map((tab) => (
+              <Tabs.Trigger
+                key={tab}
+                value={tab}
+                className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-gray-500 hover:text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-medium"
+              >
+                {tab === "ALL" ? "All" : "Unread"}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </Tabs.Root>
       </div>
 
       {/* Error */}
