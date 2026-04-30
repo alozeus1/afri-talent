@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { learning, LearningResourceItem } from "@/lib/api";
+import { billing, BillingStatus, learning, LearningResourceItem } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { FeatureGate } from "@/components/pricing/feature-gate";
 import {
   EARLY_LEARNING_CATEGORIES,
   EARLY_LEARNING_LESSONS,
@@ -14,6 +15,7 @@ import {
 import { trackEvent } from "@/lib/analytics";
 import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
 import { useT } from "@/lib/i18n/client";
+import { Lock, PlayCircle, Sparkles, Star } from "lucide-react";
 
 const difficultyVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
   BEGINNER: "success",
@@ -32,6 +34,119 @@ const categoryGradients: Record<string, string> = {
 function getGradient(category: string): string {
   return categoryGradients[category] || "from-emerald-500 to-green-600";
 }
+
+const premiumLearningLabs = [
+  {
+    field: "Cloud",
+    slug: "cloud",
+    summary: "Identity, networking, observability, and deployment choices in modern cloud systems.",
+    intro: "Build a practical cloud foundation before you touch production workloads.",
+    levels: [
+      { name: "Beginner", stars: 1, scoreBand: "60-69", focus: "Core cloud concepts, regions, shared responsibility, and IAM basics." },
+      { name: "Intermediate", stars: 2, scoreBand: "70-84", focus: "Networking, scaling, logging, and managed service selection." },
+      { name: "Advanced", stars: 3, scoreBand: "85-100", focus: "Multi-account design, resilience, governance, and cost controls." },
+    ],
+  },
+  {
+    field: "AI",
+    slug: "ai",
+    summary: "Prompting, evaluation, retrieval, and safe deployment patterns for applied AI.",
+    intro: "Practice the parts of AI work that teams actually hire for.",
+    levels: [
+      { name: "Beginner", stars: 1, scoreBand: "60-69", focus: "Prompt structure, output quality, and basic evaluation." },
+      { name: "Intermediate", stars: 2, scoreBand: "70-84", focus: "RAG, citation quality, and failure-mode analysis." },
+      { name: "Advanced", stars: 3, scoreBand: "85-100", focus: "Guardrails, hallucination control, and production monitoring." },
+    ],
+  },
+  {
+    field: "Cybersecurity",
+    slug: "cybersecurity",
+    summary: "Threat awareness, secure defaults, incident response, and verification habits.",
+    intro: "Show that you can reason about risk, not only memorize controls.",
+    levels: [
+      { name: "Beginner", stars: 1, scoreBand: "60-69", focus: "Phishing, password hygiene, and common attack paths." },
+      { name: "Intermediate", stars: 2, scoreBand: "70-84", focus: "Access control, logging, and suspicious activity triage." },
+      { name: "Advanced", stars: 3, scoreBand: "85-100", focus: "Incident response, hardening, and secure architecture reviews." },
+    ],
+  },
+  {
+    field: "DevOps",
+    slug: "devops",
+    summary: "Delivery pipelines, rollout hygiene, monitoring, and rollback decisions.",
+    intro: "A lab track for the operational habits teams expect from senior engineers.",
+    levels: [
+      { name: "Beginner", stars: 1, scoreBand: "60-69", focus: "Git workflows, build steps, and pipeline basics." },
+      { name: "Intermediate", stars: 2, scoreBand: "70-84", focus: "CI/CD stages, environments, and deployment checks." },
+      { name: "Advanced", stars: 3, scoreBand: "85-100", focus: "Release engineering, observability, and incident-safe rollouts." },
+    ],
+  },
+  {
+    field: "Frontend Engineering",
+    slug: "frontend-engineering",
+    summary: "Accessibility, state, performance, and component discipline.",
+    intro: "A practical front-end pathway built around real product work.",
+    levels: [
+      { name: "Beginner", stars: 1, scoreBand: "60-69", focus: "Semantic HTML, responsive layouts, and forms." },
+      { name: "Intermediate", stars: 2, scoreBand: "70-84", focus: "State management, component boundaries, and UX flow." },
+      { name: "Advanced", stars: 3, scoreBand: "85-100", focus: "Rendering performance, accessibility audits, and app architecture." },
+    ],
+  },
+  {
+    field: "Backend Engineering",
+    slug: "backend-engineering",
+    summary: "APIs, data models, error handling, and service design.",
+    intro: "Build backend judgment around reliability and maintainability.",
+    levels: [
+      { name: "Beginner", stars: 1, scoreBand: "60-69", focus: "HTTP, API contracts, and request validation." },
+      { name: "Intermediate", stars: 2, scoreBand: "70-84", focus: "Databases, auth flows, and queue-based work." },
+      { name: "Advanced", stars: 3, scoreBand: "85-100", focus: "Scaling, observability, and failure isolation." },
+    ],
+  },
+  {
+    field: "Python",
+    slug: "python",
+    summary: "Automation, scripting, data handling, and service integration.",
+    intro: "A clean skill path for candidates who need practical Python fluency.",
+    levels: [
+      { name: "Beginner", stars: 1, scoreBand: "60-69", focus: "Syntax, functions, and data structures." },
+      { name: "Intermediate", stars: 2, scoreBand: "70-84", focus: "APIs, file handling, and testing." },
+      { name: "Advanced", stars: 3, scoreBand: "85-100", focus: "Async work, packaging, and production automation." },
+    ],
+  },
+  {
+    field: "YAML",
+    slug: "yaml",
+    summary: "Configuration discipline for infrastructure and build pipelines.",
+    intro: "A precision-focused track for pipeline and platform users.",
+    levels: [
+      { name: "Beginner", stars: 1, scoreBand: "60-69", focus: "Indentation, structure, and key/value basics." },
+      { name: "Intermediate", stars: 2, scoreBand: "70-84", focus: "CI pipeline syntax, anchors, and reusable blocks." },
+      { name: "Advanced", stars: 3, scoreBand: "85-100", focus: "Complex manifests, templating, and validation strategy." },
+    ],
+  },
+  {
+    field: "Terraform",
+    slug: "terraform",
+    summary: "Infrastructure as code, state hygiene, modules, and environment strategy.",
+    intro: "A practical track for infra teams and platform-minded candidates.",
+    levels: [
+      { name: "Beginner", stars: 1, scoreBand: "60-69", focus: "Providers, resources, and variables." },
+      { name: "Intermediate", stars: 2, scoreBand: "70-84", focus: "State, modules, and reusable environments." },
+      { name: "Advanced", stars: 3, scoreBand: "85-100", focus: "Workspaces, policy controls, and drift-safe delivery." },
+    ],
+  },
+  {
+    field: "Containerization",
+    slug: "containerization",
+    summary: "Dockerfiles, images, registries, and container safety.",
+    intro: "Build and inspect container workflows the way teams actually use them.",
+    levels: [
+      { name: "Beginner", stars: 1, scoreBand: "60-69", focus: "Docker basics, images, and runtime concepts." },
+      { name: "Intermediate", stars: 2, scoreBand: "70-84", focus: "Multi-stage builds, ports, and registries." },
+      { name: "Advanced", stars: 3, scoreBand: "85-100", focus: "Security hardening, image minimization, and production orchestration." },
+    ],
+  },
+] as const;
 
 function isEarlyLesson(course: LearningResourceItem): course is EarlyLearningLesson {
   return "steps" in course && Array.isArray((course as EarlyLearningLesson).steps);
@@ -61,6 +176,7 @@ function filterFallbackLessons(filters: {
 export default function LearningPage() {
   const t = useT();
   const { user } = useAuth();
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [courses, setCourses] = useState<LearningResourceItem[]>([]);
   const [featured, setFeatured] = useState<LearningResourceItem[]>([]);
   const [recommended, setRecommended] = useState<LearningResourceItem[]>([]);
@@ -109,6 +225,15 @@ export default function LearningPage() {
             setRecommended(rec);
           } catch {
             // Recommended may not be available
+          }
+
+          if (user.role === "CANDIDATE") {
+            try {
+              const status = await billing.status();
+              setBillingStatus(status);
+            } catch {
+              setBillingStatus(null);
+            }
           }
         }
       } catch (err) {
@@ -185,6 +310,7 @@ export default function LearningPage() {
           .includes(query.trim().toLowerCase()),
       )
     : courses;
+  const currentPlan = billingStatus?.plan ?? "FREE";
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -354,6 +480,91 @@ export default function LearningPage() {
           </div>
         </div>
       )}
+
+      {/* Premium Labs */}
+      <div className="mb-10">
+        <FeatureGate
+          feature="Learning Labs"
+          requiredPlan="PROFESSIONAL"
+          currentPlan={currentPlan}
+          fallback={
+            <Card className="border-dashed border-emerald-200 bg-white">
+              <CardContent className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+                <div className="rounded-full bg-emerald-100 p-3 text-emerald-700">
+                  <Lock className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Premium Learning Labs</h2>
+                  <p className="mt-1 max-w-2xl text-sm text-gray-600">
+                    Beginner, intermediate, and advanced labs are reserved for professional plan candidates.
+                  </p>
+                </div>
+                <Button type="button" onClick={() => { window.location.href = "/billing"; }}>
+                  Upgrade to unlock labs
+                </Button>
+              </CardContent>
+            </Card>
+          }
+        >
+          <div className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Premium Learning Labs</h2>
+                <p className="text-sm text-gray-600">
+                  Structured practice across cloud, AI, cybersecurity, DevOps, frontend, backend, Python, YAML,
+                  Terraform, and containerization.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-emerald-700">
+                <Sparkles className="h-4 w-4" />
+                <span>Professional plan enabled</span>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              {premiumLearningLabs.map((track) => (
+                <Card key={track.slug} className="overflow-hidden border-emerald-100">
+                  <CardContent className="p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <Badge variant="info">{track.field}</Badge>
+                        <h3 className="mt-2 text-lg font-semibold text-gray-900">{track.field} Lab Track</h3>
+                        <p className="mt-1 text-sm text-gray-600">{track.summary}</p>
+                      </div>
+                      <div className="rounded-full bg-emerald-50 p-2 text-emerald-700">
+                        <PlayCircle className="h-5 w-5" />
+                      </div>
+                    </div>
+
+                    <p className="mt-4 text-sm text-gray-700">{track.intro}</p>
+
+                    <div className="mt-4 space-y-3">
+                      {track.levels.map((level) => (
+                        <div key={level.name} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <div className="flex gap-0.5">
+                                {Array.from({ length: level.stars }, (_, index) => (
+                                  <Star key={index} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                                ))}
+                              </div>
+                              <span className="text-sm font-semibold text-gray-900">{level.name}</span>
+                            </div>
+                            <Badge variant={level.stars === 1 ? "success" : level.stars === 2 ? "warning" : "danger"}>
+                              {level.scoreBand}
+                            </Badge>
+                          </div>
+                          <p className="mt-2 text-xs leading-5 text-gray-600">{level.focus}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </FeatureGate>
+      </div>
 
       {/* Error State */}
       {error && (
@@ -547,7 +758,11 @@ export default function LearningPage() {
           </Card>
         </div>
       )}
-      <EarlyTesterFeedback area="Learning content usefulness" />
+      <EarlyTesterFeedback
+        area="Learning content usefulness"
+        areaSlug="learning-hub"
+        showApprovedFeedback
+      />
     </div>
   );
 }

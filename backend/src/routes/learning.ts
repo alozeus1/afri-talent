@@ -1,9 +1,62 @@
 import { Router, Request, Response } from "express";
+import { LearningFeedbackStatus, Role } from "@prisma/client";
 import prisma from "../lib/prisma.js";
-import { authenticate, authorize } from "../middleware/auth.js";
-import { Role } from "@prisma/client";
+import { authenticate, authorize, optionalAuth } from "../middleware/auth.js";
+import { z } from "zod";
 
 const router = Router();
+
+const submitFeedbackSchema = z.object({
+  areaSlug: z.string().trim().min(1).max(120),
+  lessonTitle: z.string().trim().min(1).max(200).optional(),
+  firstName: z.string().trim().min(1).max(80),
+  lastName: z.string().trim().min(1).max(80),
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().trim().min(10).max(2000),
+  attachPhoto: z.boolean().default(false),
+});
+
+const moderateFeedbackSchema = z.object({
+  action: z.enum(["approve", "reject"]),
+  moderationNotes: z.string().trim().max(1000).optional(),
+});
+
+function formatFeedbackRecord(
+  feedback: {
+    id: string;
+    areaSlug: string;
+    lessonTitle: string | null;
+    firstName: string;
+    lastName: string;
+    rating: number;
+    comment: string;
+    attachPhoto: boolean;
+    avatarUrlSnapshot: string | null;
+    displayName: string;
+    status: LearningFeedbackStatus;
+    approvedAt: Date | null;
+    moderationNotes: string | null;
+    createdAt: Date;
+    userId: string | null;
+  },
+  options: { adminView: boolean } = { adminView: false },
+) {
+  return {
+    id: feedback.id,
+    areaSlug: feedback.areaSlug,
+    lessonTitle: feedback.lessonTitle,
+    firstName: feedback.firstName,
+    lastName: feedback.lastName,
+    displayName: feedback.userId ? `${feedback.firstName} ${feedback.lastName}` : "Anonymous",
+    rating: feedback.rating,
+    comment: feedback.comment,
+    avatarUrl: feedback.attachPhoto && feedback.avatarUrlSnapshot ? feedback.avatarUrlSnapshot : null,
+    status: feedback.status,
+    approvedAt: feedback.approvedAt,
+    moderationNotes: options.adminView ? feedback.moderationNotes : undefined,
+    createdAt: feedback.createdAt,
+  };
+}
 
 // GET /api/learning/categories — public. Return distinct categories.
 router.get("/categories", async (_req: Request, res: Response) => {
@@ -18,6 +71,137 @@ router.get("/categories", async (_req: Request, res: Response) => {
     res.json(categories);
   } catch (error) {
     console.error("List learning categories error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/learning/feedback — Public, optional auth. Submit learner feedback for moderation.
+router.post("/feedback", optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const data = submitFeedbackSchema.parse(req.body);
+
+    if (req.user?.role && req.user.role !== Role.CANDIDATE) {
+      res.status(403).json({ error: "Only candidates can submit learning feedback" });
+      return;
+    }
+
+    const user = req.user
+      ? await prisma.user.findUnique({
+          where: { id: req.user.userId },
+          select: { id: true, avatarUrl: true, name: true, role: true },
+        })
+      : null;
+
+    if (req.user && !user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const created = await prisma.learningFeedback.create({
+      data: {
+        areaSlug: data.areaSlug,
+        lessonTitle: data.lessonTitle ?? null,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        userId: user?.role === Role.CANDIDATE ? user.id : null,
+        rating: data.rating,
+        comment: data.comment,
+        attachPhoto: data.attachPhoto && Boolean(user?.avatarUrl),
+        avatarUrlSnapshot: data.attachPhoto ? user?.avatarUrl ?? null : null,
+        displayName: user ? `${data.firstName} ${data.lastName}` : "Anonymous",
+      },
+    });
+
+    res.status(201).json({
+      feedback: formatFeedbackRecord(created),
+      message: "Feedback submitted for admin approval",
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Validation failed", details: error.issues });
+      return;
+    }
+    console.error("Submit learning feedback error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/learning/feedback — Public approved feedback, or admin moderation list when authenticated.
+router.get("/feedback", optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(parseInt(String(req.query.page ?? "1"), 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "8"), 10) || 8, 1), 50);
+    const areaSlug = typeof req.query.areaSlug === "string" ? req.query.areaSlug.trim() : undefined;
+    const statusParam = typeof req.query.status === "string" ? req.query.status.trim().toUpperCase() : undefined;
+    const isAdmin = req.user?.role === Role.ADMIN;
+
+    const where: Record<string, unknown> = {};
+    if (areaSlug) {
+      where.areaSlug = areaSlug;
+    }
+    if (isAdmin) {
+      if (statusParam && ["PENDING", "APPROVED", "REJECTED"].includes(statusParam)) {
+        where.status = statusParam as LearningFeedbackStatus;
+      }
+    } else {
+      where.status = LearningFeedbackStatus.APPROVED;
+    }
+
+    const [feedback, total] = await Promise.all([
+      prisma.learningFeedback.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.learningFeedback.count({ where }),
+    ]);
+
+    res.json({
+      feedback: feedback.map((entry) => formatFeedbackRecord(entry, { adminView: isAdmin })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
+  } catch (error) {
+    console.error("List learning feedback error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /api/learning/feedback/:id/moderate — Admin moderation.
+router.put("/feedback/:id/moderate", authenticate, authorize(Role.ADMIN), async (req: Request, res: Response) => {
+  try {
+    const data = moderateFeedbackSchema.parse(req.body);
+    const existing = await prisma.learningFeedback.findUnique({
+      where: { id: req.params.id },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: "Feedback not found" });
+      return;
+    }
+
+    const updated = await prisma.learningFeedback.update({
+      where: { id: req.params.id },
+      data: {
+        status: data.action === "approve" ? LearningFeedbackStatus.APPROVED : LearningFeedbackStatus.REJECTED,
+        approvedAt: data.action === "approve" ? new Date() : null,
+        approvedById: req.user!.userId,
+        moderationNotes: data.moderationNotes ?? null,
+      },
+    });
+
+    res.json({ feedback: formatFeedbackRecord(updated, { adminView: true }) });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Validation failed", details: error.issues });
+      return;
+    }
+    console.error("Moderate learning feedback error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });

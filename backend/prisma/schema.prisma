@@ -55,6 +55,12 @@ enum ReviewTargetType {
   RESOURCE
 }
 
+enum LearningFeedbackStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // ──────────────── Phase A New Enums ────────────────
 
 enum VisaSponsorshipStatus {
@@ -718,6 +724,8 @@ model User {
   savedSearches                 SavedSearch[]
   jobAlerts                     JobAlert[]
   companyReviews                CompanyReview[]
+  learningFeedbackSubmissions   LearningFeedback[]            @relation("LearningFeedbackSubmitter")
+  moderatedLearningFeedback     LearningFeedback[]            @relation("LearningFeedbackModerator")
   skillAssessments              SkillAssessment[]
   assessmentInvites             AssessmentInvite[]
   passwordResets                PasswordResetToken[]
@@ -2571,6 +2579,32 @@ model LearningResource {
   @@index([category])
   @@index([skills])
   @@index([featured])
+}
+
+model LearningFeedback {
+  id               String                 @id @default(uuid())
+  areaSlug         String                 @db.VarChar(120)
+  lessonTitle      String?                @db.VarChar(200)
+  firstName        String                 @db.VarChar(80)
+  lastName         String                 @db.VarChar(80)
+  userId           String?
+  user             User?                  @relation("LearningFeedbackSubmitter", fields: [userId], references: [id], onDelete: SetNull)
+  rating           Int
+  comment          String                 @db.Text
+  attachPhoto      Boolean                @default(false)
+  avatarUrlSnapshot String?               @db.VarChar(500)
+  displayName      String                 @db.VarChar(180)
+  status           LearningFeedbackStatus @default(PENDING)
+  approvedAt       DateTime?
+  approvedById     String?
+  approvedBy       User?                  @relation("LearningFeedbackModerator", fields: [approvedById], references: [id], onDelete: SetNull)
+  moderationNotes  String?                @db.Text
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([areaSlug, status])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
 }
 
 // ──────────────── Calendar Events / Interview Scheduling ────────────────

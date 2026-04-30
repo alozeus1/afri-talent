@@ -2751,6 +2751,27 @@ export const learning = {
   categories: () => fetchAPI<string[]>("/api/learning/categories"),
   recommended: () => fetchAPI<LearningResourceItem[]>("/api/learning/recommended"),
   get: (id: string) => fetchAPI<LearningResourceItem>(`/api/learning/${id}`),
+  feedback: {
+    submit: (data: LearningFeedbackSubmitInput) =>
+      fetchAPI<{ feedback: LearningFeedbackItem; message: string }>("/api/learning/feedback", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    list: (params?: { areaSlug?: string; status?: "PENDING" | "APPROVED" | "REJECTED"; page?: number; limit?: number }) => {
+      const sp = new URLSearchParams();
+      if (params?.areaSlug) sp.set("areaSlug", params.areaSlug);
+      if (params?.status) sp.set("status", params.status);
+      if (params?.page) sp.set("page", params.page.toString());
+      if (params?.limit) sp.set("limit", params.limit.toString());
+      const q = sp.toString();
+      return fetchAPI<LearningFeedbackListResponse>(`/api/learning/feedback${q ? `?${q}` : ""}`);
+    },
+    moderate: (id: string, data: { action: "approve" | "reject"; moderationNotes?: string }) =>
+      fetchAPI<{ feedback: LearningFeedbackItem }>(`/api/learning/feedback/${id}/moderate`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+  },
 };
 
 // Calendar
@@ -3158,6 +3179,37 @@ export interface LearningResourceItem {
 
 export interface LearningListResponse {
   resources: LearningResourceItem[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
+export interface LearningFeedbackSubmitInput {
+  areaSlug: string;
+  lessonTitle?: string;
+  firstName: string;
+  lastName: string;
+  rating: number;
+  comment: string;
+  attachPhoto: boolean;
+}
+
+export interface LearningFeedbackItem {
+  id: string;
+  areaSlug: string;
+  lessonTitle: string | null;
+  firstName?: string;
+  lastName?: string;
+  displayName: string;
+  rating: number;
+  comment: string;
+  avatarUrl: string | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  approvedAt: string | null;
+  moderationNotes?: string | null;
+  createdAt: string;
+}
+
+export interface LearningFeedbackListResponse {
+  feedback: LearningFeedbackItem[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
