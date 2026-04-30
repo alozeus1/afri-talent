@@ -46,16 +46,31 @@ function isInternalPublicFetch(req: Request): boolean {
   return req.path === "/api/public/stats" || req.path.startsWith("/api/jobs");
 }
 
+// Endpoints that browsers poll on every page navigation (RSC prefetches,
+// session-restore, etc.). They are cheap, idempotent reads and should NOT be
+// counted against the general per-IP burst budget — otherwise a single user
+// browsing the marketing site can trip the limiter in under a minute.
+const GENERAL_LIMITER_BYPASS_PATHS = new Set<string>([
+  "/health",
+  "/api/health",
+  "/api/auth/me",
+  "/api/auth/oauth/providers",
+  "/api/public/stats",
+  "/api/notifications/unread-count",
+]);
+
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isTestEnv ? 10000 : 100,
+  // 600/15min ≈ 40/min — comfortably accommodates real users (Next.js prefetch
+  // + multiple RSC calls per page load). Abusive bursts are still blocked.
+  max: isTestEnv ? 10000 : 600,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: getRateLimitKey,
   message: { error: "Too many requests, please try again later" },
   skip: (req) => {
-    // Skip rate limiting for health checks
-    return req.path === "/health" || isInternalPublicFetch(req);
+    if (GENERAL_LIMITER_BYPASS_PATHS.has(req.path)) return true;
+    return isInternalPublicFetch(req);
   },
 });
 export const authLimiter = rateLimit({
