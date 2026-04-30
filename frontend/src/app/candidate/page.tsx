@@ -133,12 +133,13 @@ export default function CandidateDashboard() {
         .catch(console.error)
         .finally(() => setLoading(false));
 
-      // Fetch profile
+      // Fetch profile (backend returns null for newly registered candidates with no profile yet)
       fetch(`${API_URL}/api/profile`, { credentials: "include" })
         .then((res) => res.json())
-        .then((data: CandidateProfile) => {
+        .then((data: CandidateProfile | null) => {
+          if (!data) return;
           setProfile(data);
-          setOpenToWork(data.openToWork);
+          setOpenToWork(Boolean(data.openToWork));
         })
         .catch(console.error);
 

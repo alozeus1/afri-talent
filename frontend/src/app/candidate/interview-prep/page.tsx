@@ -39,7 +39,7 @@ const DIFFICULTY_OPTIONS: { value: Difficulty; label: string; color: string }[] 
 ];
 
 export default function InterviewPrepPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   const [stage, setStage] = useState<Stage>("setup");
@@ -54,6 +54,7 @@ export default function InterviewPrepPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  if (authLoading) return null;
   if (!user) {
     router.push("/login");
     return null;

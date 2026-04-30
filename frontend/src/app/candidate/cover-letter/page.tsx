@@ -25,7 +25,7 @@ const TONES: { value: Tone; apiTone: "professional" | "conversational" | "execut
 ];
 
 export default function CoverLetterPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   const [jobId, setJobId] = useState("");
@@ -37,6 +37,7 @@ export default function CoverLetterPage() {
   const [copied, setCopied] = useState(false);
   const [edited, setEdited] = useState(false);
 
+  if (authLoading) return null;
   if (!user) {
     router.push("/login");
     return null;

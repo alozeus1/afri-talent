@@ -44,7 +44,7 @@ const emptyWork: WorkEntry = { company: "", title: "", period: "", description: 
 const emptyEdu: EduEntry = { institution: "", degree: "", period: "" };
 
 export default function ResumeBuilderPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   const [form, setForm] = useState<FormState>({
@@ -80,6 +80,7 @@ export default function ResumeBuilderPage() {
   const [atsLoading, setAtsLoading] = useState(false);
   const [atsError, setAtsError] = useState<FriendlyError | null>(null);
 
+  if (authLoading) return null;
   if (!user) {
     router.push("/login");
     return null;

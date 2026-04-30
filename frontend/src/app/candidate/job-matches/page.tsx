@@ -33,7 +33,7 @@ const qualityVariant = (label?: string): "success" | "info" | "warning" | "defau
 };
 
 export default function JobMatchesPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   const [matches, setMatches] = useState<JobMatch[]>([]);
@@ -64,12 +64,13 @@ export default function JobMatchesPage() {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       router.push("/login");
       return;
     }
     void loadMatches();
-  }, [user, loadMatches, router]);
+  }, [user, authLoading, loadMatches, router]);
 
   async function handleReEmbed() {
     setEmbedding(true);

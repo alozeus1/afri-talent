@@ -17,7 +17,7 @@ interface GapResult {
 }
 
 export default function CareerGapPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   const [gapStartDate, setGapStartDate] = useState("");
@@ -28,6 +28,7 @@ export default function CareerGapPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  if (authLoading) return null;
   if (!user) {
     router.push("/login");
     return null;
