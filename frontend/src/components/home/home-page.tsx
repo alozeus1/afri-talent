@@ -104,7 +104,7 @@ export function HomePageContent() {
                 <div className="surface-panel relative ml-auto w-full max-w-[36rem] rounded-3xl p-5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
                   <div className="relative flex h-[540px] items-center justify-center overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
                     <img
-                      src="/images/hero/homepage-design-preview.jpg"
+                      src="/images/hero/homepage-design-preview.webp"
                       alt="AfriTalent platform preview"
                       width={190}
                       height={600}
@@ -166,7 +166,7 @@ export function HomePageContent() {
             <div className="grid items-stretch lg:grid-cols-[0.95fr_1.05fr]">
               <div className="relative min-h-[320px] overflow-hidden bg-zinc-950 lg:min-h-[420px]">
                 <img
-                  src="/images/generated/afritalent-smart-search-workspace.jpg"
+                  src="/images/generated/afritalent-smart-search-workspace.webp"
                   alt="Smart job search workspace with hiring signals and candidate notes"
                   loading="lazy"
                   className="absolute inset-0 h-full w-full object-cover opacity-90"
@@ -203,7 +203,7 @@ export function HomePageContent() {
         <div className="page-frame text-center">
           <div className="relative overflow-hidden rounded-3xl border border-emerald-900 bg-emerald-950 px-6 py-16 text-white shadow-2xl md:px-12">
             <img
-              src="/images/generated/afritalent-collaboration-hiring.jpg"
+              src="/images/generated/afritalent-collaboration-hiring.webp"
               alt="Hiring team collaborating with a remote teammate"
               loading="lazy"
               className="absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-overlay pointer-events-none"
