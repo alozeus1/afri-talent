@@ -110,8 +110,13 @@ export async function runAlertDispatchCycle(): Promise<void> {
 
   for (const [userId, userAlerts] of alertsByUser) {
     try {
+      // Track last notification time for profile-based alerts (no saved search).
+      // Profile-based alerts use a 4-hour minimum spacing to prevent notification spam.
+      const PROFILE_ALERT_MIN_HOURS = 4;
+
       const eligibleAlerts = userAlerts.filter((alert) => {
         if (!alert.searchId) {
+          // Profile-based alert — allow through (frequency checked at batch level below)
           return true;
         }
         const search = searchMap.get(alert.searchId);
@@ -120,6 +125,23 @@ export async function runAlertDispatchCycle(): Promise<void> {
         }
         return isSearchDeliveryDue(search);
       });
+
+      // For profile-based batches (no searchId), enforce minimum spacing
+      const hasProfileAlerts = eligibleAlerts.some((a) => !a.searchId);
+      if (hasProfileAlerts && eligibleAlerts.every((a) => !a.searchId)) {
+        // Check if this user already received a profile-based notification recently
+        const recentNotif = await prisma.notification.findFirst({
+          where: {
+            userId,
+            type: "JOB_MATCH",
+            createdAt: { gt: new Date(Date.now() - PROFILE_ALERT_MIN_HOURS * 60 * 60 * 1000) },
+          },
+          select: { id: true },
+        });
+        if (recentNotif) {
+          continue; // Skip — too recent
+        }
+      }
 
       if (eligibleAlerts.length === 0) {
         continue;

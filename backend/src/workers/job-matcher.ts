@@ -15,8 +15,9 @@ import logger from "../lib/logger.js";
 import { buildJobSearchWhere, buildPreferenceContext, publicJobInclude } from "../lib/jobs/search.js";
 import { collapseDuplicateRankedJobs, scoreJobForSearch } from "../lib/jobs/discovery.js";
 
-// Minimum overlap score (0-100) to consider a job a match worth alerting on
-const ALERT_SCORE_THRESHOLD = parseInt(process.env.ALERT_SCORE_THRESHOLD || "40", 10);
+// Minimum overlap score (0-100) to consider a job a match worth alerting on.
+// Raised from 40 to 60 to eliminate low-quality matches (HVAC Specialist for Cloud Engineer, etc.)
+const ALERT_SCORE_THRESHOLD = parseInt(process.env.ALERT_SCORE_THRESHOLD || "60", 10);
 const MAX_ALERTS_PER_CYCLE = parseInt(process.env.MAX_ALERTS_PER_CYCLE || "500", 10);
 
 export async function runJobMatcherCycle(): Promise<void> {
@@ -175,8 +176,23 @@ async function matchCandidateProfiles(): Promise<number> {
   });
 
   for (const profile of orphanProfiles) {
+    // Pre-filter: only score jobs whose title overlaps with at least one targetRole keyword.
+    // This prevents irrelevant jobs (HVAC Specialist, Material Handler) from reaching a
+    // Cloud/DevOps Engineer profile just because of generic skill overlap.
+    const targetRoleKeywords = profile.targetRoles
+      .flatMap((role) => role.toLowerCase().split(/[\s\/,]+/).filter((w) => w.length > 3));
+
+    const candidateJobs = targetRoleKeywords.length > 0
+      ? recentJobs.filter((job) => {
+          const title = job.title.toLowerCase();
+          return targetRoleKeywords.some((kw) => title.includes(kw));
+        })
+      : recentJobs;
+
+    if (candidateJobs.length === 0) continue;
+
     const rankedJobs = collapseDuplicateRankedJobs(
-      recentJobs.map((job) => scoreJobForSearch(job, {
+      candidateJobs.map((job) => scoreJobForSearch(job, {
         skills: profile.skills,
         targetRoles: profile.targetRoles,
         targetCountries: profile.targetCountries,
