@@ -268,16 +268,39 @@ export async function fetchRankedJobs(input: {
     providerCounts: Record<string, number>;
   };
 }> {
-  const maxCandidates = input.take ?? Math.max(150, input.page * input.limit * 8);
-  const jobs = await prisma.job.findMany({
-    where: input.where,
-    include: publicJobInclude,
-    orderBy: [
-      { publishedAt: "desc" },
-      { updatedAt: "desc" },
-    ],
-    take: Math.min(maxCandidates, 500),
-  });
+  // Size the ranking candidate pool so the requested page is reachable.
+  // The pool grows with the page number; we cap it generously to keep ranking work bounded
+  // while still allowing deep pagination across the live catalog.
+  const RANKING_POOL_CEILING = 2000;
+  const desiredPool = input.take ?? Math.max(150, input.page * input.limit * 8);
+  const maxCandidates = Math.min(desiredPool, RANKING_POOL_CEILING);
+
+  // Run the ranking-pool fetch and the total count in parallel. The count gives the UI an
+  // accurate "X jobs found" number that reflects the entire catalog matching the filter,
+  // independent of how many candidates we actually rank in memory.
+  const countPromise = (async () => {
+    try {
+      return await prisma.job.count({ where: input.where });
+    } catch {
+      return null;
+    }
+  })();
+  const [jobs, totalMatchingRaw] = await Promise.all([
+    prisma.job.findMany({
+      where: input.where,
+      include: publicJobInclude,
+      orderBy: [
+        { publishedAt: "desc" },
+        { updatedAt: "desc" },
+      ],
+      take: maxCandidates,
+    }),
+    countPromise,
+  ]);
+  const totalMatching =
+    typeof totalMatchingRaw === "number" && Number.isFinite(totalMatchingRaw)
+      ? totalMatchingRaw
+      : jobs.length;
 
   const collapsed = collapseDuplicateRankedJobs(
     jobs.map((job) => scoreJobForSearch(job, input.preferenceContext)),
@@ -296,9 +319,12 @@ export async function fetchRankedJobs(input: {
 
   const start = (input.page - 1) * input.limit;
   const end = start + input.limit;
+  // Surface the larger of the DB-wide count and the deduped ranked count so the UI never
+  // shows a smaller number than the items currently visible on screen.
+  const total = Math.max(totalMatching, ranked.length);
   return {
     jobs: ranked.slice(start, end),
-    total: ranked.length,
+    total,
     diagnostics: {
       rawCandidateCount: jobs.length,
       deduplicatedCount: ranked.length,
