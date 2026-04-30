@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { useNetworkProfile } from "@/lib/network-profile";
+import FeedbackToast from "@/components/ui/feedback-toast";
 
 const QuickApplyModal = dynamic(
   () => import("@/components/jobs/quick-apply-modal").then((mod) => mod.QuickApplyModal),
@@ -110,11 +111,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
             </div>
           )}
 
-          {applied ? (
-            <div className="bg-emerald-50 text-emerald-700 p-4 rounded-lg mb-4">
-              {isOnPlatformApply ? "Application submitted successfully!" : "Employer application page opened successfully."}
-            </div>
-          ) : user && user.role === "EMPLOYER" ? (
+          {user && user.role === "EMPLOYER" ? (
             <div className="bg-blue-50 text-blue-700 p-4 rounded-lg mb-4 text-sm">
               <p className="font-medium">You&apos;re logged in as an employer.</p>
               <p className="mt-1">Only candidates can apply to jobs.</p>
@@ -177,6 +174,13 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
           setQuickApplyOpen(false);
           setApplied(true);
         }}
+      />
+      <FeedbackToast 
+        visible={applied} 
+        onClose={() => setApplied(false)} 
+        mode="success" 
+        title="Success!"
+        message={isOnPlatformApply ? "Application submitted successfully!" : "Employer application page opened."}
       />
     </>
   );

@@ -12,6 +12,7 @@ import {
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import FeedbackToast from "@/components/ui/feedback-toast";
 
 interface Toast {
   type: "success" | "error";
@@ -249,17 +250,18 @@ export default function CandidateProfilePage() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Toast */}
-      {toast && (
-        <div
-          className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-xl shadow-lg text-sm font-medium ${
-            toast.type === "success"
-              ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
-              : "bg-red-50 border border-red-200 text-red-800"
-          }`}
-        >
+      {toast && toast.type === "error" && (
+        <div className="fixed top-4 right-4 z-50 px-6 py-3 rounded-xl shadow-lg text-sm font-medium bg-red-50 border border-red-200 text-red-800">
           {toast.message}
         </div>
       )}
+      <FeedbackToast 
+        visible={toast?.type === "success"} 
+        onClose={() => setToast(null)} 
+        mode="success" 
+        title="Success!"
+        message={toast?.message}
+      />
 
       <h1 className="text-3xl font-bold text-gray-900 mb-2">Edit Profile</h1>
       <p className="text-gray-600 mb-8">

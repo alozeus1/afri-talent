@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ThumbsUp, ThumbsDown, X, ArrowLeft } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -13,15 +13,26 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onFeedback?: (type: FeedbackType, reason?: string) => void;
+  mode?: 'feedback' | 'success';
+  title?: string;
+  message?: string;
 };
 
 const FEEDBACK_CLOSE_DELAY = 1500; // ms
 
-export default function FeedbackToast({ visible, onClose, onFeedback }: Props) {
+export default function FeedbackToast({ visible, onClose, onFeedback, mode = 'feedback', title, message }: Props) {
   const [selected, setSelected] = useState<FeedbackType | null>(null);
   const [showReasonInput, setShowReasonInput] = useState(false);
   const [reason, setReason] = useState('');
   const [submitted, setSubmitted] = useState(false);
+
+  // Auto-close for success mode
+  useEffect(() => {
+    if (visible && mode === 'success') {
+      const timer = setTimeout(onClose, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [visible, mode, onClose]);
 
   const closeAfterDelay = () => {
     setTimeout(onClose, FEEDBACK_CLOSE_DELAY);
@@ -70,11 +81,23 @@ export default function FeedbackToast({ visible, onClose, onFeedback }: Props) {
             layout
             className="bg-background border-border overflow-hidden rounded-xl border p-4 shadow-xl"
           >
-            {!submitted ? (
+            {mode === 'success' ? (
+              <motion.div layout className="flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-foreground text-sm font-medium">{title || "Success!"}</p>
+                  {message && <p className="text-muted-foreground text-xs">{message}</p>}
+                </div>
+              </motion.div>
+            ) : !submitted ? (
               <>
                 {selected === null && (
                   <motion.div layout className="flex items-center justify-between">
-                    <p className="text-foreground text-sm font-medium">Was this helpful?</p>
+                    <p className="text-foreground text-sm font-medium">{title || "Was this helpful?"}</p>
                     <div className="flex gap-2">
                       <Button
                         variant="ghost"

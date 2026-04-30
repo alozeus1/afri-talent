@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import * as Tabs from "@radix-ui/react-tabs";
+import { ArrowRight, MapPin } from "lucide-react";
 import {
   applications,
   Application,
@@ -118,6 +120,9 @@ export default function CandidateDashboard() {
   const [emailVerified, setEmailVerified] = useState<boolean>(true);
   const [sendingVerification, setSendingVerification] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
+
+  const [selectedTab, setSelectedTab] = useState("Overview");
+  const tabItems = ["Overview", "Applications", "Settings"];
 
   useEffect(() => {
     if (!isLoading && (!user || user.role?.toUpperCase() !== "CANDIDATE")) {
@@ -234,6 +239,31 @@ export default function CandidateDashboard() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">{t("candidate.dashboard")}: {user.name}</h1>
         <p className="text-gray-600">Track your job applications and career progress</p>
       </div>
+
+      <Tabs.Root
+        className="mt-2"
+        value={selectedTab}
+        orientation="horizontal"
+        onValueChange={(val) => setSelectedTab(val)}
+      >
+        <div className="mb-8 border-b border-gray-200 dark:border-zinc-800">
+          <Tabs.List
+            className="flex -mb-px space-x-8 overflow-x-auto hide-scrollbar"
+            aria-label="Candidate Dashboard Tabs"
+          >
+            {tabItems.map((item, idx) => (
+              <Tabs.Trigger
+                key={idx}
+                className="data-[state=active]:border-emerald-600 data-[state=active]:text-emerald-600 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:data-[state=active]:text-emerald-400 dark:data-[state=active]:border-emerald-400 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+                value={item}
+              >
+                {item}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </div>
+
+        <Tabs.Content value="Overview">
 
       {!emailVerified && (
         <Card className="mb-8 border-amber-200 bg-amber-50">
@@ -516,67 +546,6 @@ export default function CandidateDashboard() {
             <p className="text-[10px] text-gray-500 dark:text-orange-200/50 mt-2 text-right">2 days until next milestone</p>
           </CardContent>
         </Card>
-
-        {/* Open to Work Toggle */}
-        <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
-          <CardContent className="p-6">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Job Visibility</h3>
-            <div className="flex items-center gap-3 mb-2">
-              <button
-                onClick={toggleOpenToWork}
-                disabled={togglingOtw}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  openToWork ? "bg-emerald-600" : "bg-gray-300"
-                }`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  openToWork ? "translate-x-6" : "translate-x-1"
-                }`} />
-              </button>
-              <span className="text-sm font-medium text-gray-900">
-                {openToWork ? "Open to Work" : "Not Looking"}
-              </span>
-            </div>
-            <p className="text-xs text-gray-500">
-              {openToWork ? "Visible to employers" : "Hidden from employers"}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Subscription Status */}
-        <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
-          <CardContent className="p-6">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Subscription</h3>
-            {billingStatus ? (
-              <>
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant={billingStatus.plan === "FREE" ? "default" : "success"}>
-                    {planLabels[billingStatus.plan] || billingStatus.plan}
-                  </Badge>
-                  {billingStatus.status === "ACTIVE" && billingStatus.plan !== "FREE" && (
-                    <span className="text-xs text-emerald-600 font-medium">Active</span>
-                  )}
-                </div>
-                {billingStatus.plan === "FREE" && (
-                  <Link href={localizePath("/billing", locale)}>
-                    <Button size="sm" variant="outline" className="mt-1">Upgrade Plan</Button>
-                  </Link>
-                )}
-                {billingStatus.plan !== "FREE" && billingStatus.currentPeriodEnd && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Renews {new Date(billingStatus.currentPeriodEnd).toLocaleDateString()}
-                  </p>
-                )}
-              </>
-            ) : (
-              <div className="animate-pulse h-6 w-24 bg-gray-200 rounded"></div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mb-8">
-        <PushOptInCard />
       </div>
 
       {/* Quick Links */}
@@ -639,32 +608,6 @@ export default function CandidateDashboard() {
         </Link>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-3xl font-bold text-emerald-600 mb-1">{myApplications.length}</div>
-            <div className="text-gray-600">Total Applications</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-3xl font-bold text-blue-600 mb-1">
-              {myApplications.filter((a) => a.status === "REVIEWING" || a.status === "SHORTLISTED").length}
-            </div>
-            <div className="text-gray-600">In Progress</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-3xl font-bold text-green-600 mb-1">
-              {myApplications.filter((a) => a.status === "ACCEPTED").length}
-            </div>
-            <div className="text-gray-600">Accepted</div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Recommended For You Section */}
       <div className="mb-10">
         <div className="flex justify-between items-end mb-4">
@@ -706,6 +649,34 @@ export default function CandidateDashboard() {
             </Link>
           ))}
         </div>
+      </div>
+        </Tabs.Content>
+
+        <Tabs.Content value="Applications">
+      {/* Stat Cards */}
+      <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-3xl font-bold text-emerald-600 mb-1">{myApplications.length}</div>
+            <div className="text-gray-600">Total Applications</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-3xl font-bold text-blue-600 mb-1">
+              {myApplications.filter((a) => a.status === "REVIEWING" || a.status === "SHORTLISTED").length}
+            </div>
+            <div className="text-gray-600">In Progress</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-3xl font-bold text-green-600 mb-1">
+              {myApplications.filter((a) => a.status === "ACCEPTED").length}
+            </div>
+            <div className="text-gray-600">Accepted</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* My Applications */}
@@ -774,6 +745,74 @@ export default function CandidateDashboard() {
           )}
         </CardContent>
       </Card>
+        </Tabs.Content>
+
+        <Tabs.Content value="Settings">
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            {/* Open to Work Toggle */}
+            <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
+              <CardContent className="p-6">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Job Visibility</h3>
+                <div className="flex items-center gap-3 mb-2">
+                  <button
+                    onClick={toggleOpenToWork}
+                    disabled={togglingOtw}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      openToWork ? "bg-emerald-600" : "bg-gray-300"
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      openToWork ? "translate-x-6" : "translate-x-1"
+                    }`} />
+                  </button>
+                  <span className="text-sm font-medium text-gray-900">
+                    {openToWork ? "Open to Work" : "Not Looking"}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {openToWork ? "Visible to employers" : "Hidden from employers"}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Subscription Status */}
+            <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
+              <CardContent className="p-6">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Subscription</h3>
+                {billingStatus ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant={billingStatus.plan === "FREE" ? "default" : "success"}>
+                        {planLabels[billingStatus.plan] || billingStatus.plan}
+                      </Badge>
+                      {billingStatus.status === "ACTIVE" && billingStatus.plan !== "FREE" && (
+                        <span className="text-xs text-emerald-600 font-medium">Active</span>
+                      )}
+                    </div>
+                    {billingStatus.plan === "FREE" && (
+                      <Link href={localizePath("/billing", locale)}>
+                        <Button size="sm" variant="outline" className="mt-1">Upgrade Plan</Button>
+                      </Link>
+                    )}
+                    {billingStatus.plan !== "FREE" && billingStatus.currentPeriodEnd && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Renews {new Date(billingStatus.currentPeriodEnd).toLocaleDateString()}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="animate-pulse h-6 w-24 bg-gray-200 rounded"></div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="mb-8">
+            <PushOptInCard />
+          </div>
+        </Tabs.Content>
+      </Tabs.Root>
+
       <div className="mt-8">
         <EarlyTesterFeedback area="Job match quality" />
       </div>

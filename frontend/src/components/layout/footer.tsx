@@ -134,10 +134,9 @@ export function Footer() {
           </p>
         </div>
 
-        {/* Powered by Maralito Labs */}
         <div className="mt-6 border-t border-white/10 pt-4 text-center">
           <p className="text-xs text-white/40">
-            Powered by <span className="font-semibold text-white/55">Maralito Labs</span>
+            Powered by <span className="font-semibold text-white/55">Maralito Labs Studio</span>
             <sup className="text-gray-600 ml-0.5">TM</sup>
           </p>
         </div>
