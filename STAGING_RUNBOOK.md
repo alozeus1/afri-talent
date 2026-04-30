@@ -4,6 +4,23 @@ Last updated: April 30, 2026 (Lighthouse quality pass)
 
 ## Update on April 30, 2026: Lighthouse quality pass on public landing page
 
+Follow-up performance patch:
+
+- Commit `6a906be` (`perf(frontend): trim landing page critical load`) was
+  pushed to `develop` after the live audit showed Performance `75`,
+  Accessibility `100`, Best Practices `100`, SEO `100`.
+- Changes:
+  - removed the unused Geist font preload from the root layout
+  - switched landing page art from JPEG/Next optimizer paths to right-sized
+    static WebP files
+  - removed the unused first-viewport decorative hero image asset from the page
+    path, so Lighthouse no longer treats it as the LCP element
+- Local desktop Lighthouse on `/en` after this patch reached
+  Performance `100`, Accessibility `100`, Best Practices `100`, SEO `100`.
+- After the App Runner deploy completes, rerun live Lighthouse on
+  `https://3mwn2b4e5t.us-east-1.awsapprunner.com/en` and archive the fresh
+  report in `lighthouse-reports/`.
+
 Commit `2168210` (`fix(frontend): improve lighthouse quality scores`) was
 pushed to `develop` after reviewing the April 30 Lighthouse report for
 `https://3mwn2b4e5t.us-east-1.awsapprunner.com/en`.
