@@ -83,27 +83,13 @@ They were verified working on staging after the cited prior commits:
 
 ## 5. Open Items (sorted by launch impact)
 
-### A. Inherited UI refactor type errors (non-blocking, not mine)
+### A. Inherited UI refactor (now landed)
 
-Untracked / pending files left over from a parallel shadcn + radix-ui +
-Geist refactor:
-
-- `frontend/components.json`
-- `frontend/src/components/ui/feedback-toast.tsx`
-- `frontend/src/components/ui/mac-os-dock.tsx`
-- `frontend/src/components/ui/tabs-2.tsx`
-- `frontend/src/lib/utils.ts`
-- `frontend/src/app/layout.tsx`
-- `frontend/package.json` and `frontend/package-lock.json`
-- `frontend/src/app/admin/{blog,reviews}/page.tsx`
-- `frontend/src/app/notifications/page.tsx`
-- `frontend/src/app/pricing/page.tsx`
-- `frontend/src/components/layout/footer.tsx`
-
-There are 7 type errors confined to that refactor (`tabs-2.tsx` pattern). The
-QA fixes in this pass were kept independent so they could ship without
-adopting that refactor wholesale. Owner of the refactor needs to either
-land it or revert it before `prod` is cut.
+The parallel shadcn + radix-ui + Geist refactor was landed on `develop` as
+`2a51db8` "feat(ui): upgrade global tabs, footer dock, and feedback toast".
+After the merge, `frontend npx tsc --noEmit` is fully green. The QA fixes
+from this pass and that UI refactor coexist cleanly. No follow-up needed
+unless visual regression testing flags issues.
 
 ### B. Public-listing hydration roll
 

@@ -36,13 +36,10 @@ Bugs found and fixed in this session (all on `develop`):
 
 Open / non-blocking items recorded for the next session:
 
-- 7 pre-existing TypeScript errors in untracked frontend files
-  (`components.json`, `src/components/ui/{feedback-toast, mac-os-dock, tabs-2}.tsx`,
-  `src/lib/utils.ts`, `src/app/layout.tsx`, plus `package.json` /
-  `package-lock.json` Geist + shadcn additions). These are leftovers from a
-  parallel UI refactor; they are not part of the QA fixes and were left
-  untouched. Whoever owns that refactor should either land it or revert it
-  before promoting `develop` to `prod`.
+- The parallel shadcn + radix-ui + Geist UI refactor was landed by another
+  author as `2a51db8` "feat(ui): upgrade global tabs, footer dock, and
+  feedback toast". `frontend npx tsc --noEmit` is now fully green on
+  `develop`.
 - 8 dependabot advisories on `main` (7 moderate, 1 low) flagged by GitHub on
   push. Triage and patch before a `prod` cut.
 
