@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, KeyboardEvent, useCallback, useEffect, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 interface AuditLog {
     id: string;
@@ -51,7 +53,7 @@ export default function AuditLogsPage() {
         setLoading(true);
         try {
             const response = await fetch(
-                `/api/admin/audit-logs?page=${page}&limit=50${filterAction !== "ALL" ? `&action=${filterAction}` : ""}${filterTarget ? `&targetType=${filterTarget}` : ""}`,
+                `${API_URL}/api/admin/audit-logs?page=${page}&limit=50${filterAction !== "ALL" ? `&action=${filterAction}` : ""}${filterTarget ? `&targetType=${filterTarget}` : ""}`,
                 {
                     credentials: "include",
                 }
@@ -72,34 +74,12 @@ export default function AuditLogsPage() {
         }
     }, [user, loadLogs]);
 
-    const handleFilterLoad = async () => {
-        setLoading(true);
-        try {
-            const response = await fetch(
-                `/api/admin/audit-logs?page=${page}&limit=50${filterAction !== "ALL" ? `&action=${filterAction}` : ""
-                }${filterTarget ? `&targetType=${filterTarget}` : ""}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-                    },
-                }
-            );
-            const data = await response.json();
-            setLogs(data.logs);
-            setTotal(data.pagination.total);
-        } catch (error) {
-            console.error("Failed to load audit logs:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleSearch = async () => {
         if (!searchTerm) return;
         setLoading(true);
         try {
             const response = await fetch(
-                `/api/admin/audit-logs?page=1&targetId=${searchTerm}`,
+                `${API_URL}/api/admin/audit-logs?page=1&targetId=${searchTerm}`,
                 {
                     credentials: "include",
                 }

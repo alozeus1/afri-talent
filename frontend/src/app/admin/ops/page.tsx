@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
 interface Alert {
     id: string;
     title: string;
@@ -37,7 +39,7 @@ export default function OpsPage() {
     const loadAlerts = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch(`/api/admin/alerts?status=${filterStatus}`, {
+            const response = await fetch(`${API_URL}/api/admin/alerts?status=${filterStatus}`, {
                 credentials: "include",
             });
             const data = await response.json();
@@ -57,7 +59,7 @@ export default function OpsPage() {
 
     const handleResolveAlert = async (alertId: string, resolution: string) => {
         try {
-            await fetch(`/api/admin/alerts/${alertId}/resolve`, {
+            await fetch(`${API_URL}/api/admin/alerts/${alertId}/resolve`, {
                 method: "POST",
                 credentials: "include",
                 headers: {
