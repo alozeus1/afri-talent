@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { EarlyAccessProof } from "@/components/home/early-access-proof";
 import { HeroStats } from "@/components/home/hero-stats";
@@ -47,12 +46,6 @@ export function HomePageContent() {
       <section className="section-shell relative overflow-hidden px-0 pt-8 md:pt-12">
         <div className="page-frame">
           <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white px-6 py-16 shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:px-10 md:py-20 lg:px-14">
-            <Image
-              src="/images/generated/afritalent-hero-global-talent.jpg"
-              alt="African technology professional exploring global job opportunities"
-              fill
-              className="object-cover opacity-[0.08] mix-blend-multiply dark:opacity-[0.14] dark:mix-blend-screen pointer-events-none"
-            />
             <div className="relative grid items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]">
               <div>
                 <div className="eyebrow-pill mb-6 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
@@ -72,12 +65,12 @@ export function HomePageContent() {
                 </p>
 
                 <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-                  <Link href="/jobs">
+                  <Link href="/jobs" prefetch={false}>
                     <Button size="lg" className="w-full sm:w-auto">
                       {t("home.hero.exploreCta")}
                     </Button>
                   </Link>
-                  <Link href="/register?role=employer">
+                  <Link href="/register?role=employer" prefetch={false}>
                     <Button size="lg" variant="outline" className="w-full sm:w-auto">
                       {t("home.hero.employerCta")}
                     </Button>
@@ -85,13 +78,13 @@ export function HomePageContent() {
                 </div>
 
                 <div className="mt-8 flex flex-wrap gap-3 text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                  <Link href="/jobs?filter=remote" className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                  <Link href="/jobs?filter=remote" prefetch={false} className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     {t("home.hero.remoteFirstRoles")}
                   </Link>
-                  <Link href="/jobs?filter=visa" className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                  <Link href="/jobs?filter=visa" prefetch={false} className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     {t("home.hero.visaSupported")}
                   </Link>
-                  <Link href="/trust" className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                  <Link href="/trust" prefetch={false} className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     {t("home.hero.seeTrustModel")}
                   </Link>
                 </div>
@@ -110,15 +103,13 @@ export function HomePageContent() {
 
                 <div className="surface-panel relative ml-auto w-full max-w-[36rem] rounded-3xl p-5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
                   <div className="relative flex h-[540px] items-center justify-center overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-                    <Image
-                      src="/images/hero/homepage-design.png"
+                    <img
+                      src="/images/hero/homepage-design-preview.jpg"
                       alt="AfriTalent platform preview"
                       width={190}
                       height={600}
                       className="h-full w-auto object-contain p-4"
-                      priority
-                      quality={72}
-                      sizes="190px"
+                      fetchPriority="high"
                     />
                   </div>
 
@@ -174,12 +165,11 @@ export function HomePageContent() {
           <div className="surface-panel overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="grid items-stretch lg:grid-cols-[0.95fr_1.05fr]">
               <div className="relative min-h-[320px] overflow-hidden bg-zinc-950 lg:min-h-[420px]">
-                <Image
+                <img
                   src="/images/generated/afritalent-smart-search-workspace.jpg"
                   alt="Smart job search workspace with hiring signals and candidate notes"
-                  fill
-                  className="object-cover opacity-90"
-                  sizes="(max-width: 1023px) 100vw, 42vw"
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full object-cover opacity-90"
                 />
                 <div className="absolute inset-0 bg-gradient-to-tr from-emerald-950/55 via-transparent to-amber-500/15" />
               </div>
@@ -212,11 +202,11 @@ export function HomePageContent() {
       <section className="px-0 py-20">
         <div className="page-frame text-center">
           <div className="relative overflow-hidden rounded-3xl border border-emerald-900 bg-emerald-950 px-6 py-16 text-white shadow-2xl md:px-12">
-            <Image
+            <img
               src="/images/generated/afritalent-collaboration-hiring.jpg"
               alt="Hiring team collaborating with a remote teammate"
-              fill
-              className="object-cover opacity-20 mix-blend-overlay pointer-events-none"
+              loading="lazy"
+              className="absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-overlay pointer-events-none"
             />
             <div className="relative text-center z-10">
               <p className="text-sm font-semibold uppercase tracking-widest text-emerald-300">
@@ -231,12 +221,12 @@ export function HomePageContent() {
             </div>
 
             <div className="relative mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link href="/register">
+              <Link href="/register" prefetch={false}>
                 <Button size="lg" className="w-full sm:w-auto bg-emerald-700 text-white hover:bg-emerald-800 border-transparent">
                   {t("home.cta.candidateCta")}
                 </Button>
               </Link>
-              <Link href="/resources">
+              <Link href="/resources" prefetch={false}>
                 <Button size="lg" variant="outline" className="w-full border-emerald-700 bg-emerald-900 text-emerald-100 hover:bg-emerald-800 hover:text-white sm:w-auto">
                   {t("home.cta.resourcesCta")}
                 </Button>
