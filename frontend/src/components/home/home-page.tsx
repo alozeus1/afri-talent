@@ -48,7 +48,7 @@ export function HomePageContent() {
         <div className="page-frame">
           <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white px-6 py-16 shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:px-10 md:py-20 lg:px-14">
             <Image
-              src="/images/generated/afritalent-hero-global-talent.png"
+              src="/images/generated/afritalent-hero-global-talent.jpg"
               alt="African technology professional exploring global job opportunities"
               fill
               className="object-cover opacity-[0.08] mix-blend-multiply dark:opacity-[0.14] dark:mix-blend-screen pointer-events-none"
@@ -109,15 +109,16 @@ export function HomePageContent() {
                 </div>
 
                 <div className="surface-panel relative ml-auto w-full max-w-[36rem] rounded-3xl p-5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                  <div className="relative h-[540px] overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+                  <div className="relative flex h-[540px] items-center justify-center overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
                     <Image
                       src="/images/hero/homepage-design.png"
                       alt="AfriTalent platform preview"
-                      fill
-                      className="object-contain p-4"
+                      width={190}
+                      height={600}
+                      className="h-full w-auto object-contain p-4"
                       priority
                       quality={72}
-                      sizes="(max-width: 1023px) 0px, 50vw"
+                      sizes="190px"
                     />
                   </div>
 
@@ -174,7 +175,7 @@ export function HomePageContent() {
             <div className="grid items-stretch lg:grid-cols-[0.95fr_1.05fr]">
               <div className="relative min-h-[320px] overflow-hidden bg-zinc-950 lg:min-h-[420px]">
                 <Image
-                  src="/images/generated/afritalent-smart-search-workspace.png"
+                  src="/images/generated/afritalent-smart-search-workspace.jpg"
                   alt="Smart job search workspace with hiring signals and candidate notes"
                   fill
                   className="object-cover opacity-90"
@@ -198,7 +199,7 @@ export function HomePageContent() {
                   {sourceLabels.map(([label, sublabel]) => (
                     <div key={label}>
                       <div className="font-bold text-zinc-800 dark:text-zinc-200">{label}</div>
-                      <div className="mt-1 text-xs font-medium text-zinc-500 dark:text-zinc-500">{sublabel}</div>
+                      <div className="mt-1 text-xs font-medium text-zinc-500 dark:text-zinc-300">{sublabel}</div>
                     </div>
                   ))}
                 </div>
@@ -212,7 +213,7 @@ export function HomePageContent() {
         <div className="page-frame text-center">
           <div className="relative overflow-hidden rounded-3xl border border-emerald-900 bg-emerald-950 px-6 py-16 text-white shadow-2xl md:px-12">
             <Image
-              src="/images/generated/afritalent-collaboration-hiring.png"
+              src="/images/generated/afritalent-collaboration-hiring.jpg"
               alt="Hiring team collaborating with a remote teammate"
               fill
               className="object-cover opacity-20 mix-blend-overlay pointer-events-none"
@@ -231,7 +232,7 @@ export function HomePageContent() {
 
             <div className="relative mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link href="/register">
-                <Button size="lg" className="w-full sm:w-auto bg-emerald-500 text-white hover:bg-emerald-600 border-transparent">
+                <Button size="lg" className="w-full sm:w-auto bg-emerald-700 text-white hover:bg-emerald-800 border-transparent">
                   {t("home.cta.candidateCta")}
                 </Button>
               </Link>

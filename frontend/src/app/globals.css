@@ -29,8 +29,8 @@ html.dark {
   --surface-soft: #18181b;
   --border-soft: #27272a;
   --border-strong: #3f3f46;
-  --brand: #14b8a6; /* Tailwind teal-500 */
-  --brand-strong: #2dd4bf; /* Tailwind teal-400 */
+  --brand: #0f766e; /* Tailwind teal-700 */
+  --brand-strong: #14b8a6; /* Tailwind teal-500 */
   --accent: #f59e0b; /* Tailwind amber-500 */
   --accent-soft: rgba(245, 158, 11, 0.15);
   --focus-ring: #34d399;
