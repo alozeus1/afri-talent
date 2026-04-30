@@ -213,62 +213,62 @@ export function EarlyTesterFeedback({
               Feedback submitted for review. It will appear after admin approval.
             </p>
           )}
+        </div>
+      )}
 
-          {showApprovedFeedback && (
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-emerald-950">Approved learner notes</p>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    learning.feedback
-                      .list({ areaSlug: resolvedAreaSlug, limit: 6 })
-                      .then((data) => setFeedback(data.feedback))
-                      .catch(() => setFeedback([]));
-                  }}
-                >
-                  Refresh
-                </Button>
-              </div>
-              {feedback.length === 0 ? (
-                <p className="text-xs text-emerald-700">No approved feedback yet.</p>
-              ) : (
-                <div className="grid gap-3">
-                  {feedback.map((entry) => (
-                    <Card key={entry.id} className="border-emerald-100 bg-white/90">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800">
-                            {entry.avatarUrl ? (
-                              <img src={entry.avatarUrl} alt={entry.displayName} className="h-full w-full object-cover" />
-                            ) : (
-                              entry.displayName
-                                .split(" ")
-                                .map((part) => part[0])
-                                .join("")
-                                .slice(0, 2)
-                                .toUpperCase()
-                            )}
+      {showApprovedFeedback && (
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-emerald-950">Approved learner notes</h3>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                learning.feedback
+                  .list({ areaSlug: resolvedAreaSlug, limit: 6 })
+                  .then((data) => setFeedback(data.feedback))
+                  .catch(() => setFeedback([]));
+              }}
+            >
+              Refresh
+            </Button>
+          </div>
+          {feedback.length === 0 ? (
+            <p className="text-xs text-emerald-700">No approved feedback yet.</p>
+          ) : (
+            <div className="grid gap-3">
+              {feedback.map((entry) => (
+                <Card key={entry.id} className="border-emerald-100 bg-white/90">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800">
+                        {entry.avatarUrl ? (
+                          <img src={entry.avatarUrl} alt={entry.displayName} className="h-full w-full object-cover" />
+                        ) : (
+                          entry.displayName
+                            .split(" ")
+                            .map((part) => part[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase()
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{entry.displayName}</p>
+                            <Stars rating={entry.rating} />
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <div>
-                                <p className="text-sm font-semibold text-gray-900">{entry.displayName}</p>
-                                <Stars rating={entry.rating} />
-                              </div>
-                              <p className="text-[11px] text-gray-400">
-                                {new Date(entry.createdAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <p className="mt-2 text-sm text-gray-700">{entry.comment}</p>
-                          </div>
+                          <p className="text-[11px] text-gray-400">
+                            {new Date(entry.createdAt).toLocaleDateString()}
+                          </p>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
+                        <p className="mt-2 text-sm text-gray-700">{entry.comment}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </div>

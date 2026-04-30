@@ -4,11 +4,13 @@ import { API, TEST_ADMIN, TEST_CANDIDATE, loginAs } from "./fixtures/auth";
 const LEARNING_FEEDBACK = `${API}/api/learning/feedback`;
 
 test("learning feedback can be submitted, moderated, and read back once approved", async ({ request }) => {
+  const areaSlug = `learning-hub-e2e-${Date.now()}`;
+
   await loginAs(request, TEST_CANDIDATE);
 
   const submitRes = await request.post(LEARNING_FEEDBACK, {
     data: {
-      areaSlug: "learning-hub",
+      areaSlug,
       lessonTitle: "Learning content usefulness",
       firstName: "Ada",
       lastName: "Lovelace",
@@ -21,19 +23,19 @@ test("learning feedback can be submitted, moderated, and read back once approved
   const submitBody = await submitRes.json();
   expect(submitBody.feedback.status).toBe("PENDING");
 
-  const pendingRes = await request.get(`${LEARNING_FEEDBACK}?areaSlug=learning-hub&status=PENDING`);
+  await loginAs(request, TEST_ADMIN);
+  const pendingRes = await request.get(`${LEARNING_FEEDBACK}?areaSlug=${encodeURIComponent(areaSlug)}&status=PENDING`);
   expect(pendingRes.ok()).toBe(true);
   const pendingBody = await pendingRes.json();
   expect(pendingBody.feedback).toHaveLength(1);
   const feedbackId = pendingBody.feedback[0].id as string;
 
-  await loginAs(request, TEST_ADMIN);
   const approveRes = await request.put(`${LEARNING_FEEDBACK}/${feedbackId}/moderate`, {
     data: { action: "approve" },
   });
   expect(approveRes.ok()).toBe(true);
 
-  const publicRes = await request.get(`${LEARNING_FEEDBACK}?areaSlug=learning-hub`);
+  const publicRes = await request.get(`${LEARNING_FEEDBACK}?areaSlug=${encodeURIComponent(areaSlug)}`);
   expect(publicRes.ok()).toBe(true);
   const publicBody = await publicRes.json();
   expect(publicBody.feedback).toHaveLength(1);
