@@ -1,6 +1,35 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: April 29, 2026 (Droid QA pass)
+Last updated: April 30, 2026 (Lighthouse quality pass)
+
+## Update on April 30, 2026: Lighthouse quality pass on public landing page
+
+Commit `2168210` (`fix(frontend): improve lighthouse quality scores`) was
+pushed to `develop` after reviewing the April 30 Lighthouse report for
+`https://3mwn2b4e5t.us-east-1.awsapprunner.com/en`.
+
+Fixes applied:
+
+- raised primary button and dark-mode brand contrast so desktop Lighthouse
+  accessibility reaches `100` locally
+- repaired footer light/dark contrast and replaced the animated client footer
+  dock with static accessible social links to reduce global JavaScript work
+- added compressed generated JPEG hero/section assets and switched the landing
+  page to them, avoiding the image optimization timeouts seen in the report
+- tightened the product mockup image sizing to reduce responsive-image waste
+
+Validation before push:
+
+- `cd frontend && npm run lint` passed with existing warnings only
+- `cd frontend && npx tsc --noEmit` passed
+- `cd frontend && npm run build` passed
+- local desktop Lighthouse on `/en` reached Performance `99`,
+  Accessibility `100`, Best Practices `96`, SEO `100`; the remaining local
+  Best Practices issue was `ERR_CONNECTION_REFUSED` for `localhost:4000` API
+  calls because the backend was not running locally, not a live staging issue
+
+After the deploy workflow completes, rerun Lighthouse against the staging URL
+to confirm whether live Performance and Best Practices both reach `100`.
 
 ## Update on April 29, 2026: Pre-prod QA pass on `develop`
 
