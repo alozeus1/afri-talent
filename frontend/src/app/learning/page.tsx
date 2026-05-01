@@ -186,6 +186,7 @@ export default function LearningPage() {
   const [usingFallbackContent, setUsingFallbackContent] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
   const [selectedLesson, setSelectedLesson] = useState<EarlyLearningLesson | null>(null);
+  const [activeLessonStep, setActiveLessonStep] = useState(0);
 
   // Filters
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -300,6 +301,12 @@ export default function LearningPage() {
       window.localStorage.setItem("afritalent_learning_completed_lessons", JSON.stringify([...next]));
       return next;
     });
+  };
+
+  const openLesson = (lesson: EarlyLearningLesson) => {
+    setSelectedLesson(lesson);
+    setActiveLessonStep(0);
+    trackEvent("lesson_started", { lesson_id: lesson.id, category: lesson.category });
   };
 
   const displayedCourses = query.trim() && !usingFallbackContent
@@ -467,7 +474,7 @@ export default function LearningPage() {
                       <span className="text-xs text-gray-500">{course.durationHours}h</span>
                     )}
                     {isEarlyLesson(course) ? (
-                      <Button size="sm" onClick={() => setSelectedLesson(course)}>{t("learning.startLesson")}</Button>
+                      <Button size="sm" onClick={() => openLesson(course)}>{t("learning.startLesson")}</Button>
                     ) : (
                       <a href={course.url} target="_blank" rel="noopener noreferrer">
                         <Button size="sm">{t("learning.viewCourse")}</Button>
@@ -638,8 +645,7 @@ export default function LearningPage() {
                               size="sm"
                               variant="outline"
                               onClick={() => {
-                                setSelectedLesson(course);
-                                trackEvent("lesson_started", { lesson_id: course.id, category: course.category });
+                                openLesson(course);
                               }}
                             >
                               Start
@@ -723,9 +729,49 @@ export default function LearningPage() {
 
               <section>
                 <h3 className="font-semibold text-gray-900">{t("learning.stepByStep")}</h3>
-                <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-gray-700">
-                  {selectedLesson.steps.map((step) => <li key={step}>{step}</li>)}
-                </ol>
+                <div className="mt-3 space-y-3">
+                  <div className="rounded-xl border border-gray-200 bg-white p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Step {activeLessonStep + 1} of {selectedLesson.steps.length}
+                      </p>
+                      <Badge variant={completedLessons.has(selectedLesson.id) ? "success" : "info"}>
+                        {completedLessons.has(selectedLesson.id) ? "Complete" : "In progress"}
+                      </Badge>
+                    </div>
+                    <p className="text-sm leading-6 text-gray-700">{selectedLesson.steps[activeLessonStep]}</p>
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={activeLessonStep === 0}
+                        onClick={() => setActiveLessonStep((step) => Math.max(0, step - 1))}
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex gap-1">
+                        {selectedLesson.steps.map((step, index) => (
+                          <button
+                            key={step}
+                            type="button"
+                            aria-label={`Go to lesson step ${index + 1}`}
+                            onClick={() => setActiveLessonStep(index)}
+                            className={`h-2.5 w-2.5 rounded-full ${index === activeLessonStep ? "bg-emerald-600" : "bg-gray-300"}`}
+                          />
+                        ))}
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={activeLessonStep === selectedLesson.steps.length - 1}
+                        onClick={() => setActiveLessonStep((step) => Math.min(selectedLesson.steps.length - 1, step + 1))}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </section>
 
               <section>
@@ -750,7 +796,14 @@ export default function LearningPage() {
                 <p className="text-xs text-gray-500">
                   {t("learning.completionNote")}
                 </p>
-                <Button onClick={() => toggleCompleted(selectedLesson.id)}>
+                <Button
+                  onClick={() => {
+                    toggleCompleted(selectedLesson.id);
+                    if (!completedLessons.has(selectedLesson.id)) {
+                      setActiveLessonStep(selectedLesson.steps.length - 1);
+                    }
+                  }}
+                >
                   {completedLessons.has(selectedLesson.id) ? t("learning.markIncomplete") : t("learning.markComplete")}
                 </Button>
               </div>

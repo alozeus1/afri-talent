@@ -78,9 +78,10 @@ Return ONLY valid JSON (no markdown):
 }
 
 function buildQuestionsMock(input: InterviewQuestionInput): InterviewQuestionsResult {
+  const role = input.role;
   const questions: InterviewQuestion[] = [
     {
-      question: `Tell me about your experience as a ${input.role}.`,
+      question: `Tell me about your experience as a ${role}.`,
       category: "behavioral",
       difficulty: input.difficulty,
       expectedPoints: ["Specific examples", "Measurable outcomes", "Lessons learned"],
@@ -96,6 +97,48 @@ function buildQuestionsMock(input: InterviewQuestionInput): InterviewQuestionsRe
       category: "behavioral",
       difficulty: input.difficulty,
       expectedPoints: ["Career alignment", "Growth mindset", "Company fit"],
+    },
+    {
+      question: `Walk me through a recent ${role} decision where you had to balance speed, quality, and risk.`,
+      category: "situational",
+      difficulty: input.difficulty,
+      expectedPoints: ["Tradeoff framing", "Risk mitigation", "Outcome"],
+    },
+    {
+      question: `What technical or process signals would you monitor to know your ${role} work is succeeding?`,
+      category: "technical",
+      difficulty: input.difficulty,
+      expectedPoints: ["Relevant metrics", "Alert thresholds", "Business impact"],
+    },
+    {
+      question: "Tell me about a time you disagreed with a stakeholder or teammate. What did you do?",
+      category: "behavioral",
+      difficulty: input.difficulty,
+      expectedPoints: ["Communication", "Evidence", "Resolution"],
+    },
+    {
+      question: `How would you onboard into a new ${role} team during your first 30 days?`,
+      category: "cultural",
+      difficulty: input.difficulty,
+      expectedPoints: ["Learning plan", "Relationship building", "Early deliverables"],
+    },
+    {
+      question: "Describe a time you found a production, customer, or delivery problem before it became serious.",
+      category: "situational",
+      difficulty: input.difficulty,
+      expectedPoints: ["Detection", "Escalation", "Prevention"],
+    },
+    {
+      question: `What are the most common mistakes people make in ${role} work, and how do you avoid them?`,
+      category: "technical",
+      difficulty: input.difficulty,
+      expectedPoints: ["Role-specific risks", "Quality habits", "Examples"],
+    },
+    {
+      question: "Why are you interested in this role, and what would make you successful here?",
+      category: "cultural",
+      difficulty: input.difficulty,
+      expectedPoints: ["Motivation", "Role understanding", "Relevant strengths"],
     },
   ];
   return { questions: questions.slice(0, input.count), source: "template" };

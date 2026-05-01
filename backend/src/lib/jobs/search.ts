@@ -109,6 +109,72 @@ function boostSemanticRanking(
     .sort((left, right) => right.score - left.score);
 }
 
+const SEARCH_STOP_WORDS = new Set(["and", "for", "the", "with", "job", "jobs", "role", "roles", "remote"]);
+
+function normalizeSearchText(value: string | null | undefined): string {
+  return (value || "").toLowerCase().replace(/[^a-z0-9+#./\s-]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function tokenizeSearchText(value: string | null | undefined): string[] {
+  return Array.from(new Set(
+    normalizeSearchText(value)
+      .split(" ")
+      .filter((token) => token.length > 2 && !SEARCH_STOP_WORDS.has(token)),
+  ));
+}
+
+function hasSearchIntentMatch(job: PublicJobRecord, query?: string): boolean {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return true;
+
+  const queryTokens = tokenizeSearchText(normalizedQuery);
+  if (queryTokens.length === 0) return true;
+
+  const title = normalizeSearchText(job.title);
+  const tagText = normalizeSearchText((job.tags || []).join(" "));
+  const company = normalizeSearchText(job.sourceName || job.employer?.companyName || "");
+  const description = normalizeSearchText(job.description);
+
+  if (title.includes(normalizedQuery)) return true;
+  if (queryTokens.some((token) => title.includes(token) || tagText.includes(token) || company.includes(token))) {
+    return true;
+  }
+
+  const descriptionHits = queryTokens.filter((token) => description.includes(token)).length;
+  return queryTokens.length === 1 ? descriptionHits > 0 : descriptionHits >= 2;
+}
+
+function boostTitleIntent<TJob extends PublicJobRecord>(
+  result: ReturnType<typeof scoreJobForSearch<TJob>>,
+  query?: string,
+): ReturnType<typeof scoreJobForSearch<TJob>> {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return result;
+
+  const title = normalizeSearchText(result.job.title);
+  const queryTokens = tokenizeSearchText(normalizedQuery);
+  const titleHitCount = queryTokens.filter((token) => title.includes(token)).length;
+  const exactPhraseBoost = title.includes(normalizedQuery) ? 12 : 0;
+  const tokenBoost = Math.min(18, titleHitCount * 6);
+  const boost = exactPhraseBoost + tokenBoost;
+  if (boost <= 0) return result;
+
+  const nextScore = clampScore(result.score + boost);
+  return {
+    ...result,
+    score: nextScore,
+    explanation: {
+      ...result.explanation,
+      score: nextScore,
+      reasons: [...result.explanation.reasons, "job title matches the search intent"],
+      components: {
+        ...result.explanation.components,
+        relevance: clampScore(result.explanation.components.relevance + boost),
+      },
+    },
+  };
+}
+
 export function buildJobSearchWhere(filters: JobSearchFilters): Prisma.JobWhereInput {
   const conditions: Prisma.JobWhereInput[] = [
     { status: JobStatus.PUBLISHED },
@@ -304,7 +370,9 @@ export async function fetchRankedJobs(input: {
 
   const collapsed = collapseDuplicateRankedJobs(
     jobs.map((job) => scoreJobForSearch(job, input.preferenceContext)),
-  );
+  )
+    .filter((result) => hasSearchIntentMatch(result.job, input.preferenceContext?.query))
+    .map((result) => boostTitleIntent(result, input.preferenceContext?.query));
   const sorted = sortRankedResults(
     boostSemanticRanking(collapsed, input.preferenceContext?.query),
     input.sortBy ?? "relevance",

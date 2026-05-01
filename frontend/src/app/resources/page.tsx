@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { OFFICIAL_IMMIGRATION_GUIDES } from "@/lib/market-reference-data";
 
 export default function ResourcesPage() {
   const [data, setData] = useState<ResourceListResponse | null>(null);
@@ -57,18 +58,34 @@ export default function ResourcesPage() {
 
       {/* Featured Guides */}
       <div className="mb-10">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Featured Guides</h2>
-        <div className="grid md:grid-cols-3 gap-4">
-          {[
-            { title: "Canada Express Entry for African Developers", category: "Immigration", color: "bg-red-50 text-red-700 border-red-200", icon: "🇨🇦" },
-            { title: "German Blue Card: Complete Guide", category: "Immigration", color: "bg-yellow-50 text-yellow-700 border-yellow-200", icon: "🇩🇪" },
-            { title: "UK Skilled Worker Visa from Nigeria", category: "Immigration", color: "bg-blue-50 text-blue-700 border-blue-200", icon: "🇬🇧" },
-          ].map((guide) => (
-            <div key={guide.title} className={`rounded-xl border p-5 ${guide.color}`}>
-              <span className="text-2xl mb-2 block">{guide.icon}</span>
-              <Badge variant="default" className="mb-2">{guide.category}</Badge>
-              <h3 className="font-semibold text-gray-900">{guide.title}</h3>
-              <p className="text-sm text-gray-600 mt-1">Coming soon</p>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Official Immigration Guides</h2>
+        <p className="mb-4 text-sm text-gray-600">
+          Candidate planning notes sourced from government immigration pages. Rules change, so always verify on the official page before applying.
+        </p>
+        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {OFFICIAL_IMMIGRATION_GUIDES.map((guide) => (
+            <div key={guide.country} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <Badge variant="info" className="mb-2">{guide.country}</Badge>
+                  <h3 className="font-semibold text-gray-900">{guide.pathway}</h3>
+                </div>
+                <Badge variant="success">Official</Badge>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-gray-600">{guide.summary}</p>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
+                {guide.requirements.slice(0, 3).map((requirement) => (
+                  <li key={requirement} className="rounded-lg bg-gray-50 px-3 py-2">{requirement}</li>
+                ))}
+              </ul>
+              <a
+                href={guide.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-flex text-sm font-semibold text-emerald-700 underline-offset-2 hover:underline"
+              >
+                Verify at {guide.sourceLabel}
+              </a>
             </div>
           ))}
         </div>

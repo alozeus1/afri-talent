@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Job, quickApply, QuickApplyEligibility } from "@/lib/api";
+import { applications, Job, quickApply, QuickApplyEligibility } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
@@ -103,6 +103,25 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
     }
   };
 
+  const handleExternalApply = async () => {
+    if (!externalApplyUrl) return;
+    setApplying(true);
+    setError(null);
+    try {
+      await applications.apply({ jobId: job.id });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (!message.toLowerCase().includes("already applied")) {
+        setError(toFriendlyError(err));
+        setApplying(false);
+        return;
+      }
+    }
+    window.open(externalApplyUrl, "_blank", "noopener,noreferrer");
+    setApplying(false);
+    onSuccess();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -165,16 +184,17 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                   <Button
                     className="w-full"
                     size="lg"
-                    onClick={() => {
-                      if (externalApplyUrl) {
-                        window.open(externalApplyUrl, "_blank", "noopener,noreferrer");
-                        onSuccess();
-                      }
-                    }}
-                    disabled={!externalApplyUrl}
+                    onClick={() => void handleExternalApply()}
+                    disabled={!externalApplyUrl || applying}
                   >
-                    Continue to Employer Site
+                    {applying ? "Opening..." : "Continue to Employer Site"}
                   </Button>
+                  {error && (
+                    <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                      <p className="font-medium">{error.title}</p>
+                      <p className="mt-0.5">{error.description}</p>
+                    </div>
+                  )}
                   <Button variant="outline" className="w-full" onClick={onClose}>
                     Close
                   </Button>

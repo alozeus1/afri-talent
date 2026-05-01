@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { CardGridSkeleton } from "@/components/ui/skeleton";
 import { TOP_PAYING_ROLE_GUIDANCE } from "@/lib/early-tester-content";
 import { useT } from "@/lib/i18n/client";
+import { MARKET_SALARY_BENCHMARKS } from "@/lib/market-reference-data";
 
 const COUNTRIES = [
   "USA", "UK", "Germany", "Canada", "Australia",
@@ -21,13 +22,6 @@ const COUNTRIES = [
 const CURRENCIES = ["USD", "EUR", "GBP", "NGN", "KES", "ZAR"];
 const SALARY_PERIODS = ["yearly", "monthly"];
 const EMPLOYMENT_TYPES = ["FULL_TIME", "PART_TIME", "CONTRACT", "FREELANCE"];
-
-const MOCK_DISTRIBUTION_DATA = [
-  { level: "Junior (0-2y)", min: 25000, max: 45000, avg: 35000 },
-  { level: "Mid-Level (3-5y)", min: 45000, max: 80000, avg: 65000 },
-  { level: "Senior (6-8y)", min: 80000, max: 130000, avg: 105000 },
-  { level: "Lead/Staff (9+y)", min: 120000, max: 180000, avg: 145000 },
-];
 
 export default function SalariesPage() {
   const t = useT();
@@ -169,6 +163,11 @@ export default function SalariesPage() {
     }).format(amount);
   };
 
+  const selectedBenchmark = MARKET_SALARY_BENCHMARKS.find((benchmark) =>
+    [searchTitle, compareTitle].some((title) =>
+      title.trim() && benchmark.role.toLowerCase().includes(title.trim().toLowerCase()),
+    ),
+  ) ?? MARKET_SALARY_BENCHMARKS[0];
 
 
   return (
@@ -471,14 +470,28 @@ export default function SalariesPage() {
         <CardHeader>
           <h2 className="text-xl font-bold text-gray-900">{t("salaries.distributionByLevel")}</h2>
           <p className="text-sm text-gray-500">
-            Sample compensation bands for education only. Not verified AfriTalent salary reports.
+            Real market benchmark bands for comparison. These are research references, not AfriTalent placement outcomes.
           </p>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="font-semibold">{selectedBenchmark.role}</p>
+              <p className="mt-1 leading-6">{selectedBenchmark.note}</p>
+            </div>
+            <a
+              href={selectedBenchmark.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 font-semibold underline-offset-2 hover:underline"
+            >
+              {selectedBenchmark.sourceLabel}
+            </a>
+          </div>
           <div className="h-[300px] w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={MOCK_DISTRIBUTION_DATA}
+                data={selectedBenchmark.levels}
                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
               >
                 <XAxis dataKey="level" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 13 }} />

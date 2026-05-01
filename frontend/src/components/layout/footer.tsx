@@ -103,7 +103,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/resources" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/hiring-resources" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Hiring Resources
                 </Link>
               </li>

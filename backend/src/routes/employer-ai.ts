@@ -49,6 +49,16 @@ function overlapScore(a: string[], b: string[]): number {
   return Math.round((hits / setA.size) * 100);
 }
 
+function tokenizeRankingText(value: string | null | undefined): string[] {
+  return Array.from(new Set(
+    (value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9+#./\s-]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length > 2 && !["and", "the", "for", "with", "from", "role", "work"].includes(token)),
+  ));
+}
+
 function generateJobDescriptionDraft(input: z.infer<typeof jobDescriptionSchema>): string {
   const responsibilities = input.responsibilities.map((item) => `- ${item}`).join("\n");
   const requirements = input.requirements.map((item) => `- ${item}`).join("\n");
@@ -160,7 +170,7 @@ router.post("/candidate-ranking-drafts", aiToolLimiter, async (req: Request, res
 
     const job = await prisma.job.findFirst({
       where: { id: input.jobId, employerId: employer.id },
-      select: { id: true, title: true, tags: true, seniority: true },
+      select: { id: true, title: true, description: true, tags: true, seniority: true },
     });
 
     if (!job) {
@@ -189,8 +199,18 @@ router.post("/candidate-ranking-drafts", aiToolLimiter, async (req: Request, res
     });
 
     const ranked = applications.map((application) => {
-      const skills = application.candidate.candidateProfile?.skills || [];
-      const skillMatchScore = overlapScore(job.tags || [], skills);
+      const profile = application.candidate.candidateProfile;
+      const skills = profile?.skills || [];
+      const jobKeywords = Array.from(new Set([
+        ...tokenizeRankingText(job.title),
+        ...tokenizeRankingText(job.description).slice(0, 40),
+        ...(job.tags || []).flatMap(tokenizeRankingText),
+      ]));
+      const candidateKeywords = Array.from(new Set([
+        ...skills.flatMap(tokenizeRankingText),
+        ...tokenizeRankingText(profile?.headline || ""),
+      ]));
+      const skillMatchScore = overlapScore(jobKeywords, candidateKeywords);
       const experience = application.candidate.candidateProfile?.yearsExperience || 0;
       const experienceScore = Math.min(100, experience * 8);
       const finalScore = Math.round(skillMatchScore * 0.75 + experienceScore * 0.25);
@@ -203,7 +223,7 @@ router.post("/candidate-ranking-drafts", aiToolLimiter, async (req: Request, res
         rationale: [
           `Skill overlap score: ${skillMatchScore}%`,
           `Experience score: ${experienceScore}%`,
-          application.candidate.candidateProfile?.headline || "No profile headline provided",
+          profile?.headline || "No profile headline provided",
         ],
       };
     }).sort((a, b) => b.score - a.score);
@@ -296,4 +316,3 @@ router.post("/tasks/:id/review", async (req: Request, res: Response) => {
 });
 
 export default router;
-

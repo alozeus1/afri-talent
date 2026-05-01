@@ -60,8 +60,20 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
         return;
       }
 
+      setApplying(true);
+      try {
+        await applications.apply({ jobId: job.id });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (!message.toLowerCase().includes("already applied")) {
+          setApplyError(message || "Failed to record this application");
+          setApplying(false);
+          return;
+        }
+      }
       window.open(externalApplyUrl, "_blank", "noopener,noreferrer");
       setApplied(true);
+      setApplying(false);
       return;
     }
 
