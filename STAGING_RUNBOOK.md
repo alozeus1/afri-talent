@@ -1,6 +1,23 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: April 30, 2026 (Lighthouse quality pass)
+Last updated: May 1, 2026 (CI deploy fix)
+
+## Update on May 1, 2026: Deploy workflow repaired after Mara product knowledge build failure
+
+GitHub Actions run `25219626472` failed in `Deploy Shared Environment (App Runner)`
+while building the backend Docker image from commit `919b4b2`. The backend
+TypeScript build could not resolve `src/lib/ai/product-knowledge.ts`, which was
+referenced by `chat-context.ts` but had not been included in the pushed commit.
+
+- Fix pushed: `cd2b79c` (`fix(api): include Mara product knowledge module`)
+- Local validation before push:
+  - `cd backend && npm run build`
+  - `cd backend && npm test -- src/lib/ai/product-knowledge.test.ts`
+- Replacement deploy run `25222079661` completed successfully on `develop`.
+- The replacement run passed image builds, Terraform, App Runner backend/frontend
+  deployment waits, and post-deploy backend/frontend health checks.
+- Remaining workflow annotations are Node.js 20 deprecation warnings for GitHub
+  Actions dependencies; they did not block deployment.
 
 ## Update on April 30, 2026: Lighthouse quality pass on public landing page
 
