@@ -16,6 +16,16 @@ referenced by `chat-context.ts` but had not been included in the pushed commit.
 - Replacement deploy run `25222079661` completed successfully on `develop`.
 - The replacement run passed image builds, Terraform, App Runner backend/frontend
   deployment waits, and post-deploy backend/frontend health checks.
+- Follow-up fix: `ff00434` (`fix(api): satisfy job matcher lint`) removed an
+  unnecessary regex escape in `backend/src/workers/job-matcher.ts` after CI run
+  `25222844111` exposed the lint error on the runbook-only push.
+- Final validation on `ff00434`:
+  - CI run `25225690693` completed successfully, including backend/frontend
+    lint, typecheck, builds, backend tests, frontend unit tests, Playwright E2E,
+    and Lighthouse mobile performance.
+  - Deploy run `25225690659` completed successfully, including backend/frontend
+    image builds, App Runner deployment waits, and post-deploy backend/frontend
+    health checks.
 - Remaining workflow annotations are Node.js 20 deprecation warnings for GitHub
   Actions dependencies; they did not block deployment.
 
