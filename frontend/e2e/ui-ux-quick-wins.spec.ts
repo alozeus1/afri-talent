@@ -22,28 +22,16 @@ test.describe('UI/UX Quick Wins Verification', () => {
     // But the link existence and focusability is the core fix.
   });
 
-  test('Companies page empty state is honest early-access messaging', async ({ page }) => {
-    await page.route('**/api/companies*', async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          companies: [],
-          pagination: { page: 1, limit: 12, total: 0, totalPages: 1 }
-        })
-      });
-    });
-
+  test('Companies page no-result state is honest and actionable', async ({ page }) => {
     await page.goto('/companies', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText('Verified profiles, reviews, and hiring outcomes will appear only after real verification.')).toBeVisible();
-    const heading = page.locator('h2', { hasText: 'Verified employer profiles are being onboarded' });
+    await page.getByPlaceholder('Search companies by name or industry...').fill('zzzz-no-company-match-verified-directory');
 
-    await expect(heading).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('0 companies found')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('h2', { hasText: 'No companies found' })).toBeVisible();
 
-    await expect(page.locator('text=AfriTalent does not publish placeholder employer profiles')).toBeVisible();
-    await expect(page.locator('text=Browse verified job listings')).toBeVisible();
-    await expect(page.locator('text=Use visa-friendly filters')).toBeVisible();
-    await expect(page.locator('text=Set alert preferences')).toBeVisible();
+    await expect(page.locator("text=We couldn't find any companies matching your search")).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Clear current search query to view all companies' })).toBeVisible();
   });
 });
