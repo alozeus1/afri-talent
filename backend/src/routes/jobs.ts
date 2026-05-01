@@ -42,6 +42,7 @@ const createJobSchema = z.object({
   salaryMax: z.coerce.number().optional(),
   currency: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  applicationUrl: z.string().url().max(500).optional().or(z.literal("")),
 });
 
 const updateJobSchema = createJobSchema.partial();
@@ -368,6 +369,10 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
   const startedAt = Date.now();
   try {
     const data = createJobSchema.parse(req.body);
+    const jobData = {
+      ...data,
+      applicationUrl: data.applicationUrl || null,
+    };
 
     const employer = await prisma.employer.findUnique({
       where: { userId: req.user!.userId },
@@ -412,10 +417,10 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
     }
 
     const jobRisk = assessJobPostingRisk({
-      title: data.title,
-      description: data.description,
-      salaryMin: data.salaryMin ?? null,
-      salaryMax: data.salaryMax ?? null,
+      title: jobData.title,
+      description: jobData.description,
+      salaryMin: jobData.salaryMin ?? null,
+      salaryMax: jobData.salaryMax ?? null,
       employerRiskScore: trustProfile.riskScore,
     });
     const requiresModeration =
@@ -425,17 +430,17 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
       jobRisk.level === TrustRiskLevel.CRITICAL;
     const publishedAt = requiresModeration ? null : new Date();
     const intelligence = buildJobIntelligenceUpdate({
-      title: data.title,
-      description: data.description,
-      location: data.location,
-      type: data.type,
-      jobField: data.jobField ?? null,
-      workplaceType: data.workplaceType ?? null,
-      seniority: data.seniority,
-      salaryMin: data.salaryMin ?? null,
-      salaryMax: data.salaryMax ?? null,
-      currency: data.currency ?? null,
-      tags: data.tags || [],
+      title: jobData.title,
+      description: jobData.description,
+      location: jobData.location,
+      type: jobData.type,
+      jobField: jobData.jobField ?? null,
+      workplaceType: jobData.workplaceType ?? null,
+      seniority: jobData.seniority,
+      salaryMin: jobData.salaryMin ?? null,
+      salaryMax: jobData.salaryMax ?? null,
+      currency: jobData.currency ?? null,
+      tags: jobData.tags || [],
       publishedAt,
       riskScore: jobRisk.score,
       riskLevel: jobRisk.level,
@@ -450,9 +455,9 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
 
     const job = await prisma.job.create({
       data: {
-        ...data,
-        slug: generateSlug(data.title),
-        tags: data.tags || [],
+        ...jobData,
+        slug: generateSlug(jobData.title),
+        tags: jobData.tags || [],
         status: requiresModeration ? JobStatus.PENDING_REVIEW : JobStatus.PUBLISHED,
         publishedAt,
         employerId: employer.id,

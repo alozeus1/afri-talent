@@ -647,7 +647,15 @@ export const employerAnalytics = {
       body: JSON.stringify(data),
     }),
   getBranding: () => fetchAPI<EmployerBranding>("/api/employer/branding"),
-  updateBranding: (data: { companyName?: string; website?: string; location?: string; bio?: string }) =>
+  updateBranding: (data: {
+    companyName?: string;
+    website?: string;
+    location?: string;
+    bio?: string;
+    logoUrl?: string;
+    brandColor?: string;
+    accentColor?: string;
+  }) =>
     fetchAPI<EmployerBranding>("/api/employer/branding", {
       method: "PUT",
       body: JSON.stringify(data),
@@ -1426,6 +1434,7 @@ export interface CreateJobData {
   currency?: string;
   salaryPeriod?: string;
   tags?: string[];
+  applicationUrl?: string;
 }
 
 export interface Application {
@@ -2392,6 +2401,11 @@ export interface EmployerBranding {
   website: string | null;
   location: string;
   bio: string | null;
+  logoUrl: string | null;
+  brandColor: string | null;
+  accentColor: string | null;
+  premiumBrandingEnabled: boolean;
+  subscriptionPlan: BillingStatus["plan"];
 }
 
 export type EmployerOnboardingStep =
@@ -2750,6 +2764,15 @@ export const learning = {
   },
   categories: () => fetchAPI<string[]>("/api/learning/categories"),
   recommended: () => fetchAPI<LearningResourceItem[]>("/api/learning/recommended"),
+  progress: () => fetchAPI<{ progress: LearningProgressItem[] }>("/api/learning/progress"),
+  updateProgress: (
+    id: string,
+    data: { status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED"; lastStepIndex?: number },
+  ) =>
+    fetchAPI<{ progress: LearningProgressItem }>(`/api/learning/${id}/progress`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   get: (id: string) => fetchAPI<LearningResourceItem>(`/api/learning/${id}`),
   feedback: {
     submit: (data: LearningFeedbackSubmitInput) =>
@@ -3180,6 +3203,17 @@ export interface LearningResourceItem {
 export interface LearningListResponse {
   resources: LearningResourceItem[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
+export interface LearningProgressItem {
+  id: string;
+  userId: string;
+  resourceId: string;
+  status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+  lastStepIndex: number;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface LearningFeedbackSubmitInput {

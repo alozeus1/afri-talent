@@ -25,6 +25,7 @@ export default function JobApplicationsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [jobApplications, setJobApplications] = useState<Application[]>([]);
+  const [candidateAccessLocked, setCandidateAccessLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
 
@@ -40,6 +41,7 @@ export default function JobApplicationsPage() {
         .forJob(params.id as string)
         .then((response) => {
           setJobApplications(response);
+          setCandidateAccessLocked(response.some((application) => Boolean((application as Application & { locked?: boolean }).locked)));
           employerOnboardingEvents.candidateListViewed({
             job_id: params.id as string,
             applicant_count: response.length,
@@ -97,7 +99,16 @@ export default function JobApplicationsPage() {
               <p className="text-gray-600">No applications yet</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div>
+              {candidateAccessLocked && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
+                  Applications are being counted, but full candidate profiles, resumes, and contact details unlock with an active employer subscription.
+                  <Link href={localizePath("/billing", locale)} className="ml-1 font-semibold text-amber-950 underline">
+                    Upgrade to review candidates
+                  </Link>
+                </div>
+              )}
+              <div className="divide-y divide-gray-200">
               {jobApplications.map((application) => (
                 <div key={application.id} className="py-6">
                   <div className="flex justify-between items-start mb-3">
@@ -137,7 +148,7 @@ export default function JobApplicationsPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={updating === application.id || application.status === "REVIEWING"}
+                      disabled={candidateAccessLocked || updating === application.id || application.status === "REVIEWING"}
                       onClick={() => updateStatus(application.id, "REVIEWING")}
                     >
                       Mark Reviewing
@@ -145,14 +156,14 @@ export default function JobApplicationsPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={updating === application.id || application.status === "SHORTLISTED"}
+                      disabled={candidateAccessLocked || updating === application.id || application.status === "SHORTLISTED"}
                       onClick={() => updateStatus(application.id, "SHORTLISTED")}
                     >
                       Shortlist
                     </Button>
                     <Button
                       size="sm"
-                      disabled={updating === application.id || application.status === "ACCEPTED"}
+                      disabled={candidateAccessLocked || updating === application.id || application.status === "ACCEPTED"}
                       onClick={() => updateStatus(application.id, "ACCEPTED")}
                     >
                       Accept
@@ -160,7 +171,7 @@ export default function JobApplicationsPage() {
                     <Button
                       size="sm"
                       variant="danger"
-                      disabled={updating === application.id || application.status === "REJECTED"}
+                      disabled={candidateAccessLocked || updating === application.id || application.status === "REJECTED"}
                       onClick={() => updateStatus(application.id, "REJECTED")}
                     >
                       Reject
@@ -168,6 +179,7 @@ export default function JobApplicationsPage() {
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           )}
         </CardContent>

@@ -42,6 +42,7 @@ export default function NewJobPage() {
     salaryMax: "",
     currency: "USD",
     tags: "",
+    applicationUrl: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -127,6 +128,7 @@ export default function NewJobPage() {
         salaryMax: formData.salaryMax ? parseInt(formData.salaryMax, 10) : undefined,
         currency: formData.currency || undefined,
         tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
+        applicationUrl: formData.applicationUrl || undefined,
       });
       router.push(localizePath("/employer", locale));
     } catch (err) {
@@ -370,6 +372,16 @@ export default function NewJobPage() {
                     value={formData.tags}
                     onChange={(e) => updateField("tags", e.target.value)}
                   />
+                  <Input
+                    id="applicationUrl"
+                    label="Optional employer application link"
+                    placeholder="https://company.com/careers/job-id"
+                    value={formData.applicationUrl}
+                    onChange={(e) => updateField("applicationUrl", e.target.value)}
+                  />
+                  <p className="-mt-2 text-sm text-gray-500">
+                    Leave this blank to receive applications directly on AfriTalent. Add it when candidates should also be able to continue on your company careers site.
+                  </p>
                 </>
               )}
 
@@ -385,6 +397,7 @@ export default function NewJobPage() {
                       <strong>Salary:</strong> {formData.salaryMin || "-"} - {formData.salaryMax || "-"} {formData.currency}
                     </p>
                     <p><strong>Tags:</strong> {formData.tags || "None added yet"}</p>
+                    <p><strong>Application path:</strong> {formData.applicationUrl ? "AfriTalent and employer site" : "AfriTalent direct apply"}</p>
                   </div>
                   <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-950">
                     Keep communication on-platform, avoid vague salary bait, and make location plus visa expectations explicit. These patterns most strongly improve trust and reduce moderation holds.

@@ -131,6 +131,12 @@ enum SubscriptionPlan {
   EMPLOYER_PREMIUM
 }
 
+enum LearningProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
 enum ATSProvider {
   GREENHOUSE
   LEVER
@@ -782,6 +788,7 @@ model User {
   adminRole                     AdminRole?
   userPhoneOtps                 UserPhoneOtp[]
   smsDeliveryLogs               SmsDeliveryLog[]
+  learningProgress              LearningProgress[]
 
   @@index([role])
   @@index([createdAt])
@@ -794,6 +801,9 @@ model Employer {
   website     String?
   location    String
   bio         String?
+  logoUrl     String?  @db.VarChar(500)
+  brandColor  String?  @db.VarChar(7)
+  accentColor String?  @db.VarChar(7)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -2579,6 +2589,22 @@ model LearningResource {
   @@index([category])
   @@index([skills])
   @@index([featured])
+}
+
+model LearningProgress {
+  id            String                 @id @default(uuid())
+  userId        String
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resourceId    String                 @db.VarChar(160)
+  status        LearningProgressStatus @default(NOT_STARTED)
+  lastStepIndex Int                    @default(0)
+  completedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@unique([userId, resourceId])
+  @@index([userId, status])
+  @@index([resourceId])
 }
 
 model LearningFeedback {

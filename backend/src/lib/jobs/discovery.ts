@@ -893,6 +893,9 @@ export function scoreJobForSearch<TJob extends JobDocumentLike>(
   if (riskLevelValue(job.riskLevel) === TrustRiskLevel.CRITICAL) {
     score -= 24;
   }
+  if (job.jobSource === "EMPLOYER_POSTED" || job.employerId) {
+    score += 10;
+  }
 
   const normalizedScore = clamp(score);
   const explanation = buildExplanation({

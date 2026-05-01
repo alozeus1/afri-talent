@@ -185,6 +185,7 @@ export default function LearningPage() {
   const [error, setError] = useState<string | null>(null);
   const [usingFallbackContent, setUsingFallbackContent] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
+  const [lessonProgress, setLessonProgress] = useState<Record<string, "IN_PROGRESS" | "COMPLETED">>({});
   const [selectedLesson, setSelectedLesson] = useState<EarlyLearningLesson | null>(null);
   const [activeLessonStep, setActiveLessonStep] = useState(0);
 
@@ -230,8 +231,25 @@ export default function LearningPage() {
 
           if (user.role === "CANDIDATE") {
             try {
-              const status = await billing.status();
+              const [status, persistedProgress] = await Promise.all([
+                billing.status(),
+                learning.progress().catch(() => ({ progress: [] })),
+              ]);
               setBillingStatus(status);
+              const completed = new Set<string>();
+              const progressMap: Record<string, "IN_PROGRESS" | "COMPLETED"> = {};
+              persistedProgress.progress.forEach((item) => {
+                if (item.status === "COMPLETED") {
+                  completed.add(item.resourceId);
+                  progressMap[item.resourceId] = "COMPLETED";
+                } else if (item.status === "IN_PROGRESS") {
+                  progressMap[item.resourceId] = "IN_PROGRESS";
+                }
+              });
+              if (completed.size > 0) {
+                setCompletedLessons((prev) => new Set([...prev, ...completed]));
+              }
+              setLessonProgress(progressMap);
             } catch {
               setBillingStatus(null);
             }
@@ -289,10 +307,32 @@ export default function LearningPage() {
     setPage(1);
   };
 
+  const persistLessonProgress = async (
+    lessonId: string,
+    status: "IN_PROGRESS" | "COMPLETED" | "NOT_STARTED",
+    lastStepIndex = activeLessonStep,
+  ) => {
+    if (user?.role !== "CANDIDATE") return;
+    try {
+      await learning.updateProgress(lessonId, { status, lastStepIndex });
+    } catch (err) {
+      console.error("Failed to save learning progress:", err);
+    }
+  };
+
+  const setLessonStep = (lessonId: string, step: number) => {
+    setActiveLessonStep(step);
+    if (!completedLessons.has(lessonId)) {
+      setLessonProgress((prev) => ({ ...prev, [lessonId]: "IN_PROGRESS" }));
+      void persistLessonProgress(lessonId, "IN_PROGRESS", step);
+    }
+  };
+
   const toggleCompleted = (lessonId: string) => {
+    const willComplete = !completedLessons.has(lessonId);
     setCompletedLessons((prev) => {
       const next = new Set(prev);
-      if (next.has(lessonId)) {
+      if (!willComplete) {
         next.delete(lessonId);
       } else {
         next.add(lessonId);
@@ -301,11 +341,20 @@ export default function LearningPage() {
       window.localStorage.setItem("afritalent_learning_completed_lessons", JSON.stringify([...next]));
       return next;
     });
+    setLessonProgress((prev) => ({
+      ...prev,
+      [lessonId]: willComplete ? "COMPLETED" : "IN_PROGRESS",
+    }));
+    void persistLessonProgress(lessonId, willComplete ? "COMPLETED" : "IN_PROGRESS", activeLessonStep);
   };
 
   const openLesson = (lesson: EarlyLearningLesson) => {
     setSelectedLesson(lesson);
     setActiveLessonStep(0);
+    if (!completedLessons.has(lesson.id)) {
+      setLessonProgress((prev) => ({ ...prev, [lesson.id]: "IN_PROGRESS" }));
+      void persistLessonProgress(lesson.id, "IN_PROGRESS", 0);
+    }
     trackEvent("lesson_started", { lesson_id: lesson.id, category: lesson.category });
   };
 
@@ -640,7 +689,11 @@ export default function LearningPage() {
                       <div className="flex gap-2">
                         {isEarlyLesson(course) ? (
                           <>
-                            {completedLessons.has(course.id) && <Badge variant="success">Complete</Badge>}
+                            {completedLessons.has(course.id) ? (
+                              <Badge variant="success">Complete</Badge>
+                            ) : lessonProgress[course.id] === "IN_PROGRESS" ? (
+                              <Badge variant="info">In progress</Badge>
+                            ) : null}
                             <Button
                               size="sm"
                               variant="outline"
@@ -746,7 +799,7 @@ export default function LearningPage() {
                         variant="outline"
                         size="sm"
                         disabled={activeLessonStep === 0}
-                        onClick={() => setActiveLessonStep((step) => Math.max(0, step - 1))}
+                        onClick={() => setLessonStep(selectedLesson.id, Math.max(0, activeLessonStep - 1))}
                       >
                         Previous
                       </Button>
@@ -756,7 +809,7 @@ export default function LearningPage() {
                             key={step}
                             type="button"
                             aria-label={`Go to lesson step ${index + 1}`}
-                            onClick={() => setActiveLessonStep(index)}
+                            onClick={() => setLessonStep(selectedLesson.id, index)}
                             className={`h-2.5 w-2.5 rounded-full ${index === activeLessonStep ? "bg-emerald-600" : "bg-gray-300"}`}
                           />
                         ))}
@@ -765,7 +818,9 @@ export default function LearningPage() {
                         type="button"
                         size="sm"
                         disabled={activeLessonStep === selectedLesson.steps.length - 1}
-                        onClick={() => setActiveLessonStep((step) => Math.min(selectedLesson.steps.length - 1, step + 1))}
+                        onClick={() =>
+                          setLessonStep(selectedLesson.id, Math.min(selectedLesson.steps.length - 1, activeLessonStep + 1))
+                        }
                       >
                         Next
                       </Button>
@@ -794,7 +849,7 @@ export default function LearningPage() {
 
               <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-gray-500">
-                  {t("learning.completionNote")}
+                  Progress is saved to your AfriTalent account and synced across devices.
                 </p>
                 <Button
                   onClick={() => {
