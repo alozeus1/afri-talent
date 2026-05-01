@@ -22,7 +22,7 @@ test.describe('UI/UX Quick Wins Verification', () => {
     // But the link existence and focusability is the core fix.
   });
 
-  test('Companies page empty state shows featured companies', async ({ page }) => {
+  test('Companies page empty state is honest early-access messaging', async ({ page }) => {
     await page.route('**/api/companies*', async route => {
       await route.fulfill({
         status: 200,
@@ -36,14 +36,14 @@ test.describe('UI/UX Quick Wins Verification', () => {
 
     await page.goto('/companies', { waitUntil: 'domcontentloaded' });
 
-    const heading = page.locator('h2', { hasText: 'Directory is being updated' });
-    const sampleHeading = page.locator('h3', { hasText: 'Sample Employer Profile Structure' });
+    await expect(page.getByText('Verified profiles, reviews, and hiring outcomes will appear only after real verification.')).toBeVisible();
+    const heading = page.locator('h2', { hasText: 'Verified employer profiles are being onboarded' });
 
-    await expect(heading).toBeVisible();
-    await expect(sampleHeading).toBeVisible();
+    await expect(heading).toBeVisible({ timeout: 15000 });
 
-    await expect(page.locator('text=Sample fintech employer profile')).toBeVisible();
-    await expect(page.locator('text=Sample distributed engineering network')).toBeVisible();
-    await expect(page.locator('text=Sample global payments company')).toBeVisible();
+    await expect(page.locator('text=AfriTalent does not publish placeholder employer profiles')).toBeVisible();
+    await expect(page.locator('text=Browse verified job listings')).toBeVisible();
+    await expect(page.locator('text=Use visa-friendly filters')).toBeVisible();
+    await expect(page.locator('text=Set alert preferences')).toBeVisible();
   });
 });

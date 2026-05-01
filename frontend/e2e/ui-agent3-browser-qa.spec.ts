@@ -70,7 +70,7 @@ test("public landing, jobs, and companies pages render core browse affordances",
     page.getByRole("heading", { name: /Discover employer profiles as verification comes online/i }),
   ).toBeVisible();
   await expect(page.getByPlaceholder("Search companies by name or industry...")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Directory is being updated" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Verified employer profiles are being onboarded" })).toBeVisible();
 });
 
 test("candidate dashboard accepts login and exposes basic candidate actions", async ({
