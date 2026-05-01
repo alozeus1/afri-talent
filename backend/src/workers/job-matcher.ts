@@ -180,7 +180,7 @@ async function matchCandidateProfiles(): Promise<number> {
     // This prevents irrelevant jobs (HVAC Specialist, Material Handler) from reaching a
     // Cloud/DevOps Engineer profile just because of generic skill overlap.
     const targetRoleKeywords = profile.targetRoles
-      .flatMap((role) => role.toLowerCase().split(/[\s\/,]+/).filter((w) => w.length > 3));
+      .flatMap((role) => role.toLowerCase().split(/[\s/,]+/).filter((w) => w.length > 3));
 
     const candidateJobs = targetRoleKeywords.length > 0
       ? recentJobs.filter((job) => {
