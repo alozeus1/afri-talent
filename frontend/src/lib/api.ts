@@ -133,7 +133,7 @@ export const jobs = {
     fetchAPI<Job>(`/api/jobs/${slug}`),
 
   create: (data: CreateJobData, token?: string) =>
-    fetchAPI<Job>("/api/jobs", {
+    fetchAPI<Job & { pendingReason: string | null }>("/api/jobs", {
       method: "POST",
       body: JSON.stringify(data),
       token,
@@ -2567,6 +2567,14 @@ export const notifications = {
   },
   unreadCount: () => fetchAPI<{ count: number }>("/api/notifications/unread-count"),
   markRead: (id: string) => fetchAPI<{ notification: NotificationItem }>(`/api/notifications/${id}/read`, { method: "PUT" }),
+  feedback: (
+    id: string,
+    feedback: "RELEVANT" | "NOT_RELEVANT" | "TOO_MANY" | "WRONG_ROLE" | "WRONG_LOCATION",
+  ) =>
+    fetchAPI<{ notification: NotificationItem }>(`/api/notifications/${id}/feedback`, {
+      method: "PUT",
+      body: JSON.stringify({ feedback }),
+    }),
   markAllRead: () => fetchAPI<{ updated: number }>("/api/notifications/read-all", { method: "PUT" }),
 };
 
