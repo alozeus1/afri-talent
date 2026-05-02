@@ -1,0 +1,35 @@
+name: Agent Heartbeat
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-heartbeat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  heartbeat:
+    name: Read-only agent heartbeat
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+
+      - name: Run local-safe heartbeat
+        run: bash scripts/agent-heartbeat.sh
+
+      - name: Upload heartbeat artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-heartbeat
+          path: docs/agent-heartbeat.md
+          retention-days: 14
