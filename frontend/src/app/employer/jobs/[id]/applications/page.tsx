@@ -41,7 +41,7 @@ export default function JobApplicationsPage() {
         .forJob(params.id as string)
         .then((response) => {
           setJobApplications(response);
-          setCandidateAccessLocked(response.some((application) => Boolean((application as Application & { locked?: boolean }).locked)));
+          setCandidateAccessLocked(response.some((application) => Boolean(application.locked)));
           employerOnboardingEvents.candidateListViewed({
             job_id: params.id as string,
             applicant_count: response.length,

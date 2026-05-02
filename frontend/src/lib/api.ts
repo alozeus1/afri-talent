@@ -1460,6 +1460,8 @@ export interface Application {
     name: string;
     email: string;
   };
+  locked?: boolean;
+  upgradeRequired?: boolean;
 }
 
 export interface Resource {
