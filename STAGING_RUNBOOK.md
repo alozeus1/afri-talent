@@ -745,3 +745,13 @@ The `random_password.db` resource was aligned to the existing state specifically
 ## Maintenance Rule
 
 Whenever live infrastructure, deploy status, recovery steps, or critical environment assumptions change, update this file in the same work session.
+
+## Trust Queue Coverage
+
+**URL:** `/admin/trust`
+**Runbook:** `docs/ops/trust-review-runbook.md`
+
+At launch, the bootstrap admin account must monitor the trust queue daily.
+Verification submissions that sit `PENDING` more than 48 hours degrade
+the user experience — verified users get higher-quality job matches and
+skip job moderation queues.
