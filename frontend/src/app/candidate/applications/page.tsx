@@ -7,9 +7,12 @@ import { useAuth } from "@/lib/auth-context";
 import {
   applications,
   candidateAnalytics,
+  messages,
   Application,
   ApplicationFunnel,
+  MessageThread,
 } from "@/lib/api";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,8 +57,10 @@ function timeAgo(dateStr: string): string {
 export default function CandidateApplicationsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const locale = useLocale();
   const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [funnel, setFunnel] = useState<ApplicationFunnel | null>(null);
+  const [threads, setThreads] = useState<MessageThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("newest");
@@ -80,10 +85,12 @@ export default function CandidateApplicationsPage() {
       Promise.all([
         applications.my(),
         candidateAnalytics.applicationFunnel(),
+        messages.threads().then((r) => r.threads).catch(() => [] as MessageThread[]),
       ])
-        .then(([apps, funnelData]) => {
+        .then(([apps, funnelData, threadData]) => {
           setMyApplications(apps);
           setFunnel(funnelData);
+          setThreads(threadData);
         })
         .catch((err) => setError(err instanceof Error ? err.message : "Failed to load data"))
         .finally(() => setLoading(false));
@@ -312,6 +319,20 @@ export default function CandidateApplicationsPage() {
                     </div>
                     {/* Status indicator bar */}
                     <div className={`mt-4 h-1 rounded-full ${statusColors[app.status] || "bg-gray-300"}`} />
+                    {(() => {
+                      const thread = threads.find((t) => t.job?.id === app.job.id);
+                      return thread ? (
+                        <Link
+                          href={localizePath(`/messages/${thread.id}`, locale)}
+                          className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 mt-2"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3-3-3z" />
+                          </svg>
+                          View messages with employer
+                        </Link>
+                      ) : null;
+                    })()}
                   </CardContent>
                 </Card>
               ))}
