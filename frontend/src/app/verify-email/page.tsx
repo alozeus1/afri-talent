@@ -12,6 +12,7 @@ function VerifyEmailInner() {
   const token = searchParams.get("token");
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
+  const [returnToUrl, setReturnToUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -22,6 +23,14 @@ function VerifyEmailInner() {
         if (data.message) {
           setStatus("success");
           setMessage(data.message || "Email verified successfully!");
+          if (typeof window !== "undefined") {
+            const returnTo = sessionStorage.getItem("verifyReturnTo");
+            if (returnTo) {
+              sessionStorage.removeItem("verifyReturnTo");
+              setReturnToUrl(returnTo);
+              setTimeout(() => { window.location.href = returnTo; }, 1800);
+            }
+          }
         }
       } catch (verificationError) {
         setStatus("error");
@@ -57,9 +66,13 @@ function VerifyEmailInner() {
               </div>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Email Verified!</h2>
               <p className="text-gray-600 dark:text-gray-300 mb-6">{message}</p>
-              <Link href="/candidate">
-                <Button className="w-full">Go to Dashboard</Button>
-              </Link>
+              {returnToUrl ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">Returning you to your job application...</p>
+              ) : (
+                <Link href="/candidate">
+                  <Button className="w-full">Go to Dashboard</Button>
+                </Link>
+              )}
             </>
           )}
 
