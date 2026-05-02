@@ -134,7 +134,7 @@ export default function NewJobPage() {
       setSubmitted({
         jobId: result.id,
         pending: !!result.pendingReason,
-        pendingReason: result.pendingReason ?? null,
+        pendingReason: result.pendingReason,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create job");
@@ -182,7 +182,7 @@ export default function NewJobPage() {
 
   if (submitted) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <div className={`w-16 h-16 mx-auto mb-6 rounded-full flex items-center justify-center ${submitted.pending ? "bg-amber-100" : "bg-emerald-100"}`}>
           {submitted.pending ? (
             <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
