@@ -89,18 +89,24 @@ Verification submissions from both candidates and employers land in the admin tr
 
 ### Phase A — Critical Blockers (implement first, highest ROI)
 
-#### A1: Job moderation — auto-publish path for verified employers
+#### A1: Job moderation — fast-approve path for admins + auto-publish for verified employers
 
-**Problem:** `POST /api/jobs` sets status `PENDING_REVIEW` unconditionally.
+**Problem:** `POST /api/jobs` sets status `PENDING_REVIEW` unconditionally. At launch day 1, no employer has a VERIFIED trust badge yet, so the auto-publish rule alone solves nothing until at least one employer completes verification.
 
-**Solution:** Add a trusted-employer auto-publish rule.
-- In `backend/src/routes/jobs.ts`, after the job is created, check if the posting employer has a trust badge of `VERIFIED` or higher (via `employerProfile.trustBadge`).
-- If verified: set `status = PUBLISHED` immediately and record an ops event `auto_published_trusted_employer`.
-- If not verified: keep `PENDING_REVIEW` and return a clear message to the employer: "Your job is in review. Verified employers publish instantly."
-- Add an `adminBypass` flag to the admin job review endpoint so admins can approve in one click.
+**Two-part solution:**
+
+*Part 1 — Admin one-click approve (day 1 fix):*
+- In `backend/src/routes/admin.ts`, ensure the job review endpoint (`PUT /api/admin/jobs/:id/review`) accepts `{ action: "APPROVE" }` and sets `status = PUBLISHED` in a single request.
+- Confirm the admin jobs UI at `/admin` surfaces the pending jobs queue with an "Approve" button per job.
+- If the button is missing or calls a different endpoint, add it.
+
+*Part 2 — Auto-publish for verified employers (day 2+ fix):*
+- In `backend/src/routes/jobs.ts` post handler (~line 368), after job creation, query the employer's `trustBadge` from `employerProfile`.
+- If `trustBadge` is `VERIFIED` or higher: update the job status to `PUBLISHED` immediately and emit ops event `auto_published_trusted_employer`.
+- If not verified: keep `PENDING_REVIEW` and include a field `pendingReason: "Your job is in review. Verified employers publish instantly."` in the 201 response so the frontend can surface it.
 - No schema migration required — `status` and `trustBadge` fields already exist.
 
-**Files:** `backend/src/routes/jobs.ts` (post handler, ~line 368), `backend/src/routes/admin.ts` (review handler)
+**Files:** `backend/src/routes/jobs.ts` (~line 368), `backend/src/routes/admin.ts` (review handler), `frontend/src/app/admin/page.tsx` (pending jobs queue UI)
 
 #### A2: Employer-candidate messaging entry points
 
@@ -172,19 +178,24 @@ Verification submissions from both candidates and employers land in the admin tr
 
 #### B4: Phase4 503 graceful handling audit
 
-**Check:** Identify all frontend pages that call Phase4-gated APIs.
-- For each: verify the `catch` block sets an error state and renders a graceful empty/disabled state rather than throwing.
-- Specifically check: any page importing from `social`, `salaryNegotiation`, `employerAi` keys in `api.ts`.
+**Check:** Read the following specific pages and confirm each `catch` block sets an error state and renders a graceful empty/disabled UI rather than throwing an unhandled error:
+- `frontend/src/app/candidate/salary/page.tsx` — calls `/api/salary-benchmarks/negotiate`
+- `frontend/src/app/employer/integrations/page.tsx` — check for any employer-AI calls
+- `frontend/src/app/[locale]/employer/integrations/page.tsx` — same
+- Any component importing `salaryNegotiation`, `social`, or `employerAi` from `@/lib/api` (run `grep -r "salaryNegotiation\|employerAi\|social\." frontend/src --include="*.tsx"`)
 
-**Files:** Audit pass across `frontend/src/app` and `frontend/src/components`
+For each page found: if the catch block does `console.error` only (no state update), change it to `setError(message)` and render an inline "This feature is not available right now" card.
+
+**Files:** Named pages above + grep-identified files
 
 #### B5: Skills assessments — seed available assessments
 
-**Action:** Add a Prisma seed entry or admin-insertable list of available skill assessment names.
-- Alternatively: if `available()` is meant to return a static list, make it static in the backend rather than DB-driven.
-- For launch: seed at minimum 10 common tech/soft skill assessment entries.
+**Action:** First confirm how `GET /api/skills-assessments/available` is implemented — read `backend/src/routes/skills-assessments.ts`.
+- If it queries a DB table: add seed entries in `backend/prisma/seed.ts` for these skill names: `"JavaScript"`, `"TypeScript"`, `"Python"`, `"SQL"`, `"React"`, `"Node.js"`, `"Data Analysis"`, `"Communication"`, `"Project Management"`, `"Problem Solving"`.
+- If it returns a hardcoded list: expand that list to include the above 10 entries and ensure it is exported as a constant, not inlined.
+- The `SkillAssessment` Prisma model likely has `skillName` as the key field — seed each as `{ skillName: "JavaScript", level: "intermediate", ... }` matching whatever fields the model requires.
 
-**Files:** `backend/prisma/seed.ts` or `backend/src/routes/skills-assessments.ts`
+**Files:** `backend/src/routes/skills-assessments.ts`, `backend/prisma/seed.ts`
 
 #### B6: Blog — add early-access placeholder or redirect
 
