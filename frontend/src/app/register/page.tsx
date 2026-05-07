@@ -54,6 +54,8 @@ function RegisterForm() {
       errors.password = "Password is required";
     } else if (formData.password.length < 8) {
       errors.password = "Password must be at least 8 characters";
+    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+      errors.password = "Password must contain an uppercase letter, a lowercase letter, and a number";
     }
     
     if (formData.role === "EMPLOYER" && !formData.companyName) {

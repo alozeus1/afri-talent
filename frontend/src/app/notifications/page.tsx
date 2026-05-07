@@ -1,5 +1,6 @@
 "use client";
 
+import * as Tabs from "@radix-ui/react-tabs";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -53,6 +54,7 @@ export default function NotificationsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -122,6 +124,19 @@ export default function NotificationsPage() {
     }
   };
 
+  const handleFeedback = async (
+    id: string,
+    feedback: "RELEVANT" | "NOT_RELEVANT" | "TOO_MANY" | "WRONG_ROLE" | "WRONG_LOCATION",
+  ) => {
+    try {
+      const response = await notifications.feedback(id, feedback);
+      setItems((prev) => prev.map((item) => (item.id === id ? response.notification : item)));
+      setFeedbackMessage("Notification feedback saved.");
+    } catch {
+      setFeedbackMessage("Could not save feedback right now.");
+    }
+  };
+
   const handleFilterChange = (tab: FilterTab) => {
     setFilter(tab);
     setPage(1);
@@ -158,26 +173,37 @@ export default function NotificationsPage() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 mb-6">
-        {(["ALL", "UNREAD"] as FilterTab[]).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => handleFilterChange(tab)}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              filter === tab
-                ? "bg-emerald-600 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
+      <div className="mb-6 flex">
+        <Tabs.Root
+          value={filter}
+          onValueChange={(val) => handleFilterChange(val as FilterTab)}
+        >
+          <Tabs.List
+            className="flex items-center gap-x-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm text-sm"
+            aria-label="Filter Notifications"
           >
-            {tab === "ALL" ? "All" : "Unread"}
-          </button>
-        ))}
+            {(["ALL", "UNREAD"] as FilterTab[]).map((tab) => (
+              <Tabs.Trigger
+                key={tab}
+                value={tab}
+                className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-gray-500 hover:text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-medium"
+              >
+                {tab === "ALL" ? "All" : "Unread"}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </Tabs.Root>
       </div>
 
       {/* Error */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
           {error}
+        </div>
+      )}
+      {feedbackMessage && (
+        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+          {feedbackMessage}
         </div>
       )}
 
@@ -236,6 +262,31 @@ export default function NotificationsPage() {
                     <p className="text-sm text-gray-500 mt-1">
                       {notification.body}
                     </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {([
+                        ["RELEVANT", "Relevant"],
+                        ["NOT_RELEVANT", "Not relevant"],
+                        ["TOO_MANY", "Too many"],
+                        ["WRONG_ROLE", "Wrong role"],
+                        ["WRONG_LOCATION", "Wrong location"],
+                      ] as const).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleFeedback(notification.id, value);
+                          }}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                            notification.metadata?.feedback === value
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                              : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   {isUnread && (
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5"></span>

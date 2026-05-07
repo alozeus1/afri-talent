@@ -23,6 +23,7 @@ import { runBillingReconciliationWorker } from "./billing-reconciliation.js";
 import { runCandidateRetentionWorker } from "./candidate-retention.js";
 import { runSemanticIndexWorker } from "./semantic-indexer.js";
 import { runSkillsJobEmbedder } from "./skills-job-embedder.js";
+import { runBlogAutomationCycle, BLOG_AUTOMATION_INTERVAL_MS } from "./blog-automation.js";
 import { pushDeadLetter, recordWorkerState, withRetry } from "../lib/ops/resilience.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
 
@@ -48,7 +49,8 @@ const SEMANTIC_INDEX_INTERVAL_MS = parseInt(process.env.SEMANTIC_INDEX_INTERVAL_
 const LOCK_TTL_SECONDS = 300; // 5 min lock
 
 const isTest = process.env.NODE_ENV === "test";
-const isSchedulerDisabled = process.env.DISABLE_SCHEDULER === "1";
+const isE2E = process.env.E2E === "1";
+const isSchedulerDisabled = process.env.DISABLE_SCHEDULER === "1" || isE2E;
 
 type IntervalRef = ReturnType<typeof setInterval>;
 
@@ -260,6 +262,15 @@ export function startScheduler(): void {
     void safeRun("skills-job-embedder", runSkillsJobEmbedder);
   }, 150_000);
   intervals.push(skillsEmbedDelay as unknown as IntervalRef);
+
+  // Weekly blog automation — generates AI-authored blog posts for human review.
+  // Disabled by default; set BLOG_AUTOMATION_ENABLED=1 to activate.
+  intervals.push(
+    setInterval(
+      () => void safeRun("blog-automation", runBlogAutomationCycle),
+      BLOG_AUTOMATION_INTERVAL_MS,
+    )
+  );
 }
 
 export function stopScheduler(): void {

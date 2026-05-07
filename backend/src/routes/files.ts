@@ -98,6 +98,7 @@ router.post("/presign", authenticate, async (req: Request, res: Response) => {
       method: "PUT",
       headers: {
         "Content-Type": data.contentType,
+        "x-amz-server-side-encryption": "aws:kms",
       },
     });
   } catch (error) {

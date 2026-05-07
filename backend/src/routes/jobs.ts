@@ -15,6 +15,7 @@ import {
   loadCandidatePreferenceContext,
   publicJobInclude,
 } from "../lib/jobs/search.js";
+import { expandSearchKeywords } from "../lib/jobs/smart-search/keywords.js";
 import {
   addTrustCaseAction,
   createTrustCase,
@@ -34,11 +35,14 @@ const createJobSchema = z.object({
   description: z.string().min(10),
   location: z.string(),
   type: z.string(),
+  jobField: z.string().max(80).optional(),
+  workplaceType: z.string().max(32).optional(),
   seniority: z.string(),
   salaryMin: z.coerce.number().optional(),
   salaryMax: z.coerce.number().optional(),
   currency: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  applicationUrl: z.string().url().max(500).optional().or(z.literal("")),
 });
 
 const updateJobSchema = createJobSchema.partial();
@@ -199,34 +203,73 @@ router.get("/", optionalAuth, anonymousJobsLimiter, blockAnonymousJobsAutomation
     }
 
     const {
-      search, query: queryAlias, location, type, seniority,
-      visaSponsorship, relocationAssistance, remote,
-      salaryMin, salaryMax, country,
+      search, query: queryAlias, location, type, jobField, workplaceType, seniority,
+      visaSponsorship, relocationAssistance, remote, remoteOnly,
+      salaryMin, salaryMax, country, employmentType, provider, includeExpandedKeywords, sortBy,
       page = "1", limit = "10", forAI,
     } = req.query;
     const searchTerm = (search || queryAlias) as string | undefined;
     const parsedLimit = Math.min(parseInt(limit as string) || 10, 100);
     const currentPage = Math.max(parseInt(page as string) || 1, 1);
+    const expanded = expandSearchKeywords({
+      query: searchTerm,
+      includeExpandedKeywords: includeExpandedKeywords === "true",
+    });
+    const normalizedSortBy = ["relevance", "newest", "salary", "companyQuality"].includes(String(sortBy))
+      ? sortBy as "relevance" | "newest" | "salary" | "companyQuality"
+      : "relevance";
     const filters = {
       search: searchTerm,
+      expandedKeywords: expanded.expanded,
       location: location as string | undefined,
       type: type as string | undefined,
+      employmentType: employmentType as string | undefined,
+      jobField: jobField as string | undefined,
+      workplaceType: workplaceType as string | undefined,
       seniority: seniority as string | undefined,
       visaSponsorship: visaSponsorship as string | undefined,
       relocationAssistance: relocationAssistance === "true",
-      remote: remote === "true",
+      remote: remote === "true" || remoteOnly === "true",
       salaryMin: salaryMin ? parseInt(salaryMin as string, 10) : null,
       salaryMax: salaryMax ? parseInt(salaryMax as string, 10) : null,
       country: country as string | undefined,
+      provider: provider as string | undefined,
+      includeExpandedKeywords: includeExpandedKeywords === "true",
+      sortBy: normalizedSortBy,
     };
+    logger.info({
+      search: searchTerm ?? null,
+      location: filters.location ?? null,
+      remoteOnly: filters.remote,
+      employmentType: filters.employmentType ?? filters.type ?? null,
+      provider: filters.provider ?? null,
+      includeExpandedKeywords: filters.includeExpandedKeywords,
+      sortBy: filters.sortBy,
+    }, "[jobs.search] query received");
+    if (expanded.enabled && expanded.expanded.length > 0) {
+      logger.info({
+        search: searchTerm,
+        expandedKeywords: expanded.expanded,
+      }, "[jobs.search] expanded keywords generated");
+    }
     const candidateContext = await loadCandidatePreferenceContext(req);
     const preferenceContext = buildPreferenceContext(filters, candidateContext);
-    const { jobs, total } = await fetchRankedJobs({
+    const { jobs, total, diagnostics } = await fetchRankedJobs({
       where: buildJobSearchWhere(filters),
       page: currentPage,
       limit: parsedLimit,
       preferenceContext,
+      sortBy: normalizedSortBy,
     });
+    const highRiskCount = jobs.filter((job) => job.riskScore >= 70).length;
+    logger.info({
+      providersQueried: filters.provider ? [filters.provider] : ["database"],
+      jobsReturnedPerProvider: diagnostics.providerCounts,
+      rawCandidateCount: diagnostics.rawCandidateCount,
+      duplicatesRemoved: diagnostics.duplicatesRemoved,
+      scamRiskJobsDetected: highRiskCount,
+      finalRankedResultCount: total,
+    }, "[jobs.search] ranked results ready");
 
     if (forAI === "true") {
       const aiJobs = jobs.map(job => ({
@@ -239,7 +282,7 @@ router.get("/", optionalAuth, anonymousJobsLimiter, blockAnonymousJobsAutomation
         description: job.description,
         rankingExplanation: job.rankingExplanation.summary,
       }));
-      const payload = { jobs: aiJobs, total };
+      const payload = { jobs: aiJobs, total, smartSearch: { expandedKeywords: expanded.expanded, diagnostics } };
       await setCachedJson(cacheKey, payload, 60);
       res.setHeader("X-Cache", "MISS");
       recordLatencyMetric("job_search_latency", Date.now() - startedAt, {
@@ -252,6 +295,11 @@ router.get("/", optionalAuth, anonymousJobsLimiter, blockAnonymousJobsAutomation
 
     const payload = {
       jobs: jobs.map(serializeJob),
+      smartSearch: {
+        expandedKeywords: expanded.expanded,
+        sortBy: normalizedSortBy,
+        diagnostics,
+      },
       pagination: {
         page: currentPage,
         limit: parsedLimit,
@@ -321,6 +369,10 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
   const startedAt = Date.now();
   try {
     const data = createJobSchema.parse(req.body);
+    const jobData = {
+      ...data,
+      applicationUrl: data.applicationUrl || null,
+    };
 
     const employer = await prisma.employer.findUnique({
       where: { userId: req.user!.userId },
@@ -365,10 +417,10 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
     }
 
     const jobRisk = assessJobPostingRisk({
-      title: data.title,
-      description: data.description,
-      salaryMin: data.salaryMin ?? null,
-      salaryMax: data.salaryMax ?? null,
+      title: jobData.title,
+      description: jobData.description,
+      salaryMin: jobData.salaryMin ?? null,
+      salaryMax: jobData.salaryMax ?? null,
       employerRiskScore: trustProfile.riskScore,
     });
     const requiresModeration =
@@ -378,15 +430,17 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
       jobRisk.level === TrustRiskLevel.CRITICAL;
     const publishedAt = requiresModeration ? null : new Date();
     const intelligence = buildJobIntelligenceUpdate({
-      title: data.title,
-      description: data.description,
-      location: data.location,
-      type: data.type,
-      seniority: data.seniority,
-      salaryMin: data.salaryMin ?? null,
-      salaryMax: data.salaryMax ?? null,
-      currency: data.currency ?? null,
-      tags: data.tags || [],
+      title: jobData.title,
+      description: jobData.description,
+      location: jobData.location,
+      type: jobData.type,
+      jobField: jobData.jobField ?? null,
+      workplaceType: jobData.workplaceType ?? null,
+      seniority: jobData.seniority,
+      salaryMin: jobData.salaryMin ?? null,
+      salaryMax: jobData.salaryMax ?? null,
+      currency: jobData.currency ?? null,
+      tags: jobData.tags || [],
       publishedAt,
       riskScore: jobRisk.score,
       riskLevel: jobRisk.level,
@@ -401,9 +455,9 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
 
     const job = await prisma.job.create({
       data: {
-        ...data,
-        slug: generateSlug(data.title),
-        tags: data.tags || [],
+        ...jobData,
+        slug: generateSlug(jobData.title),
+        tags: jobData.tags || [],
         status: requiresModeration ? JobStatus.PENDING_REVIEW : JobStatus.PUBLISHED,
         publishedAt,
         employerId: employer.id,
@@ -484,6 +538,9 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
       ...job,
       moderationRequired: requiresModeration,
       trust,
+      pendingReason: requiresModeration
+        ? "Your job is under review. Verified employers publish instantly — complete trust verification to skip the queue."
+        : null,
     });
     recordOpsEvent({
       metricName: requiresModeration ? "job_publish_held" : "job_publish_success",

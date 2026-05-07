@@ -26,7 +26,13 @@ import { ApifySource, parseApifyTaskConfigs } from "./sources/apify.js";
 import { GreenhouseSource } from "./sources/greenhouse.js";
 import { LeverSource } from "./sources/lever.js";
 import { WorkableSource } from "./sources/workable.js";
+import {
+  CompanyCareerApiSource,
+  parseCompanyCareerSourceConfigs,
+  type CompanyCareerSourceConfig,
+} from "./sources/company-careers.js";
 import type { BaseJobSource, JobQuery } from "./sources/base.js";
+import { classifyJobField, normalizeWorkplaceType } from "./taxonomy.js";
 
 interface AggregatedJobGroup {
   canonical: AggregatedJob;
@@ -60,6 +66,17 @@ const DEFAULT_LEVER_SITE_TOKENS = [
   "levelai",
   "enter-rcm-llc",
 ];
+
+const DEFAULT_COMPANY_CAREER_SOURCES = [
+  { provider: "ASHBY", companyName: "Anthropic", providerKey: "anthropic", careersUrl: "https://www.anthropic.com/careers" },
+  { provider: "ASHBY", companyName: "Linear", providerKey: "linear", careersUrl: "https://linear.app/careers" },
+  { provider: "GREENHOUSE", companyName: "Nubank", providerKey: "nubank", careersUrl: "https://nubank.com.br/en/careers/" },
+  { provider: "GREENHOUSE", companyName: "Wise", providerKey: "wise", careersUrl: "https://wise.jobs/" },
+  { provider: "LEVER", companyName: "Spotify", providerKey: "spotify", careersUrl: "https://www.lifeatspotify.com/jobs" },
+  { provider: "SMARTRECRUITERS", companyName: "Visa", providerKey: "Visa", careersUrl: "https://usa.visa.com/careers.html" },
+  { provider: "SMARTRECRUITERS", companyName: "Bosch Group", providerKey: "BoschGroup", careersUrl: "https://www.bosch.com/careers/" },
+  { provider: "RECRUITEE", companyName: "Mews", providerKey: "mews", careersUrl: "https://www.mews.com/en/careers" },
+] as const;
 
 function parseTokenList(raw: string | undefined): string[] {
   return (raw || "")
@@ -125,7 +142,7 @@ export class JobAggregator {
   private sources: BaseJobSource[] = [];
   private prisma: PrismaClient;
 
-  constructor(prisma: PrismaClient) {
+  constructor(prisma: PrismaClient, private readonly extraCompanyCareerSources: CompanyCareerSourceConfig[] = []) {
     this.prisma = prisma;
     this.initializeSources();
   }
@@ -178,6 +195,17 @@ export class JobAggregator {
       apiBackedSources.push(new WorkableSource(workableAccounts));
     }
 
+    const companyCareerSources = parseCompanyCareerSourceConfigs(
+      process.env.COMPANY_CAREER_SOURCES_JSON,
+      [
+        ...(includeDefaultBoardCatalog ? [...DEFAULT_COMPANY_CAREER_SOURCES] : []),
+        ...this.extraCompanyCareerSources,
+      ],
+    );
+    if (companyCareerSources.length > 0) {
+      apiBackedSources.push(new CompanyCareerApiSource(companyCareerSources));
+    }
+
     const preferApiOnly = apiBackedSources.length > 0 && process.env.AGGREGATOR_INCLUDE_SCRAPED_SOURCES !== "1";
     if (preferApiOnly) {
       this.sources.push(...apiBackedSources);
@@ -202,6 +230,7 @@ export class JobAggregator {
         greenhouseBoardCount: greenhouseBoards.length,
         leverSiteCount: leverSites.length,
         workableAccountCount: workableAccounts.length,
+        companyCareerSourceCount: companyCareerSources.length,
       },
       "[aggregator] Initialized job sources",
     );
@@ -481,6 +510,12 @@ export class JobAggregator {
       location: job.location,
       type: job.jobType,
       seniority: job.seniority,
+      jobField: job.jobField ?? classifyJobField({
+        title: job.title,
+        description: job.description,
+        tags: job.skills,
+      }),
+      workplaceType: job.workplaceType ?? normalizeWorkplaceType(job.locationType),
       tags: job.skills,
       salaryMin: job.salary?.min ?? null,
       salaryMax: job.salary?.max ?? null,
@@ -493,6 +528,7 @@ export class JobAggregator {
       sourceName: job.company,
       jobSource: job.source,
       applicationUrl: job.applicationUrl,
+      companyCareerSourceId: job.companyCareerSourceId ?? null,
       publishedAt: job.postedAt,
       sourceFirstSeenAt: job.postedAt,
       sourceLastSeenAt: new Date(),
@@ -535,6 +571,12 @@ export class JobAggregator {
       description: job.description,
       location: job.location,
       type: job.jobType,
+      jobField: job.jobField ?? classifyJobField({
+        title: job.title,
+        description: job.description,
+        tags: job.skills,
+      }),
+      workplaceType: job.workplaceType ?? normalizeWorkplaceType(job.locationType),
       seniority: job.seniority || "Mid-level",
       salaryMin: job.salary?.min,
       salaryMax: job.salary?.max,
@@ -550,6 +592,7 @@ export class JobAggregator {
       sourceId: job.externalId,
       sourceName: job.company,
       expiresAt: job.expiresAt || null,
+      companyCareerSourceId: job.companyCareerSourceId ?? null,
       lastCheckedAt: new Date(),
       isExpired: false,
       riskScore: 0,

@@ -1,4 +1,8 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { getPublicStatsServer } from "@/lib/server-public-api";
+import { EARLY_LEARNING_LESSONS, INTERVIEW_ROLE_TRACKS, SCAM_PROTECTION_TIPS } from "@/lib/early-tester-content";
 
 function formatCompact(value: number): string {
   if (value < 1000) return value.toString();
@@ -10,27 +14,65 @@ function formatCompact(value: number): string {
   return compact.toUpperCase().replace(".0", "");
 }
 
-export async function HeroStats() {
-  const stats = await getPublicStatsServer();
+export function HeroStats() {
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof getPublicStatsServer>>>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void getPublicStatsServer().then((nextStats) => {
+      if (isMounted) {
+        setStats(nextStats);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const hasLiveStats = Boolean(stats);
-  const items = [
-    {
-      label: "Active Candidates",
-      value: stats ? `${formatCompact(stats.activeCandidates)}+` : "10K+",
-    },
-    {
-      label: "Partner Companies",
-      value: stats ? `${formatCompact(stats.partnerCompanies)}+` : "500+",
-    },
-    {
-      label: "Jobs Posted",
-      value: stats ? `${formatCompact(stats.jobsPosted)}+` : "2K+",
-    },
-    {
-      label: "African Countries",
-      value: stats ? `${stats.africanCountries}` : "54",
-    },
-  ];
+  const interviewQuestionCount = INTERVIEW_ROLE_TRACKS.reduce(
+    (total, track) => total + track.questions.length,
+    0,
+  );
+  const items = stats
+    ? [
+        {
+          label: "Early Users",
+          value: `${formatCompact(stats.activeCandidates)}`,
+        },
+        {
+          label: "Employer Proof",
+          value: "Pending",
+        },
+        {
+          label: "Open Roles Indexed",
+          value: `${formatCompact(stats.jobsPosted)}`,
+        },
+        {
+          label: "Africa Context",
+          value: `${stats.africanCountries}`,
+        },
+      ]
+    : [
+        {
+          label: "Starter Lessons",
+          value: `${EARLY_LEARNING_LESSONS.length}`,
+        },
+        {
+          label: "Practice Questions",
+          value: `${interviewQuestionCount}`,
+        },
+        {
+          label: "Trust Safety Tips",
+          value: `${SCAM_PROTECTION_TIPS.length}`,
+        },
+        {
+          label: "Pilot Outcomes",
+          value: "Soon",
+        },
+      ];
 
   return (
     <section className="section-shell py-14">
@@ -46,7 +88,12 @@ export async function HeroStats() {
 
         {!hasLiveStats && (
           <p className="mt-5 text-center text-sm text-gray-500 dark:text-gray-400">
-            Live stats are temporarily unavailable. Showing trusted baseline platform metrics.
+            Showing verifiable product-readiness signals. Candidate outcomes, employer counts, and testimonials will appear after real early-access activity.
+          </p>
+        )}
+        {hasLiveStats && (
+          <p className="mt-5 text-center text-sm text-gray-500 dark:text-gray-400">
+            Employer validation, hiring-partner counts, and testimonials will appear only after verified early-access workflows produce real proof.
           </p>
         )}
       </div>

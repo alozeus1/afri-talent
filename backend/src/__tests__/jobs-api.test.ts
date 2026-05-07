@@ -192,6 +192,54 @@ describe("Jobs API", () => {
                 })
             );
         });
+
+        it("supports opt-in expanded keyword search and new smart search filters", async () => {
+            vi.stubEnv("SMART_SEARCH_KEYWORD_EXPANSION_ENABLED", "1");
+            (prisma.job.findMany as any).mockResolvedValueOnce([{
+                ...DUMMY_JOB,
+                id: "job-smart-search",
+                title: "Platform Engineer",
+                type: "Full-time",
+                sourceName: "Greenhouse",
+                sourceUrl: "https://boards.greenhouse.io/acme",
+                publishedAt: new Date("2026-04-01T00:00:00.000Z"),
+            }]);
+
+            const res = await request(app)
+                .get("/api/jobs")
+                .query({
+                    query: "DevOps Engineer",
+                    includeExpandedKeywords: "true",
+                    remoteOnly: "true",
+                    employmentType: "Full-time",
+                    provider: "greenhouse",
+                    sortBy: "newest",
+                    page: "1",
+                    limit: "10",
+                });
+
+            expect(res.status).toBe(200);
+            expect(res.body.smartSearch.expandedKeywords).toEqual(expect.arrayContaining([
+                "platform engineer",
+                "cloud engineer",
+                "kubernetes engineer",
+            ]));
+            expect(res.body.smartSearch.sortBy).toBe("newest");
+            expect(prisma.job.findMany).toHaveBeenCalledWith(expect.objectContaining({
+                where: expect.objectContaining({
+                    AND: expect.arrayContaining([
+                        expect.objectContaining({ type: "Full-time" }),
+                        expect.objectContaining({
+                            OR: expect.arrayContaining([
+                                { sourceName: { contains: "greenhouse", mode: "insensitive" } },
+                                { sourceUrl: { contains: "greenhouse", mode: "insensitive" } },
+                            ]),
+                        }),
+                    ]),
+                }),
+            }));
+            vi.unstubAllEnvs();
+        });
     });
 
     describe("GET /api/jobs/:slug", () => {

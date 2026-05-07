@@ -133,7 +133,7 @@ export const jobs = {
     fetchAPI<Job>(`/api/jobs/${slug}`),
 
   create: (data: CreateJobData, token?: string) =>
-    fetchAPI<Job>("/api/jobs", {
+    fetchAPI<Job & { pendingReason: string | null }>("/api/jobs", {
       method: "POST",
       body: JSON.stringify(data),
       token,
@@ -201,14 +201,72 @@ export const admin = {
       token,
     }),
 
-  users: (token?: string, params?: { role?: string; page?: number }) => {
+  users: (token?: string, params?: { role?: string; status?: string; search?: string; page?: number; limit?: number }) => {
     const searchParams = new URLSearchParams();
     if (params?.role) searchParams.set("role", params.role);
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.search) searchParams.set("search", params.search);
     if (params?.page) searchParams.set("page", params.page.toString());
+    if (params?.limit) searchParams.set("limit", params.limit.toString());
 
     const query = searchParams.toString();
     return fetchAPI<UserListResponse>(`/api/admin/users${query ? `?${query}` : ""}`, { token });
   },
+
+  user: (id: string, token?: string) =>
+    fetchAPI<AdminUserDetailResponse>(`/api/admin/users/${id}`, { token }),
+
+  updateUserRole: (
+    id: string,
+    data: {
+      role: User["role"];
+      permissions?: AdminPermission[];
+      adminTitle?: string;
+      adminDescription?: string;
+      adminRoleActive?: boolean;
+      reason?: string;
+    },
+    token?: string
+  ) =>
+    fetchAPI<{ user: AdminUserListItem }>(`/api/admin/users/${id}/role`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  updateUserStatus: (
+    id: string,
+    data: { status: AccountRestrictionStatus; reason?: string },
+    token?: string
+  ) =>
+    fetchAPI<{ user: AdminUserListItem }>(`/api/admin/users/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+      token,
+    }),
+};
+
+export const adminBlog = {
+  list: (params?: { status?: "pending" | "published" | "all"; page?: number; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.page) searchParams.set("page", params.page.toString());
+    if (params?.limit) searchParams.set("limit", params.limit.toString());
+    const query = searchParams.toString();
+    return fetchAPI<{ posts: BlogPost[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
+      `/api/admin/blog${query ? `?${query}` : ""}`
+    );
+  },
+  get: (id: string) => fetchAPI<BlogPost & { wordCount: number }>(`/api/admin/blog/${id}`),
+  approve: (id: string) =>
+    fetchAPI<{ success: boolean }>(`/api/admin/blog/${id}/approve`, { method: "PUT" }),
+  reject: (id: string, notes: string) =>
+    fetchAPI<{ success: boolean }>(`/api/admin/blog/${id}/reject`, {
+      method: "PUT",
+      body: JSON.stringify({ notes }),
+    }),
+  trigger: () =>
+    fetchAPI<{ success: boolean; message: string }>("/api/admin/blog/trigger", { method: "POST" }),
 };
 
 export const adminTrust = {
@@ -278,7 +336,7 @@ export const adminBilling = {
   searchCustomers: (query: string) =>
     fetchAPI<{ customers: AdminBillingCustomerSearchResult[] }>(`/api/admin/billing/customers/search?query=${encodeURIComponent(query)}`),
   customer: (userId: string) =>
-    fetchAPI<{ customer: AdminBillingCustomerDetail }>(`/api/admin/billing/customers/${userId}`),
+    fetchAPI<{ customer: AdminBillingCustomerDetail; planEntitlements: PlanEntitlements[] }>(`/api/admin/billing/customers/${userId}`),
   resyncEntitlements: (userId: string) =>
     fetchAPI<{
       state: BillingEntitlementState;
@@ -286,6 +344,45 @@ export const adminBilling = {
       action: BillingSupportActionRecord;
     }>(`/api/admin/billing/customers/${userId}/resync-entitlements`, {
       method: "POST",
+    }),
+  updateSubscriptionAccess: (
+    userId: string,
+    data: {
+      plan: BillingStatus["plan"];
+      status: BillingStatus["status"];
+      currentPeriodEnd?: string | null;
+      reasonCode: string;
+      notes?: string;
+    },
+  ) =>
+    fetchAPI<{
+      subscription: AdminBillingCustomerDetail["subscription"];
+      state: BillingEntitlementState;
+      validation: BillingEntitlementValidation;
+      action: BillingSupportActionRecord;
+      warnings: string[];
+    }>(`/api/admin/billing/customers/${userId}/subscription-access`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateCapabilityAccess: (
+    userId: string,
+    data: {
+      capability: "CANDIDATE_PREMIUM" | "CANDIDATE_AI" | "EMPLOYER_PREMIUM";
+      action: "GRANT" | "REVOKE";
+      reasonCode: string;
+      notes?: string;
+    },
+  ) =>
+    fetchAPI<{
+      subscription: AdminBillingCustomerDetail["subscription"];
+      state: BillingEntitlementState;
+      validation: BillingEntitlementValidation;
+      action: BillingSupportActionRecord;
+      warnings: string[];
+    }>(`/api/admin/billing/customers/${userId}/capability-access`, {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
   supportAction: (
     userId: string,
@@ -550,7 +647,15 @@ export const employerAnalytics = {
       body: JSON.stringify(data),
     }),
   getBranding: () => fetchAPI<EmployerBranding>("/api/employer/branding"),
-  updateBranding: (data: { companyName?: string; website?: string; location?: string; bio?: string }) =>
+  updateBranding: (data: {
+    companyName?: string;
+    website?: string;
+    location?: string;
+    bio?: string;
+    logoUrl?: string;
+    brandColor?: string;
+    accentColor?: string;
+  }) =>
     fetchAPI<EmployerBranding>("/api/employer/branding", {
       method: "PUT",
       body: JSON.stringify(data),
@@ -682,7 +787,7 @@ export const mockInterviews = {
   create: (data: {
     title: string;
     targetRole: string;
-    promptLanguage?: "EN" | "FR" | "PT" | "AR";
+    promptLanguage?: "EN" | "ES" | "FR" | "PT" | "AR";
     questionSet?: string[];
     visibility?: "PRIVATE" | "TEAM_SHARED";
     retentionDays?: number;
@@ -1248,6 +1353,8 @@ export interface Job {
   description: string;
   location: string;
   type: string;
+  jobField?: string | null;
+  workplaceType?: string | null;
   seniority: string;
   salaryMin?: number;
   salaryMax?: number;
@@ -1285,15 +1392,23 @@ export interface Job {
 
 export interface JobListParams {
   search?: string;
+  query?: string;
   location?: string;
   type?: string;
+  employmentType?: string;
+  jobField?: string;
+  workplaceType?: string;
   seniority?: string;
   visaSponsorship?: string;
   relocationAssistance?: string;
   remote?: string;
+  remoteOnly?: string;
   salaryMin?: number;
   salaryMax?: number;
   country?: string;
+  provider?: string;
+  includeExpandedKeywords?: string;
+  sortBy?: "relevance" | "newest" | "salary" | "companyQuality";
   page?: number;
   limit?: number;
 }
@@ -1319,6 +1434,7 @@ export interface CreateJobData {
   currency?: string;
   salaryPeriod?: string;
   tags?: string[];
+  applicationUrl?: string;
 }
 
 export interface Application {
@@ -1344,6 +1460,8 @@ export interface Application {
     name: string;
     email: string;
   };
+  locked?: boolean;
+  upgradeRequired?: boolean;
 }
 
 export interface Resource {
@@ -1355,6 +1473,19 @@ export interface Resource {
   category: string;
   coverImage?: string;
   publishedAt?: string;
+}
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  coverImage: string | null;
+  published: boolean;
+  publishedAt: string | null;
+  createdAt: string;
+  reviewStatus: "PENDING" | "APPROVED" | "REJECTED" | "REVIEWED";
+  reviewNotes: string | null;
 }
 
 export interface ResourceListResponse {
@@ -1383,8 +1514,94 @@ export interface PublicStats {
   lastUpdated: string;
 }
 
+export type AccountRestrictionStatus = "ACTIVE" | "LIMITED" | "SUSPENDED";
+
+export type AdminPermission =
+  | "VIEW_USERS"
+  | "MANAGE_USER_ACCOUNTS"
+  | "RESET_USER_PASSWORD"
+  | "RESTRICT_USER_ACCOUNT"
+  | "REVIEW_JOBS"
+  | "REVIEW_APPLICATIONS"
+  | "REVIEW_RESOURCES"
+  | "REVIEW_COMPANY_DATA"
+  | "VIEW_TRUST_CASES"
+  | "MANAGE_TRUST_CASES"
+  | "VIEW_ABUSE_REPORTS"
+  | "MANAGE_ABUSE_REPORTS"
+  | "VIEW_VERIFICATION_ARTIFACTS"
+  | "APPROVE_VERIFICATION"
+  | "VIEW_AUDIT_LOGS"
+  | "VIEW_HEALTH_STATUS"
+  | "MANAGE_ALERTS"
+  | "VIEW_SYSTEMS_METRICS"
+  | "VIEW_BILLING_DATA"
+  | "MANAGE_BILLING_DISPUTES"
+  | "VIEW_REVENUE_REPORTS"
+  | "EXPORT_DATA"
+  | "RUN_BULK_OPERATIONS"
+  | "MODIFY_BULK_DATA";
+
+export interface AdminUserListItem extends User {
+  createdAt: string;
+  emailVerified?: boolean;
+  accountRestrictionStatus: AccountRestrictionStatus;
+  accountRestrictionReason: string | null;
+  accountRestrictedAt: string | null;
+  adminRole: {
+    id: string;
+    title: string;
+    description?: string | null;
+    permissions: AdminPermission[];
+    isActive: boolean;
+  } | null;
+  _count: {
+    applications: number;
+    companyReviews: number;
+    sentMessages: number;
+  };
+}
+
+export interface AdminUserDetailResponse {
+  user: AdminUserListItem & {
+    preferredLocale: string;
+    emailVerifiedAt: string | null;
+    deletionRequestedAt: string | null;
+    deletedAt: string | null;
+    phoneVerifiedAt: string | null;
+    updatedAt: string;
+    candidateProfile: {
+      id: string;
+      headline: string | null;
+      targetCountries: string[];
+      yearsExperience: number | null;
+    } | null;
+    subscription: {
+      plan: string;
+      status: string;
+      currentPeriodEnd: string | null;
+    } | null;
+    _count: AdminUserListItem["_count"] & {
+      savedSearches: number;
+      notifications: number;
+    };
+  };
+  auditLogs: Array<{
+    id: string;
+    action: string;
+    changes: unknown;
+    reason: string | null;
+    status: string;
+    createdAt: string;
+    admin: {
+      title: string;
+      admin: { id: string; name: string; email: string };
+    } | null;
+  }>;
+}
+
 export interface UserListResponse {
-  users: Array<User & { createdAt: string; _count: { applications: number } }>;
+  users: AdminUserListItem[];
   pagination: {
     page: number;
     limit: number;
@@ -1409,6 +1626,7 @@ export interface BillingEntitlementState {
   billingRegion: "AFRICA" | "EUROPE" | "ROW" | null;
   currency: string | null;
   pricingVersion: number | null;
+  entitlements: PlanEntitlements;
   checksum: string;
   isInSync: boolean;
   source: string;
@@ -1574,6 +1792,9 @@ export interface AdminBillingCustomerDetail {
     id: string;
     plan: BillingStatus["plan"];
     status: BillingStatus["status"];
+    billingProvider: "STRIPE" | "FLUTTERWAVE" | null;
+    providerCustomerId: string | null;
+    providerSubscriptionId: string | null;
     stripeCustomerId: string | null;
     stripeSubId: string | null;
     currentPeriodEnd: string | null;
@@ -2128,7 +2349,7 @@ export interface MockInterviewSession {
   userId: string;
   title: string;
   targetRole: string;
-  promptLanguage: "EN" | "FR" | "PT" | "AR";
+  promptLanguage: "EN" | "ES" | "FR" | "PT" | "AR";
   questionSet: unknown;
   transcript: unknown;
   feedbackSummary: string | null;
@@ -2182,6 +2403,11 @@ export interface EmployerBranding {
   website: string | null;
   location: string;
   bio: string | null;
+  logoUrl: string | null;
+  brandColor: string | null;
+  accentColor: string | null;
+  premiumBrandingEnabled: boolean;
+  subscriptionPlan: BillingStatus["plan"];
 }
 
 export type EmployerOnboardingStep =
@@ -2343,13 +2569,21 @@ export const notifications = {
   },
   unreadCount: () => fetchAPI<{ count: number }>("/api/notifications/unread-count"),
   markRead: (id: string) => fetchAPI<{ notification: NotificationItem }>(`/api/notifications/${id}/read`, { method: "PUT" }),
+  feedback: (
+    id: string,
+    feedback: "RELEVANT" | "NOT_RELEVANT" | "TOO_MANY" | "WRONG_ROLE" | "WRONG_LOCATION",
+  ) =>
+    fetchAPI<{ notification: NotificationItem }>(`/api/notifications/${id}/feedback`, {
+      method: "PUT",
+      body: JSON.stringify({ feedback }),
+    }),
   markAllRead: () => fetchAPI<{ updated: number }>("/api/notifications/read-all", { method: "PUT" }),
 };
 
 export const preferences = {
-  getLocale: () => fetchAPI<{ preferredLocale: "EN" | "FR" | "PT" | "AR" }>("/api/preferences/locale"),
-  setLocale: (preferredLocale: "EN" | "FR" | "PT" | "AR") =>
-    fetchAPI<{ preferredLocale: "EN" | "FR" | "PT" | "AR" }>("/api/preferences/locale", {
+  getLocale: () => fetchAPI<{ preferredLocale: "EN" | "ES" | "FR" | "PT" | "AR" }>("/api/preferences/locale"),
+  setLocale: (preferredLocale: "EN" | "ES" | "FR" | "PT" | "AR") =>
+    fetchAPI<{ preferredLocale: "EN" | "ES" | "FR" | "PT" | "AR" }>("/api/preferences/locale", {
       method: "PUT",
       body: JSON.stringify({ preferredLocale }),
     }),
@@ -2540,7 +2774,37 @@ export const learning = {
   },
   categories: () => fetchAPI<string[]>("/api/learning/categories"),
   recommended: () => fetchAPI<LearningResourceItem[]>("/api/learning/recommended"),
+  progress: () => fetchAPI<{ progress: LearningProgressItem[] }>("/api/learning/progress"),
+  updateProgress: (
+    id: string,
+    data: { status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED"; lastStepIndex?: number },
+  ) =>
+    fetchAPI<{ progress: LearningProgressItem }>(`/api/learning/${id}/progress`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   get: (id: string) => fetchAPI<LearningResourceItem>(`/api/learning/${id}`),
+  feedback: {
+    submit: (data: LearningFeedbackSubmitInput) =>
+      fetchAPI<{ feedback: LearningFeedbackItem; message: string }>("/api/learning/feedback", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    list: (params?: { areaSlug?: string; status?: "PENDING" | "APPROVED" | "REJECTED"; page?: number; limit?: number }) => {
+      const sp = new URLSearchParams();
+      if (params?.areaSlug) sp.set("areaSlug", params.areaSlug);
+      if (params?.status) sp.set("status", params.status);
+      if (params?.page) sp.set("page", params.page.toString());
+      if (params?.limit) sp.set("limit", params.limit.toString());
+      const q = sp.toString();
+      return fetchAPI<LearningFeedbackListResponse>(`/api/learning/feedback${q ? `?${q}` : ""}`);
+    },
+    moderate: (id: string, data: { action: "approve" | "reject"; moderationNotes?: string }) =>
+      fetchAPI<{ feedback: LearningFeedbackItem }>(`/api/learning/feedback/${id}/moderate`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+  },
 };
 
 // Calendar
@@ -2951,6 +3215,48 @@ export interface LearningListResponse {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
+export interface LearningProgressItem {
+  id: string;
+  userId: string;
+  resourceId: string;
+  status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+  lastStepIndex: number;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LearningFeedbackSubmitInput {
+  areaSlug: string;
+  lessonTitle?: string;
+  firstName: string;
+  lastName: string;
+  rating: number;
+  comment: string;
+  attachPhoto: boolean;
+}
+
+export interface LearningFeedbackItem {
+  id: string;
+  areaSlug: string;
+  lessonTitle: string | null;
+  firstName?: string;
+  lastName?: string;
+  displayName: string;
+  rating: number;
+  comment: string;
+  avatarUrl: string | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  approvedAt: string | null;
+  moderationNotes?: string | null;
+  createdAt: string;
+}
+
+export interface LearningFeedbackListResponse {
+  feedback: LearningFeedbackItem[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
 export interface CalendarEventItem {
   id: string;
   title: string;
@@ -3244,4 +3550,53 @@ export const skills = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+};
+
+// ── Resume Templates ──────────────────────────────────────────────────────────
+
+export type SubscriptionPlan =
+  | "FREE"
+  | "BASIC"
+  | "PROFESSIONAL"
+  | "EMPLOYER_FREE"
+  | "EMPLOYER_BASIC"
+  | "EMPLOYER_PREMIUM";
+
+export interface ResumeTemplate {
+  id: string;
+  name: string;
+  description: string;
+  thumbnailUrl: string;
+  tags: string[];
+  bestFor: string[];
+  minPlan: SubscriptionPlan;
+  sortOrder: number;
+  files: Array<{
+    id: string;
+    format: string;
+    s3Key: string | null;
+    externalUrl: string | null;
+    fileSizeBytes: number | null;
+  }>;
+  isLocked: boolean;
+  totalDownloads: number;
+}
+
+export interface TemplateListResponse {
+  templates: ResumeTemplate[];
+  userPlan: SubscriptionPlan;
+  userDownloadsThisMonth: number;
+  quota: number | null;
+  canDownload: boolean;
+}
+
+export interface TemplateDownloadResponse {
+  downloadUrl: string;
+  expiresAt: string | null;
+}
+
+export const templates = {
+  list: () => fetchAPI<TemplateListResponse>("/api/skills/resume-templates"),
+  download: (id: string, format: string) =>
+    fetchAPI<TemplateDownloadResponse>(`/api/skills/resume-templates/${id}/download?format=${encodeURIComponent(format)}`),
 };

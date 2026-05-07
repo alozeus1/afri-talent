@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CardGridSkeleton } from "@/components/ui/skeleton";
+import { trackEvent } from "@/lib/analytics";
+import { useT } from "@/lib/i18n/client";
 
 const DIFFICULTY_OPTIONS = ["EASY", "MEDIUM", "HARD"];
 const OUTCOME_OPTIONS = ["OFFERED", "REJECTED", "NO_RESPONSE", "IN_PROGRESS"];
@@ -23,6 +26,80 @@ const INTERVIEW_TYPES = [
   "PANEL",
   "ON_SITE",
   "OTHER",
+];
+const HELPFUL_STORAGE_KEY = "afritalent_interview_helpful_votes";
+
+const MOCK_EXPERIENCES: InterviewExperienceItem[] = [
+  {
+    id: "sample-aws-cloud-engineer",
+    company: { id: "sample-company-type-cloud", name: "Sample scenario: global cloud consulting team" },
+    jobTitle: "AWS Cloud Engineer",
+    difficulty: "MEDIUM",
+    outcome: "IN_PROGRESS",
+    interviewType: "TECHNICAL",
+    process: "Practice scenario, not a real user-submitted interview. A typical flow could include a recruiter screen, AWS fundamentals round, troubleshooting exercise, and a short architecture discussion.",
+    questions: ["How would you troubleshoot an EC2 instance that cannot be reached over SSH?", "Explain public vs private subnets in a VPC.", "How would you monitor a small production API?"],
+    tips: "Prepare to explain IAM, VPC routing, security groups, CloudWatch, and one reliability story from your own experience.",
+    duration: "Practice flow: 3 to 4 rounds",
+    helpfulCount: 42,
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+  },
+  {
+    id: "sample-devops-engineer",
+    company: { id: "sample-company-type-saas", name: "Sample scenario: remote SaaS platform team" },
+    jobTitle: "DevOps Engineer",
+    difficulty: "HARD",
+    outcome: "IN_PROGRESS",
+    interviewType: "SYSTEM_DESIGN",
+    process: "Practice scenario, not a real user-submitted interview. The candidate is asked to design a deployment pipeline, debug a failed release, and explain rollback and observability choices.",
+    questions: ["Design a CI/CD pipeline from commit to production.", "A deployment passes tests but health checks fail. What do you do first?", "How do you manage secrets in CI/CD?"],
+    tips: "Use a structured answer: quality gates, deployment strategy, monitoring, rollback, and communication.",
+    duration: "Practice flow: 2 to 3 rounds",
+    helpfulCount: 15,
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+  },
+  {
+    id: "sample-cybersecurity-analyst",
+    company: { id: "sample-company-type-fintech", name: "Sample scenario: regulated fintech security team" },
+    jobTitle: "Cybersecurity Analyst",
+    difficulty: "HARD",
+    outcome: "IN_PROGRESS",
+    interviewType: "TECHNICAL",
+    process: "Practice scenario, not a real user-submitted interview. The flow includes a security fundamentals screen, phishing/risk discussion, and an incident response case.",
+    questions: ["How would you prioritize vulnerabilities when fixes exceed team capacity?", "What phishing indicators would you teach non-technical users?", "How would you document an incident escalation?"],
+    tips: "Think in evidence, impact, urgency, and practical risk reduction. Avoid guessing when facts are missing.",
+    duration: "Practice flow: 2 to 4 rounds",
+    helpfulCount: 89,
+    createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
+  },
+  {
+    id: "sample-backend-developer",
+    company: { id: "sample-company-type-marketplace", name: "Sample scenario: global marketplace engineering team" },
+    jobTitle: "Backend Developer",
+    difficulty: "MEDIUM",
+    outcome: "IN_PROGRESS",
+    interviewType: "TECHNICAL",
+    process: "Practice scenario, not a real user-submitted interview. The candidate discusses API design, duplicate handling, data validation, and production debugging.",
+    questions: ["Design an API for saving and tracking job applications.", "How would you prevent duplicate jobs from multiple providers?", "A production endpoint is timing out. What is your debugging sequence?"],
+    tips: "Explain data models, status transitions, authorization, logs, metrics, and a safe mitigation path.",
+    duration: "Practice flow: 3 rounds",
+    helpfulCount: 23,
+    createdAt: new Date(Date.now() - 86400000 * 18).toISOString(),
+  },
+  {
+    id: "sample-product-manager",
+    company: { id: "sample-company-type-startup", name: "Sample scenario: early-stage product team" },
+    jobTitle: "Product Manager",
+    difficulty: "MEDIUM",
+    outcome: "IN_PROGRESS",
+    interviewType: "BEHAVIORAL",
+    process: "Practice scenario, not a real user-submitted interview. The flow evaluates product judgment, prioritization, early-user feedback, and safety metrics.",
+    questions: ["How would you prioritize improvements for a pre-launch job platform?", "Tell me about a time you changed direction after user feedback.", "What metrics would you track for an application assistant feature?"],
+    tips: "Anchor answers in user value, risk, learning speed, and measurable product quality signals.",
+    duration: "Practice flow: 2 to 3 rounds",
+    helpfulCount: 7,
+    createdAt: new Date(Date.now() - 86400000 * 25).toISOString(),
+  }
 ];
 
 function difficultyBadge(difficulty: string) {
@@ -54,6 +131,7 @@ function outcomeBadge(outcome: string) {
 }
 
 export default function InterviewsPage() {
+  const t = useT();
   const { user } = useAuth();
 
   // List state
@@ -90,6 +168,17 @@ export default function InterviewsPage() {
 
   // Helpful tracking
   const [helpfulSet, setHelpfulSet] = useState<Set<string>>(new Set());
+  const [helpfulLoadingId, setHelpfulLoadingId] = useState<string | null>(null);
+  const [helpfulError, setHelpfulError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(HELPFUL_STORAGE_KEY);
+      if (saved) setHelpfulSet(new Set(JSON.parse(saved) as string[]));
+    } catch {
+      setHelpfulSet(new Set());
+    }
+  }, []);
 
   const fetchExperiences = useCallback(async () => {
     setLoading(true);
@@ -100,9 +189,19 @@ export default function InterviewsPage() {
         difficulty: filterDifficulty || undefined,
         page,
       });
-      setData(response);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load interview experiences");
+      if (response && response.experiences.length > 0) {
+        setData(response);
+      } else {
+        setData({
+          experiences: MOCK_EXPERIENCES,
+          pagination: { page: 1, limit: 10, total: MOCK_EXPERIENCES.length, totalPages: 1 }
+        });
+      }
+    } catch {
+      setData({
+        experiences: MOCK_EXPERIENCES,
+        pagination: { page: 1, limit: 10, total: MOCK_EXPERIENCES.length, totalPages: 1 }
+      });
     } finally {
       setLoading(false);
     }
@@ -117,21 +216,37 @@ export default function InterviewsPage() {
 
   const handleHelpful = async (id: string) => {
     if (helpfulSet.has(id)) return;
+    const isDemoExperience = id.startsWith("exp-") || id.startsWith("sample-");
+    const previousData = data;
+    const previousHelpfulSet = helpfulSet;
+    const nextHelpfulSet = new Set(helpfulSet).add(id);
+
+    setHelpfulError(null);
+    setHelpfulLoadingId(id);
+    setHelpfulSet(nextHelpfulSet);
+    window.localStorage.setItem(HELPFUL_STORAGE_KEY, JSON.stringify([...nextHelpfulSet]));
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        experiences: prev.experiences.map((exp) =>
+          exp.id === id ? { ...exp, helpfulCount: exp.helpfulCount + 1 } : exp
+        ),
+      };
+    });
+    trackEvent("interview_experience_helpful_clicked", { experience_id: id, demo: isDemoExperience });
+
     try {
-      await interviewExperiences.helpful(id);
-      setHelpfulSet((prev) => new Set(prev).add(id));
-      // Optimistic update
-      setData((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          experiences: prev.experiences.map((exp) =>
-            exp.id === id ? { ...exp, helpfulCount: exp.helpfulCount + 1 } : exp
-          ),
-        };
-      });
+      if (user && !isDemoExperience) {
+        await interviewExperiences.helpful(id);
+      }
     } catch {
-      // Silently fail
+      setData(previousData);
+      setHelpfulSet(previousHelpfulSet);
+      window.localStorage.setItem(HELPFUL_STORAGE_KEY, JSON.stringify([...previousHelpfulSet]));
+      setHelpfulError("Could not save your helpful vote. Please try again.");
+    } finally {
+      setHelpfulLoadingId(null);
     }
   };
 
@@ -209,10 +324,9 @@ export default function InterviewsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Hero */}
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Interview Insights</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">{t("interviews.title")}</h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Learn from the community. Read real interview experiences from African
-          professionals and prepare for your next opportunity.
+          {t("interviews.practiceSubtitle")}
         </p>
       </div>
 
@@ -222,7 +336,7 @@ export default function InterviewsPage() {
           <div className="flex flex-col md:flex-row gap-4 mb-4">
             <div className="flex-1">
               <Input
-                placeholder="Search by company name or job title..."
+                placeholder={t("interviews.searchPlaceholder")}
                 value={searchText}
                 onChange={(e) => {
                   setSearchText(e.target.value);
@@ -234,7 +348,7 @@ export default function InterviewsPage() {
 
           {/* Filter Chips */}
           <div className="flex flex-wrap gap-2">
-            <span className="text-sm text-gray-500 self-center mr-2">Difficulty:</span>
+            <span className="text-sm text-gray-500 self-center mr-2">{t("common.difficulty")}:</span>
             {DIFFICULTY_OPTIONS.map((d) => (
               <button
                 key={d}
@@ -252,7 +366,7 @@ export default function InterviewsPage() {
               </button>
             ))}
 
-            <span className="text-sm text-gray-500 self-center ml-4 mr-2">Outcome:</span>
+            <span className="text-sm text-gray-500 self-center ml-4 mr-2">{t("common.outcome")}:</span>
             {["OFFERED", "REJECTED"].map((o) => (
               <button
                 key={o}
@@ -288,24 +402,27 @@ export default function InterviewsPage() {
 
       {/* Loading */}
       {loading && (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-        </div>
+        <CardGridSkeleton count={3} />
       )}
 
       {/* Error */}
       {error && (
         <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-8">{error}</div>
       )}
+      {helpfulError && (
+        <div className="bg-amber-50 text-amber-800 border border-amber-200 p-4 rounded-lg mb-8 text-sm">
+          {helpfulError}
+        </div>
+      )}
 
       {/* Interview Cards */}
       {!loading && filteredExperiences && (
         <>
           {filteredExperiences.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-600 mb-2">No interview experiences found</p>
-              <p className="text-sm text-gray-400">
-                Be the first to share your experience!
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
+              <p className="text-lg font-semibold text-gray-900 mb-2">{t("interviews.noMatch")}</p>
+              <p className="mx-auto max-w-xl text-sm leading-6 text-gray-500">
+                {t("interviews.noMatchDesc")}
               </p>
             </div>
           ) : (
@@ -320,6 +437,7 @@ export default function InterviewsPage() {
                   }
                   onHelpful={() => handleHelpful(exp.id)}
                   isHelpfulMarked={helpfulSet.has(exp.id)}
+                  isHelpfulLoading={helpfulLoadingId === exp.id}
                 />
               ))}
             </div>
@@ -333,7 +451,7 @@ export default function InterviewsPage() {
                 disabled={page === 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                Previous
+                {t("common.previous")}
               </Button>
               <span className="flex items-center px-4 text-gray-600">
                 Page {page} of {data.pagination.totalPages}
@@ -343,7 +461,7 @@ export default function InterviewsPage() {
                 disabled={page === data.pagination.totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
+                {t("common.next")}
               </Button>
             </div>
           )}
@@ -363,7 +481,7 @@ export default function InterviewsPage() {
             setShowSubmitForm(true);
           }}
         >
-          ✍️ Share Your Experience
+          ✍️ {t("interviews.shareExperience")}
         </Button>
       </div>
 
@@ -374,7 +492,7 @@ export default function InterviewsPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-900">
-                  Share Your Interview Experience
+                  {t("interviews.shareExperience")}
                 </h2>
                 <button
                   className="text-gray-400 hover:text-gray-600 text-2xl"
@@ -391,7 +509,7 @@ export default function InterviewsPage() {
             <CardContent>
               {submitSuccess && (
                 <div className="bg-emerald-50 text-emerald-700 p-4 rounded-lg mb-4">
-                  ✅ Experience shared successfully! Thank you for helping the community.
+                  ✅ {t("interviews.shareSuccess")}
                 </div>
               )}
 
@@ -403,7 +521,7 @@ export default function InterviewsPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <Input
-                  label="Company ID"
+                  label={t("interviews.companyId")}
                   id="interview-companyId"
                   placeholder="Enter company ID"
                   value={formData.companyId}
@@ -413,7 +531,7 @@ export default function InterviewsPage() {
                   required
                 />
                 <Input
-                  label="Job Title"
+                  label={t("interviews.jobTitle")}
                   id="interview-jobTitle"
                   placeholder="e.g. Senior Frontend Developer"
                   value={formData.jobTitle}
@@ -502,7 +620,7 @@ export default function InterviewsPage() {
                     htmlFor="interview-process"
                     className="block text-sm font-medium text-gray-700 mb-1"
                   >
-                    Interview Process
+                    {t("interviews.interviewProcess")}
                   </label>
                   <textarea
                     id="interview-process"
@@ -519,7 +637,7 @@ export default function InterviewsPage() {
                 {/* Questions */}
                 <div className="w-full">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Interview Questions
+                    {t("interviews.interviewQuestions")}
                   </label>
                   {formData.questions.map((q, i) => (
                     <div key={i} className="flex gap-2 mb-2">
@@ -546,7 +664,7 @@ export default function InterviewsPage() {
                     size="sm"
                     onClick={addQuestion}
                   >
-                    + Add Question
+                    {t("interviews.addQuestion")}
                   </Button>
                 </div>
 
@@ -556,7 +674,7 @@ export default function InterviewsPage() {
                       htmlFor="interview-tips"
                       className="block text-sm font-medium text-gray-700 mb-1"
                     >
-                      Tips for Others
+                      {t("interviews.tipsForOthers")}
                     </label>
                     <textarea
                       id="interview-tips"
@@ -591,7 +709,7 @@ export default function InterviewsPage() {
                     Cancel
                   </Button>
                   <Button type="submit" disabled={submitLoading}>
-                    {submitLoading ? "Submitting..." : "Share Experience"}
+                    {submitLoading ? t("common.submitting") : t("interviews.shareButton")}
                   </Button>
                 </div>
               </form>
@@ -609,16 +727,21 @@ function InterviewCard({
   onToggle,
   onHelpful,
   isHelpfulMarked,
+  isHelpfulLoading,
 }: {
   experience: InterviewExperienceItem;
   isExpanded: boolean;
   onToggle: () => void;
   onHelpful: () => void;
   isHelpfulMarked: boolean;
+  isHelpfulLoading: boolean;
 }) {
+  const t = useT();
+  const isSampleScenario = experience.id.startsWith("sample-") || experience.id.startsWith("exp-");
+
   return (
     <Card
-      className="cursor-pointer hover:shadow-md transition-shadow"
+      className="interactive-card cursor-pointer hover:shadow-md transition-shadow"
       onClick={onToggle}
     >
       <CardContent className="p-6">
@@ -630,11 +753,23 @@ function InterviewCard({
             <p className="text-sm text-gray-600">{experience.jobTitle}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {isSampleScenario && <Badge variant="warning">{t("interviews.sampleScenario")}</Badge>}
             {difficultyBadge(experience.difficulty)}
             {outcomeBadge(experience.outcome)}
             <Badge variant="info">
               {experience.interviewType.replace(/_/g, " ")}
             </Badge>
+            <button
+              type="button"
+              className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+              aria-expanded={isExpanded}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggle();
+              }}
+            >
+              {isExpanded ? t("interviews.hideDetails") : t("interviews.viewDetails")}
+            </button>
           </div>
         </div>
 
@@ -657,7 +792,7 @@ function InterviewCard({
           >
             <div>
               <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                Full Interview Process
+                {t("interviews.fullProcess")}
               </h4>
               <p className="text-sm text-gray-600 whitespace-pre-wrap">
                 {experience.process}
@@ -667,7 +802,7 @@ function InterviewCard({
             {experience.questions.length > 0 && (
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                  Interview Questions
+                  {t("interviews.questionsLabel")}
                 </h4>
                 <ul className="list-disc list-inside space-y-1">
                   {experience.questions.map((q, i) => (
@@ -682,7 +817,7 @@ function InterviewCard({
             {experience.tips && (
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                  Tips
+                  {t("interviews.tipsLabel")}
                 </h4>
                 <p className="text-sm text-gray-600">{experience.tips}</p>
               </div>
@@ -702,17 +837,25 @@ function InterviewCard({
             {new Date(experience.createdAt).toLocaleDateString()}
           </span>
           <button
-            className={`flex items-center gap-1 text-sm transition-colors ${
+            type="button"
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed ${
               isHelpfulMarked
                 ? "text-emerald-600 font-medium"
                 : "text-gray-400 hover:text-emerald-600"
             }`}
+            disabled={isHelpfulMarked || isHelpfulLoading}
+            aria-pressed={isHelpfulMarked}
+            aria-label={
+              isHelpfulMarked
+                ? `Marked helpful with ${experience.helpfulCount} helpful votes`
+                : `Mark ${experience.company?.name || "this"} interview experience as helpful`
+            }
             onClick={(e) => {
               e.stopPropagation();
               onHelpful();
             }}
           >
-            👍 Helpful ({experience.helpfulCount})
+            {isHelpfulLoading ? "..." : t("common.helpfulLabel")} ({experience.helpfulCount})
           </button>
         </div>
       </CardContent>

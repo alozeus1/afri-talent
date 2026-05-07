@@ -4,15 +4,18 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import ReactMarkdown from "react-markdown";
 import { resources, Resource } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import FeedbackToast from "@/components/ui/feedback-toast";
 
 export default function ResourceDetailPage() {
   const params = useParams();
   const [resource, setResource] = useState<Resource | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => {
     async function fetchResource() {
@@ -26,6 +29,10 @@ export default function ResourceDetailPage() {
       }
     }
     fetchResource();
+    
+    // Show feedback toast after a delay
+    const timer = setTimeout(() => setShowFeedback(true), 5000);
+    return () => clearTimeout(timer);
   }, [params.slug]);
 
   if (loading) {
@@ -93,13 +100,20 @@ export default function ResourceDetailPage() {
             {resource.excerpt}
           </p>
 
-          <div className="prose max-w-none">
-            <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-              {resource.content}
-            </div>
+          <div className="prose prose-emerald max-w-none prose-headings:font-bold prose-headings:text-gray-900 prose-p:text-gray-700 prose-p:leading-relaxed prose-a:text-emerald-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-gray-900 prose-li:text-gray-700">
+            <ReactMarkdown>{resource.content}</ReactMarkdown>
           </div>
         </div>
       </article>
+      
+      <FeedbackToast 
+        visible={showFeedback}
+        onClose={() => setShowFeedback(false)}
+        onFeedback={(type, reason) => {
+          console.log("Feedback received:", type, reason);
+          // Here you would normally send to your API
+        }}
+      />
     </div>
   );
 }

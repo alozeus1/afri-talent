@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { Prisma, EmployerVerificationLevel, JobStatus, Role, SubscriptionPlan } from "@prisma/client";
+import { Prisma, EmployerVerificationLevel, JobStatus, Role, SubscriptionPlan, SubscriptionStatus } from "@prisma/client";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
@@ -34,6 +34,9 @@ const updateBrandingSchema = z.object({
   website: z.string().url().max(500).optional().or(z.literal("")),
   location: z.string().max(200).optional(),
   bio: z.string().max(5000).optional().or(z.literal("")),
+  logoUrl: z.string().url().max(500).optional().or(z.literal("")),
+  brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().or(z.literal("")),
+  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().or(z.literal("")),
 });
 
 const employerPlanSchema = z.enum([
@@ -108,6 +111,10 @@ function analyticsPropertyString(value: Prisma.JsonValue | null | undefined, key
   }
   const raw = (value as Record<string, Prisma.JsonValue | undefined>)[key];
   return typeof raw === "string" ? raw : null;
+}
+
+function premiumBrandingEnabled(subscription: { plan: SubscriptionPlan; status: SubscriptionStatus } | null) {
+  return subscription?.plan === SubscriptionPlan.EMPLOYER_PREMIUM && subscription.status === SubscriptionStatus.ACTIVE;
 }
 
 async function buildEmployerActivationData(userId: string, employerId: string) {
@@ -257,13 +264,21 @@ router.get("/branding", authenticate, authorize(Role.EMPLOYER), async (req: Requ
         },
       },
     });
+    const subscription = await prisma.subscription.findUnique({
+      where: { userId: req.user!.userId },
+      select: { plan: true, status: true },
+    }).catch(() => null);
 
     if (!employer) {
       res.status(404).json({ error: "Employer profile not found" });
       return;
     }
 
-    res.json(employer);
+    res.json({
+      ...employer,
+      premiumBrandingEnabled: premiumBrandingEnabled(subscription),
+      subscriptionPlan: subscription?.plan ?? SubscriptionPlan.EMPLOYER_FREE,
+    });
   } catch (error) {
     logger.error({ error }, "Get branding error");
     res.status(500).json({ error: "Internal server error" });
@@ -274,17 +289,38 @@ router.get("/branding", authenticate, authorize(Role.EMPLOYER), async (req: Requ
 router.put("/branding", authenticate, authorize(Role.EMPLOYER), async (req: Request, res: Response) => {
   try {
     const data = updateBrandingSchema.parse(req.body);
+    const subscription = await prisma.subscription.findUnique({
+      where: { userId: req.user!.userId },
+      select: { plan: true, status: true },
+    }).catch(() => null);
+    const canCustomizeBrand = premiumBrandingEnabled(subscription);
+    const premiumFieldsSubmitted =
+      data.logoUrl !== undefined || data.brandColor !== undefined || data.accentColor !== undefined;
+
+    if (premiumFieldsSubmitted && !canCustomizeBrand) {
+      res.status(403).json({
+        error: "Premium employer branding is available to active Employer Premium subscribers.",
+        code: "PREMIUM_BRANDING_REQUIRED",
+      });
+      return;
+    }
 
     const website = data.website || null;
     const bio = data.bio || null;
+    const logoUrl = data.logoUrl || null;
+    const brandColor = data.brandColor || null;
+    const accentColor = data.accentColor || null;
 
     const employer = await prisma.employer.update({
       where: { userId: req.user!.userId },
       data: {
         ...(data.companyName !== undefined && { companyName: data.companyName }),
         ...(data.location !== undefined && { location: data.location }),
-        website,
-        bio,
+        ...(data.website !== undefined && { website }),
+        ...(data.bio !== undefined && { bio }),
+        ...(canCustomizeBrand && data.logoUrl !== undefined && { logoUrl }),
+        ...(canCustomizeBrand && data.brandColor !== undefined && { brandColor }),
+        ...(canCustomizeBrand && data.accentColor !== undefined && { accentColor }),
       },
       include: {
         user: {
@@ -293,7 +329,11 @@ router.put("/branding", authenticate, authorize(Role.EMPLOYER), async (req: Requ
       },
     });
 
-    res.json(employer);
+    res.json({
+      ...employer,
+      premiumBrandingEnabled: canCustomizeBrand,
+      subscriptionPlan: subscription?.plan ?? SubscriptionPlan.EMPLOYER_FREE,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       res.status(400).json({ error: "Validation failed", details: error.issues });

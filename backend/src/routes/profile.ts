@@ -31,17 +31,22 @@ const structuredCertificationItemSchema = z.object({
   credentialUrl: z.string().url().max(500).optional().or(z.literal("")),
 });
 
+const optionalTrimmedText = (max: number) =>
+  z.string().max(max).trim().nullable().optional();
+
+const optionalUrl = z.string().url().max(500).nullable().optional().or(z.literal(""));
+
 const upsertProfileSchema = z.object({
-  headline: z.string().max(200).trim().optional(),
-  bio: z.string().max(5000).trim().optional(),
+  headline: optionalTrimmedText(200),
+  bio: optionalTrimmedText(5000),
   skills: z.array(z.string().max(100)).max(50).optional(),
   targetRoles: z.array(z.string().max(100)).max(20).optional(),
   targetCountries: z.array(z.string().max(100)).max(54).optional(),
   yearsExperience: z.coerce.number().min(0).max(50).optional(),
-  visaStatus: z.string().max(100).trim().optional(),
-  linkedinUrl: z.string().url().max(500).optional().or(z.literal("")),
-  githubUrl: z.string().url().max(500).optional().or(z.literal("")),
-  portfolioUrl: z.string().url().max(500).optional().or(z.literal("")),
+  visaStatus: optionalTrimmedText(100),
+  linkedinUrl: optionalUrl,
+  githubUrl: optionalUrl,
+  portfolioUrl: optionalUrl,
   workHistory: z.array(structuredWorkHistoryItemSchema).max(20).optional(),
   educationHistory: z.array(structuredEducationItemSchema).max(12).optional(),
   certifications: z.array(structuredCertificationItemSchema).max(20).optional(),

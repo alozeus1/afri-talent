@@ -13,6 +13,10 @@
   --brand-strong: #0f8f78;
   --accent: #d97706; /* Tailwind amber-600 */
   --accent-soft: rgba(217, 119, 6, 0.1);
+  --focus-ring: #059669;
+  --focus-ring-soft: rgba(5, 150, 105, 0.24);
+  --transition-fast: 150ms ease;
+  --transition-base: 220ms ease;
   --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
   --shadow-elevated: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
 }
@@ -25,10 +29,12 @@ html.dark {
   --surface-soft: #18181b;
   --border-soft: #27272a;
   --border-strong: #3f3f46;
-  --brand: #14b8a6; /* Tailwind teal-500 */
-  --brand-strong: #2dd4bf; /* Tailwind teal-400 */
+  --brand: #0f766e; /* Tailwind teal-700 */
+  --brand-strong: #14b8a6; /* Tailwind teal-500 */
   --accent: #f59e0b; /* Tailwind amber-500 */
   --accent-soft: rgba(245, 158, 11, 0.15);
+  --focus-ring: #34d399;
+  --focus-ring-soft: rgba(52, 211, 153, 0.22);
   --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
   --shadow-elevated: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
 }
@@ -42,6 +48,55 @@ body {
   background: var(--background);
   color: var(--foreground);
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+*:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 0.35rem;
+  box-shadow: 0 0 0 6px var(--focus-ring-soft);
+}
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--brand);
+  color: white;
+  padding: 8px;
+  z-index: 100;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+button,
+[role="button"],
+a,
+input,
+select,
+textarea {
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-base),
+    transform var(--transition-base),
+    opacity var(--transition-fast);
+}
+
+button:not(:disabled):not([aria-disabled="true"]):active,
+[role="button"]:not([aria-disabled="true"]):active {
+  transform: translateY(0);
+}
+
+button:disabled,
+button[aria-disabled="true"],
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .app-shell {
@@ -63,6 +118,37 @@ h4,
   border: 1px solid var(--border-soft);
   box-shadow: var(--shadow-soft);
   border-radius: 1rem;
+}
+
+.interactive-card {
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-base),
+    background-color var(--transition-base);
+}
+
+.interactive-card:hover {
+  border-color: rgba(16, 185, 129, 0.45);
+  box-shadow: var(--shadow-elevated);
+  transform: translateY(-2px);
+}
+
+.interactive-card:focus-within {
+  border-color: rgba(16, 185, 129, 0.55);
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(226, 232, 240, 0.8), rgba(241, 245, 249, 0.95), rgba(226, 232, 240, 0.8));
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.dark .skeleton-shimmer {
+  background: linear-gradient(90deg, rgba(39, 39, 42, 0.9), rgba(63, 63, 70, 0.8), rgba(39, 39, 42, 0.9));
+  background-size: 200% 100%;
 }
 
 .surface-panel-strong {
@@ -125,4 +211,45 @@ h4,
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
+}
+
+@keyframes gradient-breath {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.animate-gradient-breath {
+  background-size: 200% 200%;
+  animation: gradient-breath 15s ease infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .interactive-card:hover {
+    transform: none;
+  }
 }

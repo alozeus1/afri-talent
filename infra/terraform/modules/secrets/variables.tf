@@ -110,6 +110,20 @@ variable "adzuna_api_key" {
   default     = ""
 }
 
+variable "google_client_id" {
+  type        = string
+  description = "Google OAuth client ID for social login"
+  sensitive   = true
+  default     = ""
+}
+
+variable "google_client_secret" {
+  type        = string
+  description = "Google OAuth client secret for social login"
+  sensitive   = true
+  default     = ""
+}
+
 variable "apify_token" {
   type        = string
   description = "Apify API token for job task execution"
@@ -143,6 +157,13 @@ variable "workable_company_tokens" {
   default     = ""
 }
 
+variable "company_career_sources_json" {
+  type        = string
+  description = "JSON array of direct company career source configs"
+  sensitive   = true
+  default     = ""
+}
+
 variable "redis_url" {
   type        = string
   description = "Optional Redis connection string"
@@ -153,6 +174,20 @@ variable "redis_url" {
 variable "sentry_dsn" {
   type        = string
   description = "Optional backend Sentry DSN"
+  sensitive   = true
+  default     = ""
+}
+
+variable "admin_bootstrap_email" {
+  type        = string
+  description = "Optional bootstrap admin email for runtime account repair"
+  sensitive   = true
+  default     = ""
+}
+
+variable "admin_bootstrap_password" {
+  type        = string
+  description = "Optional bootstrap admin password for runtime account repair"
   sensitive   = true
   default     = ""
 }

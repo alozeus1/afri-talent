@@ -4,6 +4,8 @@ export interface JobSearchState extends Required<Pick<JobListParams, "page" | "l
   search: string;
   location: string;
   type: string;
+  jobField: string;
+  workplaceType: string;
   seniority: string;
   visaSponsorship: string;
   relocationAssistance: string;
@@ -34,6 +36,8 @@ export function parseJobSearchState(
     search: readStringParam(searchParams.search),
     location: readStringParam(searchParams.location),
     type: readStringParam(searchParams.type),
+    jobField: readStringParam(searchParams.jobField),
+    workplaceType: readStringParam(searchParams.workplaceType),
     seniority: readStringParam(searchParams.seniority),
     visaSponsorship: readStringParam(searchParams.visaSponsorship),
     relocationAssistance: readStringParam(searchParams.relocationAssistance),
@@ -48,6 +52,8 @@ export function hasActiveJobFilters(filters: Partial<JobSearchState>): boolean {
     filters.search ||
       filters.location ||
       filters.type ||
+      filters.jobField ||
+      filters.workplaceType ||
       filters.seniority ||
       filters.visaSponsorship ||
       filters.relocationAssistance ||
@@ -60,6 +66,8 @@ export function toJobListParams(state: JobSearchState): JobListParams {
     search: state.search || undefined,
     location: state.location || undefined,
     type: state.type || undefined,
+    jobField: state.jobField || undefined,
+    workplaceType: state.workplaceType || undefined,
     seniority: state.seniority || undefined,
     visaSponsorship: state.visaSponsorship || undefined,
     relocationAssistance: state.relocationAssistance || undefined,
@@ -76,6 +84,8 @@ export function buildJobsHref(nextState: Partial<JobSearchState>): string {
     ["search", nextState.search],
     ["location", nextState.location],
     ["type", nextState.type],
+    ["jobField", nextState.jobField],
+    ["workplaceType", nextState.workplaceType],
     ["seniority", nextState.seniority],
     ["visaSponsorship", nextState.visaSponsorship],
     ["relocationAssistance", nextState.relocationAssistance],

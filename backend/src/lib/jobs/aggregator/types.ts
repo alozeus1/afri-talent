@@ -11,6 +11,8 @@ export interface AggregatedJob {
   companyLogo?: string;
   location: string;
   locationType: "remote" | "hybrid" | "onsite";
+  workplaceType?: "REMOTE" | "HYBRID" | "ONSITE";
+  jobField?: string;
   country: string;
   region: JobRegion;
   description: string;
@@ -30,6 +32,7 @@ export interface AggregatedJob {
   postedAt: Date;
   expiresAt?: Date;
   applicationUrl: string;
+  companyCareerSourceId?: string;
   rawData?: Record<string, unknown>;
 }
 

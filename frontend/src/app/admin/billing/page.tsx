@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   adminBilling,
+  BillingStatus,
   AdminBillingCustomerDetail,
   AdminBillingCustomerSearchResult,
   AdminBillingDashboard,
   AdminBillingDiscrepancy,
   AdminBillingReconciliationRun,
+  PlanEntitlements,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -23,6 +25,29 @@ const initialSupportForm = {
   notes: "",
   invoiceId: "",
 };
+
+const initialCapabilityForm = {
+  capability: "CANDIDATE_AI" as "CANDIDATE_PREMIUM" | "CANDIDATE_AI" | "EMPLOYER_PREMIUM",
+  action: "GRANT" as "GRANT" | "REVOKE",
+  reasonCode: "admin_capability_access_update",
+  notes: "",
+};
+
+const candidatePlanOptions: BillingStatus["plan"][] = ["FREE", "BASIC", "PROFESSIONAL"];
+const employerPlanOptions: BillingStatus["plan"][] = ["EMPLOYER_FREE", "EMPLOYER_BASIC", "EMPLOYER_PREMIUM"];
+const subscriptionStatusOptions: BillingStatus["status"][] = ["ACTIVE", "PAST_DUE", "INACTIVE", "CANCELLED"];
+
+function buildInitialSubscriptionAccessForm(customer: AdminBillingCustomerDetail | null) {
+  const defaultPlan = customer?.role === "EMPLOYER" ? "EMPLOYER_FREE" : "FREE";
+
+  return {
+    plan: customer?.subscription?.plan ?? defaultPlan,
+    status: customer?.subscription?.status ?? "INACTIVE",
+    currentPeriodEnd: toDatetimeLocalValue(customer?.subscription?.currentPeriodEnd ?? null),
+    reasonCode: "admin_subscription_access_update",
+    notes: "",
+  };
+}
 
 function formatMinorAmount(amountMinor: number | null, currency: string | null) {
   if (amountMinor == null) return "n/a";
@@ -39,6 +64,23 @@ function formatMinorAmount(amountMinor: number | null, currency: string | null) 
   }
 }
 
+function toDatetimeLocalValue(value: string | null) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+
+function formatEntitlementLimit(value: number | null | boolean | undefined) {
+  if (value === null) return "Unlimited";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (value === undefined) return "n/a";
+  return value.toString();
+}
+
 export default function AdminBillingPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
@@ -49,7 +91,10 @@ export default function AdminBillingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<AdminBillingCustomerSearchResult[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<AdminBillingCustomerDetail | null>(null);
+  const [selectedPlanEntitlements, setSelectedPlanEntitlements] = useState<PlanEntitlements[]>([]);
   const [supportForm, setSupportForm] = useState(initialSupportForm);
+  const [capabilityForm, setCapabilityForm] = useState(initialCapabilityForm);
+  const [subscriptionAccessForm, setSubscriptionAccessForm] = useState(buildInitialSubscriptionAccessForm(null));
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +102,7 @@ export default function AdminBillingPage() {
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "ADMIN")) {
-      router.push("/login");
+      router.push(`/login?redirect=${encodeURIComponent("/admin/billing")}`);
     }
   }, [isLoading, router, user]);
 
@@ -67,10 +112,20 @@ export default function AdminBillingPage() {
     }
   }, [user]);
 
+  useEffect(() => {
+    setSubscriptionAccessForm(buildInitialSubscriptionAccessForm(selectedCustomer));
+    setCapabilityForm((current) => ({
+      ...current,
+      capability: selectedCustomer?.role === "EMPLOYER" ? "EMPLOYER_PREMIUM" : "CANDIDATE_AI",
+    }));
+  }, [selectedCustomer]);
+
   const openDiscrepancies = useMemo(
     () => discrepancies.filter((item) => item.status !== "RESOLVED"),
     [discrepancies],
   );
+
+  const effectiveEntitlements = selectedCustomer?.billingEntitlementState?.entitlements ?? null;
 
   async function loadOverview() {
     setLoading(true);
@@ -97,6 +152,7 @@ export default function AdminBillingPage() {
     try {
       const response = await adminBilling.customer(userId);
       setSelectedCustomer(response.customer);
+      setSelectedPlanEntitlements(response.planEntitlements);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load customer billing details.");
     } finally {
@@ -151,6 +207,64 @@ export default function AdminBillingPage() {
       setSuccess("Entitlements were re-synced and stale state was cleared.");
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Failed to re-sync entitlements.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleSubscriptionAccess(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedCustomer) return;
+    setBusy("subscription-access");
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await adminBilling.updateSubscriptionAccess(selectedCustomer.id, {
+        plan: subscriptionAccessForm.plan,
+        status: subscriptionAccessForm.status,
+        currentPeriodEnd: subscriptionAccessForm.currentPeriodEnd
+          ? new Date(subscriptionAccessForm.currentPeriodEnd).toISOString()
+          : null,
+        reasonCode: subscriptionAccessForm.reasonCode,
+        notes: subscriptionAccessForm.notes || undefined,
+      });
+      await Promise.all([loadOverview(), loadCustomer(selectedCustomer.id)]);
+      setSuccess(
+        response.warnings[0]
+          ? `Subscription access updated. Effective plan is ${response.state.effectivePlan} and status is ${response.state.effectiveStatus}. Warning: ${response.warnings[0]}`
+          : `Subscription access updated. Effective plan is ${response.state.effectivePlan} and status is ${response.state.effectiveStatus}.`,
+      );
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to update subscription access.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleCapabilityAccess(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedCustomer) return;
+    setBusy("capability-access");
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await adminBilling.updateCapabilityAccess(selectedCustomer.id, {
+        capability: capabilityForm.capability,
+        action: capabilityForm.action,
+        reasonCode: capabilityForm.reasonCode,
+        notes: capabilityForm.notes || undefined,
+      });
+      await Promise.all([loadOverview(), loadCustomer(selectedCustomer.id)]);
+      setCapabilityForm((current) => ({ ...current, notes: "" }));
+      setSuccess(
+        response.warnings[0]
+          ? `Capability access updated. Effective plan is ${response.state.effectivePlan}. Warning: ${response.warnings[0]}`
+          : `Capability access updated. Effective plan is ${response.state.effectivePlan}.`,
+      );
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to update capability access.");
     } finally {
       setBusy(null);
     }
@@ -454,6 +568,9 @@ export default function AdminBillingPage() {
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Subscription</p>
                 <div className="mt-3 space-y-2 text-sm text-gray-700">
+                  <p>Provider: {selectedCustomer.subscription?.billingProvider || "n/a"}</p>
+                  <p>Provider customer: {selectedCustomer.subscription?.providerCustomerId || "n/a"}</p>
+                  <p>Provider subscription: {selectedCustomer.subscription?.providerSubscriptionId || "n/a"}</p>
                   <p>Stripe customer: {selectedCustomer.subscription?.stripeCustomerId || "n/a"}</p>
                   <p>Stripe subscription: {selectedCustomer.subscription?.stripeSubId || "n/a"}</p>
                   <p>Current period end: {selectedCustomer.subscription?.currentPeriodEnd ? new Date(selectedCustomer.subscription.currentPeriodEnd).toLocaleString() : "n/a"}</p>
@@ -463,6 +580,7 @@ export default function AdminBillingPage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Entitlement state</p>
                 <div className="mt-3 space-y-2 text-sm text-gray-700">
                   <p>Effective plan: {selectedCustomer.billingEntitlementState?.effectivePlan || "FREE"}</p>
+                  <p>Effective status: {selectedCustomer.billingEntitlementState?.effectiveStatus || "INACTIVE"}</p>
                   <p>Synced: {selectedCustomer.billingEntitlementState?.lastSyncedAt ? new Date(selectedCustomer.billingEntitlementState.lastSyncedAt).toLocaleString() : "never"}</p>
                   <p>Checksum: {selectedCustomer.billingEntitlementState?.checksum?.slice(0, 12) || "n/a"}</p>
                 </div>
@@ -472,6 +590,244 @@ export default function AdminBillingPage() {
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200">
+            <CardHeader>
+              <h3 className="text-xl font-semibold text-gray-900">Premium and AI capability control</h3>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-4 lg:grid-cols-[0.9fr,1.1fr]">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Current effective capabilities</p>
+                  <div className="mt-3 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
+                    <p>AI resume reviews: {formatEntitlementLimit(effectiveEntitlements?.aiResumeReviews)}</p>
+                    <p>AI job matches: {formatEntitlementLimit(effectiveEntitlements?.aiJobMatches)}</p>
+                    <p>AI apply packs: {formatEntitlementLimit(effectiveEntitlements?.aiApplyPacks)}</p>
+                    <p>Chat access: {formatEntitlementLimit(effectiveEntitlements?.chatAccess)}</p>
+                    <p>Autopilot: {formatEntitlementLimit(effectiveEntitlements?.autopilot)}</p>
+                    <p>Priority support: {formatEntitlementLimit(effectiveEntitlements?.prioritySupport)}</p>
+                    <p>Talent search: {formatEntitlementLimit(effectiveEntitlements?.talentSearch)}</p>
+                    <p>API access: {formatEntitlementLimit(effectiveEntitlements?.apiAccess)}</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleCapabilityAccess} className="space-y-4 rounded-2xl border border-slate-200 p-4">
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    Scoped controls map to approved plans, sync BillingEntitlementState, and write support/audit events. Use the raw subscription override only for non-standard cases.
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <label className="text-sm text-gray-700">
+                      <span className="mb-1 block">Capability</span>
+                      <select
+                        className="w-full rounded-xl border border-gray-300 px-3 py-2"
+                        value={capabilityForm.capability}
+                        onChange={(event) =>
+                          setCapabilityForm((current) => ({
+                            ...current,
+                            capability: event.target.value as typeof capabilityForm.capability,
+                          }))
+                        }
+                      >
+                        {selectedCustomer.role === "EMPLOYER" ? (
+                          <option value="EMPLOYER_PREMIUM">Employer premium and AI tools</option>
+                        ) : (
+                          <>
+                            <option value="CANDIDATE_PREMIUM">Candidate premium</option>
+                            <option value="CANDIDATE_AI">Candidate AI tools</option>
+                          </>
+                        )}
+                      </select>
+                    </label>
+                    <label className="text-sm text-gray-700">
+                      <span className="mb-1 block">Action</span>
+                      <select
+                        className="w-full rounded-xl border border-gray-300 px-3 py-2"
+                        value={capabilityForm.action}
+                        onChange={(event) =>
+                          setCapabilityForm((current) => ({
+                            ...current,
+                            action: event.target.value as typeof capabilityForm.action,
+                          }))
+                        }
+                      >
+                        <option value="GRANT">Grant</option>
+                        <option value="REVOKE">Revoke</option>
+                      </select>
+                    </label>
+                    <label className="text-sm text-gray-700">
+                      <span className="mb-1 block">Reason code</span>
+                      <Input
+                        value={capabilityForm.reasonCode}
+                        onChange={(event) =>
+                          setCapabilityForm((current) => ({
+                            ...current,
+                            reasonCode: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <label className="block text-sm text-gray-700">
+                    <span className="mb-1 block">Audit notes</span>
+                    <textarea
+                      className="min-h-[100px] w-full rounded-2xl border border-gray-300 px-3 py-3"
+                      value={capabilityForm.notes}
+                      onChange={(event) =>
+                        setCapabilityForm((current) => ({
+                          ...current,
+                          notes: event.target.value,
+                        }))
+                      }
+                      placeholder="Document the customer request, support ticket, or risk rationale."
+                    />
+                  </label>
+                  <Button type="submit" disabled={busy === "capability-access"}>
+                    {busy === "capability-access" ? "Updating..." : "Apply capability change"}
+                  </Button>
+                </form>
+              </div>
+
+              {selectedPlanEntitlements.length > 0 && (
+                <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+                      <tr>
+                        <th className="px-4 py-3">Plan</th>
+                        <th className="px-4 py-3">AI reviews</th>
+                        <th className="px-4 py-3">AI matches</th>
+                        <th className="px-4 py-3">Apply packs</th>
+                        <th className="px-4 py-3">Chat</th>
+                        <th className="px-4 py-3">Autopilot</th>
+                        <th className="px-4 py-3">Employer premium</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white text-gray-700">
+                      {selectedPlanEntitlements.map((plan) => (
+                        <tr key={plan.plan}>
+                          <td className="px-4 py-3 font-semibold text-gray-900">{plan.plan}</td>
+                          <td className="px-4 py-3">{formatEntitlementLimit(plan.aiResumeReviews)}</td>
+                          <td className="px-4 py-3">{formatEntitlementLimit(plan.aiJobMatches)}</td>
+                          <td className="px-4 py-3">{formatEntitlementLimit(plan.aiApplyPacks)}</td>
+                          <td className="px-4 py-3">{formatEntitlementLimit(plan.chatAccess)}</td>
+                          <td className="px-4 py-3">{formatEntitlementLimit(plan.autopilot)}</td>
+                          <td className="px-4 py-3">
+                            {formatEntitlementLimit(plan.apiAccess || plan.pipelineExports || plan.advancedFunnelMetrics)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200">
+            <CardHeader>
+              <h3 className="text-xl font-semibold text-gray-900">Subscription access override</h3>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                This updates the existing subscription record and immediately re-syncs effective entitlements. It does not create a separate access system.
+              </div>
+              {(selectedCustomer.subscription?.billingProvider
+                || selectedCustomer.subscription?.providerSubscriptionId
+                || selectedCustomer.subscription?.stripeSubId) && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  A live provider-linked subscription is still attached to this account. Future billing webhooks may overwrite local plan or status changes.
+                </div>
+              )}
+              <form onSubmit={handleSubscriptionAccess} className="space-y-4 rounded-2xl border border-slate-200 p-4">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <label className="text-sm text-gray-700">
+                    <span className="mb-1 block">Plan</span>
+                    <select
+                      className="w-full rounded-xl border border-gray-300 px-3 py-2"
+                      value={subscriptionAccessForm.plan}
+                      onChange={(event) =>
+                        setSubscriptionAccessForm((current) => ({
+                          ...current,
+                          plan: event.target.value as BillingStatus["plan"],
+                        }))
+                      }
+                    >
+                      {(selectedCustomer.role === "EMPLOYER" ? employerPlanOptions : candidatePlanOptions).map((plan) => (
+                        <option key={plan} value={plan}>
+                          {plan}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-sm text-gray-700">
+                    <span className="mb-1 block">Status</span>
+                    <select
+                      className="w-full rounded-xl border border-gray-300 px-3 py-2"
+                      value={subscriptionAccessForm.status}
+                      onChange={(event) =>
+                        setSubscriptionAccessForm((current) => ({
+                          ...current,
+                          status: event.target.value as BillingStatus["status"],
+                        }))
+                      }
+                    >
+                      {subscriptionStatusOptions.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-sm text-gray-700">
+                    <span className="mb-1 block">Current period end</span>
+                    <Input
+                      type="datetime-local"
+                      value={subscriptionAccessForm.currentPeriodEnd}
+                      onChange={(event) =>
+                        setSubscriptionAccessForm((current) => ({
+                          ...current,
+                          currentPeriodEnd: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="text-sm text-gray-700">
+                    <span className="mb-1 block">Reason code</span>
+                    <Input
+                      value={subscriptionAccessForm.reasonCode}
+                      onChange={(event) =>
+                        setSubscriptionAccessForm((current) => ({
+                          ...current,
+                          reasonCode: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+                <label className="block text-sm text-gray-700">
+                  <span className="mb-1 block">Audit notes</span>
+                  <textarea
+                    className="min-h-[120px] w-full rounded-2xl border border-gray-300 px-3 py-3"
+                    value={subscriptionAccessForm.notes}
+                    onChange={(event) =>
+                      setSubscriptionAccessForm((current) => ({
+                        ...current,
+                        notes: event.target.value,
+                      }))
+                    }
+                    placeholder="Document why access is being granted, changed, or revoked."
+                  />
+                </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button type="submit" disabled={busy === "subscription-access"}>
+                    {busy === "subscription-access" ? "Updating..." : "Update subscription access"}
+                  </Button>
+                  <p className="text-xs text-gray-500">
+                    Role-compatible plans only: {selectedCustomer.role === "EMPLOYER" ? "EMPLOYER_*" : "FREE, BASIC, PROFESSIONAL"}.
+                  </p>
+                </div>
+              </form>
             </CardContent>
           </Card>
 

@@ -211,6 +211,52 @@ describe("billing operations", () => {
     );
   });
 
+  it("normalizes long admin sources before persisting entitlement and billing audit records", async () => {
+    prismaMock.subscription.findUnique.mockResolvedValue({
+      id: "sub-1",
+      plan: SubscriptionPlan.BASIC,
+      status: SubscriptionStatus.ACTIVE,
+    });
+    prismaMock.userBillingProfile.findUnique.mockResolvedValue({
+      region: "ROW",
+      currency: "USD",
+      pricingVersion: 1,
+      isGrandfathered: false,
+      country: "US",
+      stripeCountry: "US",
+    });
+    prismaMock.billingEntitlementState.findUnique.mockResolvedValue(null);
+    prismaMock.billingEntitlementState.upsert.mockResolvedValue({
+      id: "state-1",
+      effectivePlan: SubscriptionPlan.BASIC,
+      effectiveStatus: SubscriptionStatus.ACTIVE,
+      checksum: "new-checksum",
+    });
+
+    await syncBillingEntitlementState(
+      "user-1",
+      "admin:12345678-1234-1234-1234-123456789abc:subscription_access",
+    );
+
+    expect(prismaMock.billingEntitlementState.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          source: "admin:12345678-1234-1234-1234-123456789abc:subscri",
+        }),
+        update: expect.objectContaining({
+          source: "admin:12345678-1234-1234-1234-123456789abc:subscri",
+        }),
+      }),
+    );
+    expect(prismaMock.billingEventAudit.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          source: "ADMIN:12345678-1234-1234-1234-123456789A",
+        }),
+      }),
+    );
+  });
+
   it("blocks checkout when billing country and verified payment country differ", async () => {
     prismaMock.userBillingProfile.findUnique.mockResolvedValue({
       id: "profile-1",

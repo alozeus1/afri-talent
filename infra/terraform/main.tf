@@ -97,6 +97,7 @@ module "secrets" {
   greenhouse_board_tokens       = var.greenhouse_board_tokens
   lever_site_tokens             = var.lever_site_tokens
   workable_company_tokens       = var.workable_company_tokens
+  company_career_sources_json   = var.company_career_sources_json
   redis_url                     = var.redis_url
   sentry_dsn                    = var.sentry_dsn
 }
@@ -131,13 +132,16 @@ module "acm" {
 module "apprunner" {
   source = "./modules/apprunner"
 
-  name_prefix        = local.name_prefix
-  environment        = var.environment
-  private_subnet_ids = module.network.private_subnet_ids
-  security_group_id  = module.security.ecs_sg_id # Reuse existing SG
-  secret_arn         = module.secrets.secret_arn
-  secret_arns        = [module.secrets.secret_arn]
-  s3_bucket_arns     = [module.s3.bucket_arn, "${module.s3.bucket_arn}/*"]
+  name_prefix         = local.name_prefix
+  environment         = var.environment
+  private_subnet_ids  = module.network.private_subnet_ids
+  security_group_id   = module.security.ecs_sg_id # Reuse existing SG
+  secret_arn          = module.secrets.secret_arn
+  secret_arns         = [module.secrets.secret_arn]
+  s3_bucket_arns      = [module.s3.bucket_arn, "${module.s3.bucket_arn}/*"]
+  backend_ssm_secrets = module.secrets.blog_ssm_parameter_arns
+  ssm_parameter_arns  = values(module.secrets.blog_ssm_parameter_arns)
+  ssm_kms_key_arns    = [module.secrets.blog_ssm_kms_key_arn]
 
   # Backend configuration
   backend_image           = var.backend_image
@@ -166,6 +170,8 @@ module "apprunner" {
       DAILY_JOB_MATCH_LIMIT             = tostring(var.daily_job_match_limit)
       DAILY_RESUME_REVIEW_LIMIT         = tostring(var.daily_resume_review_limit)
       AGGREGATOR_INTERVAL_MINUTES       = tostring(var.aggregator_interval_minutes)
+      BLOG_AUTOMATION_ENABLED           = var.blog_automation_enabled ? "1" : "0"
+      BLOG_AUTOMATION_INTERVAL_DAYS     = tostring(var.blog_automation_interval_days)
       STRIPE_PRICE_BASIC_MONTHLY        = var.stripe_price_basic_monthly
       STRIPE_PRICE_PROFESSIONAL_MONTHLY = var.stripe_price_professional_monthly
     } : key => value if value != null
@@ -184,14 +190,22 @@ module "apprunner" {
     "FLUTTERWAVE_PAYMENT_OPTIONS",
     "ADZUNA_APP_ID",
     "ADZUNA_API_KEY",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
     "APIFY_TOKEN",
     "APIFY_JOB_TASKS_JSON",
     "GREENHOUSE_BOARD_TOKENS",
     "LEVER_SITE_TOKENS",
     "WORKABLE_COMPANY_TOKENS",
+    "COMPANY_CAREER_SOURCES_JSON",
     "REDIS_URL",
-    "SENTRY_DSN"
+    "SENTRY_DSN",
+    "ADMIN_BOOTSTRAP_EMAIL",
+    "ADMIN_BOOTSTRAP_PASSWORD",
   ]
+  # NOTE: NEWS_API_KEY, UNSPLASH_ACCESS_KEY, PEXELS_API_KEY,
+  # BLOG_ADMIN_NOTIFICATION_EMAIL are sourced from SSM Parameter Store
+  # (see backend_ssm_secrets above) — not from Secrets Manager.
 
   # Frontend configuration
   frontend_image           = var.frontend_image

@@ -308,7 +308,7 @@ router.post("/generate", authenticate, authorize(Role.CANDIDATE), async (req: Re
     const result = await generateInterviewQuestions({
       role: session.targetRole,
       difficulty: difficulty ?? "medium",
-      count: 5,
+      count: 10,
     });
 
     res.json(result);

@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { skills, GeneratedResume } from "@/lib/api";
+import { profile, skills, CandidateProfile, GeneratedResume } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ATSScoreDisplay } from "@/components/ui/ats-score-display";
 import { LoadingState } from "@/components/ui/loading-state";
 import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
+import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
+import { RESUME_IMPROVEMENT_TIPS, reviewResumeInput } from "@/lib/early-tester-content";
 
 interface WorkEntry {
   company: string;
@@ -42,7 +45,7 @@ const emptyWork: WorkEntry = { company: "", title: "", period: "", description: 
 const emptyEdu: EduEntry = { institution: "", degree: "", period: "" };
 
 export default function ResumeBuilderPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   const [form, setForm] = useState<FormState>({
@@ -65,6 +68,8 @@ export default function ResumeBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<FriendlyError | null>(null);
   const [saved, setSaved] = useState(false);
+  const [savedProfile, setSavedProfile] = useState<CandidateProfile | null>(null);
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
 
   // ATS scan state
   const [atsJobDescription, setAtsJobDescription] = useState("");
@@ -78,10 +83,92 @@ export default function ResumeBuilderPage() {
   const [atsLoading, setAtsLoading] = useState(false);
   const [atsError, setAtsError] = useState<FriendlyError | null>(null);
 
-  if (!user) {
-    router.push("/login");
-    return null;
+  function formHasDraft(value: FormState): boolean {
+    return Boolean(
+      value.targetRole ||
+        value.location ||
+        value.summary ||
+        value.skills ||
+        value.certifications ||
+        value.workHistory.some((item) => item.company || item.title || item.description) ||
+        value.educationHistory.some((item) => item.institution || item.degree),
+    );
   }
+
+  function fromProfile(candidateProfile: CandidateProfile): Partial<FormState> {
+    return {
+      location: candidateProfile.targetCountries?.[0] || "",
+      targetRole: candidateProfile.targetRoles?.[0] || "",
+      yearsExperience: String(candidateProfile.yearsExperience ?? 0),
+      summary: candidateProfile.bio || candidateProfile.headline || "",
+      skills: candidateProfile.skills.join(", "),
+      certifications: (candidateProfile.certifications || [])
+        .map((item) => item.name)
+        .filter(Boolean)
+        .join(", "),
+      workHistory: candidateProfile.workHistory?.length
+        ? candidateProfile.workHistory.map((item) => ({
+            company: item.company || "",
+            title: item.title || "",
+            period: item.period || "",
+            description: item.description || "",
+          }))
+        : [{ ...emptyWork }],
+      educationHistory: candidateProfile.educationHistory?.length
+        ? candidateProfile.educationHistory.map((item) => ({
+            institution: item.institution || "",
+            degree: item.degree || "",
+            period: item.period || "",
+          }))
+        : [{ ...emptyEdu }],
+    };
+  }
+
+  function applyProfileToForm(candidateProfile: CandidateProfile, overwrite = false) {
+    const profileForm = fromProfile(candidateProfile);
+    setForm((prev) => ({
+      ...prev,
+      ...Object.fromEntries(
+        Object.entries(profileForm).filter(([key, value]) => {
+          if (overwrite) return true;
+          const current = prev[key as keyof FormState];
+          if (Array.isArray(current)) {
+            return current.length === 0 || current.every((item) => Object.values(item).every((field) => !field));
+          }
+          return !current && Boolean(value);
+        }),
+      ),
+    }));
+    setProfileNotice(overwrite ? "Resume fields updated from your latest profile." : "Blank resume fields were prefilled from your profile.");
+  }
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [authLoading, router, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    profile.get()
+      .then((candidateProfile) => {
+        if (cancelled || !candidateProfile) return;
+        setSavedProfile(candidateProfile);
+        setForm((current) => {
+          if (formHasDraft(current)) return current;
+          const profileForm = fromProfile(candidateProfile);
+          setProfileNotice("Resume builder started from your saved profile.");
+          return { ...current, ...profileForm };
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  if (authLoading || !user) return null;
 
   function updateWork(index: number, field: keyof WorkEntry, value: string) {
     setForm((prev) => {
@@ -100,6 +187,15 @@ export default function ResumeBuilderPage() {
   }
 
   async function handleGenerate() {
+    const readiness = reviewResumeInput(form);
+    if (readiness.missing.length > 0) {
+      setError({
+        title: "Resume details missing",
+        description: `Add these required details before generating: ${readiness.missing.join(", ")}.`,
+        tone: "warning",
+      });
+      return;
+    }
     setLoading(true);
     setError(null);
     setSaved(false);
@@ -174,7 +270,7 @@ export default function ResumeBuilderPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">AI Resume Builder</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Generate an ATS-optimised resume tailored to your target role
+              Build an ATS-friendly resume draft from truthful profile, project, and work details.
             </p>
           </div>
           <Badge variant="info">Premium</Badge>
@@ -198,12 +294,94 @@ export default function ResumeBuilderPage() {
           </div>
         )}
 
+        {profileNotice && (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            {profileNotice}
+          </div>
+        )}
+
         {!generated ? (
           <Card>
             <CardHeader>
               <h2 className="text-lg font-semibold">Your Information</h2>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                <p className="font-semibold">Resume safety checklist</p>
+                <p className="mt-1">
+                  Keep every claim verifiable. AfriTalent can improve wording and structure, but it should not invent tools, employers, certifications, or results.
+                </p>
+              </div>
+              {savedProfile && (
+                <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-white p-4">
+                  <Button size="sm" variant="outline" onClick={() => applyProfileToForm(savedProfile, false)}>
+                    Update from profile
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      applyProfileToForm(savedProfile, true);
+                    }}
+                  >
+                    Start from profile
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setForm({
+                        fullName: user?.name || "",
+                        email: user?.email || "",
+                        phone: "",
+                        location: "",
+                        targetRole: "",
+                        yearsExperience: "0",
+                        summary: "",
+                        skills: "",
+                        certifications: "",
+                        workHistory: [{ ...emptyWork }],
+                        educationHistory: [{ ...emptyEdu }],
+                      });
+                      setProfileNotice("Started a blank resume draft.");
+                    }}
+                  >
+                    Start blank
+                  </Button>
+                </div>
+              )}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-950">Premium template bundle</p>
+                    <p className="mt-1 text-sm text-emerald-800">
+                      Preview ATS-ready layouts and download templates included with your plan.
+                    </p>
+                  </div>
+                  <Link
+                    href="/candidate/resume-templates"
+                    className="inline-flex items-center justify-center rounded-md border border-zinc-200 bg-transparent px-3.5 py-2 text-sm font-medium text-zinc-900 shadow-sm transition-all duration-200 hover:bg-zinc-100"
+                  >
+                    Browse templates
+                  </Link>
+                </div>
+              </div>
+
+              <div className="grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
+                {reviewResumeInput(form).suggestions.slice(0, 4).map((item) => (
+                  <div key={item} className="rounded-lg bg-white p-3 text-xs text-gray-700">
+                    {item}
+                  </div>
+                ))}
+                {reviewResumeInput(form).suggestions.length === 0 && (
+                  RESUME_IMPROVEMENT_TIPS.slice(0, 4).map((item) => (
+                    <div key={item} className="rounded-lg bg-white p-3 text-xs text-gray-700">
+                      {item}
+                    </div>
+                  ))
+                )}
+              </div>
+
               {/* Basic Info */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -302,7 +480,7 @@ export default function ResumeBuilderPage() {
                   onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))}
                   rows={3}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Optional — Claude will generate a compelling summary if left blank"
+                  placeholder="Optional — AfriTalent can draft this from your real experience if left blank"
                 />
               </div>
 
@@ -344,7 +522,7 @@ export default function ResumeBuilderPage() {
                       />
                     </div>
                     <textarea
-                      placeholder="Brief description of responsibilities and achievements"
+                      placeholder="Responsibilities and truthful achievements. Add metrics where available."
                       value={w.description}
                       onChange={(e) => updateWork(i, "description", e.target.value)}
                       rows={2}
@@ -442,6 +620,9 @@ export default function ResumeBuilderPage() {
                   data-testid="resume-preview-textarea"
                   className="w-full rounded-md border border-gray-200 bg-white px-4 py-3 font-mono text-sm text-gray-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  Review before saving. Remove any claim you cannot prove or explain in an interview. ATS-friendly does not mean guaranteed ATS approval.
+                </div>
               </CardContent>
             </Card>
 
@@ -541,7 +722,7 @@ export default function ResumeBuilderPage() {
                       </div>
                     )}
 
-                    {atsResult.suggestions.length > 0 && (
+                {atsResult.suggestions.length > 0 && (
                       <div>
                         <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">
                           Suggestions
@@ -557,8 +738,10 @@ export default function ResumeBuilderPage() {
                 )}
               </CardContent>
             </Card>
+            <EarlyTesterFeedback area="Resume review" />
           </div>
         )}
+        {!generated && <EarlyTesterFeedback area="Resume review" />}
       </div>
     </div>
   );

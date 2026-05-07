@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { skills, JobMatch } from "@/lib/api";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
@@ -33,7 +33,7 @@ const qualityVariant = (label?: string): "success" | "info" | "warning" | "defau
 };
 
 export default function JobMatchesPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   const [matches, setMatches] = useState<JobMatch[]>([]);
@@ -64,12 +64,13 @@ export default function JobMatchesPage() {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       router.push("/login");
       return;
     }
     void loadMatches();
-  }, [user, loadMatches, router]);
+  }, [user, authLoading, loadMatches, router]);
 
   async function handleReEmbed() {
     setEmbedding(true);
@@ -94,7 +95,7 @@ export default function JobMatchesPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">AI Job Matches</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Jobs ranked by semantic similarity to your resume
+              Available on Basic and Professional plans. Basic starts at $9.99/month and unlocks personalized match scoring, skill-gap analysis, and saved match history.
             </p>
             <div className="flex items-center gap-2 flex-wrap mt-2">
               <button

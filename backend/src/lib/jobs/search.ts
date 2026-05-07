@@ -11,11 +11,16 @@ import {
 } from "./discovery.js";
 import { buildJobSemanticContent } from "../rag/job-documents.js";
 import { semanticTextScore } from "../rag/embedding.js";
+import { expandSearchKeywords } from "./smart-search/keywords.js";
 
 export interface JobSearchFilters {
   search?: string;
+  expandedKeywords?: string[];
   location?: string;
   type?: string;
+  employmentType?: string;
+  jobField?: string;
+  workplaceType?: string;
   seniority?: string;
   visaSponsorship?: string;
   relocationAssistance?: boolean;
@@ -23,6 +28,9 @@ export interface JobSearchFilters {
   salaryMin?: number | null;
   salaryMax?: number | null;
   country?: string;
+  provider?: string;
+  includeExpandedKeywords?: boolean;
+  sortBy?: "relevance" | "newest" | "salary" | "companyQuality";
 }
 
 export const publicJobInclude = Prisma.validator<Prisma.JobInclude>()({
@@ -101,6 +109,72 @@ function boostSemanticRanking(
     .sort((left, right) => right.score - left.score);
 }
 
+const SEARCH_STOP_WORDS = new Set(["and", "for", "the", "with", "job", "jobs", "role", "roles", "remote"]);
+
+function normalizeSearchText(value: string | null | undefined): string {
+  return (value || "").toLowerCase().replace(/[^a-z0-9+#./\s-]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function tokenizeSearchText(value: string | null | undefined): string[] {
+  return Array.from(new Set(
+    normalizeSearchText(value)
+      .split(" ")
+      .filter((token) => token.length > 2 && !SEARCH_STOP_WORDS.has(token)),
+  ));
+}
+
+function hasSearchIntentMatch(job: PublicJobRecord, query?: string): boolean {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return true;
+
+  const queryTokens = tokenizeSearchText(normalizedQuery);
+  if (queryTokens.length === 0) return true;
+
+  const title = normalizeSearchText(job.title);
+  const tagText = normalizeSearchText((job.tags || []).join(" "));
+  const company = normalizeSearchText(job.sourceName || job.employer?.companyName || "");
+  const description = normalizeSearchText(job.description);
+
+  if (title.includes(normalizedQuery)) return true;
+  if (queryTokens.some((token) => title.includes(token) || tagText.includes(token) || company.includes(token))) {
+    return true;
+  }
+
+  const descriptionHits = queryTokens.filter((token) => description.includes(token)).length;
+  return queryTokens.length === 1 ? descriptionHits > 0 : descriptionHits >= 2;
+}
+
+function boostTitleIntent<TJob extends PublicJobRecord>(
+  result: ReturnType<typeof scoreJobForSearch<TJob>>,
+  query?: string,
+): ReturnType<typeof scoreJobForSearch<TJob>> {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return result;
+
+  const title = normalizeSearchText(result.job.title);
+  const queryTokens = tokenizeSearchText(normalizedQuery);
+  const titleHitCount = queryTokens.filter((token) => title.includes(token)).length;
+  const exactPhraseBoost = title.includes(normalizedQuery) ? 12 : 0;
+  const tokenBoost = Math.min(18, titleHitCount * 6);
+  const boost = exactPhraseBoost + tokenBoost;
+  if (boost <= 0) return result;
+
+  const nextScore = clampScore(result.score + boost);
+  return {
+    ...result,
+    score: nextScore,
+    explanation: {
+      ...result.explanation,
+      score: nextScore,
+      reasons: [...result.explanation.reasons, "job title matches the search intent"],
+      components: {
+        ...result.explanation.components,
+        relevance: clampScore(result.explanation.components.relevance + boost),
+      },
+    },
+  };
+}
+
 export function buildJobSearchWhere(filters: JobSearchFilters): Prisma.JobWhereInput {
   const conditions: Prisma.JobWhereInput[] = [
     { status: JobStatus.PUBLISHED },
@@ -108,13 +182,19 @@ export function buildJobSearchWhere(filters: JobSearchFilters): Prisma.JobWhereI
   ];
 
   if (filters.search) {
+    const searchTerms = filters.expandedKeywords?.length
+      ? [filters.search, ...filters.expandedKeywords]
+      : expandSearchKeywords({
+          query: filters.search,
+          includeExpandedKeywords: filters.includeExpandedKeywords,
+        }).all;
     conditions.push({
-      OR: [
-        { title: { contains: filters.search, mode: "insensitive" } },
-        { description: { contains: filters.search, mode: "insensitive" } },
-        { sourceName: { contains: filters.search, mode: "insensitive" } },
-        { tags: { has: filters.search.toLowerCase() } },
-      ],
+      OR: searchTerms.flatMap((term) => [
+        { title: { contains: term, mode: "insensitive" as const } },
+        { description: { contains: term, mode: "insensitive" as const } },
+        { sourceName: { contains: term, mode: "insensitive" as const } },
+        { tags: { has: term.toLowerCase() } },
+      ]),
     });
   }
 
@@ -124,8 +204,16 @@ export function buildJobSearchWhere(filters: JobSearchFilters): Prisma.JobWhereI
     });
   }
 
-  if (filters.type) {
-    conditions.push({ type: filters.type });
+  if (filters.type || filters.employmentType) {
+    conditions.push({ type: filters.type ?? filters.employmentType });
+  }
+
+  if (filters.jobField) {
+    conditions.push({ jobField: filters.jobField });
+  }
+
+  if (filters.workplaceType) {
+    conditions.push({ workplaceType: filters.workplaceType });
   }
 
   if (filters.seniority) {
@@ -162,6 +250,15 @@ export function buildJobSearchWhere(filters: JobSearchFilters): Prisma.JobWhereI
       OR: [
         { eligibleCountries: { has: filters.country } },
         { location: { contains: filters.country, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  if (filters.provider) {
+    conditions.push({
+      OR: [
+        { sourceName: { contains: filters.provider, mode: "insensitive" } },
+        { sourceUrl: { contains: filters.provider, mode: "insensitive" } },
       ],
     });
   }
@@ -204,8 +301,8 @@ export function buildPreferenceContext(
     ...base,
     query: filters.search,
     locations: filters.location ? [filters.location] : base?.locations,
-    keywords: filters.search ? [filters.search] : base?.keywords,
-    jobTypes: filters.type ? [filters.type] : base?.jobTypes,
+    keywords: filters.search ? [filters.search, ...(filters.expandedKeywords ?? [])] : base?.keywords,
+    jobTypes: filters.type || filters.employmentType ? [filters.type ?? filters.employmentType!] : base?.jobTypes,
     seniorities: filters.seniority ? [filters.seniority] : base?.seniorities,
     remoteOnly: filters.remote ?? base?.remoteOnly,
     requiresVisaSponsorship:
@@ -226,24 +323,61 @@ export async function fetchRankedJobs(input: {
   limit: number;
   preferenceContext?: CandidatePreferenceContext;
   take?: number;
+  sortBy?: JobSearchFilters["sortBy"];
 }): Promise<{
   jobs: RankedPublicJob[];
   total: number;
+  diagnostics: {
+    rawCandidateCount: number;
+    deduplicatedCount: number;
+    duplicatesRemoved: number;
+    providerCounts: Record<string, number>;
+  };
 }> {
-  const maxCandidates = input.take ?? Math.max(150, input.page * input.limit * 8);
-  const jobs = await prisma.job.findMany({
-    where: input.where,
-    include: publicJobInclude,
-    orderBy: [
-      { publishedAt: "desc" },
-      { updatedAt: "desc" },
-    ],
-    take: Math.min(maxCandidates, 500),
-  });
+  // Size the ranking candidate pool so the requested page is reachable.
+  // The pool grows with the page number; we cap it generously to keep ranking work bounded
+  // while still allowing deep pagination across the live catalog.
+  const RANKING_POOL_CEILING = 2000;
+  const desiredPool = input.take ?? Math.max(150, input.page * input.limit * 8);
+  const maxCandidates = Math.min(desiredPool, RANKING_POOL_CEILING);
 
-  const ranked = boostSemanticRanking(collapseDuplicateRankedJobs(
+  // Run the ranking-pool fetch and the total count in parallel. The count gives the UI an
+  // accurate "X jobs found" number that reflects the entire catalog matching the filter,
+  // independent of how many candidates we actually rank in memory.
+  const countPromise = (async () => {
+    try {
+      return await prisma.job.count({ where: input.where });
+    } catch {
+      return null;
+    }
+  })();
+  const [jobs, totalMatchingRaw] = await Promise.all([
+    prisma.job.findMany({
+      where: input.where,
+      include: publicJobInclude,
+      orderBy: [
+        { publishedAt: "desc" },
+        { updatedAt: "desc" },
+      ],
+      take: maxCandidates,
+    }),
+    countPromise,
+  ]);
+  const totalMatching =
+    typeof totalMatchingRaw === "number" && Number.isFinite(totalMatchingRaw)
+      ? totalMatchingRaw
+      : jobs.length;
+
+  const collapsed = collapseDuplicateRankedJobs(
     jobs.map((job) => scoreJobForSearch(job, input.preferenceContext)),
-  ), input.preferenceContext?.query).map((result) => ({
+  )
+    .filter((result) => hasSearchIntentMatch(result.job, input.preferenceContext?.query))
+    .map((result) => boostTitleIntent(result, input.preferenceContext?.query));
+  const sorted = sortRankedResults(
+    boostSemanticRanking(collapsed, input.preferenceContext?.query),
+    input.sortBy ?? "relevance",
+  );
+  const ranked = sorted.map((result) => ({
     ...result.job,
     discovery: result.discovery,
     rankingExplanation: result.explanation,
@@ -253,8 +387,49 @@ export async function fetchRankedJobs(input: {
 
   const start = (input.page - 1) * input.limit;
   const end = start + input.limit;
+  // Surface the larger of the DB-wide count and the deduped ranked count so the UI never
+  // shows a smaller number than the items currently visible on screen.
+  const total = Math.max(totalMatching, ranked.length);
   return {
     jobs: ranked.slice(start, end),
-    total: ranked.length,
+    total,
+    diagnostics: {
+      rawCandidateCount: jobs.length,
+      deduplicatedCount: ranked.length,
+      duplicatesRemoved: Math.max(0, jobs.length - ranked.length),
+      providerCounts: buildProviderCounts(ranked),
+    },
   };
+}
+
+function sortRankedResults<TJob extends PublicJobRecord>(
+  results: ReturnType<typeof scoreJobForSearch<TJob>>[],
+  sortBy: NonNullable<JobSearchFilters["sortBy"]>,
+): ReturnType<typeof scoreJobForSearch<TJob>>[] {
+  if (sortBy === "newest") {
+    return [...results].sort((left, right) =>
+      (right.job.publishedAt?.getTime() ?? 0) - (left.job.publishedAt?.getTime() ?? 0),
+    );
+  }
+  if (sortBy === "salary") {
+    return [...results].sort((left, right) =>
+      (right.job.salaryMax ?? right.job.salaryMin ?? 0) - (left.job.salaryMax ?? left.job.salaryMin ?? 0),
+    );
+  }
+  if (sortBy === "companyQuality") {
+    return [...results].sort((left, right) => {
+      const leftScore = left.job.employer?.trustProfile?.authenticityScore ?? left.job.qualityScore ?? 0;
+      const rightScore = right.job.employer?.trustProfile?.authenticityScore ?? right.job.qualityScore ?? 0;
+      return rightScore - leftScore;
+    });
+  }
+  return results;
+}
+
+function buildProviderCounts(jobs: Array<Pick<PublicJobRecord, "sourceName" | "jobSource">>): Record<string, number> {
+  return jobs.reduce<Record<string, number>>((counts, job) => {
+    const provider = job.sourceName ?? job.jobSource ?? "unknown";
+    counts[provider] = (counts[provider] ?? 0) + 1;
+    return counts;
+  }, {});
 }

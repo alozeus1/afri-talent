@@ -188,3 +188,22 @@ variable "create_custom_domain_associations" {
   description = "Whether to create App Runner custom domain associations"
   default     = false
 }
+
+# SSM Parameter Store — optional blog pipeline keys
+variable "backend_ssm_secrets" {
+  type        = map(string)
+  description = "Map of env-var-name → SSM Parameter ARN injected into the backend service"
+  default     = {}
+}
+
+variable "ssm_parameter_arns" {
+  type        = list(string)
+  description = "All SSM Parameter ARNs the instance role must be allowed to read"
+  default     = []
+}
+
+variable "ssm_kms_key_arns" {
+  type        = list(string)
+  description = "KMS key ARNs used to encrypt SSM parameters exposed to the service"
+  default     = []
+}

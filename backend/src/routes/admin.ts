@@ -2,7 +2,18 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
-import { AbuseReportStatus, JobStatus, ReviewStatus, ReviewTargetType, Role, TrustCaseStatus, VerificationArtifactStatus } from "@prisma/client";
+import { checkPermission, createAuditLog, enforceAdminRbac } from "../middleware/admin-rbac.js";
+import {
+  AbuseReportStatus,
+  AccountRestrictionStatus,
+  AdminPermission,
+  JobStatus,
+  ReviewStatus,
+  ReviewTargetType,
+  Role,
+  TrustCaseStatus,
+  VerificationArtifactStatus,
+} from "@prisma/client";
 import { getIngestionReliabilityState, getLastSyncTime } from "../workers/aggregator-cron.js";
 import { summarizeDeadLetters, getWorkerStates, listDeadLetters } from "../lib/ops/resilience.js";
 import { redisHealthStatus } from "../lib/redis.js";
@@ -17,10 +28,31 @@ const reviewJobSchema = z.object({
   notes: z.string().optional(),
 });
 
-const reviewResourceSchema = z.object({
-  status: z.enum(["APPROVED", "REJECTED"]),
-  notes: z.string().optional(),
+const adminUserListQuerySchema = z.object({
+  role: z.nativeEnum(Role).optional(),
+  status: z.nativeEnum(AccountRestrictionStatus).optional(),
+  search: z.string().trim().max(120).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
 });
+
+const updateAdminUserRoleSchema = z.object({
+  role: z.nativeEnum(Role),
+  permissions: z.array(z.nativeEnum(AdminPermission)).min(1).optional(),
+  adminTitle: z.string().trim().min(2).max(100).optional(),
+  adminDescription: z.string().trim().max(500).optional(),
+  adminRoleActive: z.boolean().optional(),
+  reason: z.string().trim().min(3).max(500).optional(),
+});
+
+const updateAdminUserStatusSchema = z.object({
+  status: z.nativeEnum(AccountRestrictionStatus),
+  reason: z.string().trim().max(160).optional(),
+});
+
+const userManagementRbac = [enforceAdminRbac, checkPermission(AdminPermission.VIEW_USERS)];
+const userMutationRbac = [enforceAdminRbac, checkPermission(AdminPermission.MANAGE_USER_ACCOUNTS)];
+const userStatusRbac = [enforceAdminRbac, checkPermission(AdminPermission.RESTRICT_USER_ACCOUNT)];
 
 // GET /api/admin/stats - Dashboard stats
 router.get("/stats", async (_req: Request, res: Response) => {
@@ -260,24 +292,27 @@ router.put("/jobs/:id/review", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/admin/users - List all users (with optional search by name/email)
-router.get("/users", async (req: Request, res: Response) => {
+// GET /api/admin/users - List users with scoped search/filtering
+router.get("/users", userManagementRbac, async (req: Request, res: Response) => {
   try {
-    const { role, search, page = "1", limit = "20" } = req.query;
+    const { role, status, search, page, limit } = adminUserListQuerySchema.parse(req.query);
 
     const where: any = {};
     if (role) {
-      where.role = role as Role;
+      where.role = role;
     }
-    if (search && typeof search === "string" && search.trim()) {
+    if (status) {
+      where.accountRestrictionStatus = status;
+    }
+    if (search) {
       where.OR = [
-        { name: { contains: search.trim(), mode: "insensitive" } },
-        { email: { contains: search.trim(), mode: "insensitive" } },
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
       ];
     }
 
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
-    const take = parseInt(limit as string);
+    const skip = (page - 1) * limit;
+    const take = limit;
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
@@ -287,11 +322,23 @@ router.get("/users", async (req: Request, res: Response) => {
           email: true,
           name: true,
           role: true,
+          emailVerified: true,
+          accountRestrictionStatus: true,
+          accountRestrictionReason: true,
+          accountRestrictedAt: true,
           createdAt: true,
-          employer: {
-            select: { companyName: true },
+          adminRole: {
+            select: {
+              id: true,
+              title: true,
+              permissions: true,
+              isActive: true,
+            },
           },
-          _count: { select: { applications: true } },
+          employer: {
+            select: { id: true, companyName: true, location: true },
+          },
+          _count: { select: { applications: true, companyReviews: true, sentMessages: true } },
         },
         orderBy: { createdAt: "desc" },
         skip,
@@ -303,14 +350,347 @@ router.get("/users", async (req: Request, res: Response) => {
     res.json({
       users,
       pagination: {
-        page: parseInt(page as string),
-        limit: parseInt(limit as string),
+        page,
+        limit,
         total,
         totalPages: Math.ceil(total / take),
       },
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Validation failed", details: error.issues });
+      return;
+    }
     console.error("Admin users error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/admin/users/:id - Inspect a user and recent admin actions
+router.get("/users/:id", userManagementRbac, async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        preferredLocale: true,
+        emailVerified: true,
+        emailVerifiedAt: true,
+        accountRestrictionStatus: true,
+        accountRestrictionReason: true,
+        accountRestrictedAt: true,
+        deletionRequestedAt: true,
+        deletedAt: true,
+        phoneVerifiedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        employer: {
+          select: {
+            id: true,
+            companyName: true,
+            location: true,
+          },
+        },
+        candidateProfile: {
+          select: {
+            id: true,
+            headline: true,
+            targetCountries: true,
+            yearsExperience: true,
+          },
+        },
+        subscription: {
+          select: {
+            plan: true,
+            status: true,
+            currentPeriodEnd: true,
+          },
+        },
+        adminRole: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            permissions: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        _count: {
+          select: {
+            applications: true,
+            companyReviews: true,
+            sentMessages: true,
+            savedSearches: true,
+            notifications: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const auditLogs = await prisma.auditLog.findMany({
+      where: { targetType: "USER", targetId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        action: true,
+        changes: true,
+        reason: true,
+        status: true,
+        createdAt: true,
+        admin: {
+          select: {
+            title: true,
+            admin: { select: { id: true, name: true, email: true } },
+          },
+        },
+      },
+    });
+
+    res.json({ user, auditLogs });
+  } catch (error) {
+    console.error("Admin user detail error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/admin/users/:id/role - Update platform role and admin permissions
+router.patch("/users/:id/role", userMutationRbac, async (req: Request, res: Response) => {
+  try {
+    const data = updateAdminUserRoleSchema.parse(req.body);
+
+    if (req.params.id === req.user?.userId) {
+      res.status(400).json({ error: "Admins cannot change their own role or admin permissions." });
+      return;
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        adminRole: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            permissions: true,
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: existing.id },
+        data: { role: data.role },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          emailVerified: true,
+          accountRestrictionStatus: true,
+          accountRestrictionReason: true,
+          accountRestrictedAt: true,
+          createdAt: true,
+          adminRole: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              permissions: true,
+              isActive: true,
+            },
+          },
+          employer: { select: { id: true, companyName: true, location: true } },
+          _count: { select: { applications: true, companyReviews: true, sentMessages: true } },
+        },
+      });
+
+      if (data.role === Role.ADMIN) {
+        await tx.adminRole.upsert({
+          where: { adminId: existing.id },
+          create: {
+            adminId: existing.id,
+            title: data.adminTitle ?? "Platform Administrator",
+            description: data.adminDescription,
+            permissions: data.permissions ?? [AdminPermission.VIEW_USERS],
+            isActive: data.adminRoleActive ?? true,
+          },
+          update: {
+            title: data.adminTitle ?? existing.adminRole?.title ?? "Platform Administrator",
+            description: data.adminDescription ?? existing.adminRole?.description,
+            permissions: data.permissions ?? existing.adminRole?.permissions ?? [AdminPermission.VIEW_USERS],
+            isActive: data.adminRoleActive ?? existing.adminRole?.isActive ?? true,
+          },
+        });
+      } else if (existing.adminRole) {
+        await tx.adminRole.update({
+          where: { adminId: existing.id },
+          data: { isActive: false },
+        });
+      }
+
+      return tx.user.findUniqueOrThrow({
+        where: { id: existing.id },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          emailVerified: true,
+          accountRestrictionStatus: true,
+          accountRestrictionReason: true,
+          accountRestrictedAt: true,
+          createdAt: true,
+          adminRole: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              permissions: true,
+              isActive: true,
+            },
+          },
+          employer: { select: { id: true, companyName: true, location: true } },
+          _count: { select: { applications: true, companyReviews: true, sentMessages: true } },
+        },
+      });
+    });
+
+    await createAuditLog(
+      req.adminRole?.id,
+      "USER_UPDATED",
+      "USER",
+      existing.id,
+      {
+        targetName: existing.email,
+        reason: data.reason,
+        changes: {
+          role: { from: existing.role, to: updatedUser.role },
+          adminRole: {
+            from: existing.adminRole,
+            to: updatedUser.adminRole,
+          },
+        },
+      },
+      req
+    );
+
+    res.json({ user: updatedUser });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Validation failed", details: error.issues });
+      return;
+    }
+    console.error("Admin user role update error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /api/admin/users/:id/status - Limit, suspend, or reactivate an account
+router.patch("/users/:id/status", userStatusRbac, async (req: Request, res: Response) => {
+  try {
+    const data = updateAdminUserStatusSchema.parse(req.body);
+
+    if (req.params.id === req.user?.userId && data.status !== AccountRestrictionStatus.ACTIVE) {
+      res.status(400).json({ error: "Admins cannot restrict their own account." });
+      return;
+    }
+
+    if (data.status !== AccountRestrictionStatus.ACTIVE && !data.reason) {
+      res.status(400).json({ error: "A reason is required when limiting or suspending an account." });
+      return;
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        email: true,
+        accountRestrictionStatus: true,
+        accountRestrictionReason: true,
+        accountRestrictedAt: true,
+      },
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: existing.id },
+      data: {
+        accountRestrictionStatus: data.status,
+        accountRestrictionReason: data.status === AccountRestrictionStatus.ACTIVE ? null : data.reason,
+        accountRestrictedAt: data.status === AccountRestrictionStatus.ACTIVE ? null : new Date(),
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        emailVerified: true,
+        accountRestrictionStatus: true,
+        accountRestrictionReason: true,
+        accountRestrictedAt: true,
+        createdAt: true,
+        adminRole: {
+          select: {
+            id: true,
+            title: true,
+            permissions: true,
+            isActive: true,
+          },
+        },
+        employer: { select: { id: true, companyName: true, location: true } },
+        _count: { select: { applications: true, companyReviews: true, sentMessages: true } },
+      },
+    });
+
+    await createAuditLog(
+      req.adminRole?.id,
+      data.status === AccountRestrictionStatus.ACTIVE ? "USER_UPDATED" : "USER_RESTRICTED",
+      "USER",
+      existing.id,
+      {
+        targetName: existing.email,
+        reason: data.reason,
+        changes: {
+          accountRestrictionStatus: { from: existing.accountRestrictionStatus, to: data.status },
+          accountRestrictionReason: { from: existing.accountRestrictionReason, to: updatedUser.accountRestrictionReason },
+        },
+      },
+      req
+    );
+
+    res.json({ user: updatedUser });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Validation failed", details: error.issues });
+      return;
+    }
+    console.error("Admin user status update error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });

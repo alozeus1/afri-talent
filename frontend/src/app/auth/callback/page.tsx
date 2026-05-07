@@ -29,6 +29,23 @@ function clearStoredOAuthState() {
   sessionStorage.removeItem("oauth_provider");
 }
 
+function describeOAuthError(codeOrMessage: string): string {
+  const normalized = codeOrMessage.toUpperCase();
+  if (normalized.includes("OAUTH_CALLBACK_MISMATCH") || normalized.includes("REDIRECT_URI")) {
+    return "Google sign-in is almost configured, but this callback URL is not registered for the current environment. Ask an admin to add this app URL in Google Cloud OAuth settings.";
+  }
+  if (normalized.includes("OAUTH_MISSING_CONFIG") || normalized.includes("NOT CONFIGURED")) {
+    return "Google sign-in is not configured for this environment yet. You can continue with email and password.";
+  }
+  if (normalized.includes("ACCESS_DENIED") || normalized.includes("USER_CANCEL")) {
+    return "Sign-in was cancelled. You can try again or continue with email and password.";
+  }
+  if (normalized.includes("OAUTH_PROVIDER_UNAVAILABLE")) {
+    return "The OAuth provider is temporarily unavailable. Try again later or continue with email and password.";
+  }
+  return codeOrMessage || "Authentication failed. Try again or continue with email and password.";
+}
+
 function OAuthCallbackInner() {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +71,7 @@ function OAuthCallbackInner() {
         stage: "provider_redirect",
         error: errorParam,
       });
-      setError(`OAuth was cancelled or failed: ${errorParam}`);
+      setError(describeOAuthError(errorParam));
       clearStoredOAuthState();
       return;
     }
@@ -64,7 +81,7 @@ function OAuthCallbackInner() {
         provider,
         stage: "missing_code",
       });
-      setError("No authorization code received");
+      setError("No authorization code was received from the provider. Try signing in again.");
       clearStoredOAuthState();
       return;
     }
@@ -120,7 +137,7 @@ function OAuthCallbackInner() {
 
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.error || "OAuth failed");
+          throw new Error(data.code || data.message || data.error || "OAuth failed");
         }
 
         trackEvent(data.isNewUser ? "oauth_signup" : "oauth_login", {
@@ -146,7 +163,7 @@ function OAuthCallbackInner() {
           provider,
           stage: "exchange",
         });
-        setError(err instanceof Error ? err.message : "Authentication failed");
+        setError(describeOAuthError(err instanceof Error ? err.message : "Authentication failed"));
         clearStoredOAuthState();
       }
     };

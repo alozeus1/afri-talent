@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import AdminPartnersPage from "../partners/page";
 
 const push = jest.fn();
 const listMock = jest.fn();
 const detailMock = jest.fn();
+let AdminPartnersPage: typeof import("../partners/page").default;
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
@@ -37,6 +37,11 @@ jest.mock("@/lib/api", () => ({
 }));
 
 describe("AdminPartnersPage", () => {
+  beforeAll(async () => {
+    process.env.NEXT_PUBLIC_PHASE4_UNIVERSITY_API_ENABLED = "true";
+    AdminPartnersPage = (await import("../partners/page")).default;
+  });
+
   beforeEach(() => {
     push.mockReset();
     listMock.mockReset();

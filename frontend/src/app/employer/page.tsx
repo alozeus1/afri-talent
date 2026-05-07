@@ -13,6 +13,7 @@ import {
   jobs,
   trust,
 } from "@/lib/api";
+import * as Tabs from "@radix-ui/react-tabs";
 import { EmployerActivationChecklist } from "@/components/employer/activation-checklist";
 import { EmployerMilestones } from "@/components/employer/activation-milestones";
 import { TrustBadge } from "@/components/trust/trust-badge";
@@ -37,6 +38,9 @@ export default function EmployerDashboard() {
   const [trustDashboard, setTrustDashboard] = useState<EmployerTrustDashboard | null>(null);
   const [analytics, setAnalytics] = useState<EmployerAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [selectedTab, setSelectedTab] = useState("Overview");
+  const tabItems = ["Overview", "Jobs"];
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "EMPLOYER")) {
@@ -135,7 +139,31 @@ export default function EmployerDashboard() {
         </div>
       </div>
 
-      <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <Tabs.Root
+        className="mt-8"
+        value={selectedTab}
+        orientation="horizontal"
+        onValueChange={(val) => setSelectedTab(val)}
+      >
+        <div className="mb-8 border-b border-gray-200 dark:border-zinc-800">
+          <Tabs.List
+            className="flex -mb-px space-x-8 overflow-x-auto hide-scrollbar"
+            aria-label="Employer Dashboard Tabs"
+          >
+            {tabItems.map((item, idx) => (
+              <Tabs.Trigger
+                key={idx}
+                className="data-[state=active]:border-emerald-600 data-[state=active]:text-emerald-600 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:data-[state=active]:text-emerald-400 dark:data-[state=active]:border-emerald-400 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+                value={item}
+              >
+                {item}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </div>
+
+        <Tabs.Content value="Overview">
+          <div className="mt-2 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[
           {
             label: "Published jobs",
@@ -271,9 +299,11 @@ export default function EmployerDashboard() {
             </div>
           </div>
         </div>
-      )}
+        )}
+        </Tabs.Content>
 
-      <div className="mt-10">
+        <Tabs.Content value="Jobs">
+          <div className="mt-2">
         <Card>
           <CardHeader>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -358,6 +388,8 @@ export default function EmployerDashboard() {
           </CardContent>
         </Card>
       </div>
+        </Tabs.Content>
+      </Tabs.Root>
     </div>
   );
 }

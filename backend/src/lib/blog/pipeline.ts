@@ -1,0 +1,274 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Blog Pipeline — orchestrates all 5 blog automation agents end-to-end
+//
+// Flow:
+//   Agent 1: ContentSourceAgent  → RawContent[]
+//   Agent 2: FactCheckAgent      → VerifiedContent[]
+//   Agent 3: BlogWriterAgent     → DraftPost
+//   ImageSourcerAgent            → coverImageUrl | null
+//   DB write                     → Resource (published=false) + AdminReview (PENDING)
+//   Email                        → admin notification
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { ReviewTargetType, ReviewStatus } from "@prisma/client";
+import prisma from "../prisma.js";
+import logger from "../logger.js";
+import { withRetry, pushDeadLetter } from "../ops/resilience.js";
+import { ContentSourceAgent } from "./agents/content-source-agent.js";
+import { FactCheckAgent } from "./agents/fact-check-agent.js";
+import { BlogWriterAgent } from "./agents/blog-writer-agent.js";
+import { ImageSourcerAgent } from "./agents/image-sourcer.js";
+import type { BlogPipelineResult } from "./types.js";
+
+const log = logger.child({ worker: "blog-pipeline" });
+
+// ── Admin notification email (inline — avoids adding another exported fn to email.ts) ──
+
+async function notifyAdmin(resourceId: string, title: string): Promise<void> {
+  const adminEmail = process.env.BLOG_ADMIN_NOTIFICATION_EMAIL;
+  if (!adminEmail) {
+    log.info("[pipeline] BLOG_ADMIN_NOTIFICATION_EMAIL not set, skipping notification email");
+    return;
+  }
+
+  const SES_FROM = process.env.SES_FROM_EMAIL;
+  if (!SES_FROM) {
+    log.info("[pipeline] SES_FROM_EMAIL not configured, skipping notification email");
+    return;
+  }
+
+  try {
+    const { SESClient, SendEmailCommand } = await import("@aws-sdk/client-ses");
+    const SES_REGION = process.env.SES_REGION || process.env.AWS_REGION || "us-east-1";
+    const ses = new SESClient({ region: SES_REGION });
+
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const reviewUrl = `${frontendUrl}/admin/blog`;
+
+    const html = `
+      <h2>New Weekly Blog Post Ready for Review</h2>
+      <p><strong>Title:</strong> ${title}</p>
+      <p>A new AI-generated blog post has been created and is awaiting your approval before publication.</p>
+      <p><a href="${reviewUrl}" style="background:#059669;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;margin-top:10px;">Review Post →</a></p>
+      <hr/>
+      <p style="color:#6b7280;font-size:12px;">Resource ID: ${resourceId}</p>
+    `;
+    const text = `New blog post ready for review: "${title}"\nReview at: ${reviewUrl}`;
+
+    await ses.send(
+      new SendEmailCommand({
+        Source: SES_FROM,
+        Destination: { ToAddresses: [adminEmail] },
+        Message: {
+          Subject: { Data: `[AfriTalent Blog] New post awaiting review: ${title}`, Charset: "UTF-8" },
+          Body: {
+            Html: { Data: html, Charset: "UTF-8" },
+            Text: { Data: text, Charset: "UTF-8" },
+          },
+        },
+      })
+    );
+
+    log.info({ adminEmail }, "[pipeline] admin notification email sent");
+  } catch (err) {
+    log.warn({ err }, "[pipeline] admin notification email failed — non-fatal");
+  }
+}
+
+// ── Main pipeline ─────────────────────────────────────────────────────────────
+
+export async function runBlogPipeline(): Promise<BlogPipelineResult> {
+  const start = Date.now();
+  const weekOf = new Date();
+
+  log.info({ weekOf: weekOf.toISOString() }, "[pipeline] starting");
+
+  // ── Agent 1: Source content ─────────────────────────────────────────────────
+  let rawContent;
+  try {
+    rawContent = await withRetry(() => ContentSourceAgent(weekOf), {
+      operationName: "blog_content_source",
+      attempts: 2,
+      initialDelayMs: 2_000,
+    });
+  } catch (err) {
+    log.error({ err }, "[pipeline] ContentSourceAgent failed");
+    await pushDeadLetter({
+      category: "scheduler",
+      source: "blog-pipeline",
+      reasonCode: "content_source_failed",
+      error: err,
+      payload: { weekOf: weekOf.toISOString() },
+    });
+    return { success: false, error: String(err), rawContentCount: 0, verifiedContentCount: 0, durationMs: Date.now() - start };
+  }
+
+  if (rawContent.length === 0) {
+    log.warn("[pipeline] no raw content found — skipping pipeline run");
+    return {
+      success: false,
+      skippedReason: "No relevant content found from any source",
+      rawContentCount: 0,
+      verifiedContentCount: 0,
+      durationMs: Date.now() - start,
+    };
+  }
+
+  log.info({ count: rawContent.length }, "[pipeline] Agent 1 complete");
+
+  // ── Agent 2: Fact-check ─────────────────────────────────────────────────────
+  let verifiedContent;
+  try {
+    verifiedContent = await withRetry(() => FactCheckAgent(rawContent), {
+      operationName: "blog_fact_check",
+      attempts: 2,
+      initialDelayMs: 2_000,
+    });
+  } catch (err) {
+    log.error({ err }, "[pipeline] FactCheckAgent failed");
+    await pushDeadLetter({
+      category: "scheduler",
+      source: "blog-pipeline",
+      reasonCode: "fact_check_failed",
+      error: err,
+      payload: { rawCount: rawContent.length },
+    });
+    return {
+      success: false,
+      error: String(err),
+      rawContentCount: rawContent.length,
+      verifiedContentCount: 0,
+      durationMs: Date.now() - start,
+    };
+  }
+
+  if (verifiedContent.length === 0) {
+    log.warn("[pipeline] no content passed fact-check — skipping");
+    return {
+      success: false,
+      skippedReason: "All sourced content failed fact-check credibility threshold",
+      rawContentCount: rawContent.length,
+      verifiedContentCount: 0,
+      durationMs: Date.now() - start,
+    };
+  }
+
+  log.info({ count: verifiedContent.length }, "[pipeline] Agent 2 complete");
+
+  // ── Agent 3: Write blog post ────────────────────────────────────────────────
+  let draft;
+  try {
+    draft = await withRetry(() => BlogWriterAgent(verifiedContent, weekOf), {
+      operationName: "blog_writer",
+      attempts: 2,
+      initialDelayMs: 3_000,
+    });
+  } catch (err) {
+    log.error({ err }, "[pipeline] BlogWriterAgent failed");
+    await pushDeadLetter({
+      category: "scheduler",
+      source: "blog-pipeline",
+      reasonCode: "blog_writer_failed",
+      error: err,
+      payload: { verifiedCount: verifiedContent.length },
+    });
+    return {
+      success: false,
+      error: String(err),
+      rawContentCount: rawContent.length,
+      verifiedContentCount: verifiedContent.length,
+      durationMs: Date.now() - start,
+    };
+  }
+
+  log.info({ title: draft.title, slug: draft.slug }, "[pipeline] Agent 3 complete");
+
+  // ── ImageSourcerAgent ───────────────────────────────────────────────────────
+  const coverImage = await ImageSourcerAgent(draft.topicKeywords).catch((err) => {
+    log.warn({ err }, "[pipeline] ImageSourcerAgent failed — continuing without image");
+    return null;
+  });
+
+  log.info({ hasImage: !!coverImage }, "[pipeline] image sourcing complete");
+
+  // ── DB write: Resource + AdminReview ───────────────────────────────────────
+  // Find any admin user to assign the review to (required FK on AdminReview)
+  const adminUser = await prisma.user.findFirst({
+    where: { role: "ADMIN" },
+    select: { id: true },
+  });
+
+  if (!adminUser) {
+    log.warn("[pipeline] no admin user found in DB — skipping review assignment");
+    // Still create the resource, just without a formal review record
+  }
+
+  let resource;
+  try {
+    resource = await prisma.resource.create({
+      data: {
+        title: draft.title,
+        slug: draft.slug,
+        excerpt: draft.excerpt,
+        content: draft.content,
+        category: draft.category,
+        coverImage: coverImage ?? undefined,
+        published: false,
+      },
+    });
+    log.info({ resourceId: resource.id }, "[pipeline] Resource record created");
+
+    if (adminUser) {
+      await prisma.adminReview.create({
+        data: {
+          status: ReviewStatus.PENDING,
+          targetType: ReviewTargetType.RESOURCE,
+          targetResourceId: resource.id,
+          reviewerId: adminUser.id,
+          notes: `Auto-generated by blog pipeline. Sources: ${verifiedContent.length} verified. Read time: ${draft.estimatedReadMinutes} min.`,
+        },
+      });
+      log.info({ resourceId: resource.id }, "[pipeline] AdminReview record created");
+    }
+  } catch (err) {
+    log.error({ err }, "[pipeline] DB write failed");
+    await pushDeadLetter({
+      category: "scheduler",
+      source: "blog-pipeline",
+      reasonCode: "db_write_failed",
+      error: err,
+      payload: { slug: draft.slug },
+    });
+    return {
+      success: false,
+      error: String(err),
+      rawContentCount: rawContent.length,
+      verifiedContentCount: verifiedContent.length,
+      durationMs: Date.now() - start,
+    };
+  }
+
+  // ── Admin notification ──────────────────────────────────────────────────────
+  await notifyAdmin(resource.id, draft.title);
+
+  const durationMs = Date.now() - start;
+  log.info(
+    {
+      resourceId: resource.id,
+      title: draft.title,
+      durationMs,
+      rawContentCount: rawContent.length,
+      verifiedContentCount: verifiedContent.length,
+    },
+    "[pipeline] complete — awaiting human review"
+  );
+
+  return {
+    success: true,
+    resourceId: resource.id,
+    title: draft.title,
+    rawContentCount: rawContent.length,
+    verifiedContentCount: verifiedContent.length,
+    durationMs,
+  };
+}

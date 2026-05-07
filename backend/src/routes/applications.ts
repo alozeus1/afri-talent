@@ -2,7 +2,15 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize, requireVerifiedEmail } from "../middleware/auth.js";
-import { ApplicationStatus, JobStatus, Role, TrustEntityType, TrustRiskLevel } from "@prisma/client";
+import {
+  ApplicationStatus,
+  JobStatus,
+  Role,
+  SubscriptionPlan,
+  SubscriptionStatus,
+  TrustEntityType,
+  TrustRiskLevel,
+} from "@prisma/client";
 import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import { requireAccountStanding } from "../middleware/account-standing.js";
 import { assessApplicationRisk } from "../lib/trust/risk.js";
@@ -337,6 +345,32 @@ router.get("/job/:jobId", authenticate, authorize(Role.EMPLOYER), async (req: Re
       },
       orderBy: { createdAt: "desc" },
     });
+
+    const subscription = await prisma.subscription.findUnique({
+      where: { userId: req.user!.userId },
+      select: { plan: true, status: true },
+    }).catch(() => null);
+    const canViewFullCandidates =
+      subscription?.status === SubscriptionStatus.ACTIVE &&
+      (subscription.plan === SubscriptionPlan.EMPLOYER_BASIC || subscription.plan === SubscriptionPlan.EMPLOYER_PREMIUM);
+
+    if (!canViewFullCandidates) {
+      res.json(
+        applications.map((application, index) => ({
+          ...application,
+          cvUrl: null,
+          coverLetter: null,
+          candidate: {
+            id: application.candidate.id,
+            name: `Candidate ${index + 1}`,
+            email: "Upgrade to unlock candidate contact details",
+          },
+          locked: true,
+          upgradeRequired: true,
+        })),
+      );
+      return;
+    }
 
     res.json(applications);
   } catch (error) {

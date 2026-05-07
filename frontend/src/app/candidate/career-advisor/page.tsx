@@ -18,7 +18,7 @@ const priorityVariant: Record<string, "danger" | "warning" | "default"> = {
 };
 
 export default function CareerAdvisorPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   const [targetRole, setTargetRole] = useState("");
@@ -47,12 +47,13 @@ export default function CareerAdvisorPage() {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       router.push("/login");
       return;
     }
     void loadHistory();
-  }, [user, loadHistory, router]);
+  }, [user, authLoading, loadHistory, router]);
 
   async function handleAnalyse() {
     if (!targetRole.trim()) return;

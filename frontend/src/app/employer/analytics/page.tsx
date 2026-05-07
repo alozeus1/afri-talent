@@ -35,7 +35,7 @@ export default function EmployerAnalyticsPage() {
 
   const [analytics, setAnalytics] = useState<EmployerAnalytics | null>(null);
   const [advancedAnalytics, setAdvancedAnalytics] = useState<EmployerAdvancedAnalytics | null>(null);
-  const [, setBranding] = useState<EmployerBranding | null>(null);
+  const [branding, setBranding] = useState<EmployerBranding | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +44,9 @@ export default function EmployerAnalyticsPage() {
     website: "",
     location: "",
     bio: "",
+    logoUrl: "",
+    brandColor: "#0f766e",
+    accentColor: "#10b981",
   });
   const [savingBranding, setSavingBranding] = useState(false);
   const [brandingSaved, setBrandingSaved] = useState(false);
@@ -73,6 +76,9 @@ export default function EmployerAnalyticsPage() {
           website: brandingData.website || "",
           location: brandingData.location || "",
           bio: brandingData.bio || "",
+          logoUrl: brandingData.logoUrl || "",
+          brandColor: brandingData.brandColor || "#0f766e",
+          accentColor: brandingData.accentColor || "#10b981",
         });
       })
       .catch((err) => {
@@ -404,6 +410,47 @@ export default function EmployerAnalyticsPage() {
                     onChange={(e) => setBrandingForm({ ...brandingForm, bio: e.target.value })}
                     placeholder="Tell candidates about the company, product, team, and why the role matters."
                   />
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">Premium dashboard branding</p>
+                      <p className="mt-1 text-sm text-gray-600">
+                        Active Employer Premium companies can apply their logo and colors across their AfriTalent employer surfaces.
+                      </p>
+                    </div>
+                    <Badge variant={branding?.premiumBrandingEnabled ? "success" : "warning"}>
+                      {branding?.premiumBrandingEnabled ? "Premium active" : "Premium required"}
+                    </Badge>
+                  </div>
+                  <div className="mt-4 grid gap-4 md:grid-cols-3">
+                    <Input
+                      label="Logo URL"
+                      value={brandingForm.logoUrl}
+                      disabled={!branding?.premiumBrandingEnabled}
+                      onChange={(e) => setBrandingForm({ ...brandingForm, logoUrl: e.target.value })}
+                      placeholder="https://example.com/logo.png"
+                    />
+                    <Input
+                      label="Primary color"
+                      type="color"
+                      value={brandingForm.brandColor}
+                      disabled={!branding?.premiumBrandingEnabled}
+                      onChange={(e) => setBrandingForm({ ...brandingForm, brandColor: e.target.value })}
+                    />
+                    <Input
+                      label="Accent color"
+                      type="color"
+                      value={brandingForm.accentColor}
+                      disabled={!branding?.premiumBrandingEnabled}
+                      onChange={(e) => setBrandingForm({ ...brandingForm, accentColor: e.target.value })}
+                    />
+                  </div>
+                  {!branding?.premiumBrandingEnabled && (
+                    <Link href={localizePath("/billing", locale)} className="mt-3 inline-flex text-sm font-medium text-emerald-700 hover:text-emerald-800">
+                      Upgrade to unlock custom dashboard branding
+                    </Link>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <Button type="submit" disabled={savingBranding}>

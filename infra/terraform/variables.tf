@@ -507,6 +507,18 @@ variable "ai_disabled" {
   default     = false
 }
 
+variable "blog_automation_enabled" {
+  type        = bool
+  description = "Enable the 5-agent weekly blog automation pipeline"
+  default     = true
+}
+
+variable "blog_automation_interval_days" {
+  type        = number
+  description = "Interval in days between blog pipeline runs"
+  default     = 7
+}
+
 variable "daily_apply_pack_limit" {
   type        = number
   description = "Per-user daily limit for apply pack generation"
@@ -641,6 +653,13 @@ variable "lever_site_tokens" {
 variable "workable_company_tokens" {
   type        = string
   description = "Comma-separated Workable account slugs or account:token pairs"
+  sensitive   = true
+  default     = ""
+}
+
+variable "company_career_sources_json" {
+  type        = string
+  description = "JSON array of direct company career source configs"
   sensitive   = true
   default     = ""
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Job } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +9,8 @@ import { TrustBadge } from "@/components/trust/trust-badge";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { formatSalaryRange } from "@/lib/salary";
 import { jobDiscoveryEvents } from "@/lib/analytics";
+import { MapPin, Briefcase, Globe, Plane, Heart } from "lucide-react";
+import { Coachmark } from "@/components/ui/coachmark";
 
 interface JobCardProps {
   job: Job;
@@ -15,6 +18,8 @@ interface JobCardProps {
 
 export function JobCard({ job }: JobCardProps) {
   const locale = useLocale();
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const tags = Array.isArray(job.tags) ? job.tags : [];
   const salary = formatSalaryRange({
     salaryMin: job.salaryMin,
@@ -24,8 +29,10 @@ export function JobCard({ job }: JobCardProps) {
   });
   const freshnessLabel = job.discovery?.freshnessLabel?.toLowerCase() ?? null;
   const discoverySummary = job.rankingExplanation?.summary || job.trust?.guidance;
+  // Use ISO date (YYYY-MM-DD) to keep server and client output identical and avoid
+  // React hydration mismatches caused by locale-sensitive formatters.
   const lastSeenText = job.discovery?.lastSeenAt
-    ? new Date(job.discovery.lastSeenAt).toLocaleDateString()
+    ? new Date(job.discovery.lastSeenAt).toISOString().slice(0, 10)
     : null;
   const trustReasons = [
     job.employer?.trust?.badge,
@@ -55,10 +62,11 @@ export function JobCard({ job }: JobCardProps) {
         });
       }}
     >
-      <Card className="isolate h-full cursor-pointer transition-all duration-200 group-hover:-translate-y-1 group-hover:shadow-[0_28px_72px_rgba(15,23,32,0.12)]">
+      <Card className="isolate h-full cursor-pointer transition-all duration-300 border border-[var(--border-soft)] bg-white dark:bg-zinc-950 hover:bg-gradient-to-br hover:from-white hover:to-emerald-50/50 dark:hover:from-zinc-950 dark:hover:to-emerald-950/20 group-hover:-translate-y-1 hover:border-emerald-300 dark:hover:border-emerald-700 shadow-sm hover:shadow-[0_8px_24px_rgba(0,0,0,0.15)] relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/0 to-emerald-500/0 group-hover:via-emerald-500/5 transition-all duration-500 rounded-xl pointer-events-none" />
         <CardContent className="relative z-10 flex h-full flex-col p-6">
           <div className="flex justify-between items-start mb-3">
-            <div className="flex-1">
+            <div className="flex-1 pr-4">
               <h3 className="font-display text-lg font-bold text-gray-900 dark:text-gray-100 mb-1 line-clamp-2">
                 {job.title}
               </h3>
@@ -67,11 +75,16 @@ export function JobCard({ job }: JobCardProps) {
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {job.employer?.trust && (
-                  <TrustBadge
-                    label={job.employer.trust.badge}
-                    riskLevel={job.employer.trust.riskLevel}
-                    variant="success"
-                  />
+                  <Coachmark 
+                    title="Verified Trust Standard" 
+                    description="This employer has passed strict vetting criteria to ensure a transparent and credible hiring process for global talent."
+                  >
+                    <TrustBadge
+                      label={job.employer.trust.badge}
+                      riskLevel={job.employer.trust.riskLevel}
+                      variant="success"
+                    />
+                  </Coachmark>
                 )}
                 {job.trust?.companyReviewed && (
                   <TrustBadge label="Company reviewed" variant="info" />
@@ -80,7 +93,9 @@ export function JobCard({ job }: JobCardProps) {
                   <TrustBadge label="Job quality checked" variant="success" />
                 )}
                 {job.trust?.newEmployerCaution && (
-                  <TrustBadge label="New employer review" riskLevel="MEDIUM" variant="warning" />
+                  <span className="animate-pulse inline-block">
+                    <TrustBadge label="New employer review" riskLevel="MEDIUM" variant="warning" />
+                  </span>
                 )}
                 {job.discovery?.trustedJob && (
                   <TrustBadge label="Trusted job" variant="success" />
@@ -96,27 +111,45 @@ export function JobCard({ job }: JobCardProps) {
                 )}
               </div>
             </div>
-            <Badge variant="success">{job.type}</Badge>
+            <div className="flex flex-col items-end gap-2">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (isSaving) return;
+                  setIsSaving(true);
+                  setIsSaved((current) => !current);
+                  window.setTimeout(() => setIsSaving(false), 250);
+                }}
+                disabled={isSaving}
+                className={`p-2 rounded-full transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70 ${
+                  isSaved 
+                    ? "bg-rose-50 text-rose-500 shadow-sm ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-500/30"
+                    : "bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:bg-zinc-800/50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                }`}
+                aria-pressed={isSaved}
+                aria-label={isSaved ? "Remove saved job" : "Save job"}
+              >
+                <Heart className={`w-5 h-5 transition-transform duration-300 ${isSaved ? "fill-current scale-110" : "scale-100 active:scale-90"}`} />
+              </button>
+              <Badge variant="success">{job.type}</Badge>
+              {job.jobField && <Badge variant="default">{job.jobField}</Badge>}
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 mb-4">
-            <span className="inline-flex items-center text-sm text-gray-500 dark:text-gray-400">
-              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              {job.location}
+          <div className="flex flex-wrap gap-4 mb-4">
+            <span className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300">
+              <MapPin className="w-4 h-4 mr-1.5 text-emerald-600 dark:text-emerald-400" />
+              {job.workplaceType ? `${job.location} · ${job.workplaceType.toLowerCase()}` : job.location}
             </span>
-            <span className="inline-flex items-center text-sm text-gray-500 dark:text-gray-400">
-              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+            <span className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300">
+              <Briefcase className="w-4 h-4 mr-1.5 text-emerald-600 dark:text-emerald-400" />
               {job.seniority}
             </span>
           </div>
 
           {salary && (
-            <p className="mb-4 font-display text-lg font-bold text-gray-900 dark:text-gray-100">{salary}</p>
+            <p className="mb-4 font-display text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors duration-200">{salary}</p>
           )}
 
           {job.discovery && (
@@ -164,14 +197,14 @@ export function JobCard({ job }: JobCardProps) {
           {(job.visaSponsorship === "YES" || job.relocationAssistance) && (
             <div className="flex flex-wrap gap-2 mb-3">
               {job.visaSponsorship === "YES" && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50/80 border border-blue-100 dark:border-blue-900/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-semibold shadow-sm">
+                  <Globe className="w-3.5 h-3.5" />
                   Visa Sponsored
                 </span>
               )}
               {job.relocationAssistance && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50/80 border border-purple-100 dark:border-purple-900/50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-semibold shadow-sm">
+                  <Plane className="w-3.5 h-3.5" />
                   Relocation Support
                 </span>
               )}
@@ -193,11 +226,18 @@ export function JobCard({ job }: JobCardProps) {
 
           <div className="mt-auto" />
 
-          {job.discovery?.sourceCount && job.discovery.sourceCount > 1 && lastSeenText && (
-            <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-              Cross-checked across {job.discovery.sourceCount} sources, refreshed {lastSeenText}
-            </p>
-          )}
+          <div className="mt-4 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-zinc-800/60 pt-4">
+            <span className="flex items-center gap-1.5 font-medium">
+              <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              {job.discovery?.verifiedApplyPath ? "Verified application path" : "External listing, verify before applying"}
+            </span>
+            {job.discovery?.sourceCount && job.discovery.sourceCount > 1 && (
+              <span>Cross-checked x{job.discovery.sourceCount}{lastSeenText && ` • ${lastSeenText}`}</span>
+            )}
+          </div>
         </CardContent>
       </Card>
     </Link>

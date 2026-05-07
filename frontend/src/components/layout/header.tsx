@@ -95,7 +95,7 @@ export function Header() {
 
   const getDashboardLink = () => {
     if (!user) return "/login";
-    switch (user.role) {
+    switch (user.role?.toUpperCase()) {
       case "ADMIN":
         return "/admin";
       case "EMPLOYER":
@@ -139,7 +139,7 @@ export function Header() {
         <nav className="page-frame">
           <div className="flex min-h-[72px] justify-between">
             <div className="flex items-center">
-              <Link href={href("/")} className="flex items-center space-x-3">
+              <Link href={href("/")} prefetch={false} className="flex items-center space-x-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-500 bg-emerald-600 shadow-sm">
                   <span className="font-display text-lg font-bold text-white">A</span>
                 </div>
@@ -152,34 +152,34 @@ export function Header() {
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-6">
-              <Link href={href("/jobs")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/jobs")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 {t("nav.findJobs")}
               </Link>
-              <Link href={href("/companies")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/companies")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 {t("nav.companies")}
               </Link>
-              <Link href={href("/salaries")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/salaries")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 {t("nav.salaries")}
               </Link>
-              <Link href={href("/interviews")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/interviews")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 {t("nav.interviews")}
               </Link>
-              <Link href={href("/learning")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/learning")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 {t("nav.learn")}
               </Link>
-              <Link href={href("/pricing")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/pricing")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 {t("nav.pricing")}
               </Link>
-              <Link href={href("/trust")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/trust")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 Trust
               </Link>
               {user?.role === "CANDIDATE" && (
-                <Link href={href("/candidate/ai-assistant")} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+                <Link href={href("/candidate/ai-assistant")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                   AI Assistant
                 </Link>
               )}
               {user && (
-                <Link href={href("/messages")} className="relative text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+                <Link href={href("/messages")} prefetch={false} className="relative text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                   {t("nav.messages")}
                   {unreadMessages > 0 && (
                     <span className="absolute -top-1 -right-3 bg-emerald-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
@@ -189,7 +189,7 @@ export function Header() {
                 </Link>
               )}
               {user && (
-                <Link href={href("/notifications")} className="relative text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+                <Link href={href("/notifications")} prefetch={false} className="relative text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
@@ -211,7 +211,7 @@ export function Header() {
                 </div>
               ) : user ? (
                 <div className="flex items-center space-x-4">
-                  <Link href={href(getDashboardLink())}>
+                  <Link href={href(getDashboardLink())} prefetch={false}>
                 <Button variant="ghost">{t("nav.dashboard")}</Button>
               </Link>
                   <div className="flex items-center space-x-3">
@@ -223,10 +223,10 @@ export function Header() {
                 </div>
               ) : (
                 <div className="flex items-center space-x-3">
-                  <Link href={href("/login")}>
+                  <Link href={href("/login")} prefetch={false}>
                     <Button variant="ghost">{t("nav.login")}</Button>
                   </Link>
-                  <Link href={href("/register")}>
+                  <Link href={href("/register")} prefetch={false}>
                     <Button>{t("nav.getStarted")}</Button>
                   </Link>
                 </div>
@@ -297,6 +297,7 @@ export function Header() {
                 <Link
                   key={item.href}
                   href={href(item.href)}
+                  prefetch={false}
                   onClick={() => setMobileMenuOpen(false)}
                   className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-100"
                 >
@@ -310,15 +311,15 @@ export function Header() {
                 <div className="h-11 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
               ) : user ? (
                 <>
-                  <Link href={href(getDashboardLink())} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
+                  <Link href={href(getDashboardLink())} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
                     {t("nav.dashboard")}
                   </Link>
                   {user.role === "CANDIDATE" && (
-                    <Link href={href("/candidate/ai-assistant")} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
+                    <Link href={href("/candidate/ai-assistant")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
                       AI Assistant
                     </Link>
                   )}
-                  <Link href={href("/messages")} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
+                  <Link href={href("/messages")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
                     {t("nav.messages")}
                     {unreadMessages > 0 && (
                       <span className="ml-2 bg-emerald-600 text-white text-xs rounded-full px-1.5">
@@ -326,7 +327,7 @@ export function Header() {
                       </span>
                     )}
                   </Link>
-                  <Link href={href("/notifications")} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
+                  <Link href={href("/notifications")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
                     {t("nav.notifications")}
                     {unreadNotifs > 0 && (
                       <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5">
@@ -335,7 +336,7 @@ export function Header() {
                     )}
                   </Link>
                   {user.role === "CANDIDATE" && (
-                    <Link href={href("/immigration")} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
+                    <Link href={href("/immigration")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
                       Visa Tracker
                     </Link>
                   )}
@@ -352,10 +353,10 @@ export function Header() {
                 </>
               ) : (
                 <div className="space-y-3 mt-2">
-                  <Link href={href("/login")} onClick={() => setMobileMenuOpen(false)}>
+                  <Link href={href("/login")} prefetch={false} onClick={() => setMobileMenuOpen(false)}>
                     <Button variant="outline" className="w-full min-h-11">{t("nav.login")}</Button>
                   </Link>
-                  <Link href={href("/register")} onClick={() => setMobileMenuOpen(false)}>
+                  <Link href={href("/register")} prefetch={false} onClick={() => setMobileMenuOpen(false)}>
                     <Button className="w-full min-h-11">{t("nav.getStarted")}</Button>
                   </Link>
                 </div>

@@ -6,6 +6,9 @@ node_modules/
 coverage/
 playwright-report/
 test-results/
+.playwright-mcp/
+*.jpeg
+*.png
 
 .env
 .env.*
@@ -18,3 +21,6 @@ infra/terraform/*.tfstate.*
 infra/terraform/crash.log
 
 frontend/test-results/
+
+# One-time ops / secret-adjacent scripts
+scripts/setup-ssm-parameters.sh

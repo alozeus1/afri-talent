@@ -38,7 +38,7 @@ env:
 jobs:
   validate-ref:
     name: Validate Deployment Ref
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     steps:
       - name: Enforce protected deployment refs
         run: |
@@ -66,7 +66,7 @@ jobs:
 
   prod-gate:
     name: Production Approval Gate
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [validate-ref]
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod'
     environment: production
@@ -76,7 +76,7 @@ jobs:
 
   provision-infra:
     name: Provision Base Infrastructure
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [validate-ref, prod-gate]
     if: always() && needs.validate-ref.result == 'success' && (needs.prod-gate.result == 'success' || needs.prod-gate.result == 'skipped')
     permissions:
@@ -154,11 +154,21 @@ jobs:
           FLUTTERWAVE_PAYMENT_OPTIONS: ${{ secrets.FLUTTERWAVE_PAYMENT_OPTIONS }}
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_API_KEY: ${{ secrets.ADZUNA_API_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           APIFY_JOB_TASKS_JSON: ${{ secrets.APIFY_JOB_TASKS_JSON }}
           GREENHOUSE_BOARD_TOKENS: ${{ secrets.GREENHOUSE_BOARD_TOKENS }}
           LEVER_SITE_TOKENS: ${{ secrets.LEVER_SITE_TOKENS }}
           WORKABLE_COMPANY_TOKENS: ${{ secrets.WORKABLE_COMPANY_TOKENS }}
+          COMPANY_CAREER_SOURCES_JSON: ${{ secrets.COMPANY_CAREER_SOURCES_JSON }}
+          ADMIN_BOOTSTRAP_EMAIL: ${{ secrets.ADMIN_BOOTSTRAP_EMAIL }}
+          ADMIN_BOOTSTRAP_PASSWORD: ${{ secrets.ADMIN_BOOTSTRAP_PASSWORD }}
+          AT_API_KEY: ${{ secrets.AT_API_KEY }}
+          AT_USERNAME: ${{ secrets.AT_USERNAME }}
+          AT_SANDBOX: ${{ secrets.AT_SANDBOX }}
+          AT_SENDER_ID: ${{ secrets.AT_SENDER_ID }}
+          SMS_ENABLED: ${{ secrets.SMS_ENABLED }}
         run: |
           CURRENT=$(aws secretsmanager get-secret-value \
             --secret-id "$SECRET_NAME" \
@@ -180,11 +190,21 @@ jobs:
             --arg flutterwaveOptions "$FLUTTERWAVE_PAYMENT_OPTIONS" \
             --arg adzunaId "$ADZUNA_APP_ID" \
             --arg adzunaKey "$ADZUNA_API_KEY" \
+            --arg googleClientId "$GOOGLE_CLIENT_ID" \
+            --arg googleClientSecret "$GOOGLE_CLIENT_SECRET" \
             --arg apifyToken "$APIFY_TOKEN" \
             --arg apifyTasks "$APIFY_JOB_TASKS_JSON" \
             --arg greenhouseBoards "$GREENHOUSE_BOARD_TOKENS" \
             --arg leverSites "$LEVER_SITE_TOKENS" \
             --arg workableCompanies "$WORKABLE_COMPANY_TOKENS" \
+            --arg companyCareerSources "$COMPANY_CAREER_SOURCES_JSON" \
+            --arg adminBootstrapEmail "$ADMIN_BOOTSTRAP_EMAIL" \
+            --arg adminBootstrapPassword "$ADMIN_BOOTSTRAP_PASSWORD" \
+            --arg atApiKey "$AT_API_KEY" \
+            --arg atUsername "$AT_USERNAME" \
+            --arg atSandbox "$AT_SANDBOX" \
+            --arg atSenderId "$AT_SENDER_ID" \
+            --arg smsEnabled "$SMS_ENABLED" \
             '
             def prefer_input($value; $key):
               if ($value | length) > 0 then $value else ($current[$key] // "") end;
@@ -203,11 +223,21 @@ jobs:
               FLUTTERWAVE_PAYMENT_OPTIONS: prefer_input($flutterwaveOptions; "FLUTTERWAVE_PAYMENT_OPTIONS"),
               ADZUNA_APP_ID: prefer_input($adzunaId; "ADZUNA_APP_ID"),
               ADZUNA_API_KEY: prefer_input($adzunaKey; "ADZUNA_API_KEY"),
+              GOOGLE_CLIENT_ID: prefer_input($googleClientId; "GOOGLE_CLIENT_ID"),
+              GOOGLE_CLIENT_SECRET: prefer_input($googleClientSecret; "GOOGLE_CLIENT_SECRET"),
               APIFY_TOKEN: prefer_input($apifyToken; "APIFY_TOKEN"),
               APIFY_JOB_TASKS_JSON: prefer_input($apifyTasks; "APIFY_JOB_TASKS_JSON"),
               GREENHOUSE_BOARD_TOKENS: prefer_input($greenhouseBoards; "GREENHOUSE_BOARD_TOKENS"),
               LEVER_SITE_TOKENS: prefer_input($leverSites; "LEVER_SITE_TOKENS"),
-              WORKABLE_COMPANY_TOKENS: prefer_input($workableCompanies; "WORKABLE_COMPANY_TOKENS")
+              WORKABLE_COMPANY_TOKENS: prefer_input($workableCompanies; "WORKABLE_COMPANY_TOKENS"),
+              COMPANY_CAREER_SOURCES_JSON: prefer_input($companyCareerSources; "COMPANY_CAREER_SOURCES_JSON"),
+              ADMIN_BOOTSTRAP_EMAIL: prefer_input($adminBootstrapEmail; "ADMIN_BOOTSTRAP_EMAIL"),
+              ADMIN_BOOTSTRAP_PASSWORD: prefer_input($adminBootstrapPassword; "ADMIN_BOOTSTRAP_PASSWORD"),
+              AT_API_KEY: prefer_input($atApiKey; "AT_API_KEY"),
+              AT_USERNAME: prefer_input($atUsername; "AT_USERNAME"),
+              AT_SANDBOX: prefer_input($atSandbox; "AT_SANDBOX"),
+              AT_SENDER_ID: prefer_input($atSenderId; "AT_SENDER_ID"),
+              SMS_ENABLED: prefer_input($smsEnabled; "SMS_ENABLED")
             }')
 
           aws secretsmanager put-secret-value \
@@ -216,7 +246,7 @@ jobs:
 
   build-and-push:
     name: Build & Push Images
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [provision-infra]
     if: always() && needs.provision-infra.result == 'success'
     permissions:
@@ -292,7 +322,7 @@ jobs:
 
   finalize-infra:
     name: Finalize Infrastructure
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [provision-infra, build-and-push]
     if: always() && needs.provision-infra.result == 'success' && needs.build-and-push.result == 'success'
     permissions:
@@ -351,9 +381,69 @@ jobs:
       - name: Capture Terraform outputs
         id: outputs
         working-directory: infra/terraform
+        shell: bash
         run: |
-          echo "backend_url=$(terraform output -raw backend_url)" >> "$GITHUB_OUTPUT"
-          echo "frontend_url=$(terraform output -raw frontend_url)" >> "$GITHUB_OUTPUT"
+          terraform_output() {
+            terraform output -raw "$1" 2>/dev/null || true
+          }
+
+          extract_url() {
+            printf '%s\n' "$1" | grep -Eo 'https?://[A-Za-z0-9.-]+' | head -n 1
+          }
+
+          normalize_url() {
+            value="$1"
+            if [ -z "$value" ] || [ "$value" = "None" ] || [ "$value" = "null" ]; then
+              return 0
+            fi
+
+            case "$value" in
+              http://*|https://*) echo "$value" ;;
+              *) echo "https://$value" ;;
+            esac
+          }
+
+          apprunner_url() {
+            service_name="$1"
+            aws apprunner list-services \
+              --query "ServiceSummaryList[?ServiceName=='$service_name'].ServiceUrl | [0]" \
+              --output text
+          }
+
+          if [ "$DEPLOY_ENV" = "staging" ]; then
+            FRONTEND_SERVICE_NAME="afritalent-stg-fe-livefix"
+          else
+            FRONTEND_SERVICE_NAME="afritalent-${DEPLOY_ENV}-appr-frontend-managed"
+          fi
+
+          BACKEND_SERVICE_NAME="afritalent-${DEPLOY_ENV}-appr-backend-managed"
+
+          BACKEND_URL=$(extract_url "$(terraform_output backend_url)")
+          FRONTEND_URL=$(extract_url "$(terraform_output frontend_url)")
+
+          BACKEND_URL=$(normalize_url "$BACKEND_URL")
+          FRONTEND_URL=$(normalize_url "$FRONTEND_URL")
+
+          if [ -z "$BACKEND_URL" ]; then
+            BACKEND_URL=$(normalize_url "$(apprunner_url "$BACKEND_SERVICE_NAME")")
+          fi
+
+          if [ -z "$FRONTEND_URL" ]; then
+            FRONTEND_URL=$(normalize_url "$(apprunner_url "$FRONTEND_SERVICE_NAME")")
+          fi
+
+          echo "Resolved backend_url=$BACKEND_URL"
+          echo "Resolved frontend_url=$FRONTEND_URL"
+
+          if [ -z "$BACKEND_URL" ] || [ -z "$FRONTEND_URL" ]; then
+            echo "Failed to resolve App Runner URLs."
+            echo "backend_url=$BACKEND_URL"
+            echo "frontend_url=$FRONTEND_URL"
+            exit 1
+          fi
+
+          echo "backend_url=$BACKEND_URL" >> "$GITHUB_OUTPUT"
+          echo "frontend_url=$FRONTEND_URL" >> "$GITHUB_OUTPUT"
 
       - name: Apply frontend public URL override
         working-directory: infra/terraform
@@ -364,7 +454,7 @@ jobs:
 
   deploy-apprunner:
     name: Deploy to App Runner
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [finalize-infra]
     if: always() && needs.finalize-infra.result == 'success'
     permissions:
@@ -478,7 +568,7 @@ jobs:
 
   health-check:
     name: Post-Deploy Health Check
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs: [deploy-apprunner, finalize-infra]
     if: always() && needs.deploy-apprunner.result == 'success' && needs.finalize-infra.result == 'success'
 

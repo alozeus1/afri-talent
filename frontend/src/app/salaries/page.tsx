@@ -1,12 +1,18 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { salaryReports, SalaryReportResponse, SalaryComparison, TopPayingJob } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CardGridSkeleton } from "@/components/ui/skeleton";
+import { TOP_PAYING_ROLE_GUIDANCE } from "@/lib/early-tester-content";
+import { useT } from "@/lib/i18n/client";
+import { MARKET_SALARY_BENCHMARKS } from "@/lib/market-reference-data";
 
 const COUNTRIES = [
   "USA", "UK", "Germany", "Canada", "Australia",
@@ -18,6 +24,7 @@ const SALARY_PERIODS = ["yearly", "monthly"];
 const EMPLOYMENT_TYPES = ["FULL_TIME", "PART_TIME", "CONTRACT", "FREELANCE"];
 
 export default function SalariesPage() {
+  const t = useT();
   const { user } = useAuth();
 
   // Search state
@@ -60,9 +67,14 @@ export default function SalariesPage() {
     const loadTopPaying = async () => {
       try {
         const data = await salaryReports.topPaying();
-        setTopPaying(data);
+        if (data && data.length > 0) {
+          setTopPaying(data);
+        } else {
+          setTopPaying([]);
+        }
       } catch (err) {
         setTopPayingError(err instanceof Error ? err.message : "Failed to load top paying roles");
+        setTopPaying([]);
       } finally {
         setTopPayingLoading(false);
       }
@@ -151,26 +163,27 @@ export default function SalariesPage() {
     }).format(amount);
   };
 
-  // Find max salary for bar chart scaling
-  const maxCompareSalary = compareData
-    ? Math.max(...compareData.map((c) => c.avgSalary), 1)
-    : 1;
+  const selectedBenchmark = MARKET_SALARY_BENCHMARKS.find((benchmark) =>
+    [searchTitle, compareTitle].some((title) =>
+      title.trim() && benchmark.role.toLowerCase().includes(title.trim().toLowerCase()),
+    ),
+  ) ?? MARKET_SALARY_BENCHMARKS[0];
+
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Hero Section */}
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Know Your Worth</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">{t("salaries.title")}</h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Explore anonymous salary data from African professionals working globally.
-          Compare compensation across countries and roles to negotiate better.
+          {t("salaries.practicalSubtitle")}
         </p>
       </div>
 
       {/* Search Section */}
       <Card className="mb-10">
         <CardContent className="p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Search Salaries</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">{t("salaries.searchSalaries")}</h2>
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <Input
@@ -185,14 +198,76 @@ export default function SalariesPage() {
               value={searchCountry}
               onChange={(e) => setSearchCountry(e.target.value)}
             >
-              <option value="">All Countries</option>
+              <option value="">{t("salaries.allCountries")}</option>
               {COUNTRIES.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
             <Button onClick={handleSearch} disabled={!searchTitle.trim() || searchLoading}>
-              {searchLoading ? "Searching..." : "Search"}
+              {searchLoading ? t("common.loading") : t("salaries.searchButton")}
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Educational Role Guidance */}
+      <Card className="mb-10">
+        <CardHeader>
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Top Paying Roles: Market Guidance</h2>
+              <p className="text-sm text-gray-500">
+                Educational estimates for high-opportunity roles. These are not AfriTalent placement outcomes.
+              </p>
+            </div>
+            <Badge variant="warning">Sample market estimates</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+            Use these cards to plan learning and search strategy. Always verify compensation against the
+            country, employer, seniority, benefits, and contract type before negotiating.
+          </div>
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {TOP_PAYING_ROLE_GUIDANCE.map((role) => (
+              <article
+                key={role.role}
+                className="interactive-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">{role.role}</h3>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">{role.description}</p>
+                  </div>
+                  <Badge variant={role.remoteFriendliness === "High" ? "success" : "info"}>
+                    {role.remoteFriendliness} remote fit
+                  </Badge>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {role.commonSkills.map((skill) => (
+                    <span key={skill} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-5 rounded-xl bg-emerald-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
+                    Estimated global range
+                  </p>
+                  <p className="mt-1 text-xl font-bold text-emerald-800">{role.marketEstimate}</p>
+                  <p className="mt-2 text-xs leading-5 text-emerald-900">{role.salaryNote}</p>
+                </div>
+                <p className="mt-4 text-sm text-gray-600">Typical level: {role.experienceLevel}</p>
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                  <Link href={role.searchPath} className="flex-1">
+                    <Button size="sm" className="w-full">Search jobs</Button>
+                  </Link>
+                  <Link href={role.learningPath} className="flex-1">
+                    <Button size="sm" variant="outline" className="w-full">Learning path</Button>
+                  </Link>
+                </div>
+              </article>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -293,7 +368,7 @@ export default function SalariesPage() {
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500">
-              No salary reports found for this search. Be the first to contribute!
+              {t("salaries.noReportsFound")}
             </div>
           )}
         </div>
@@ -302,7 +377,7 @@ export default function SalariesPage() {
       {/* Compare Across Countries */}
       <Card className="mb-10">
         <CardHeader>
-          <h2 className="text-xl font-bold text-gray-900">Compare Across Countries</h2>
+          <h2 className="text-xl font-bold text-gray-900">{t("salaries.compareCountries")}</h2>
           <p className="text-sm text-gray-500">
             Select a job title to see average salaries across different countries
           </p>
@@ -318,7 +393,7 @@ export default function SalariesPage() {
               />
             </div>
             <Button onClick={handleCompare} disabled={!compareTitle.trim() || compareLoading}>
-              {compareLoading ? "Comparing..." : "Compare"}
+              {compareLoading ? t("common.loading") : t("salaries.compareButton")}
             </Button>
           </div>
 
@@ -333,53 +408,128 @@ export default function SalariesPage() {
           )}
 
           {compareData && compareData.length > 0 && (
-            <div className="space-y-3">
-              {compareData
-                .sort((a, b) => b.avgSalary - a.avgSalary)
-                .map((item) => (
-                  <div key={item.country} className="flex items-center gap-4">
-                    <span className="w-28 text-sm font-medium text-gray-700 shrink-0">
-                      {item.country}
-                    </span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-8 relative overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-                        style={{
-                          width: `${(item.avgSalary / maxCompareSalary) * 100}%`,
-                          minWidth: item.avgSalary > 0 ? "2rem" : "0",
-                        }}
-                      />
-                    </div>
-                    <span className="w-28 text-sm font-bold text-gray-900 text-right shrink-0">
-                      {formatCurrency(item.avgSalary)}
-                    </span>
-                    <span className="w-16 text-xs text-gray-400 text-right shrink-0">
-                      ({item.count})
-                    </span>
-                  </div>
-                ))}
+            <div className="h-[400px] w-full mt-8">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={compareData.sort((a, b) => b.avgSalary - a.avgSalary)}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <XAxis type="number" hide />
+                  <YAxis
+                    dataKey="country"
+                    type="category"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#374151', fontSize: 14, fontWeight: 500 }}
+                    width={100}
+                  />
+                  <Tooltip
+                    cursor={{ fill: '#f3f4f6' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-white p-4 rounded-xl shadow-xl border border-gray-100">
+                            <p className="font-bold text-gray-900 mb-1">{data.country}</p>
+                            <p className="text-emerald-600 font-bold text-lg">
+                              {formatCurrency(data.avgSalary)}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">Based on {data.count} reports</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar
+                    dataKey="avgSalary"
+                    radius={[0, 4, 4, 0]}
+                    animationDuration={1500}
+                    barSize={24}
+                  >
+                    {compareData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill="#10b981" className="hover:fill-emerald-500 transition-colors duration-300" />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           )}
 
           {compareData && compareData.length === 0 && (
             <div className="text-center py-8 text-gray-500">
-              No comparison data available for this job title.
+              {t("salaries.noCompareData")}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Salary Distribution by Level */}
+      <Card className="mb-10">
+        <CardHeader>
+          <h2 className="text-xl font-bold text-gray-900">{t("salaries.distributionByLevel")}</h2>
+          <p className="text-sm text-gray-500">
+            Real market benchmark bands for comparison. These are research references, not AfriTalent placement outcomes.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="font-semibold">{selectedBenchmark.role}</p>
+              <p className="mt-1 leading-6">{selectedBenchmark.note}</p>
+            </div>
+            <a
+              href={selectedBenchmark.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 font-semibold underline-offset-2 hover:underline"
+            >
+              {selectedBenchmark.sourceLabel}
+            </a>
+          </div>
+          <div className="h-[300px] w-full mt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={selectedBenchmark.levels}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <XAxis dataKey="level" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 13 }} />
+                <YAxis hide />
+                <Tooltip
+                  cursor={{ fill: '#f3f4f6' }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-white p-4 rounded-xl shadow-xl border border-gray-100 dark:bg-zinc-900 dark:border-zinc-800">
+                          <p className="font-bold text-gray-900 dark:text-gray-100 mb-1">{data.level}</p>
+                          <p className="text-emerald-600 font-bold">Avg: {formatCurrency(data.avg)}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Range: {formatCurrency(data.min)} - {formatCurrency(data.max)}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="avg" fill="#10b981" radius={[4, 4, 0, 0]} barSize={60} className="hover:fill-emerald-500 transition-colors" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </CardContent>
       </Card>
 
       {/* Top Paying Roles */}
       <Card className="mb-10">
         <CardHeader>
-          <h2 className="text-xl font-bold text-gray-900">Top Paying Roles</h2>
-          <p className="text-sm text-gray-500">Highest-paying job titles based on community reports</p>
+          <h2 className="text-xl font-bold text-gray-900">{t("salaries.topPayingRoles")}</h2>
+          <p className="text-sm text-gray-500">
+            Live community salary reports when available. No fallback reports are invented.
+          </p>
         </CardHeader>
         <CardContent>
           {topPayingLoading && (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-            </div>
+            <CardGridSkeleton count={3} />
           )}
 
           {topPayingError && (
@@ -391,7 +541,8 @@ export default function SalariesPage() {
               {topPaying.slice(0, 10).map((job, index) => (
                 <div
                   key={job.jobTitle}
-                  className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0"
+                  className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 animate-in fade-in slide-in-from-bottom-4 duration-700"
+                  style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-sm font-bold">
@@ -403,6 +554,9 @@ export default function SalariesPage() {
                     <span className="font-bold text-emerald-600">
                       {formatCurrency(job.avgSalary)}
                     </span>
+                    <svg className="w-16 h-6 text-emerald-500 opacity-60 hidden sm:block" viewBox="0 0 50 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={`M 0 ${15 - (job.jobTitle.length % 5)} Q 10 ${20 - (job.jobTitle.length % 10)}, 20 ${10 - (job.jobTitle.length % 3)} T 40 ${5 + (job.jobTitle.length % 5)} L 50 2`} />
+                    </svg>
                     <span className="text-xs text-gray-400">({job.count} reports)</span>
                   </div>
                 </div>
@@ -411,8 +565,12 @@ export default function SalariesPage() {
           )}
 
           {!topPayingLoading && topPaying.length === 0 && !topPayingError && (
-            <div className="text-center py-8 text-gray-500">
-              No data available yet. Be the first to submit your salary!
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-gray-600">
+              <h3 className="text-lg font-semibold text-gray-900">{t("salaries.noVerifiedReports")}</h3>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6">
+                AfriTalent will show live top-paying roles after enough real salary submissions exist.
+                Until then, use the market guidance cards above as planning support, not verified platform data.
+              </p>
             </div>
           )}
         </CardContent>
@@ -430,7 +588,7 @@ export default function SalariesPage() {
             setShowSubmitForm(!showSubmitForm);
           }}
         >
-          {showSubmitForm ? "Cancel" : "💰 Submit Your Salary"}
+          {showSubmitForm ? t("common.cancel") : `💰 ${t("salaries.submitSalary")}`}
         </Button>
       </div>
 
@@ -438,7 +596,7 @@ export default function SalariesPage() {
       {showSubmitForm && (
         <Card className="mb-10">
           <CardHeader>
-            <h2 className="text-xl font-bold text-gray-900">Submit Your Salary</h2>
+            <h2 className="text-xl font-bold text-gray-900">{t("salaries.submitSalary")}</h2>
             <p className="text-sm text-gray-500">
               All submissions are anonymous and help the community
             </p>
@@ -554,7 +712,7 @@ export default function SalariesPage() {
               </div>
               <div className="flex justify-end">
                 <Button type="submit" disabled={submitLoading}>
-                  {submitLoading ? "Submitting..." : "Submit Salary"}
+                  {submitLoading ? t("common.submitting") : t("salaries.submitButton")}
                 </Button>
               </div>
             </form>

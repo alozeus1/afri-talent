@@ -48,7 +48,7 @@ router.get("/", async (req, res) => {
       where.hiresFromAfrica = true;
     }
 
-    const [companies, total] = await Promise.all([
+    const [companies, employers] = await Promise.all([
       prisma.company.findMany({
         where,
         include: {
@@ -59,14 +59,63 @@ router.get("/", async (req, res) => {
           { ratingAggregate: { averageOverall: "desc" } },
           { name: "asc" },
         ],
-        skip: (page - 1) * limit,
-        take: limit,
       }),
-      prisma.company.count({ where }),
+      prisma.employer.findMany({
+        where: {
+          ...(search
+            ? {
+                OR: [
+                  { companyName: { contains: search, mode: "insensitive" } },
+                  { location: { contains: search, mode: "insensitive" } },
+                  { website: { contains: search, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
+        include: {
+          trustProfile: true,
+          _count: { select: { jobs: { where: { status: "PUBLISHED" } } } },
+        },
+        orderBy: { companyName: "asc" },
+      }),
     ]);
 
+    const normalizedCompanies = companies.map((company) => ({
+      ...company,
+      companyName: company.name,
+      headquarters: company.headquarters,
+      verified: Boolean(company.verifiedAt),
+      profileType: "COMPANY" as const,
+      jobCount: 0,
+    }));
+
+    const normalizedEmployers = employers.map((employer) => ({
+      id: employer.id,
+      companyName: employer.companyName,
+      industry: null,
+      headquarters: employer.location,
+      website: employer.website,
+      size: null,
+      hiresFromAfrica: true,
+      verified: Boolean(employer.trustProfile?.postingEligibility),
+      ratingAggregate: null,
+      profileType: "EMPLOYER" as const,
+      jobCount: employer._count.jobs,
+      logoUrl: employer.logoUrl,
+      brandColor: employer.brandColor,
+      accentColor: employer.accentColor,
+    }));
+
+    const allCompanies = [...normalizedEmployers, ...normalizedCompanies].sort((a, b) => {
+      if (a.verified !== b.verified) return a.verified ? -1 : 1;
+      if ((a.jobCount ?? 0) !== (b.jobCount ?? 0)) return (b.jobCount ?? 0) - (a.jobCount ?? 0);
+      return a.companyName.localeCompare(b.companyName);
+    });
+    const total = allCompanies.length;
+    const pagedCompanies = allCompanies.slice((page - 1) * limit, page * limit);
+
     res.json({
-      companies,
+      companies: pagedCompanies,
       pagination: {
         page,
         limit,
@@ -111,7 +160,38 @@ router.get("/:id", async (req, res) => {
     });
 
     if (!company) {
-      return res.status(404).json({ error: "Company not found" });
+      const employer = await prisma.employer.findUnique({
+        where: { id },
+        include: {
+          trustProfile: true,
+          _count: { select: { jobs: { where: { status: "PUBLISHED" } } } },
+        },
+      });
+
+      if (!employer) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      return res.json({
+        company: {
+          id: employer.id,
+          companyName: employer.companyName,
+          name: employer.companyName,
+          industry: null,
+          headquarters: employer.location,
+          website: employer.website,
+          size: null,
+          hiresFromAfrica: true,
+          verified: Boolean(employer.trustProfile?.postingEligibility),
+          ratingAggregate: null,
+          reviews: [],
+          jobCount: employer._count.jobs,
+          profileType: "EMPLOYER",
+          logoUrl: employer.logoUrl,
+          brandColor: employer.brandColor,
+          accentColor: employer.accentColor,
+        },
+      });
     }
 
     // Get job count from this company

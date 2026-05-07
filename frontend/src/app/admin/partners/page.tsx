@@ -34,6 +34,8 @@ const markerTypes: CandidatePartnerMarkerType[] = [
   "PARTNER_RECOMMENDED",
 ];
 
+const PARTNERS_ENABLED = process.env.NEXT_PUBLIC_PHASE4_UNIVERSITY_API_ENABLED === "true";
+
 export default function AdminPartnersPage() {
   const locale = useLocale();
   const router = useRouter();
@@ -104,6 +106,10 @@ export default function AdminPartnersPage() {
 
   useEffect(() => {
     if (user?.role === "ADMIN") {
+      if (!PARTNERS_ENABLED) {
+        setLoading(false);
+        return;
+      }
       loadPartners();
     }
   }, [loadPartners, user]);
@@ -219,6 +225,29 @@ export default function AdminPartnersPage() {
         <div className="flex justify-center py-24">
           <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
         </div>
+      </div>
+    );
+  }
+
+  if (!PARTNERS_ENABLED) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+        <section className="rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-emerald-50 p-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-700 mb-3">
+                Partner Operations
+              </p>
+              <h1 className="text-3xl font-bold text-gray-900">Institution and training trust tooling</h1>
+              <p className="mt-3 max-w-3xl text-sm text-gray-600">
+                Partner operations are not enabled in this environment, so this workspace is showing the admin shell only.
+              </p>
+            </div>
+            <Link href={localizePath("/admin", locale)}>
+              <Button variant="outline">Back to admin</Button>
+            </Link>
+          </div>
+        </section>
       </div>
     );
   }

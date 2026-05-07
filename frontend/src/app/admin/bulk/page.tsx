@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDistanceToNow } from "date-fns";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
 interface BulkOperation {
     id: string;
     operationType: string;
@@ -32,14 +34,14 @@ export default function BulkPage() {
 
     useEffect(() => {
         if (!isLoading && (!user || user.role !== "ADMIN")) {
-            router.push("/login");
+            router.push(`/login?redirect=${encodeURIComponent("/admin/bulk")}`);
         }
     }, [user, isLoading, router]);
 
     const loadOperations = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch(`/api/admin/bulk?limit=50`, {
+            const response = await fetch(`${API_URL}/api/admin/bulk?limit=50`, {
                 credentials: "include",
             });
             const data = await response.json();
@@ -59,7 +61,7 @@ export default function BulkPage() {
 
     const handleCreateOperation = async () => {
         try {
-            const response = await fetch(`/api/admin/bulk`, {
+            const response = await fetch(`${API_URL}/api/admin/bulk`, {
                 method: "POST",
                 credentials: "include",
                 headers: {

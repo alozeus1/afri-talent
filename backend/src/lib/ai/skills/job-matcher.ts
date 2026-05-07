@@ -14,6 +14,7 @@ const EMBEDDING_ENDPOINT =
   process.env.OPENAI_EMBEDDING_ENDPOINT || "https://api.openai.com/v1/embeddings";
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMS = 1536;
+let vectorSearchAvailable = true;
 
 export interface JobMatch {
   jobId: string;
@@ -138,11 +139,15 @@ export async function embedUserResume(userId: string, resumeText: string): Promi
 
   const pgVector = `[${vector.join(",")}]`;
 
-  await prisma.$executeRaw`
-    UPDATE "UserResume"
-    SET embedding = ${pgVector}::vector
-    WHERE "userId" = ${userId}
-  `;
+  try {
+    await prisma.$executeRaw`
+      UPDATE "UserResume"
+      SET embedding = ${pgVector}::vector
+      WHERE "userId" = ${userId}
+    `;
+  } catch (err) {
+    logger.warn({ err, userId }, "[job-matcher] Resume vector column unavailable; keyword matching remains active");
+  }
 }
 
 // ── Find top job matches for a user via vector similarity ─────────────────────
@@ -152,11 +157,14 @@ export async function findJobMatches(
   limit = 10
 ): Promise<JobMatch[]> {
   // Try vector search first
-  try {
-    const vectorMatches = await vectorSearch(userId, limit);
-    if (vectorMatches.length > 0) return vectorMatches;
-  } catch (err) {
-    logger.warn({ err }, "[job-matcher] Vector search failed, falling back to keyword");
+  if (vectorSearchAvailable) {
+    try {
+      const vectorMatches = await vectorSearch(userId, limit);
+      if (vectorMatches.length > 0) return vectorMatches;
+    } catch (err) {
+      vectorSearchAvailable = false;
+      logger.warn({ err }, "[job-matcher] Vector search failed, falling back to keyword");
+    }
   }
 
   // Fallback: keyword search using profile skills
@@ -263,15 +271,23 @@ async function vectorSearch(userId: string, limit: number): Promise<JobMatch[]> 
 
 async function keywordFallback(userId: string, limit: number): Promise<JobMatch[]> {
   // Fetch candidate skills from profile for keyword matching
-  const profile = await prisma.candidateProfile.findUnique({
-    where: { userId },
-    select: { skills: true, targetRoles: true },
-  });
+  const [profile, resume] = await Promise.all([
+    prisma.candidateProfile.findUnique({
+      where: { userId },
+      select: { skills: true, targetRoles: true },
+    }),
+    prisma.userResume.findUnique({
+      where: { userId },
+      select: { rawText: true },
+    }),
+  ]);
 
   const keywords = [
     ...(profile?.skills || []).slice(0, 5),
     ...(profile?.targetRoles || []).slice(0, 2),
-  ];
+    ...extractResumeKeywords(resume?.rawText || "").slice(0, 8),
+  ].map(normalizeKeyword).filter(Boolean);
+  const uniqueKeywords = Array.from(new Set(keywords));
 
   const employerSelect = {
     trustProfile: { select: { verificationLevel: true } },
@@ -294,7 +310,7 @@ async function keywordFallback(userId: string, limit: number): Promise<JobMatch[
     employer: { select: employerSelect },
   };
 
-  if (keywords.length === 0) {
+  if (uniqueKeywords.length === 0) {
     // No profile — just return latest published jobs
     const latestJobs = await prisma.job.findMany({
       where: { status: "PUBLISHED", isExpired: false },
@@ -341,17 +357,24 @@ async function keywordFallback(userId: string, limit: number): Promise<JobMatch[
     });
   }
 
-  // Simple OR filter on title/description for first keyword
+  // Fetch a broad but bounded pool, then rank deterministically against the
+  // candidate's target roles, skills, and resume language. This avoids hard
+  // failures when pgvector is unavailable and avoids weak one-word title matches.
   const jobs = await prisma.job.findMany({
     where: {
       status: "PUBLISHED",
       isExpired: false,
-      OR: keywords.map((k) => ({
-        title: { contains: k, mode: "insensitive" as const },
-      })),
+      OR: uniqueKeywords.flatMap((k) => [
+        { title: { contains: k, mode: "insensitive" as const } },
+        { description: { contains: k, mode: "insensitive" as const } },
+        { tags: { has: k } },
+      ]),
     },
-    orderBy: { freshnessScore: "desc" },
-    take: limit,
+    orderBy: [
+      { freshnessScore: "desc" },
+      { publishedAt: "desc" },
+    ],
+    take: Math.max(limit * 8, 80),
     select: baseSelect,
   });
 
@@ -359,9 +382,8 @@ async function keywordFallback(userId: string, limit: number): Promise<JobMatch[
     const verifiedEmployer =
       !!j.employer?.trustProfile?.verificationLevel &&
       j.employer.trustProfile.verificationLevel !== "UNVERIFIED";
-    const matched = keywords.filter((k) =>
-      j.title.toLowerCase().includes(k.toLowerCase())
-    );
+    const ranked = scoreKeywordJob(j, uniqueKeywords, profile?.targetRoles || []);
+    const matched = ranked.matched;
     const riskScore = j.riskScore ?? 0;
     const riskLevel = String(j.riskLevel ?? "LOW");
     const qualityScore = j.qualityScore ?? 0;
@@ -375,7 +397,7 @@ async function keywordFallback(userId: string, limit: number): Promise<JobMatch[
       type: j.type,
       seniority: j.seniority,
       slug: j.slug,
-      score: 60,
+      score: ranked.score,
       matchMethod: "keyword" as const,
       verifiedEmployer,
       explanation: buildExplanation({
@@ -394,7 +416,74 @@ async function keywordFallback(userId: string, limit: number): Promise<JobMatch[
       qualityScore,
       qualityLabel: deriveQualityLabel(qualityScore),
     };
+  })
+    .filter((match) => match.score >= 35)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+}
+
+const MATCH_STOP_WORDS = new Set([
+  "and", "the", "for", "with", "from", "that", "this", "your", "you", "are",
+  "will", "have", "role", "work", "team", "using", "about", "into",
+]);
+
+function normalizeKeyword(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9+#./\s-]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function tokenizeMatchText(value: string): string[] {
+  return Array.from(new Set(
+    normalizeKeyword(value)
+      .split(" ")
+      .filter((token) => token.length > 2 && !MATCH_STOP_WORDS.has(token)),
+  ));
+}
+
+function extractResumeKeywords(rawText: string): string[] {
+  const tokens = tokenizeMatchText(rawText);
+  const priority = [
+    "typescript", "javascript", "react", "node", "python", "aws", "azure", "gcp",
+    "docker", "kubernetes", "terraform", "postgres", "sql", "devops", "security",
+    "cloud", "data", "machine", "learning", "frontend", "backend", "fullstack",
+  ];
+  return priority.filter((token) => tokens.includes(token));
+}
+
+function scoreKeywordJob(
+  job: { title: string; description?: string | null; tags: string[]; qualityScore?: number | null; freshnessScore?: number | null },
+  keywords: string[],
+  targetRoles: string[],
+): { score: number; matched: string[] } {
+  const title = normalizeKeyword(job.title);
+  const description = normalizeKeyword(job.description || "");
+  const tags = (job.tags || []).map(normalizeKeyword);
+  const titleTokens = new Set(tokenizeMatchText(title));
+  const descriptionTokens = new Set(tokenizeMatchText(description));
+  const tagSet = new Set(tags.flatMap(tokenizeMatchText));
+  const matched = keywords.filter((keyword) => {
+    const parts = tokenizeMatchText(keyword);
+    return title.includes(keyword) ||
+      tags.includes(keyword) ||
+      parts.some((part) => titleTokens.has(part) || tagSet.has(part) || descriptionTokens.has(part));
   });
+  const titleHits = matched.filter((keyword) => {
+    const parts = tokenizeMatchText(keyword);
+    return title.includes(keyword) || parts.some((part) => titleTokens.has(part));
+  }).length;
+  const targetRoleHit = targetRoles.some((role) => {
+    const normalizedRole = normalizeKeyword(role);
+    const roleParts = tokenizeMatchText(role);
+    return title.includes(normalizedRole) || roleParts.some((part) => titleTokens.has(part));
+  });
+  const base = Math.min(70, matched.length * 10);
+  const titleBoost = Math.min(25, titleHits * 8);
+  const roleBoost = targetRoleHit ? 18 : 0;
+  const qualityBoost = Math.round(((job.qualityScore ?? 0) / 100) * 8);
+  const freshnessBoost = Math.round(((job.freshnessScore ?? 0) / 100) * 6);
+  return {
+    score: Math.max(35, Math.min(100, base + titleBoost + roleBoost + qualityBoost + freshnessBoost)),
+    matched: matched.slice(0, 5),
+  };
 }
 
 // ── Embed all unembedded published jobs (called by semantic indexer) ──────────
@@ -405,14 +494,20 @@ export async function embedPublishedJobs(batchSize = 50): Promise<{ indexed: num
     return { indexed: 0, errors: 0 };
   }
 
-  const jobs = await prisma.$queryRaw<Array<{ id: string; title: string; description: string; tags: string[] }>>`
-    SELECT id, title, description, tags
-    FROM "Job"
-    WHERE status = 'PUBLISHED'
-      AND "isExpired" = false
-      AND embedding IS NULL
-    LIMIT ${batchSize}
-  `;
+  let jobs: Array<{ id: string; title: string; description: string; tags: string[] }>;
+  try {
+    jobs = await prisma.$queryRaw<Array<{ id: string; title: string; description: string; tags: string[] }>>`
+      SELECT id, title, description, tags
+      FROM "Job"
+      WHERE status = 'PUBLISHED'
+        AND "isExpired" = false
+        AND embedding IS NULL
+      LIMIT ${batchSize}
+    `;
+  } catch (err) {
+    logger.warn({ err }, "[job-matcher] Job vector column unavailable; skipping semantic indexing");
+    return { indexed: 0, errors: 0 };
+  }
 
   let indexed = 0;
   let errors = 0;

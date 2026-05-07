@@ -10,6 +10,7 @@ import {
   getRunHistory,
   searchJobs,
 } from "@/lib/api/orchestratorClient";
+import { profile } from "@/lib/api";
 import type {
   OrchestratorRunPayload,
   OrchestratorRunResponse,
@@ -585,6 +586,7 @@ export default function AIAssistantPage() {
 
   // ── Input state ────────────────────────────────────────────────────────────
   const [resumeText, setResumeText] = useState("");
+  const [resumeUploadStatus, setResumeUploadStatus] = useState<string | null>(null);
   const [jobSlots, setJobSlots] = useState<JobSlot[]>([
     { id: makeSlotId(), text: "" },
   ]);
@@ -718,6 +720,9 @@ export default function AIAssistantPage() {
       } else {
         setPackResult(result);
       }
+
+      // Refresh run history after a successful run
+      getRunHistory(10).then(setRunHistory).catch(console.error);
     } catch (err) {
       if (err instanceof OrchestratorError) {
         setError(err.message);
@@ -795,6 +800,48 @@ export default function AIAssistantPage() {
     });
   }
 
+  async function handleResumeUpload(file: File) {
+    setResumeUploadStatus(null);
+    setError(null);
+
+    const lowerName = file.name.toLowerCase();
+    const isText = lowerName.endsWith(".txt") || lowerName.endsWith(".md");
+    const isDocument = lowerName.endsWith(".pdf") || lowerName.endsWith(".doc") || lowerName.endsWith(".docx");
+
+    if (!isText && !isDocument) {
+      setError("Upload a PDF, DOCX, TXT, or Markdown resume.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Resume uploads must be 5 MB or smaller.");
+      return;
+    }
+
+    try {
+      if (isText) {
+        const text = await file.text();
+        if (text.trim().length < 40) {
+          setError("Could not extract enough text from this file. Paste your resume text manually.");
+          return;
+        }
+        setResumeText(text);
+        setResumeUploadStatus("Text resume loaded. Review the preview before running AI analysis.");
+        return;
+      }
+
+      const parsed = await profile.parseResume(file);
+      if (!parsed.parsed.rawText || parsed.parsed.rawText.trim().length < 40) {
+        setError("Could not extract enough text from this resume. Try a clearer PDF/DOCX or paste the text manually.");
+        return;
+      }
+      setResumeText(parsed.parsed.rawText);
+      setResumeUploadStatus(`${file.name} extracted. Review and edit the text before sending it to AI.`);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Resume extraction failed.");
+    }
+  }
+
   // ── Meta for results header ────────────────────────────────────────────────
   // Pick the most recent result for the header badge/run_id/token display
   const latestResult = packResult ?? matchResult ?? analyzeResult;
@@ -844,6 +891,30 @@ export default function AIAssistantPage() {
               </div>
             </CardHeader>
             <CardContent>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload Resume (PDF, DOCX, TXT, or MD)
+                </label>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    void handleResumeUpload(file);
+                  }}
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                />
+                <p className="mt-1.5 text-xs text-gray-500">
+                  PDF/DOCX files are converted to text first. Review the extracted text before running AI analysis.
+                </p>
+                {resumeUploadStatus && (
+                  <p className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-900">
+                    {resumeUploadStatus}
+                  </p>
+                )}
+              </div>
+
               <textarea
                 value={resumeText}
                 onChange={(e) => setResumeText(e.target.value)}
@@ -854,6 +925,9 @@ export default function AIAssistantPage() {
               <FieldError errors={fieldErrors} field="resume_text" />
               <div className="mt-3 flex items-center justify-between">
                 <CharCount current={resumeText.length} max={30_000} min={100} />
+                <span className="mx-3 text-xs text-gray-400">
+                  AfriTalent sends extracted text to AI for analysis, not the original file.
+                </span>
                 <Button
                   onClick={handleAnalyze}
                   disabled={resumeText.length < 100 || activeOp !== null}
@@ -1111,7 +1185,7 @@ export default function AIAssistantPage() {
                     {activeOp !== null && (
                       <Spinner className="h-4 w-4 text-emerald-600" />
                     )}
-                    {activeOp === null && latestResult && (
+                    {activeOp === null && !error && latestResult && (
                       <Badge
                         variant={
                           latestResult.status === "ok"

@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/lib/i18n/client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -18,6 +19,10 @@ interface Company {
   size: string | null;
   hiresFromAfrica: boolean;
   verified: boolean;
+  profileType?: "COMPANY" | "EMPLOYER";
+  jobCount?: number;
+  logoUrl?: string | null;
+  brandColor?: string | null;
   ratingAggregate: {
     averageOverall: number;
     reviewCount: number;
@@ -33,6 +38,13 @@ interface CompanyListResponse {
     totalPages: number;
   };
 }
+
+const candidateActions = [
+  { label: "Browse verified job listings", href: "/jobs" },
+  { label: "Search remote roles", href: "/jobs?remote=true" },
+  { label: "Use visa-friendly filters", href: "/jobs?visaSponsorship=true" },
+  { label: "Set alert preferences", href: "/candidate/preferences" },
+];
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -55,6 +67,7 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 export default function CompaniesPage() {
+  const t = useT();
   const [data, setData] = useState<CompanyListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,22 +106,34 @@ export default function CompaniesPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Company Directory</h1>
-        <p className="text-gray-600">
-          Discover companies hiring African talent and read employee reviews
-        </p>
-      </div>
-
-      <div className="mb-8">
-        <Input
-          placeholder="Search companies by name or industry..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
+      {/* Hero Section */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-950 via-emerald-900 to-zinc-950 px-6 py-20 text-center shadow-2xl mb-12 animate-gradient-breath">
+        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
+        <div className="relative z-10 max-w-3xl mx-auto">
+          <Badge className="mb-6 bg-white/10 text-emerald-100 hover:bg-white/20 border-white/20 backdrop-blur-md">
+            {t("companies.employerDirBeta")}
+          </Badge>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 tracking-tight font-display">
+            {t("companies.heroHeading")} <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-200">
+              {t("companies.heroHighlight")}
+            </span>
+          </h1>
+          <p className="text-lg md:text-xl text-emerald-50/80 mb-8 max-w-2xl mx-auto">
+            {t("companies.heroDesc")}
+          </p>
+          <div className="max-w-xl mx-auto">
+            <Input
+              placeholder={t("companies.searchPlaceholder")}
+              value={search}
+              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 h-12 rounded-xl focus:bg-white/20 focus:ring-emerald-400 backdrop-blur-md"
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {loading && (
@@ -128,32 +153,87 @@ export default function CompaniesPage() {
           </div>
 
           {data.companies.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-600 mb-4">No companies found matching your criteria</p>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearch("");
-                  setPage(1);
-                }}
-              >
-                Clear search
-              </Button>
+            <div className="py-8">
+              <div className="text-center py-16 px-4 surface-panel bg-white shadow-sm border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-2xl mb-12">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 mb-6 dark:bg-emerald-500/10 dark:text-emerald-400">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+                  {search ? t("companies.noCompaniesFound") : t("companies.directoryUpdating")}
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-8">
+                  {search
+                    ? t("companies.noCompaniesDesc")
+                    : t("companies.directoryDesc")}
+                </p>
+                {search && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearch("");
+                      setPage(1);
+                    }}
+                    aria-label="Clear current search query to view all companies"
+                  >
+                    {t("companies.clearSearch")}
+                  </Button>
+                )}
+              </div>
+
+              {!search && (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  {candidateActions.map((action) => (
+                    <Link key={action.href} href={action.href}>
+                      <Card className="h-full interactive-card transition-all duration-200">
+                        <CardContent className="p-5">
+                          <Badge variant="info">Available now</Badge>
+                          <h3 className="mt-4 text-base font-semibold text-gray-900 dark:text-gray-100">
+                            {action.label}
+                          </h3>
+                          <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
+                            Use candidate-side tools while verified employer profiles are onboarded.
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {data.companies.map((company) => (
                 <Link key={company.id} href={`/companies/${company.id}`}>
-                  <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
+                  <Card className="h-full hover:shadow-md transition-all duration-200 hover:-translate-y-1 cursor-pointer">
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 text-lg truncate">
-                            {company.companyName}
-                          </h3>
-                          {company.industry && (
-                            <p className="text-sm text-gray-600">{company.industry}</p>
-                          )}
+                          <div className="flex items-center gap-3">
+                            {company.logoUrl ? (
+                              <img
+                                src={company.logoUrl}
+                                alt={`${company.companyName} logo`}
+                                className="h-10 w-10 rounded-lg border border-gray-200 object-contain"
+                              />
+                            ) : (
+                              <span
+                                className="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-semibold text-white"
+                                style={{ backgroundColor: company.brandColor || "#0f766e" }}
+                              >
+                                {company.companyName.slice(0, 1).toUpperCase()}
+                              </span>
+                            )}
+                            <div className="min-w-0">
+                              <h3 className="truncate text-lg font-semibold text-gray-900">
+                                {company.companyName}
+                              </h3>
+                              {company.industry && (
+                                <p className="text-sm text-gray-600">{company.industry}</p>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         {company.verified && (
                           <Badge variant="info" className="ml-2 shrink-0">Verified</Badge>
@@ -180,6 +260,12 @@ export default function CompaniesPage() {
                         {company.hiresFromAfrica && (
                           <Badge variant="success">Hires from Africa</Badge>
                         )}
+                        {company.profileType === "EMPLOYER" && (
+                          <Badge variant="info">Registered employer</Badge>
+                        )}
+                        {(company.jobCount ?? 0) > 0 && (
+                          <Badge>{company.jobCount} open role{company.jobCount === 1 ? "" : "s"}</Badge>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -189,13 +275,13 @@ export default function CompaniesPage() {
           )}
 
           {data.pagination.totalPages > 1 && (
-            <div className="flex justify-center gap-2">
+            <div className="flex justify-center gap-2 mb-16">
               <Button
                 variant="outline"
                 disabled={page === 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                Previous
+                {t("common.previous")}
               </Button>
               <span className="flex items-center px-4 text-gray-600">
                 Page {page} of {data.pagination.totalPages}
@@ -205,8 +291,39 @@ export default function CompaniesPage() {
                 disabled={page === data.pagination.totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
+                {t("common.next")}
               </Button>
+            </div>
+          )}
+
+          {/* Honest early-access employer proof */}
+          {!search && (
+            <div className="mt-16 pt-16 border-t border-gray-100 dark:border-zinc-800">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4 font-display">
+                  {t("companies.trustComingTitle")}
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                  {t("companies.trustComingDesc")}
+                </p>
+              </div>
+              
+              <div className="grid gap-4 md:grid-cols-3">
+                {["Employer verification", "Candidate safety", "Pilot stories"].map((item) => (
+                  <Card key={item} className="interactive-card bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
+                    <CardContent className="p-6">
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">{item}</h3>
+                      <p className="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-400">
+                        {item === "Employer verification"
+                          ? "Profiles should show verified domains, application paths, and hiring expectations before public promotion."
+                          : item === "Candidate safety"
+                            ? "Candidates should see source transparency, scam-risk guidance, and clear next steps before applying."
+                            : "Testimonials and case studies should require real workflow completion and explicit permission."}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
           )}
         </>

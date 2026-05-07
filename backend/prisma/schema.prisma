@@ -21,6 +21,7 @@ enum Role {
 
 enum SupportedLocale {
   EN
+  ES
   FR
   PT
   AR
@@ -52,6 +53,12 @@ enum ReviewTargetType {
   JOB
   APPLICATION
   RESOURCE
+}
+
+enum LearningFeedbackStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 // ──────────────── Phase A New Enums ────────────────
@@ -122,6 +129,12 @@ enum SubscriptionPlan {
   EMPLOYER_FREE
   EMPLOYER_BASIC
   EMPLOYER_PREMIUM
+}
+
+enum LearningProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
 }
 
 enum ATSProvider {
@@ -624,10 +637,11 @@ model PlanEntitlement {
   videoMockInterviews   Int? // monthly seat quota
   pipelineExports       Boolean          @default(false)
   brandedCareerPage     Boolean          @default(false)
-  advancedFunnelMetrics Boolean          @default(false)
-  customFeatures        Json? // extensible
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  advancedFunnelMetrics   Boolean          @default(false)
+  templateDownloadsPerMonth Int?             // null = unlimited
+  customFeatures          Json? // extensible
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
 }
 
 model UserBillingProfile {
@@ -717,6 +731,8 @@ model User {
   savedSearches                 SavedSearch[]
   jobAlerts                     JobAlert[]
   companyReviews                CompanyReview[]
+  learningFeedbackSubmissions   LearningFeedback[]            @relation("LearningFeedbackSubmitter")
+  moderatedLearningFeedback     LearningFeedback[]            @relation("LearningFeedbackModerator")
   skillAssessments              SkillAssessment[]
   assessmentInvites             AssessmentInvite[]
   passwordResets                PasswordResetToken[]
@@ -773,6 +789,7 @@ model User {
   adminRole                     AdminRole?
   userPhoneOtps                 UserPhoneOtp[]
   smsDeliveryLogs               SmsDeliveryLog[]
+  learningProgress              LearningProgress[]
 
   @@index([role])
   @@index([createdAt])
@@ -785,6 +802,9 @@ model Employer {
   website     String?
   location    String
   bio         String?
+  logoUrl     String?  @db.VarChar(500)
+  brandColor  String?  @db.VarChar(7)
+  accentColor String?  @db.VarChar(7)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -860,6 +880,8 @@ model Job {
   description String
   location    String
   type        String
+  jobField    String?   @db.VarChar(80)
+  workplaceType String? @db.VarChar(32)
   seniority   String
   salaryMin   Int?
   salaryMax   Int?
@@ -879,6 +901,7 @@ model Job {
   sourceId                   String? // external ATS/job board ID (for dedup)
   sourceName                 String? // company name for aggregated jobs
   applicationUrl             String?
+  companyCareerSourceId      String?
   sourceFingerprint          String?               @db.VarChar(80)
   sourceLineage              Json?
   sourceFirstSeenAt          DateTime?
@@ -902,6 +925,7 @@ model Job {
   // Nullable for aggregated jobs (no Employer profile in DB)
   employerId String?
   employer   Employer? @relation(fields: [employerId], references: [id])
+  companyCareerSource CompanyCareerSource? @relation(fields: [companyCareerSourceId], references: [id], onDelete: SetNull)
 
   applications              Application[]
   adminReviews              AdminReview[]              @relation("JobReviews")
@@ -921,17 +945,45 @@ model Job {
   @@index([employerId])
   @@index([location])
   @@index([type])
+  @@index([jobField])
+  @@index([workplaceType])
   @@index([seniority])
   @@index([visaSponsorship])
   @@index([jobSource])
   @@index([sourceId])
   @@index([sourceFingerprint])
+  @@index([companyCareerSourceId])
   @@index([isExpired, status])
   @@index([expiresAt])
   @@index([staleAt])
   @@index([sourceLastSeenAt])
   @@index([freshnessScore, qualityScore])
   @@index([riskLevel, riskScore])
+}
+
+model CompanyCareerSource {
+  id                  String    @id @default(uuid())
+  companyName         String
+  careersUrl          String
+  provider            String    @db.VarChar(80)
+  providerKey         String?   @db.VarChar(160)
+  allowedToCrawl      Boolean   @default(true)
+  priority            Int       @default(50)
+  crawlFrequencyHours Int       @default(12)
+  targetFields        String[]  @default([])
+  lastCrawledAt       DateTime?
+  lastSuccessAt       DateTime?
+  failureReason       String?
+  consecutiveFailures Int       @default(0)
+  active              Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  jobs                Job[]
+
+  @@index([provider])
+  @@index([active, priority])
+  @@unique([provider, providerKey])
 }
 
 model Application {
@@ -2540,6 +2592,48 @@ model LearningResource {
   @@index([featured])
 }
 
+model LearningProgress {
+  id            String                 @id @default(uuid())
+  userId        String
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resourceId    String                 @db.VarChar(160)
+  status        LearningProgressStatus @default(NOT_STARTED)
+  lastStepIndex Int                    @default(0)
+  completedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@unique([userId, resourceId])
+  @@index([userId, status])
+  @@index([resourceId])
+}
+
+model LearningFeedback {
+  id               String                 @id @default(uuid())
+  areaSlug         String                 @db.VarChar(120)
+  lessonTitle      String?                @db.VarChar(200)
+  firstName        String                 @db.VarChar(80)
+  lastName         String                 @db.VarChar(80)
+  userId           String?
+  user             User?                  @relation("LearningFeedbackSubmitter", fields: [userId], references: [id], onDelete: SetNull)
+  rating           Int
+  comment          String                 @db.Text
+  attachPhoto      Boolean                @default(false)
+  avatarUrlSnapshot String?               @db.VarChar(500)
+  displayName      String                 @db.VarChar(180)
+  status           LearningFeedbackStatus @default(PENDING)
+  approvedAt       DateTime?
+  approvedById     String?
+  approvedBy       User?                  @relation("LearningFeedbackModerator", fields: [approvedById], references: [id], onDelete: SetNull)
+  moderationNotes  String?                @db.Text
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([areaSlug, status])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+}
+
 // ──────────────── Calendar Events / Interview Scheduling ────────────────
 
 enum CalendarEventType {
@@ -2957,4 +3051,51 @@ model SmsDeliveryLog {
   @@index([phoneNumber, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
   @@index([template, createdAt(sort: Desc)])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resume Template Catalog (Premium digital bundles)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ResumeTemplate {
+  id            String   @id @default(uuid())
+  name          String   @db.VarChar(120)
+  description   String   @db.Text
+  thumbnailUrl  String   @db.VarChar(500)
+  tags          String[] @default([])
+  bestFor       String[] @default([]) // e.g. "entry", "senior", "tech", "creative", "healthcare"
+  minPlan       SubscriptionPlan @default(PROFESSIONAL)
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  files         TemplateFile[]
+  downloads     TemplateDownload[]
+}
+
+model TemplateFile {
+  id            String   @id @default(uuid())
+  templateId    String
+  template      ResumeTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  format        String   @db.VarChar(20) // "HTML", "PDF", "DOCX", "GOOGLE_DOCS", "CANVA"
+  s3Key         String?  @db.VarChar(500) // null for external links
+  externalUrl   String?  @db.VarChar(500) // for Canva/Google Docs links
+  fileSizeBytes Int?
+  createdAt     DateTime @default(now())
+}
+
+model TemplateDownload {
+  id            String   @id @default(uuid())
+  userId        String
+  templateId    String
+  template      ResumeTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  format        String   @db.VarChar(20)
+  source        String   @db.VarChar(40) // "gallery", "resume_builder", "ats_recommendation"
+  downloadedAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([templateId])
+  @@index([userId, downloadedAt(sort: Desc)])
 }

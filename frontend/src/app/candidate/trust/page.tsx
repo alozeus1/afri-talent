@@ -190,7 +190,12 @@ export default function CandidateTrustPage() {
       setOtpExpiresAt(result.expiresAt);
       setPageSuccess("Verification code created. Enter it below to complete phone verification.");
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : "Failed to request verification code.");
+      const msg = error instanceof Error ? error.message : String(error);
+      setPageError(
+        msg === "sms_provider_unconfigured" || msg.includes("SMS_DISABLED")
+          ? "Phone verification is not available in this environment. Contact support."
+          : msg || "Failed to request verification code.",
+      );
     } finally {
       setRequestingOtp(false);
     }
@@ -239,8 +244,11 @@ export default function CandidateTrustPage() {
       await loadDashboard();
       setPageSuccess("Verification evidence submitted for review.");
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       setPageError(
-        error instanceof Error ? error.message : "Failed to submit candidate verification evidence.",
+        msg.includes("S3_NOT_CONFIGURED") || msg.includes("not configured on this server")
+          ? "Document upload is not available in this environment. Contact your administrator."
+          : msg || "Failed to submit candidate verification evidence.",
       );
     } finally {
       setSubmittingArtifact(false);
@@ -281,8 +289,11 @@ export default function CandidateTrustPage() {
           : "Skill evidence submitted for trust review.",
       );
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       setPageError(
-        error instanceof Error ? error.message : "Failed to submit skill verification evidence.",
+        msg.includes("S3_NOT_CONFIGURED") || msg.includes("not configured on this server")
+          ? "Document upload is not available in this environment. Contact your administrator."
+          : msg || "Failed to submit skill verification evidence.",
       );
     } finally {
       setSubmittingSkill(false);
@@ -789,10 +800,17 @@ export default function CandidateTrustPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Linked authenticity signals</h2>
-            <p className="text-sm text-gray-600">
-              LinkedIn, GitHub, and portfolio links help employers cross-check that your work history and skill claims are real.
-            </p>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Linked authenticity signals</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  LinkedIn, GitHub, and portfolio links help employers cross-check that your work history and skill claims are real.
+                </p>
+              </div>
+              <Link href={localizePath("/candidate/profile", locale)}>
+                <Button size="sm" variant="outline">Edit links</Button>
+              </Link>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {dashboard.profile?.linkedinUrl && (

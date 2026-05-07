@@ -22,6 +22,7 @@ export interface Entitlements {
   pipelineExports: boolean;
   brandedCareerPage: boolean;
   advancedFunnelMetrics: boolean;
+  templateDownloadsPerMonth: number | null;
 }
 
 // Hardcoded defaults (used when DB has no PlanEntitlement rows)
@@ -47,6 +48,7 @@ const DEFAULT_ENTITLEMENTS: Record<SubscriptionPlan, Entitlements> = {
     pipelineExports: false,
     brandedCareerPage: false,
     advancedFunnelMetrics: false,
+    templateDownloadsPerMonth: 0,
   },
   BASIC: {
     plan: SubscriptionPlan.BASIC,
@@ -69,6 +71,7 @@ const DEFAULT_ENTITLEMENTS: Record<SubscriptionPlan, Entitlements> = {
     pipelineExports: false,
     brandedCareerPage: false,
     advancedFunnelMetrics: false,
+    templateDownloadsPerMonth: 1,
   },
   PROFESSIONAL: {
     plan: SubscriptionPlan.PROFESSIONAL,
@@ -91,6 +94,7 @@ const DEFAULT_ENTITLEMENTS: Record<SubscriptionPlan, Entitlements> = {
     pipelineExports: false,
     brandedCareerPage: false,
     advancedFunnelMetrics: false,
+    templateDownloadsPerMonth: null,
   },
   EMPLOYER_FREE: {
     plan: SubscriptionPlan.EMPLOYER_FREE,
@@ -113,6 +117,7 @@ const DEFAULT_ENTITLEMENTS: Record<SubscriptionPlan, Entitlements> = {
     pipelineExports: false,
     brandedCareerPage: false,
     advancedFunnelMetrics: false,
+    templateDownloadsPerMonth: 0,
   },
   EMPLOYER_BASIC: {
     plan: SubscriptionPlan.EMPLOYER_BASIC,
@@ -135,6 +140,7 @@ const DEFAULT_ENTITLEMENTS: Record<SubscriptionPlan, Entitlements> = {
     pipelineExports: false,
     brandedCareerPage: true,
     advancedFunnelMetrics: false,
+    templateDownloadsPerMonth: 0,
   },
   EMPLOYER_PREMIUM: {
     plan: SubscriptionPlan.EMPLOYER_PREMIUM,
@@ -157,6 +163,7 @@ const DEFAULT_ENTITLEMENTS: Record<SubscriptionPlan, Entitlements> = {
     pipelineExports: true,
     brandedCareerPage: true,
     advancedFunnelMetrics: true,
+    templateDownloadsPerMonth: null,
   },
 };
 
@@ -189,6 +196,7 @@ export async function getEntitlements(plan: SubscriptionPlan): Promise<Entitleme
       pipelineExports: dbRow.pipelineExports,
       brandedCareerPage: dbRow.brandedCareerPage,
       advancedFunnelMetrics: dbRow.advancedFunnelMetrics,
+      templateDownloadsPerMonth: dbRow.templateDownloadsPerMonth,
     };
   }
 

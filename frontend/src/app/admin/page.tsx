@@ -95,6 +95,9 @@ export default function AdminDashboard() {
           <Link href="/admin/reviews">
             <Button variant="outline">Reviews</Button>
           </Link>
+          <Link href="/admin/learning-feedback">
+            <Button variant="outline">Learning Feedback</Button>
+          </Link>
         </div>
       </div>
 

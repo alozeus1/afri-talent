@@ -33,6 +33,8 @@ describe("semantic retrieval foundation", () => {
       description: "Build resilient APIs, improve observability, and own incident response.",
       location: "Remote - Nigeria",
       type: "FULL_TIME",
+      jobField: "Technology",
+      workplaceType: "REMOTE",
       seniority: "SENIOR",
       salaryMin: 80000,
       salaryMax: 120000,

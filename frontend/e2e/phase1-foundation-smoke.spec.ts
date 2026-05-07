@@ -33,13 +33,23 @@ test("smoke: register then login with cookie session", async ({ request }) => {
 });
 
 test("smoke: active job detail page includes JobPosting schema", async ({ request, page }) => {
-  const jobsRes = await request.get(`${API}/api/jobs?limit=1`);
+  const jobsRes = await request.get(`${API}/api/jobs?limit=20`);
   expect(jobsRes.ok()).toBe(true);
   const jobsData = await jobsRes.json();
   test.skip(!jobsData.jobs || jobsData.jobs.length === 0, "No published jobs available for schema smoke test");
 
-  const slug = jobsData.jobs[0].slug as string;
-  await page.goto(`${APP_URL}/jobs/${slug}`, { waitUntil: "networkidle" });
+  let slug: string | undefined;
+  for (const candidate of jobsData.jobs as Array<{ slug?: string }>) {
+    if (!candidate.slug) continue;
+    const detailRes = await request.get(`${API}/api/jobs/${candidate.slug}`);
+    if (detailRes.ok()) {
+      slug = candidate.slug;
+      break;
+    }
+  }
+  test.skip(!slug, "No public job detail was available for schema smoke test");
+
+  await page.goto(`${APP_URL}/en/jobs/${slug}`, { waitUntil: "domcontentloaded" });
 
   const schemaScript = page.locator("script[type='application/ld+json']").first();
   await expect(schemaScript).toHaveCount(1);

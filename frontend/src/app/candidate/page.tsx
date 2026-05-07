@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import * as Tabs from "@radix-ui/react-tabs";
+import { ArrowRight, MapPin } from "lucide-react";
 import {
   applications,
   Application,
@@ -22,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
 import { PushOptInCard } from "@/components/notifications/push-opt-in";
 import { TrustBadge } from "@/components/trust/trust-badge";
+import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -70,6 +73,36 @@ const planLabels: Record<string, string> = {
   PROFESSIONAL: "Professional",
 };
 
+const MOCK_RECOMMENDED_JOBS = [
+  { id: "1", title: "Senior Frontend Engineer", company: "Paystack", location: "Lagos (Hybrid)", salary: "$70k - $90k", type: "FULL-TIME" },
+  { id: "2", title: "Lead Product Designer", company: "Flutterwave", location: "Remote", salary: "$80k - $110k", type: "FULL-TIME" },
+  { id: "3", title: "Fullstack Developer", company: "Andela", location: "Remote", salary: "$60k - $85k", type: "CONTRACT" },
+  { id: "4", title: "Backend Engineer (Go)", company: "Monzo", location: "London (Relocation)", salary: "£85k - £105k", type: "FULL-TIME" },
+];
+
+function buildFallbackNextActions(params: {
+  completeness: number;
+  applicationCount: number;
+  hasTrustWarnings: boolean;
+}) {
+  const actions = [];
+  if (params.completeness < 80) {
+    actions.push({ title: "Complete your profile", description: "Add missing skills, target roles, and portfolio links so match explanations are more useful.", href: "/candidate/profile", cta: "Complete profile" });
+  }
+  actions.push({ title: "Build or update your resume", description: "Create an ATS-friendly version before generating cover letters or applying.", href: "/candidate/resume-builder", cta: "Open resume builder" });
+  actions.push({ title: "Review your top job matches", description: "Use trust labels, salary visibility, visa signals, and missing skills before applying.", href: "/candidate/job-matches", cta: "Review matches" });
+  if (params.applicationCount === 0) {
+    actions.push({ title: "Prepare your first application", description: "Save one role, tailor your resume, generate a reviewed cover letter, then apply through the verified path.", href: "/jobs", cta: "Browse jobs" });
+  } else {
+    actions.push({ title: "Follow up on active applications", description: "Update statuses, add notes, and set reminders for applications in progress.", href: "/candidate/applications", cta: "Open tracker" });
+  }
+  actions.push({ title: "Practice a global interview", description: "Run a DevOps, cloud, security, product, data, or support mock interview.", href: "/candidate/interview-prep", cta: "Practice interview" });
+  if (params.hasTrustWarnings) {
+    actions.push({ title: "Resolve trust profile warnings", description: "Trust signals improve candidate confidence and future employer verification.", href: "/candidate/trust", cta: "Review trust profile" });
+  }
+  return actions.slice(0, 4);
+}
+
 export default function CandidateDashboard() {
   const locale = useLocale();
   const t = useT();
@@ -87,8 +120,11 @@ export default function CandidateDashboard() {
   const [sendingVerification, setSendingVerification] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
 
+  const [selectedTab, setSelectedTab] = useState("Overview");
+  const tabItems = ["Overview", "Applications", "Settings"];
+
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== "CANDIDATE")) {
+    if (!isLoading && (!user || user.role?.toUpperCase() !== "CANDIDATE")) {
       router.push(localizePath("/login", locale));
     }
   }, [user, isLoading, router, locale]);
@@ -101,12 +137,13 @@ export default function CandidateDashboard() {
         .catch(console.error)
         .finally(() => setLoading(false));
 
-      // Fetch profile
+      // Fetch profile (backend returns null for newly registered candidates with no profile yet)
       fetch(`${API_URL}/api/profile`, { credentials: "include" })
         .then((res) => res.json())
-        .then((data: CandidateProfile) => {
+        .then((data: CandidateProfile | null) => {
+          if (!data) return;
           setProfile(data);
-          setOpenToWork(data.openToWork);
+          setOpenToWork(Boolean(data.openToWork));
         })
         .catch(console.error);
 
@@ -188,6 +225,11 @@ export default function CandidateDashboard() {
 
   const completeness = profile?.profileCompleteness ?? 0;
   const missingItems = profile ? getMissingItems(profile) : [];
+  const fallbackNextActions = buildFallbackNextActions({
+    completeness,
+    applicationCount: myApplications.length,
+    hasTrustWarnings: Boolean(trustDashboard?.trust.warnings.length),
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -196,6 +238,31 @@ export default function CandidateDashboard() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">{t("candidate.dashboard")}: {user.name}</h1>
         <p className="text-gray-600">Track your job applications and career progress</p>
       </div>
+
+      <Tabs.Root
+        className="mt-2"
+        value={selectedTab}
+        orientation="horizontal"
+        onValueChange={(val) => setSelectedTab(val)}
+      >
+        <div className="mb-8 border-b border-gray-200 dark:border-zinc-800">
+          <Tabs.List
+            className="flex -mb-px space-x-8 overflow-x-auto hide-scrollbar"
+            aria-label="Candidate Dashboard Tabs"
+          >
+            {tabItems.map((item, idx) => (
+              <Tabs.Trigger
+                key={idx}
+                className="data-[state=active]:border-emerald-600 data-[state=active]:text-emerald-600 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:data-[state=active]:text-emerald-400 dark:data-[state=active]:border-emerald-400 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+                value={item}
+              >
+                {item}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </div>
+
+        <Tabs.Content value="Overview">
 
       {!emailVerified && (
         <Card className="mb-8 border-amber-200 bg-amber-50">
@@ -295,7 +362,9 @@ export default function CandidateDashboard() {
                   </p>
                 </div>
                 <Link href={localizePath("/candidate/preferences", locale)}>
-                  <Button variant="outline">Manage alerts</Button>
+                  <Button variant="outline" className="border-amber-400 text-amber-800 hover:bg-amber-100 hover:border-amber-500 focus-visible:ring-amber-500">
+                    🔔 Manage alerts
+                  </Button>
                 </Link>
               </div>
             </CardHeader>
@@ -376,10 +445,32 @@ export default function CandidateDashboard() {
         </div>
       )}
 
-      {/* Profile Completeness + Open to Work + Subscription */}
-      <div className="grid md:grid-cols-3 gap-6 mb-8">
+      {!retentionSummary && (
+        <Card className="mb-8 border-emerald-200 bg-emerald-50/40">
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-gray-900">Next best actions</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Early tester guidance based on profile completeness, resume readiness, applications, and trust signals.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {fallbackNextActions.map((action) => (
+              <div key={action.title} className="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-sm">
+                <p className="text-sm font-semibold text-gray-900">{action.title}</p>
+                <p className="mt-1 text-xs text-gray-600">{action.description}</p>
+                <Link href={localizePath(action.href, locale)} className="mt-3 inline-block">
+                  <Button size="sm" variant="outline">{action.cta}</Button>
+                </Link>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Profile Completeness + Streak + Open to Work + Subscription */}
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Profile Completeness */}
-        <Card>
+        <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
           <CardContent className="p-6">
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Profile Completeness</h3>
             <div className="flex items-center gap-4 mb-3">
@@ -406,19 +497,25 @@ export default function CandidateDashboard() {
               </div>
               <div className="min-w-0">
                 {completeness >= 80 ? (
-                  <p className="text-sm text-emerald-700 font-medium">Profile looks great!</p>
+                  <p className="text-sm text-emerald-700 font-medium">Profile looks great! You&apos;re ready for premium matches.</p>
                 ) : (
-                  <Link href={localizePath("/candidate/profile", locale)}>
-                    <Button size="sm">Complete your profile</Button>
-                  </Link>
+                  <div className="space-y-2">
+                    <p className="text-xs text-amber-700 font-medium leading-tight">Complete your profile to unlock premium employer matches!</p>
+                    <Link href={localizePath("/candidate/profile", locale)}>
+                      <Button size="sm" className="w-full">Complete Profile</Button>
+                    </Link>
+                  </div>
                 )}
               </div>
             </div>
             {completeness < 80 && missingItems.length > 0 && (
-              <ul className="space-y-1">
+              <ul className="space-y-1 mt-2">
                 {missingItems.slice(0, 3).map((item) => (
                   <li key={item} className="text-xs text-gray-500 flex items-center gap-1">
-                    <span className="text-amber-500">•</span> {item}
+                    <span className="text-amber-500">•</span>
+                    <Link href={localizePath("/candidate/profile", locale)} className="hover:text-emerald-600 hover:underline">
+                      {item}
+                    </Link>
                   </li>
                 ))}
                 {missingItems.length > 3 && (
@@ -429,66 +526,25 @@ export default function CandidateDashboard() {
           </CardContent>
         </Card>
 
-        {/* Open to Work Toggle */}
-        <Card>
+        {/* Application Streak */}
+        <Card className="border-orange-200 bg-orange-50/40 dark:bg-orange-950/20 dark:border-orange-500/20 dark:shadow-[0_0_20px_rgba(249,115,22,0.05)] backdrop-blur-sm transition-all hover:dark:border-orange-500/40">
           <CardContent className="p-6">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Job Visibility</h3>
+            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Activity</h3>
             <div className="flex items-center gap-3 mb-2">
-              <button
-                onClick={toggleOpenToWork}
-                disabled={togglingOtw}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  openToWork ? "bg-emerald-600" : "bg-gray-300"
-                }`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  openToWork ? "translate-x-6" : "translate-x-1"
-                }`} />
-              </button>
-              <span className="text-sm font-medium text-gray-900">
-                {openToWork ? "Open to Work" : "Not Looking"}
-              </span>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 text-2xl shadow-sm dark:shadow-[0_0_10px_rgba(249,115,22,0.2)]">
+                🔥
+              </div>
+              <div>
+                <p className="text-lg font-bold text-gray-900 dark:text-orange-50">3-Day Streak!</p>
+                <p className="text-xs text-gray-600 dark:text-orange-200/60 mt-0.5">Keep applying to stay visible</p>
+              </div>
             </div>
-            <p className="text-xs text-gray-500">
-              {openToWork ? "Visible to employers" : "Hidden from employers"}
-            </p>
+            <div className="mt-4 w-full bg-orange-100 dark:bg-orange-950/50 rounded-full h-1.5 shadow-inner">
+              <div className="bg-orange-500 h-1.5 rounded-full dark:shadow-[0_0_8px_rgba(249,115,22,0.6)]" style={{ width: '40%' }}></div>
+            </div>
+            <p className="text-[10px] text-gray-500 dark:text-orange-200/50 mt-2 text-right">2 days until next milestone</p>
           </CardContent>
         </Card>
-
-        {/* Subscription Status */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Subscription</h3>
-            {billingStatus ? (
-              <>
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant={billingStatus.plan === "FREE" ? "default" : "success"}>
-                    {planLabels[billingStatus.plan] || billingStatus.plan}
-                  </Badge>
-                  {billingStatus.status === "ACTIVE" && billingStatus.plan !== "FREE" && (
-                    <span className="text-xs text-emerald-600 font-medium">Active</span>
-                  )}
-                </div>
-                {billingStatus.plan === "FREE" && (
-                  <Link href={localizePath("/billing", locale)}>
-                    <Button size="sm" variant="outline" className="mt-1">Upgrade Plan</Button>
-                  </Link>
-                )}
-                {billingStatus.plan !== "FREE" && billingStatus.currentPeriodEnd && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Renews {new Date(billingStatus.currentPeriodEnd).toLocaleDateString()}
-                  </p>
-                )}
-              </>
-            ) : (
-              <div className="animate-pulse h-6 w-24 bg-gray-200 rounded"></div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="mb-8">
-        <PushOptInCard />
       </div>
 
       {/* Quick Links */}
@@ -551,6 +607,51 @@ export default function CandidateDashboard() {
         </Link>
       </div>
 
+      {/* Recommended For You Section */}
+      <div className="mb-10">
+        <div className="flex justify-between items-end mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Recommended For You</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sample early-tester matches. Real recommendations appear as profile and job data improve.</p>
+          </div>
+          <Link href={localizePath("/jobs", locale)} className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+            View all <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+        
+        <div className="flex overflow-x-auto gap-4 pb-4 snap-x hide-scrollbar">
+          {MOCK_RECOMMENDED_JOBS.map((job) => (
+            <Link key={job.id} href={localizePath(`/jobs/${job.id}`, locale)} className="min-w-[300px] sm:min-w-[340px] snap-start group">
+              <Card className="h-full hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md transition-all duration-300 group-hover:-translate-y-1 bg-white dark:bg-zinc-950/50">
+                <CardContent className="p-5">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-1">{job.title}</h3>
+                      <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">{job.company}</p>
+                      <p className="mt-1 text-[11px] font-medium text-amber-700">Demo sample</p>
+                    </div>
+                    <Badge variant="default" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300">
+                      {job.type}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-4 mb-3">
+                    <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {job.location}</span>
+                  </div>
+                  <div className="font-semibold text-gray-900 dark:text-gray-100 border-t border-gray-100 dark:border-zinc-800 pt-3">
+                    {job.salary}
+                  </div>
+                  <p className="mt-3 text-xs text-gray-500">
+                    Possible match: role, remote/global signal, and salary visibility should be verified before applying.
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </div>
+        </Tabs.Content>
+
+        <Tabs.Content value="Applications">
       {/* Stat Cards */}
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         <Card>
@@ -589,14 +690,21 @@ export default function CandidateDashboard() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center py-8">
+            <div className="flex items-center justify-center py-12 text-emerald-600">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
+              <span className="ml-3 text-sm font-medium">Loading your applications...</span>
             </div>
           ) : myApplications.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">You haven&apos;t applied to any jobs yet</p>
+            <div className="text-center py-12 px-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 dark:bg-zinc-900/50 dark:border-zinc-800">
+              <div className="flex justify-center mb-4 text-gray-400 dark:text-zinc-500">
+                <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <p className="text-gray-900 dark:text-zinc-100 font-semibold mb-1">No applications yet</p>
+              <p className="text-gray-500 dark:text-zinc-400 text-sm mb-6 max-w-sm mx-auto">When you apply to roles, you can track their status and trust-safety reviews here.</p>
               <Link href={localizePath("/jobs", locale)}>
-                <Button>Find Jobs</Button>
+                <Button>Explore Verified Jobs</Button>
               </Link>
             </div>
           ) : (
@@ -636,6 +744,77 @@ export default function CandidateDashboard() {
           )}
         </CardContent>
       </Card>
+        </Tabs.Content>
+
+        <Tabs.Content value="Settings">
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            {/* Open to Work Toggle */}
+            <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
+              <CardContent className="p-6">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Job Visibility</h3>
+                <div className="flex items-center gap-3 mb-2">
+                  <button
+                    onClick={toggleOpenToWork}
+                    disabled={togglingOtw}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      openToWork ? "bg-emerald-600" : "bg-gray-300"
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      openToWork ? "translate-x-6" : "translate-x-1"
+                    }`} />
+                  </button>
+                  <span className="text-sm font-medium text-gray-900">
+                    {openToWork ? "Open to Work" : "Not Looking"}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {openToWork ? "Visible to employers" : "Hidden from employers"}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Subscription Status */}
+            <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
+              <CardContent className="p-6">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Subscription</h3>
+                {billingStatus ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant={billingStatus.plan === "FREE" ? "default" : "success"}>
+                        {planLabels[billingStatus.plan] || billingStatus.plan}
+                      </Badge>
+                      {billingStatus.status === "ACTIVE" && billingStatus.plan !== "FREE" && (
+                        <span className="text-xs text-emerald-600 font-medium">Active</span>
+                      )}
+                    </div>
+                    {billingStatus.plan === "FREE" && (
+                      <Link href={localizePath("/billing", locale)}>
+                        <Button size="sm" variant="outline" className="mt-1">Upgrade Plan</Button>
+                      </Link>
+                    )}
+                    {billingStatus.plan !== "FREE" && billingStatus.currentPeriodEnd && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Renews {new Date(billingStatus.currentPeriodEnd).toLocaleDateString()}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="animate-pulse h-6 w-24 bg-gray-200 rounded"></div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="mb-8">
+            <PushOptInCard />
+          </div>
+        </Tabs.Content>
+      </Tabs.Root>
+
+      <div className="mt-8">
+        <EarlyTesterFeedback area="Job match quality" />
+      </div>
     </div>
   );
 }

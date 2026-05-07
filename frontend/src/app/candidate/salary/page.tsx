@@ -20,7 +20,7 @@ interface NegotiationResult {
 const CURRENCIES = ["USD", "NGN", "KES", "ZAR", "GHS", "GBP", "EUR"];
 
 export default function SalaryPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   const [role, setRole] = useState("");
@@ -34,6 +34,7 @@ export default function SalaryPage() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  if (authLoading) return null;
   if (!user) {
     router.push("/login");
     return null;

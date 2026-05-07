@@ -4,6 +4,7 @@
 
 import type { AggregatedJob, AggregatorResult, JobSource, JobSourceConfig } from "../types.js";
 import logger from "../../../logger.js";
+import { classifyJobField, normalizeWorkplaceType } from "../taxonomy.js";
 
 const HTML_ENTITY_MAP: Record<string, string> = {
   amp: "&",
@@ -22,33 +23,6 @@ const HTML_ENTITY_MAP: Record<string, string> = {
   ldquo: '"',
   hellip: "...",
 };
-
-const TITLE_ROLE_INTENT_PATTERNS = [
-  /\bengineer\b/i,
-  /\bdeveloper\b/i,
-  /\bdevops\b/i,
-  /\bsre\b/i,
-  /site reliability/i,
-  /\bsecurity\b/i,
-  /\bdata\b/i,
-  /machine learning/i,
-  /\bproduct\b/i,
-  /\bdesign(?:er)?\b/i,
-  /\bux\b/i,
-  /\bui\b/i,
-  /\bmobile\b/i,
-  /\bandroid\b/i,
-  /\bios\b/i,
-  /\bfrontend\b/i,
-  /\bfront-end\b/i,
-  /\bbackend\b/i,
-  /\bback-end\b/i,
-  /\bfull[- ]?stack\b/i,
-  /\bcloud\b/i,
-  /\bplatform\b/i,
-  /\binfrastructure\b/i,
-  /\banalytics?\b/i,
-];
 
 function decodeHtmlEntities(value: string): string {
   return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (entity, token: string) => {
@@ -247,6 +221,20 @@ export abstract class BaseJobSource {
     return null;
   }
 
+  protected classifyJobField(input: {
+    title?: string | null;
+    description?: string | null;
+    tags?: string[];
+    category?: string | null;
+    department?: string | null;
+  }): string {
+    return classifyJobField(input);
+  }
+
+  protected normalizeWorkplaceType(locationType: AggregatedJob["locationType"]): "REMOTE" | "HYBRID" | "ONSITE" {
+    return normalizeWorkplaceType(locationType);
+  }
+
   protected matchesKeywordQuery(job: AggregatedJob, query: JobQuery): boolean {
     if (query.keywords.length === 0) {
       return true;
@@ -258,11 +246,6 @@ export abstract class BaseJobSource {
       return true;
     }
 
-    const titleHasRoleIntent = TITLE_ROLE_INTENT_PATTERNS.some((pattern) => pattern.test(job.title));
-    if (!titleHasRoleIntent) {
-      return false;
-    }
-
     const descriptionBag = job.description.toLowerCase();
     return normalizedKeywords.some((keyword) => descriptionBag.includes(keyword));
   }
@@ -270,9 +253,13 @@ export abstract class BaseJobSource {
 
 export interface JobQuery {
   keywords: string[];
+  includeAllCompanyJobs?: boolean;
+  fields?: string[];
   location?: string;
   remote?: boolean;
+  workplaceTypes?: Array<"REMOTE" | "HYBRID" | "ONSITE">;
   visaSponsorship?: boolean;
+  relocationAssistance?: boolean;
   postedWithinDays?: number;
   limit?: number;
   cursor?: string;

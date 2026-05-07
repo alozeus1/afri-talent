@@ -18,6 +18,8 @@ describe("jobs-search helpers", () => {
       search: "backend engineer",
       location: "Kenya",
       type: "",
+      jobField: "",
+      workplaceType: "",
       seniority: "",
       visaSponsorship: "",
       relocationAssistance: "",
@@ -32,11 +34,13 @@ describe("jobs-search helpers", () => {
       buildJobsHref({
         search: "platform",
         location: "Remote",
+        jobField: "Healthcare",
+        workplaceType: "REMOTE",
         remote: "true",
         page: 1,
         limit: 12,
       }),
-    ).toBe("/jobs?search=platform&location=Remote&remote=true");
+    ).toBe("/jobs?search=platform&location=Remote&jobField=Healthcare&workplaceType=REMOTE&remote=true");
   });
 
   it("converts filter state to API params and detects active filters", () => {
@@ -51,6 +55,8 @@ describe("jobs-search helpers", () => {
       search: undefined,
       location: undefined,
       type: undefined,
+      jobField: undefined,
+      workplaceType: undefined,
       seniority: undefined,
       visaSponsorship: "YES",
       relocationAssistance: undefined,
