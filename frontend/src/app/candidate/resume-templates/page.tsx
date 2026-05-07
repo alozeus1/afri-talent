@@ -16,6 +16,7 @@ export default function ResumeTemplatesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [fillingId, setFillingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -48,6 +49,19 @@ export default function ResumeTemplatesPage() {
       setError(err instanceof Error ? err.message : "Could not prepare the template download.");
     } finally {
       setDownloadingId(null);
+    }
+  }
+
+  async function handleFill(template: ResumeTemplate) {
+    setFillingId(template.id);
+    setError(null);
+    try {
+      const response = await templates.fill(template.id);
+      window.location.assign(response.downloadUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not fill template with your data.");
+    } finally {
+      setFillingId(null);
     }
   }
 
@@ -97,8 +111,11 @@ export default function ResumeTemplatesPage() {
               key={template.id}
               template={template}
               canDownload={catalog.canDownload}
+              userPlan={catalog.userPlan}
               onDownload={handleDownload}
+              onFill={catalog.userPlan === "PROFESSIONAL" ? handleFill : undefined}
               isDownloading={downloadingId === template.id}
+              isFilling={fillingId === template.id}
             />
           ))}
         </div>

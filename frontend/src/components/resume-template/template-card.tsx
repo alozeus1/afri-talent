@@ -9,15 +9,21 @@ import { Lock, Download, Eye } from "lucide-react";
 interface TemplateCardProps {
   template: ResumeTemplate;
   canDownload: boolean;
+  userPlan: string;
   onDownload: (template: ResumeTemplate, format: string) => void;
+  onFill?: (template: ResumeTemplate) => void;
   isDownloading?: boolean;
+  isFilling?: boolean;
 }
 
 export function TemplateCard({
   template,
   canDownload,
+  userPlan,
   onDownload,
+  onFill,
   isDownloading,
+  isFilling,
 }: TemplateCardProps) {
   const htmlFile = template.files.find((f) => f.format === "HTML");
   const pdfFile = template.files.find((f) => f.format === "PDF");
@@ -79,7 +85,7 @@ export function TemplateCard({
         )}
 
         {/* Actions */}
-        <div className="mt-auto flex items-center gap-2 pt-2">
+        <div className="mt-auto flex flex-col gap-2 pt-2">
           {template.isLocked ? (
             <Button
               variant="outline"
@@ -93,18 +99,31 @@ export function TemplateCard({
               Unlock with {template.minPlan}
             </Button>
           ) : (
-            <Button
-              variant="primary"
-              size="sm"
-              className="w-full"
-              disabled={!canDownload || isDownloading}
-              onClick={() =>
-                primaryFile && onDownload(template, primaryFile.format)
-              }
-            >
-              <Download className="mr-1 h-3.5 w-3.5" />
-              {isDownloading ? "Downloading..." : "Download"}
-            </Button>
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                className="w-full"
+                disabled={!canDownload || isDownloading}
+                onClick={() =>
+                  primaryFile && onDownload(template, primaryFile.format)
+                }
+              >
+                <Download className="mr-1 h-3.5 w-3.5" />
+                {isDownloading ? "Downloading..." : "Download blank"}
+              </Button>
+              {userPlan === "PROFESSIONAL" && onFill && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  disabled={isFilling}
+                  onClick={() => onFill(template)}
+                >
+                  {isFilling ? "Filling..." : "Use with my data"}
+                </Button>
+              )}
+            </>
           )}
         </div>
 
