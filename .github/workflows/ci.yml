@@ -24,7 +24,7 @@ jobs:
     runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     steps:
       - uses: actions/checkout@v4
-      - uses: rhysd/actionlint@v1.7.8
+      - uses: rhysd/actionlint@v1.7.12
 
   backend-lint:
     name: Backend Lint
