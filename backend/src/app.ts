@@ -77,6 +77,7 @@ import adminBulkRoutes from "./routes/admin-bulk.js";
 import adminBlogRoutes from "./routes/admin-blog.js";
 // AI Skills routes (premium, additive)
 import skillsResumeBuilderRoutes from "./routes/skills/resume-builder.js";
+import skillsResumeTemplateRoutes from "./routes/skills/resume-templates.js";
 import skillsJobMatcherRoutes from "./routes/skills/job-matcher.js";
 import skillsApplicationWriterRoutes from "./routes/skills/application-writer.js";
 import skillsCareerAdvisorRoutes from "./routes/skills/career-advisor.js";
@@ -358,6 +359,7 @@ app.use("/api/admin/blog", adminBlogRoutes);
 app.use("/api/bots", botsRoutes);
 // AI Skills (premium gated — require PROFESSIONAL plan + per-user rate limit)
 app.use("/api/skills/resume-builder", skillsLimiter, skillsResumeBuilderRoutes);
+app.use("/api/skills/resume-templates", skillsLimiter, skillsResumeTemplateRoutes);
 app.use("/api/skills/job-matcher", skillsLimiter, skillsJobMatcherRoutes);
 app.use("/api/skills/application-writer", skillsLimiter, skillsApplicationWriterRoutes);
 app.use("/api/skills/career-advisor", skillsLimiter, skillsCareerAdvisorRoutes);

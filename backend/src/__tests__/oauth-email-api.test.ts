@@ -81,6 +81,30 @@ describe("OAuth + Email Verification API", () => {
     process.env.APPLE_CLIENT_ID = previousApple;
   });
 
+  it("exposes safe OAuth diagnostics without secrets", async () => {
+    const previousFrontend = process.env.FRONTEND_URL;
+    const previousGoogle = process.env.GOOGLE_CLIENT_ID;
+    const previousGoogleSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    process.env.FRONTEND_URL = "https://staging.example.com";
+    process.env.GOOGLE_CLIENT_ID = "google-client-id";
+    process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
+
+    const res = await request(app).get("/api/auth/oauth/diagnostics");
+
+    expect(res.status).toBe(200);
+    expect(res.body.providers.google.configured).toBe(true);
+    expect(res.body.providers.google.clientSecretConfigured).toBe(true);
+    expect(res.body.providers.google.requiredCallbackUrls).toContain("https://staging.example.com/auth/callback");
+    expect(res.body.providers.google.requiredCallbackUrls).toContain("http://localhost:3000/auth/callback");
+    expect(res.body.secretsExposed).toBe(false);
+    expect(JSON.stringify(res.body)).not.toContain("google-client-secret");
+
+    process.env.FRONTEND_URL = previousFrontend;
+    process.env.GOOGLE_CLIENT_ID = previousGoogle;
+    process.env.GOOGLE_CLIENT_SECRET = previousGoogleSecret;
+  });
+
   it("returns provider-mismatch when password login is attempted for OAuth-only account", async () => {
     (prisma.user.findUnique as any).mockResolvedValueOnce({
       id: "oauth-user-1",

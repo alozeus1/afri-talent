@@ -637,10 +637,11 @@ model PlanEntitlement {
   videoMockInterviews   Int? // monthly seat quota
   pipelineExports       Boolean          @default(false)
   brandedCareerPage     Boolean          @default(false)
-  advancedFunnelMetrics Boolean          @default(false)
-  customFeatures        Json? // extensible
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  advancedFunnelMetrics   Boolean          @default(false)
+  templateDownloadsPerMonth Int?             // null = unlimited
+  customFeatures          Json? // extensible
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
 }
 
 model UserBillingProfile {
@@ -3050,4 +3051,51 @@ model SmsDeliveryLog {
   @@index([phoneNumber, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
   @@index([template, createdAt(sort: Desc)])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resume Template Catalog (Premium digital bundles)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ResumeTemplate {
+  id            String   @id @default(uuid())
+  name          String   @db.VarChar(120)
+  description   String   @db.Text
+  thumbnailUrl  String   @db.VarChar(500)
+  tags          String[] @default([])
+  bestFor       String[] @default([]) // e.g. "entry", "senior", "tech", "creative", "healthcare"
+  minPlan       SubscriptionPlan @default(PROFESSIONAL)
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  files         TemplateFile[]
+  downloads     TemplateDownload[]
+}
+
+model TemplateFile {
+  id            String   @id @default(uuid())
+  templateId    String
+  template      ResumeTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  format        String   @db.VarChar(20) // "HTML", "PDF", "DOCX", "GOOGLE_DOCS", "CANVA"
+  s3Key         String?  @db.VarChar(500) // null for external links
+  externalUrl   String?  @db.VarChar(500) // for Canva/Google Docs links
+  fileSizeBytes Int?
+  createdAt     DateTime @default(now())
+}
+
+model TemplateDownload {
+  id            String   @id @default(uuid())
+  userId        String
+  templateId    String
+  template      ResumeTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  format        String   @db.VarChar(20)
+  source        String   @db.VarChar(40) // "gallery", "resume_builder", "ats_recommendation"
+  downloadedAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([templateId])
+  @@index([userId, downloadedAt(sort: Desc)])
 }

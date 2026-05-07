@@ -42,7 +42,7 @@ export function EarlyTesterFeedback({
   showApprovedFeedback = false,
 }: EarlyTesterFeedbackProps) {
   const { user } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(showApprovedFeedback);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [rating, setRating] = useState(0);
@@ -52,9 +52,14 @@ export function EarlyTesterFeedback({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<LearningFeedbackItem[]>([]);
+  const [hydrated, setHydrated] = useState(false);
 
   const resolvedAreaSlug = useMemo(() => areaSlug || slugify(area), [area, areaSlug]);
   const canAttachPhoto = Boolean(user?.role === "CANDIDATE" && user.avatarUrl);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
     const nameParts = splitName(user?.name);
@@ -81,7 +86,7 @@ export function EarlyTesterFeedback({
   }, [resolvedAreaSlug, showApprovedFeedback]);
 
   async function handleSubmit() {
-    if (!rating || !firstName.trim() || !lastName.trim()) return;
+    if (!rating) return;
 
     setLoading(true);
     setError(null);
@@ -90,8 +95,8 @@ export function EarlyTesterFeedback({
       await learning.feedback.submit({
         areaSlug: resolvedAreaSlug,
         lessonTitle: area,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        firstName: firstName.trim() || "Anonymous",
+        lastName: lastName.trim() || "Learner",
         rating,
         comment: comment.trim(),
         attachPhoto: canAttachPhoto ? attachPhoto : false,
@@ -122,7 +127,13 @@ export function EarlyTesterFeedback({
             Share a short note. Submissions stay hidden until an admin approves them.
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setOpen((value) => !value)}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
           {open ? "Close feedback" : "Give feedback"}
         </Button>
       </div>
@@ -163,6 +174,7 @@ export function EarlyTesterFeedback({
                   setRating(value);
                   setSubmitted(false);
                 }}
+                disabled={!hydrated}
                 className={`h-9 w-9 rounded-full border text-sm font-semibold transition-colors ${
                   rating === value
                     ? "border-emerald-700 bg-emerald-700 text-white"
@@ -196,7 +208,7 @@ export function EarlyTesterFeedback({
             <Button
               size="sm"
               onClick={handleSubmit}
-              disabled={!rating || !firstName.trim() || !lastName.trim() || loading}
+              disabled={!hydrated || !rating || loading}
             >
               {loading ? "Submitting..." : "Submit feedback"}
             </Button>

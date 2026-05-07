@@ -40,7 +40,9 @@ async function exchangeGoogleCode(code: string, redirectUri: string): Promise<{
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    throw new Error("Google OAuth not configured");
+    const error = new Error("Google OAuth is not configured");
+    error.name = "OAUTH_MISSING_CONFIG";
+    throw error;
   }
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -56,8 +58,12 @@ async function exchangeGoogleCode(code: string, redirectUri: string): Promise<{
   });
 
   if (!tokenRes.ok) {
-    const err = await tokenRes.text();
-    throw new Error(`Google token exchange failed: ${err}`);
+    const body = await tokenRes.text().catch(() => "");
+    const error = new Error("Google token exchange failed");
+    error.name = body.includes("redirect_uri_mismatch")
+      ? "OAUTH_CALLBACK_MISMATCH"
+      : "OAUTH_PROVIDER_UNAVAILABLE";
+    throw error;
   }
 
   const tokens = (await tokenRes.json()) as { access_token: string; id_token?: string };
@@ -66,7 +72,11 @@ async function exchangeGoogleCode(code: string, redirectUri: string): Promise<{
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   });
 
-  if (!userRes.ok) throw new Error("Failed to fetch Google user info");
+  if (!userRes.ok) {
+    const error = new Error("Failed to fetch Google user info");
+    error.name = "OAUTH_PROVIDER_UNAVAILABLE";
+    throw error;
+  }
   return userRes.json() as Promise<{
     sub: string;
     email: string;
@@ -97,8 +107,25 @@ router.post("/google/callback", authLimiter, async (req: Request, res: Response)
       res.status(400).json({ error: "Invalid request", details: error.issues });
       return;
     }
-    console.error("Google OAuth error:", error);
-    res.status(500).json({ error: "OAuth authentication failed" });
+    const code =
+      error instanceof Error && error.name.startsWith("OAUTH_")
+        ? error.name
+        : "OAUTH_EXCHANGE_FAILED";
+    console.error("Google OAuth error:", {
+      code,
+      message: error instanceof Error ? error.message : "unknown",
+    });
+    const status = code === "OAUTH_MISSING_CONFIG" ? 503 : code === "OAUTH_CALLBACK_MISMATCH" ? 400 : 502;
+    res.status(status).json({
+      error: "OAuth authentication failed",
+      code,
+      message:
+        code === "OAUTH_CALLBACK_MISMATCH"
+          ? "The OAuth callback URL is not registered for this environment."
+          : code === "OAUTH_MISSING_CONFIG"
+            ? "Google sign-in is not configured for this environment."
+            : "The OAuth provider is unavailable or rejected the sign-in request.",
+    });
   }
 });
 
@@ -367,6 +394,34 @@ router.get("/providers", (_req: Request, res: Response) => {
   }
 
   res.json({ providers });
+});
+
+router.get("/diagnostics", (_req: Request, res: Response) => {
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const googleConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  const appleConfigured = Boolean(process.env.APPLE_CLIENT_ID);
+
+  res.json({
+    environment: process.env.NODE_ENV || "development",
+    providers: {
+      google: {
+        configured: googleConfigured,
+        clientSecretConfigured: Boolean(process.env.GOOGLE_CLIENT_SECRET),
+        requiredCallbackUrls: [
+          `${frontendUrl}/auth/callback`,
+          "http://localhost:3000/auth/callback",
+        ],
+      },
+      apple: {
+        configured: appleConfigured,
+        requiredCallbackUrls: [
+          `${frontendUrl}/auth/apple/callback`,
+          "http://localhost:3000/auth/apple/callback",
+        ],
+      },
+    },
+    secretsExposed: false,
+  });
 });
 
 export default router;

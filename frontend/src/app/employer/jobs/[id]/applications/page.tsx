@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { applications, Application } from "@/lib/api";
+import { applications, messages, Application } from "@/lib/api";
 import { employerOnboardingEvents } from "@/lib/analytics";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,9 @@ export default function JobApplicationsPage() {
   const [candidateAccessLocked, setCandidateAccessLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [messagingId, setMessagingId] = useState<string | null>(null);
+  const [messageInput, setMessageInput] = useState("");
+  const [messageError, setMessageError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "EMPLOYER")) {
@@ -41,7 +44,7 @@ export default function JobApplicationsPage() {
         .forJob(params.id as string)
         .then((response) => {
           setJobApplications(response);
-          setCandidateAccessLocked(response.some((application) => Boolean((application as Application & { locked?: boolean }).locked)));
+          setCandidateAccessLocked(response.some((application) => Boolean(application.locked)));
           employerOnboardingEvents.candidateListViewed({
             job_id: params.id as string,
             applicant_count: response.length,
@@ -64,6 +67,31 @@ export default function JobApplicationsPage() {
       console.error("Failed to update status:", err);
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const startThread = async (candidateUserId: string) => {
+    if (!user || !messageInput.trim()) return;
+    setMessagingId(candidateUserId);
+    setMessageError(null);
+    try {
+      const result = await messages.createThread({
+        participantId: candidateUserId,
+        jobId: params.id as string,
+        message: messageInput.trim(),
+      });
+      router.push(localizePath(`/messages/${result.id}`, locale));
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("already exists")) {
+        const match = err.message.match(/threadId[": ]+([a-z0-9-]+)/i);
+        if (match) {
+          router.push(localizePath(`/messages/${match[1]}`, locale));
+          return;
+        }
+      }
+      setMessageError(err instanceof Error ? err.message : "Failed to send message");
+    } finally {
+      setMessagingId(null);
     }
   };
 
@@ -177,6 +205,33 @@ export default function JobApplicationsPage() {
                       Reject
                     </Button>
                   </div>
+
+                  {!candidateAccessLocked && application.candidate?.id && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      {messageError && messagingId === application.candidate.id && (
+                        <p className="text-xs text-red-500 mb-2">{messageError}</p>
+                      )}
+                      <div className="flex gap-2 items-start">
+                        <textarea
+                          className="flex-1 text-sm rounded-lg border border-gray-300 px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          rows={2}
+                          placeholder="Send a message to this candidate..."
+                          value={messagingId === application.candidate.id ? messageInput : ""}
+                          onChange={(e) => {
+                            setMessagingId(application.candidate!.id);
+                            setMessageInput(e.target.value);
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          disabled={!messageInput.trim() || messagingId !== application.candidate.id}
+                          onClick={() => startThread(application.candidate!.id)}
+                        >
+                          {messagingId === application.candidate.id && messageInput.trim() ? "Send" : "Message"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               </div>

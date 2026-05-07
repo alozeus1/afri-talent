@@ -46,6 +46,7 @@ export default function NewJobPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState<{ jobId: string; pending: boolean; pendingReason: string | null } | null>(null);
 
   useEffect(() => {
     if (user?.role === "EMPLOYER") {
@@ -118,7 +119,7 @@ export default function NewJobPage() {
     setLoading(true);
 
     try {
-      await jobs.create({
+      const result = await jobs.create({
         title: formData.title,
         description: formData.description,
         location: formData.location,
@@ -130,7 +131,11 @@ export default function NewJobPage() {
         tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
         applicationUrl: formData.applicationUrl || undefined,
       });
-      router.push(localizePath("/employer", locale));
+      setSubmitted({
+        jobId: result.id,
+        pending: !!result.pendingReason,
+        pendingReason: result.pendingReason,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create job");
     } finally {
@@ -171,6 +176,42 @@ export default function NewJobPage() {
         <Link href={localizePath("/login", locale)}>
           <Button>Login</Button>
         </Link>
+      </div>
+    );
+  }
+
+  if (submitted) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+        <div className={`w-16 h-16 mx-auto mb-6 rounded-full flex items-center justify-center ${submitted.pending ? "bg-amber-100" : "bg-emerald-100"}`}>
+          {submitted.pending ? (
+            <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ) : (
+            <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">
+          {submitted.pending ? "Job submitted for review" : "Job published!"}
+        </h1>
+        <p className="text-gray-600 mb-8">
+          {submitted.pending
+            ? submitted.pendingReason
+            : "Your job is live and visible to candidates now."}
+        </p>
+        <div className="flex justify-center gap-4">
+          <Link href={localizePath("/employer", locale)}>
+            <Button>Go to dashboard</Button>
+          </Link>
+          {submitted.pending && (
+            <Link href={localizePath("/employer/trust", locale)}>
+              <Button variant="outline">Complete verification</Button>
+            </Link>
+          )}
+        </div>
       </div>
     );
   }

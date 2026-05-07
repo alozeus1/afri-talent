@@ -2,8 +2,13 @@ import { Router, Request, Response } from "express";
 import prisma from "../lib/prisma.js";
 import { authenticate } from "../middleware/auth.js";
 import { NotificationStatus } from "@prisma/client";
+import { z } from "zod";
 
 const router = Router();
+
+const feedbackSchema = z.object({
+  feedback: z.enum(["RELEVANT", "NOT_RELEVANT", "TOO_MANY", "WRONG_ROLE", "WRONG_LOCATION"]),
+});
 
 // GET /api/notifications — list notifications for authenticated user
 router.get("/", authenticate, async (req: Request, res: Response) => {
@@ -88,6 +93,51 @@ router.put("/:id/read", authenticate, async (req: Request, res: Response) => {
     res.json(updated);
   } catch (error) {
     console.error("Mark read error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.put("/:id/feedback", authenticate, async (req: Request, res: Response) => {
+  try {
+    const { feedback } = feedbackSchema.parse(req.body);
+    const notification = await prisma.notification.findUnique({
+      where: { id: req.params.id },
+      select: { userId: true, metadata: true },
+    });
+
+    if (!notification) {
+      res.status(404).json({ error: "Notification not found" });
+      return;
+    }
+
+    if (notification.userId !== req.user!.userId) {
+      res.status(403).json({ error: "Not authorized" });
+      return;
+    }
+
+    const metadata =
+      notification.metadata && typeof notification.metadata === "object" && !Array.isArray(notification.metadata)
+        ? notification.metadata
+        : {};
+
+    const updated = await prisma.notification.update({
+      where: { id: req.params.id },
+      data: {
+        metadata: {
+          ...metadata,
+          feedback,
+          feedbackAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    res.json({ notification: updated });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Validation failed", details: error.issues });
+      return;
+    }
+    console.error("Notification feedback error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });

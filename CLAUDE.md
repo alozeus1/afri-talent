@@ -1,5 +1,12 @@
 # Claude Start Here
 
+Claude agents must also follow `AGENTS.md`, `CODEX.md`, and
+`docs/agent-rules.md` when working in this repository.
+
+Non-negotiable: No agent may push directly to main, deploy production, modify
+production secrets, apply infrastructure changes, or run destructive database
+migrations without explicit human approval.
+
 For any deployment, staging, infrastructure, incident, or recovery task in this repo:
 
 1. Read `STAGING_RUNBOOK.md` first
@@ -14,5 +21,12 @@ For any deployment, staging, infrastructure, incident, or recovery task in this 
 Secondary references:
 
 - `AGENTS.md` for repo rules and build/test guidance
+- `CODEX.md` for Codex-specific operating guidance
+- `docs/engineering-team.md` for supervised agent roles
+- `docs/agent-heartbeat.md` for latest local-safe heartbeat status
 - `infra/terraform/README.md` for Terraform and AWS stack details
 - `OPS_README.md` for application-level logging and health behavior
+
+Agent-team work should stay branch-based, reversible, and PR-reviewed. Use
+`scripts/safe-repo-audit.sh`, `scripts/run-agent-checks.sh`, and
+`scripts/agent-heartbeat.sh` for read-only or local-safe maintenance checks.

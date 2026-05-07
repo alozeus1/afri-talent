@@ -54,6 +54,7 @@ export default function NotificationsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -123,6 +124,19 @@ export default function NotificationsPage() {
     }
   };
 
+  const handleFeedback = async (
+    id: string,
+    feedback: "RELEVANT" | "NOT_RELEVANT" | "TOO_MANY" | "WRONG_ROLE" | "WRONG_LOCATION",
+  ) => {
+    try {
+      const response = await notifications.feedback(id, feedback);
+      setItems((prev) => prev.map((item) => (item.id === id ? response.notification : item)));
+      setFeedbackMessage("Notification feedback saved.");
+    } catch {
+      setFeedbackMessage("Could not save feedback right now.");
+    }
+  };
+
   const handleFilterChange = (tab: FilterTab) => {
     setFilter(tab);
     setPage(1);
@@ -187,6 +201,11 @@ export default function NotificationsPage() {
           {error}
         </div>
       )}
+      {feedbackMessage && (
+        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+          {feedbackMessage}
+        </div>
+      )}
 
       {/* Loading */}
       {loading ? (
@@ -243,6 +262,31 @@ export default function NotificationsPage() {
                     <p className="text-sm text-gray-500 mt-1">
                       {notification.body}
                     </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {([
+                        ["RELEVANT", "Relevant"],
+                        ["NOT_RELEVANT", "Not relevant"],
+                        ["TOO_MANY", "Too many"],
+                        ["WRONG_ROLE", "Wrong role"],
+                        ["WRONG_LOCATION", "Wrong location"],
+                      ] as const).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleFeedback(notification.id, value);
+                          }}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                            notification.metadata?.feedback === value
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                              : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   {isUnread && (
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5"></span>

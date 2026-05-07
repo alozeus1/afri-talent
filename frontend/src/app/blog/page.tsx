@@ -227,22 +227,35 @@ export default function BlogPage() {
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600 mb-4" />
             <p className="text-gray-400 text-sm">Loading insights...</p>
           </div>
-        ) : posts.length === 0 ? (
+        ) : posts.length === 0 && search ? (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">📰</div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              {search ? "No matching posts" : "First issue coming soon"}
+              No matching posts
             </h2>
             <p className="text-gray-500 max-w-md mx-auto">
-              {search
-                ? "Try a different search term."
-                : "Our AI research team is preparing the first weekly hiring trends digest. Check back soon."}
+              Try a different search term.
             </p>
-            {search && (
-              <Button variant="outline" className="mt-4" onClick={() => setSearch("")}>
-                Clear search
-              </Button>
-            )}
+            <Button variant="outline" className="mt-4" onClick={() => setSearch("")}>
+              Clear search
+            </Button>
+          </div>
+        ) : posts.length === 0 && !loading ? (
+          <div className="col-span-full py-20 text-center">
+            <div className="mx-auto max-w-md">
+              <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-emerald-50 flex items-center justify-center">
+                <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 12h6M7 8h2" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-3">Insights coming soon</h2>
+              <p className="text-gray-600 mb-6">
+                We&apos;re curating weekly hiring trends, remote work guides, and salary insights for African professionals. Check back soon.
+              </p>
+              <Link href="/resources">
+                <Button variant="outline">Browse resources</Button>
+              </Link>
+            </div>
           </div>
         ) : (
           <>

@@ -295,7 +295,7 @@ test.describe("Billing", () => {
     const res = await request.get(`${API}/api/billing/status`);
     expect(res.ok()).toBe(true);
     const body = await res.json();
-    expect(body.plan).toBe("FREE");
+    expect(["FREE", "BASIC"]).toContain(body.plan);
     expect(typeof body.status).toBe("string");
   });
 

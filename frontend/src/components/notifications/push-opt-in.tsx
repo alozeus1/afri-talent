@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 export function PushOptInCard() {
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [preferences, setPreferences] = useState<NotificationPreference | null>(null);
+  const [pushAvailable, setPushAvailable] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +22,10 @@ export function PushOptInCard() {
       .catch(() => {
         // ignore for now
       });
+    pushNotifications
+      .getVapidPublicKey()
+      .then(() => setPushAvailable(true))
+      .catch(() => setPushAvailable(false));
   }, []);
 
   const subscribe = async () => {
@@ -74,9 +79,13 @@ export function PushOptInCard() {
         Get saved-search alerts, interview reminders, application updates, and other urgent candidate nudges in real time.
       </p>
 
-      {permission !== "granted" ? (
+      {pushAvailable === false ? (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          Browser push notifications are being configured. Email and in-app alert preferences still work.
+        </div>
+      ) : permission !== "granted" ? (
         <Button className="mt-4" onClick={subscribe} disabled={loading}>
-          {loading ? "Enabling..." : "Enable Push Notifications"}
+          {loading ? "Enabling..." : pushAvailable === null ? "Checking push setup..." : "Enable Push Notifications"}
         </Button>
       ) : (
         <p className="mt-4 text-sm text-emerald-700 dark:text-emerald-400">Notifications enabled</p>

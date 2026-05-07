@@ -538,6 +538,9 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
       ...job,
       moderationRequired: requiresModeration,
       trust,
+      pendingReason: requiresModeration
+        ? "Your job is under review. Verified employers publish instantly — complete trust verification to skip the queue."
+        : null,
     });
     recordOpsEvent({
       metricName: requiresModeration ? "job_publish_held" : "job_publish_success",

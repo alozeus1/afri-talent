@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { skills } from "@/lib/api";
+import { searchJobs } from "@/lib/api/orchestratorClient";
+import type { SearchJobResult } from "@/lib/api/orchestratorTypes";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,11 +26,17 @@ const TONES: { value: Tone; apiTone: "professional" | "conversational" | "execut
   { value: "executive", apiTone: "executive", label: "Executive", description: "Leadership-oriented" },
 ];
 
-export default function CoverLetterPage() {
+function CoverLetterPageContent() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [jobId, setJobId] = useState("");
+  const [selectedJob, setSelectedJob] = useState<SearchJobResult | null>(null);
+  const [jobQuery, setJobQuery] = useState("");
+  const [jobResults, setJobResults] = useState<SearchJobResult[]>([]);
+  const [jobSearchLoading, setJobSearchLoading] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [tone, setTone] = useState<Tone>("professional");
   const [coverLetter, setCoverLetter] = useState<string | null>(null);
   const [source, setSource] = useState<"ai" | "template" | null>(null);
@@ -37,6 +45,40 @@ export default function CoverLetterPage() {
   const [copied, setCopied] = useState(false);
   const [edited, setEdited] = useState(false);
 
+  useEffect(() => {
+    const fromJobId = searchParams.get("jobId");
+    const title = searchParams.get("title");
+    const company = searchParams.get("company");
+    if (fromJobId) {
+      setJobId(fromJobId);
+      setSelectedJob({
+        id: fromJobId,
+        title: title || "Selected job",
+        company: company || "AfriTalent job",
+        location: searchParams.get("location") || "",
+        type: "",
+        seniority: "",
+        rawText: "",
+        url: null,
+      });
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!jobQuery.trim()) {
+      setJobResults([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setJobSearchLoading(true);
+      searchJobs(jobQuery, 8)
+        .then(setJobResults)
+        .catch(() => setJobResults([]))
+        .finally(() => setJobSearchLoading(false));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [jobQuery]);
+
   if (authLoading) return null;
   if (!user) {
     router.push("/login");
@@ -44,21 +86,22 @@ export default function CoverLetterPage() {
   }
 
   async function handleGenerate() {
-    if (!jobId.trim()) {
+    const effectiveJobId = selectedJob?.id || jobId.trim();
+    if (!effectiveJobId) {
       setError({
-        title: "Missing job id",
-        description: "Paste the job UUID from the listing to generate a cover letter.",
+        title: "Choose a job",
+        description: "Search and select a job first. If needed, use Advanced to paste a known job ID.",
         tone: "info",
       });
       return;
     }
     setLoading(true);
-    setError(null);
-    setCoverLetter(null);
-    setEdited(false);
-    try {
-      const selectedTone = TONES.find((item) => item.value === tone) ?? TONES[0];
-      const result = await skills.generateCoverLetter({ jobId: jobId.trim(), tone: selectedTone.apiTone });
+      setError(null);
+      setCoverLetter(null);
+      setEdited(false);
+      try {
+        const selectedTone = TONES.find((item) => item.value === tone) ?? TONES[0];
+      const result = await skills.generateCoverLetter({ jobId: effectiveJobId, tone: selectedTone.apiTone });
       setCoverLetter(result.coverLetter);
       setSource(result.source);
     } catch (err) {
@@ -69,7 +112,7 @@ export default function CoverLetterPage() {
       });
       setCoverLetter(buildFallbackCoverLetter({
         toneLabel: TONES.find((item) => item.value === tone)?.label ?? "Professional",
-        jobId: jobId.trim(),
+        jobId: effectiveJobId,
         candidateName: user?.name || user?.email,
       }));
       setSource("template");
@@ -125,17 +168,73 @@ export default function CoverLetterPage() {
               Use this as an application assistant, not an auto-submit tool. Review every claim before sending and replace placeholders if fallback mode is used.
             </div>
             <div>
-              <label htmlFor="cover-letter-job-id" className="block text-sm font-medium text-gray-700 mb-1">
-                Job ID <span className="text-gray-400 text-xs">(from the job listing)</span>
+              <label htmlFor="cover-letter-job-search" className="block text-sm font-medium text-gray-700 mb-1">
+                Select a job
               </label>
               <input
-                id="cover-letter-job-id"
+                id="cover-letter-job-search"
                 type="text"
-                value={jobId}
-                onChange={(e) => setJobId(e.target.value)}
+                value={jobQuery}
+                onChange={(e) => setJobQuery(e.target.value)}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Paste the job UUID here"
+                placeholder="Search by title, company, location, or keyword"
               />
+              {jobSearchLoading && <p className="mt-2 text-xs text-gray-500">Searching jobs...</p>}
+              {jobResults.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {jobResults.map((job) => (
+                    <button
+                      key={job.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedJob(job);
+                        setJobId(job.id);
+                        setJobQuery("");
+                        setJobResults([]);
+                      }}
+                      className="w-full rounded-lg border border-gray-200 bg-white p-3 text-left text-sm hover:border-emerald-300 hover:bg-emerald-50"
+                    >
+                      <span className="block font-semibold text-gray-900">{job.title}</span>
+                      <span className="mt-1 block text-xs text-gray-600">
+                        {job.company} • {job.location || "Location not listed"} • {job.type || "Role"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {selectedJob && (
+                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
+                  <p className="font-semibold">{selectedJob.title}</p>
+                  <p className="mt-1 text-xs">
+                    {selectedJob.company} • {selectedJob.location || "Location not listed"}
+                  </p>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((value) => !value)}
+                className="mt-3 text-sm font-medium text-gray-600 hover:text-gray-900"
+              >
+                {showAdvanced ? "Hide advanced job ID" : "Advanced: paste job ID"}
+              </button>
+              {showAdvanced && (
+                <div className="mt-3">
+                  <label htmlFor="cover-letter-job-id" className="block text-sm font-medium text-gray-700 mb-1">
+                    Manual Job ID
+                  </label>
+                  <input
+                    id="cover-letter-job-id"
+                    type="text"
+                    value={jobId}
+                    onChange={(e) => {
+                      setJobId(e.target.value);
+                      setSelectedJob(null);
+                    }}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Paste a known job UUID"
+                  />
+                </div>
+              )}
             </div>
 
             <div role="radiogroup" aria-label="Cover letter tone">
@@ -163,7 +262,7 @@ export default function CoverLetterPage() {
 
             <Button
               onClick={handleGenerate}
-              disabled={loading || !jobId.trim()}
+              disabled={loading || !(selectedJob?.id || jobId.trim())}
               className="w-full"
             >
               {loading ? "Generating..." : "Generate Cover Letter"}
@@ -236,5 +335,13 @@ export default function CoverLetterPage() {
         <EarlyTesterFeedback area="Cover letter quality" />
       </div>
     </div>
+  );
+}
+
+export default function CoverLetterPage() {
+  return (
+    <Suspense fallback={<LoadingState lines={6} className="mx-auto max-w-6xl px-4 py-8" />}>
+      <CoverLetterPageContent />
+    </Suspense>
   );
 }

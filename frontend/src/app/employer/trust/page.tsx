@@ -214,8 +214,11 @@ export default function EmployerTrustPage() {
       await loadDashboard();
       setPageSuccess("Verification evidence submitted for review.");
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       setPageError(
-        error instanceof Error ? error.message : "Failed to submit verification evidence.",
+        msg.includes("S3_NOT_CONFIGURED") || msg.includes("not configured on this server")
+          ? "Document upload is not available in this environment. Contact your administrator."
+          : msg || "Failed to submit verification evidence.",
       );
     } finally {
       setSubmittingArtifact(false);
