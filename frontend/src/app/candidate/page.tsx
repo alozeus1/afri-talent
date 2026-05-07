@@ -90,6 +90,7 @@ function buildFallbackNextActions(params: {
     actions.push({ title: "Complete your profile", description: "Add missing skills, target roles, and portfolio links so match explanations are more useful.", href: "/candidate/profile", cta: "Complete profile" });
   }
   actions.push({ title: "Build or update your resume", description: "Create an ATS-friendly version before generating cover letters or applying.", href: "/candidate/resume-builder", cta: "Open resume builder" });
+  actions.push({ title: "Browse premium resume templates", description: "Download ATS-optimized templates for your industry and experience level.", href: "/candidate/resume-templates", cta: "Browse templates" });
   actions.push({ title: "Review your top job matches", description: "Use trust labels, salary visibility, visa signals, and missing skills before applying.", href: "/candidate/job-matches", cta: "Review matches" });
   if (params.applicationCount === 0) {
     actions.push({ title: "Prepare your first application", description: "Save one role, tailor your resume, generate a reviewed cover letter, then apply through the verified path.", href: "/jobs", cta: "Browse jobs" });

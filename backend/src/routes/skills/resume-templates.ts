@@ -14,6 +14,37 @@ const router = Router();
 const BUCKET = process.env.S3_UPLOADS_BUCKET;
 const REGION = process.env.AWS_REGION || "us-east-1";
 const DOWNLOAD_URL_EXPIRY_SECONDS = 300; // 5 minutes
+const THUMBNAIL_URL_EXPIRY_SECONDS = 3600; // 1 hour
+
+async function getPresignedThumbnailUrl(thumbnailUrl: string): Promise<string> {
+  // If it's already a full HTTP URL that isn't an S3 object key, return as-is
+  if (!thumbnailUrl || !BUCKET) return thumbnailUrl || "";
+
+  // If it looks like an S3 URL, extract the key and generate a presigned URL
+  const s3UrlPattern = /^https?:\/\/[^/]+\.s3[.-]/;
+  if (s3UrlPattern.test(thumbnailUrl)) {
+    try {
+      const url = new URL(thumbnailUrl);
+      const key = url.pathname.replace(/^\//, "");
+      const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+      return await getSignedUrl(getS3Client(), command, {
+        expiresIn: THUMBNAIL_URL_EXPIRY_SECONDS,
+      });
+    } catch {
+      return thumbnailUrl;
+    }
+  }
+
+  // Otherwise assume it's an S3 key
+  if (!thumbnailUrl.includes("://")) {
+    const command = new GetObjectCommand({ Bucket: BUCKET, Key: thumbnailUrl });
+    return await getSignedUrl(getS3Client(), command, {
+      expiresIn: THUMBNAIL_URL_EXPIRY_SECONDS,
+    });
+  }
+
+  return thumbnailUrl;
+}
 
 let s3Client: S3Client | null = null;
 
@@ -74,31 +105,34 @@ router.get(
         quota === null || // unlimited
         userDownloadsThisMonth < quota;
 
-      const enriched = templates.map((t) => {
-        const planRank: Record<SubscriptionPlan, number> = {
-          FREE: 0,
-          BASIC: 1,
-          PROFESSIONAL: 2,
-          EMPLOYER_FREE: 0,
-          EMPLOYER_BASIC: 1,
-          EMPLOYER_PREMIUM: 2,
-        };
-        const isLocked = planRank[plan] < planRank[t.minPlan];
+      const enriched = await Promise.all(
+        templates.map(async (t) => {
+          const planRank: Record<SubscriptionPlan, number> = {
+            FREE: 0,
+            BASIC: 1,
+            PROFESSIONAL: 2,
+            EMPLOYER_FREE: 0,
+            EMPLOYER_BASIC: 1,
+            EMPLOYER_PREMIUM: 2,
+          };
+          const isLocked = planRank[plan] < planRank[t.minPlan];
+          const thumbnailUrl = await getPresignedThumbnailUrl(t.thumbnailUrl);
 
-        return {
-          id: t.id,
-          name: t.name,
-          description: t.description,
-          thumbnailUrl: t.thumbnailUrl,
-          tags: t.tags,
-          bestFor: t.bestFor,
-          minPlan: t.minPlan,
-          sortOrder: t.sortOrder,
-          files: t.files,
-          isLocked,
-          totalDownloads: t._count.downloads,
-        };
-      });
+          return {
+            id: t.id,
+            name: t.name,
+            description: t.description,
+            thumbnailUrl,
+            tags: t.tags,
+            bestFor: t.bestFor,
+            minPlan: t.minPlan,
+            sortOrder: t.sortOrder,
+            files: t.files,
+            isLocked,
+            totalDownloads: t._count.downloads,
+          };
+        })
+      );
 
       res.json({
         templates: enriched,
