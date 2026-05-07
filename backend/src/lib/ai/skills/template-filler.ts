@@ -75,7 +75,14 @@ export function fillTemplate(html: string, input: FillInput): string {
           let employerHtml = employerEl.html() || "";
           employerHtml = replacePlaceholder(employerHtml, "[Company Name]", exp.company);
           employerHtml = replacePlaceholder(employerHtml, "[Company]", exp.company);
+          employerHtml = replacePlaceholder(employerHtml, "[City, State]", input.location || "");
           employerEl.html(employerHtml);
+        }
+
+        // Clear stack-line if present (we don't have per-job stack data)
+        const stackLine = newJob.find(".stack-line").first();
+        if (stackLine.length) {
+          stackLine.remove();
         }
 
         // Replace bullets
@@ -99,7 +106,7 @@ export function fillTemplate(html: string, input: FillInput): string {
   }).first();
 
   if (eduSection.length) {
-    const eduItems = eduSection.find(".edu-item");
+    const eduItems = eduSection.find(".edu-item, .edu-row");
     const firstEdu = eduItems.first();
 
     if (firstEdu.length && input.resume.sections.education.length > 0) {
@@ -110,9 +117,20 @@ export function fillTemplate(html: string, input: FillInput): string {
         const newEdu = eduTemplate.clone();
         newEdu.find(".edu-degree").first().text(edu.degree);
         newEdu.find(".edu-school").first().html(replacePlaceholder(newEdu.find(".edu-school").first().html() || "", "[University Name]", edu.institution));
-        newEdu.find(".edu-meta").first().html(replacePlaceholder(newEdu.find(".edu-meta").first().html() || "", "[City, State]", input.location || ""));
+        // Clear or replace edu-meta if it exists
+        const eduMeta = newEdu.find(".edu-meta").first();
+        if (eduMeta.length) {
+          eduMeta.text(edu.period);
+        }
+        // Replace date-range if present
+        const dateRange = newEdu.find(".date-range").first();
+        if (dateRange.length) {
+          dateRange.text(edu.period);
+        }
         eduSection.append(newEdu);
       }
+      // Remove stray <br> nodes that were spacing the original template entries
+      eduSection.contents().filter((_, node) => node.type === "tag" && node.name === "br").remove();
     }
   }
 
@@ -123,11 +141,21 @@ export function fillTemplate(html: string, input: FillInput): string {
   }).first();
 
   if (skillsSection.length && input.resume.sections.skills.length > 0) {
-    const skillsContainer = skillsSection.find(".skills-grid, .skills-list, .tag-list").first();
+    // Try various skills container patterns used by different templates
+    const skillsContainer = skillsSection.find(".skills-grid, .skills-list, .tag-list, .skills-categories").first();
     if (skillsContainer.length) {
-      skillsContainer.empty();
-      for (const skill of input.resume.sections.skills) {
-        skillsContainer.append(`<span class="skill-tag">${skill}</span>`);
+      // If template uses category rows (.skill-row + .skill-tags + .tag),
+      // replace the entire container with a flat tag list preserving the template's tag styling
+      if (skillsContainer.hasClass("skills-categories")) {
+        const tagClass = skillsContainer.find(".tag").first().attr("class") || "tag";
+        skillsContainer.empty();
+        const tagsHtml = input.resume.sections.skills.map((s) => `<span class="${tagClass}">${s}</span>`).join(" ");
+        skillsContainer.html(`<div class="skill-row"><div class="skill-tags">${tagsHtml}</div></div>`);
+      } else {
+        skillsContainer.empty();
+        for (const skill of input.resume.sections.skills) {
+          skillsContainer.append(`<span class="skill-tag">${skill}</span>`);
+        }
       }
     }
   }
