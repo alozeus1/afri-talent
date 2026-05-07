@@ -3551,3 +3551,52 @@ export const skills = {
       body: JSON.stringify(data),
     }),
 };
+
+// ── Resume Templates ──────────────────────────────────────────────────────────
+
+export type SubscriptionPlan =
+  | "FREE"
+  | "BASIC"
+  | "PROFESSIONAL"
+  | "EMPLOYER_FREE"
+  | "EMPLOYER_BASIC"
+  | "EMPLOYER_PREMIUM";
+
+export interface ResumeTemplate {
+  id: string;
+  name: string;
+  description: string;
+  thumbnailUrl: string;
+  tags: string[];
+  bestFor: string[];
+  minPlan: SubscriptionPlan;
+  sortOrder: number;
+  files: Array<{
+    id: string;
+    format: string;
+    s3Key: string | null;
+    externalUrl: string | null;
+    fileSizeBytes: number | null;
+  }>;
+  isLocked: boolean;
+  totalDownloads: number;
+}
+
+export interface TemplateListResponse {
+  templates: ResumeTemplate[];
+  userPlan: SubscriptionPlan;
+  userDownloadsThisMonth: number;
+  quota: number | null;
+  canDownload: boolean;
+}
+
+export interface TemplateDownloadResponse {
+  downloadUrl: string;
+  expiresAt: string | null;
+}
+
+export const templates = {
+  list: () => fetchAPI<TemplateListResponse>("/api/skills/resume-templates"),
+  download: (id: string, format: string) =>
+    fetchAPI<TemplateDownloadResponse>(`/api/skills/resume-templates/${id}/download?format=${encodeURIComponent(format)}`),
+};

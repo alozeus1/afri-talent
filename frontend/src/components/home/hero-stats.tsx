@@ -39,19 +39,19 @@ export function HeroStats() {
   const items = stats
     ? [
         {
-          label: "Active Candidates",
-          value: `${formatCompact(stats.activeCandidates)}+`,
+          label: "Early Users",
+          value: `${formatCompact(stats.activeCandidates)}`,
         },
         {
-          label: "Partner Companies",
-          value: `${formatCompact(stats.partnerCompanies)}+`,
+          label: "Employer Proof",
+          value: "Pending",
         },
         {
-          label: "Jobs Posted",
-          value: `${formatCompact(stats.jobsPosted)}+`,
+          label: "Open Roles Indexed",
+          value: `${formatCompact(stats.jobsPosted)}`,
         },
         {
-          label: "African Countries",
+          label: "Africa Context",
           value: `${stats.africanCountries}`,
         },
       ]
@@ -89,6 +89,11 @@ export function HeroStats() {
         {!hasLiveStats && (
           <p className="mt-5 text-center text-sm text-gray-500 dark:text-gray-400">
             Showing verifiable product-readiness signals. Candidate outcomes, employer counts, and testimonials will appear after real early-access activity.
+          </p>
+        )}
+        {hasLiveStats && (
+          <p className="mt-5 text-center text-sm text-gray-500 dark:text-gray-400">
+            Employer validation, hiring-partner counts, and testimonials will appear only after verified early-access workflows produce real proof.
           </p>
         )}
       </div>

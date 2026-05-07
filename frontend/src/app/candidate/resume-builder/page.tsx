@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { skills, GeneratedResume } from "@/lib/api";
+import { profile, skills, CandidateProfile, GeneratedResume } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +68,8 @@ export default function ResumeBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<FriendlyError | null>(null);
   const [saved, setSaved] = useState(false);
+  const [savedProfile, setSavedProfile] = useState<CandidateProfile | null>(null);
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
 
   // ATS scan state
   const [atsJobDescription, setAtsJobDescription] = useState("");
@@ -80,11 +83,92 @@ export default function ResumeBuilderPage() {
   const [atsLoading, setAtsLoading] = useState(false);
   const [atsError, setAtsError] = useState<FriendlyError | null>(null);
 
-  if (authLoading) return null;
-  if (!user) {
-    router.push("/login");
-    return null;
+  function formHasDraft(value: FormState): boolean {
+    return Boolean(
+      value.targetRole ||
+        value.location ||
+        value.summary ||
+        value.skills ||
+        value.certifications ||
+        value.workHistory.some((item) => item.company || item.title || item.description) ||
+        value.educationHistory.some((item) => item.institution || item.degree),
+    );
   }
+
+  function fromProfile(candidateProfile: CandidateProfile): Partial<FormState> {
+    return {
+      location: candidateProfile.targetCountries?.[0] || "",
+      targetRole: candidateProfile.targetRoles?.[0] || "",
+      yearsExperience: String(candidateProfile.yearsExperience ?? 0),
+      summary: candidateProfile.bio || candidateProfile.headline || "",
+      skills: candidateProfile.skills.join(", "),
+      certifications: (candidateProfile.certifications || [])
+        .map((item) => item.name)
+        .filter(Boolean)
+        .join(", "),
+      workHistory: candidateProfile.workHistory?.length
+        ? candidateProfile.workHistory.map((item) => ({
+            company: item.company || "",
+            title: item.title || "",
+            period: item.period || "",
+            description: item.description || "",
+          }))
+        : [{ ...emptyWork }],
+      educationHistory: candidateProfile.educationHistory?.length
+        ? candidateProfile.educationHistory.map((item) => ({
+            institution: item.institution || "",
+            degree: item.degree || "",
+            period: item.period || "",
+          }))
+        : [{ ...emptyEdu }],
+    };
+  }
+
+  function applyProfileToForm(candidateProfile: CandidateProfile, overwrite = false) {
+    const profileForm = fromProfile(candidateProfile);
+    setForm((prev) => ({
+      ...prev,
+      ...Object.fromEntries(
+        Object.entries(profileForm).filter(([key, value]) => {
+          if (overwrite) return true;
+          const current = prev[key as keyof FormState];
+          if (Array.isArray(current)) {
+            return current.length === 0 || current.every((item) => Object.values(item).every((field) => !field));
+          }
+          return !current && Boolean(value);
+        }),
+      ),
+    }));
+    setProfileNotice(overwrite ? "Resume fields updated from your latest profile." : "Blank resume fields were prefilled from your profile.");
+  }
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
+  }, [authLoading, router, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    profile.get()
+      .then((candidateProfile) => {
+        if (cancelled || !candidateProfile) return;
+        setSavedProfile(candidateProfile);
+        setForm((current) => {
+          if (formHasDraft(current)) return current;
+          const profileForm = fromProfile(candidateProfile);
+          setProfileNotice("Resume builder started from your saved profile.");
+          return { ...current, ...profileForm };
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  if (authLoading || !user) return null;
 
   function updateWork(index: number, field: keyof WorkEntry, value: string) {
     setForm((prev) => {
@@ -210,6 +294,12 @@ export default function ResumeBuilderPage() {
           </div>
         )}
 
+        {profileNotice && (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            {profileNotice}
+          </div>
+        )}
+
         {!generated ? (
           <Card>
             <CardHeader>
@@ -221,6 +311,60 @@ export default function ResumeBuilderPage() {
                 <p className="mt-1">
                   Keep every claim verifiable. AfriTalent can improve wording and structure, but it should not invent tools, employers, certifications, or results.
                 </p>
+              </div>
+              {savedProfile && (
+                <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-white p-4">
+                  <Button size="sm" variant="outline" onClick={() => applyProfileToForm(savedProfile, false)}>
+                    Update from profile
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      applyProfileToForm(savedProfile, true);
+                    }}
+                  >
+                    Start from profile
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setForm({
+                        fullName: user?.name || "",
+                        email: user?.email || "",
+                        phone: "",
+                        location: "",
+                        targetRole: "",
+                        yearsExperience: "0",
+                        summary: "",
+                        skills: "",
+                        certifications: "",
+                        workHistory: [{ ...emptyWork }],
+                        educationHistory: [{ ...emptyEdu }],
+                      });
+                      setProfileNotice("Started a blank resume draft.");
+                    }}
+                  >
+                    Start blank
+                  </Button>
+                </div>
+              )}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-950">Premium template bundle</p>
+                    <p className="mt-1 text-sm text-emerald-800">
+                      Preview ATS-ready layouts and download templates included with your plan.
+                    </p>
+                  </div>
+                  <Link
+                    href="/candidate/resume-templates"
+                    className="inline-flex items-center justify-center rounded-md border border-zinc-200 bg-transparent px-3.5 py-2 text-sm font-medium text-zinc-900 shadow-sm transition-all duration-200 hover:bg-zinc-100"
+                  >
+                    Browse templates
+                  </Link>
+                </div>
               </div>
 
               <div className="grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
