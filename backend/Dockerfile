@@ -1,5 +1,5 @@
 # Backend Dockerfile - Production (Debian/Prisma OpenSSL compatible)
-FROM node:20-bookworm-slim AS base
+FROM node:26-bookworm-slim AS base
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates openssl curl \
