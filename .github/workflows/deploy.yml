@@ -1,0 +1,282 @@
+name: Deploy (new account, ECS Fargate + Lambda)
+
+# CI/CD pipeline for the new AWS account migration target (account 108188564905).
+# Replaces deploy-apprunner.yml once the supervisor has verified one full run.
+# Authentication is OIDC-only — no static AWS keys.
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "infra/terraform/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      skip_terraform:
+        description: "Skip the terraform-apply job (image push only)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  OIDC_ROLE_NAME: ${{ vars.OIDC_ROLE_NAME || 'afritalent-dev-github-deploy' }}
+  NODE_VERSION: "20"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Build & test both apps (no AWS access needed).
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build & Test
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Backend typecheck
+        working-directory: backend
+        run: npm run typecheck
+
+      - name: Frontend typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Backend build
+        working-directory: backend
+        run: npm run build
+
+      - name: Frontend build
+        working-directory: frontend
+        env:
+          MOCK_AI: "1"
+        run: npm run build
+
+      - name: Backend unit tests
+        working-directory: backend
+        env:
+          MOCK_AI: "1"
+        run: npm test --if-present -- --run
+
+      - name: Frontend unit tests
+        working-directory: frontend
+        run: npm test --if-present -- --run
+
+  # ---------------------------------------------------------------------------
+  # 2. Package the three Lambda functions as zip artifacts.
+  # ---------------------------------------------------------------------------
+  package-lambdas:
+    name: Package Lambdas
+    needs: [build]
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install backend deps (with dev for build)
+        working-directory: backend
+        run: npm ci
+
+      - name: Build backend (compiles dist/ + dist/lambda/)
+        working-directory: backend
+        run: npm run build
+
+      - name: Prune to production deps
+        working-directory: backend
+        run: npm prune --production
+
+      - name: Zip Lambda packages
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          for fn in webhook-stripe webhook-flutterwave orchestrator-step; do
+            echo "Packaging $fn"
+            zip -qr "../dist-lambda-${fn}.zip" \
+              "dist/lambda/${fn}.js" \
+              "dist/" \
+              "node_modules/" \
+              "package.json"
+          done
+          ls -la ../dist-lambda-*.zip
+
+      - name: Upload Lambda artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-packages-${{ github.sha }}
+          path: dist-lambda-*.zip
+          retention-days: 7
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # 3. Build & push frontend and backend container images to ECR.
+  # ---------------------------------------------------------------------------
+  push-images:
+    name: Build & Push Images
+    needs: [build]
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate required vars
+        run: |
+          if [ -z "${{ vars.AWS_ACCOUNT_ID }}" ]; then
+            echo "Missing required GitHub variable: AWS_ACCOUNT_ID" >&2
+            exit 1
+          fi
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.OIDC_ROLE_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push backend image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPO: afritalent-dev-backend
+          SHA_TAG: ${{ github.sha }}
+        run: |
+          IMAGE="$REGISTRY/$REPO"
+          docker buildx build \
+            --platform linux/amd64 \
+            --push \
+            -t "$IMAGE:$SHA_TAG" \
+            -t "$IMAGE:latest" \
+            ./backend
+
+      - name: Build & push frontend image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPO: afritalent-dev-frontend
+          SHA_TAG: ${{ github.sha }}
+        run: |
+          IMAGE="$REGISTRY/$REPO"
+          docker buildx build \
+            --platform linux/amd64 \
+            --push \
+            -t "$IMAGE:$SHA_TAG" \
+            -t "$IMAGE:latest" \
+            ./frontend
+
+  # ---------------------------------------------------------------------------
+  # 4. Apply Terraform for the new-account stack.
+  #    Main branch only, to avoid develop-branch builds mutating prod state.
+  # ---------------------------------------------------------------------------
+  terraform-apply:
+    name: Terraform Apply (dev-new)
+    needs: [package-lambdas, push-images]
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.skip_terraform != 'true')
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    defaults:
+      run:
+        working-directory: infra/terraform/accounts/dev-new
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate required vars
+        run: |
+          if [ -z "${{ vars.AWS_ACCOUNT_ID }}" ]; then
+            echo "Missing required GitHub variable: AWS_ACCOUNT_ID" >&2
+            exit 1
+          fi
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.OIDC_ROLE_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+          terraform_wrapper: false
+
+      - name: Download Lambda artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-packages-${{ github.sha }}
+          path: infra/terraform/accounts/dev-new/lambda-packages
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform apply
+        env:
+          TF_VAR_image_tag: ${{ github.sha }}
+          TF_VAR_lambda_artifact_dir: ${{ github.workspace }}/infra/terraform/accounts/dev-new/lambda-packages
+        run: |
+          if [ -f terraform.tfvars ]; then
+            terraform apply -auto-approve -input=false
+          else
+            terraform apply -auto-approve -input=false
+          fi
+
+  # ---------------------------------------------------------------------------
+  # 5. Smoke test against the deployed CloudFront / ALB endpoint.
+  # ---------------------------------------------------------------------------
+  smoke-test:
+    name: Smoke Test
+    needs: [terraform-apply]
+    if: needs.terraform-apply.result == 'success'
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve target URL
+        id: target
+        run: |
+          if [ -n "${{ vars.PROD_DOMAIN }}" ]; then
+            echo "url=https://${{ vars.PROD_DOMAIN }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "PROD_DOMAIN var not set; smoke test will skip." >&2
+            echo "url=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run smoke test
+        if: steps.target.outputs.url != ''
+        timeout-minutes: 2
+        run: |
+          chmod +x ./scripts/migrate/smoke-test.sh
+          ./scripts/migrate/smoke-test.sh "${{ steps.target.outputs.url }}"
+
+      - name: Smoke test skipped
+        if: steps.target.outputs.url == ''
+        run: echo "Skipping smoke test — vars.PROD_DOMAIN is not configured."

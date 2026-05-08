@@ -1,0 +1,47 @@
+{
+  "Comment": "AfriTalent orchestrator — single-step today, expandable to per-agent fan-out",
+  "StartAt": "RunOrchestrator",
+  "States": {
+    "RunOrchestrator": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${orchestrator_lambda_arn}",
+        "Payload.$": "$"
+      },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        },
+        {
+          "ErrorEquals": ["States.Timeout"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 1
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "RecordFailure"
+        }
+      ],
+      "End": true
+    },
+    "RecordFailure": {
+      "Type": "Pass",
+      "Comment": "Placeholder terminal state. Wire to a Lambda that records the failure to AiRun via completeAiRun(failed) when this state machine is promoted to production.",
+      "End": true
+    }
+  },
+  "TimeoutSeconds": 900
+}
