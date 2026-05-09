@@ -239,7 +239,17 @@ jobs:
 
       - name: Terraform init
         if: steps.probe.outputs.present == 'true'
-        run: terraform init
+        env:
+          TF_BACKEND_BUCKET: afritalent-${{ vars.AWS_ACCOUNT_ID }}-tfstate
+          TF_BACKEND_LOCK_TABLE: afritalent-${{ vars.AWS_ACCOUNT_ID }}-tflocks
+        run: |
+          terraform init \
+            -backend-config="bucket=${TF_BACKEND_BUCKET}" \
+            -backend-config="dynamodb_table=${TF_BACKEND_LOCK_TABLE}" \
+            -backend-config="key=dev-new/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="encrypt=true" \
+            -input=false
 
       - name: Terraform plan (read-only)
         if: steps.probe.outputs.present == 'true'

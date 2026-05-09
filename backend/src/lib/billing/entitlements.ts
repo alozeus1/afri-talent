@@ -108,7 +108,7 @@ const DEFAULT_ENTITLEMENTS: Record<SubscriptionPlan, Entitlements> = {
     skillsAssessments: false,
     chatAccess: false,
     autopilot: false,
-    jobPostsPerMonth: 3,
+    jobPostsPerMonth: null, // unlimited — every registered employer can post regardless of plan
     talentSearch: false,
     analytics: false,
     apiAccess: false,
@@ -131,7 +131,7 @@ const DEFAULT_ENTITLEMENTS: Record<SubscriptionPlan, Entitlements> = {
     skillsAssessments: false,
     chatAccess: false,
     autopilot: false,
-    jobPostsPerMonth: 20,
+    jobPostsPerMonth: null, // unlimited — paid tiers add other features (talent search, analytics) but posting is open to all
     talentSearch: true,
     analytics: true,
     apiAccess: false,

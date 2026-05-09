@@ -43,11 +43,11 @@ const PLAN_META: Record<string, { name: string; features: string[]; popular?: bo
   },
   EMPLOYER_FREE: {
     name: "Employer Free",
-    features: ["Post up to 3 jobs/month", "Basic applicant management"],
+    features: ["Unlimited job postings", "Basic applicant management"],
   },
   EMPLOYER_BASIC: {
     name: "Employer Basic",
-    features: ["Post up to 20 jobs/month", "Talent search", "Analytics dashboard"],
+    features: ["Unlimited job postings", "Talent search", "Analytics dashboard"],
   },
   EMPLOYER_PREMIUM: {
     name: "Employer Premium",
