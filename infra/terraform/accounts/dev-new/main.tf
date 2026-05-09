@@ -101,6 +101,15 @@ module "ecr" {
   # kms_key_arn empty -> AES256 encryption
 }
 
+# ── App S3 bucket for uploads (resumes, profile photos, blog images, exports) ─
+module "s3_uploads" {
+  source = "../../modules/s3"
+
+  bucket_name     = "afritalent-${var.environment}-uploads-${var.aws_account_id}"
+  environment     = var.environment
+  allowed_origins = ["https://d2j3ahmgbbdup1.cloudfront.net", "https://afri-talent.com", "https://www.afri-talent.com"]
+}
+
 module "ecs_fargate" {
   source = "../../modules/ecs-fargate"
 
@@ -123,6 +132,8 @@ module "ecs_fargate" {
   ssm_path_prefix = var.ssm_path_prefix
   ssm_kms_key_arn = module.ssm_params.ssm_kms_key_arn
 
+  app_s3_bucket_arn = module.s3_uploads.bucket_arn
+
   backend_env = {
     NODE_ENV                      = "production"
     PORT                          = "3001"
@@ -136,29 +147,68 @@ module "ecs_fargate" {
     SEMANTIC_INDEX_ENABLED        = "0"
     SMS_ENABLED                   = "0"
     AWS_REGION                    = var.aws_region
+    BLOG_AUTOMATION_ENABLED       = "1" # all blog API keys populated 2026-05-08
   }
 
   # SSM SecureString -> env var. Each value is the parameter ARN.
+  # Placeholders (Apify/Greenhouse/Lever/Workable/Blog/News/Unsplash/Pexels/Admin)
+  # are still wired so the container's env contains them at boot — when the SSM
+  # value is updated to a real value, the next ECS task pulls it without a TF change.
   backend_secrets = {
-    DATABASE_URL                  = "${local.ssm_arn_base}/DATABASE_URL"
-    JWT_SECRET                    = "${local.ssm_arn_base}/JWT_SECRET"
-    SESSION_SECRET                = "${local.ssm_arn_base}/SESSION_SECRET"
-    ANTHROPIC_API_KEY             = "${local.ssm_arn_base}/ANTHROPIC_API_KEY"
-    OPENAI_API_KEY                = "${local.ssm_arn_base}/OPENAI_API_KEY"
-    AI_FAST_MODEL                 = "${local.ssm_arn_base}/AI_FAST_MODEL"
-    AI_QUALITY_MODEL              = "${local.ssm_arn_base}/AI_QUALITY_MODEL"
-    STRIPE_SECRET_KEY             = "${local.ssm_arn_base}/STRIPE_SECRET_KEY"
-    STRIPE_WEBHOOK_SECRET         = "${local.ssm_arn_base}/STRIPE_WEBHOOK_SECRET"
-    STRIPE_PRICE_CATALOG_JSON     = "${local.ssm_arn_base}/STRIPE_PRICE_CATALOG_JSON"
+    DATABASE_URL   = "${local.ssm_arn_base}/DATABASE_URL"
+    JWT_SECRET     = "${local.ssm_arn_base}/JWT_SECRET"
+    SESSION_SECRET = "${local.ssm_arn_base}/SESSION_SECRET"
+
+    ANTHROPIC_API_KEY         = "${local.ssm_arn_base}/ANTHROPIC_API_KEY"
+    OPENAI_API_KEY            = "${local.ssm_arn_base}/OPENAI_API_KEY"
+    OPENAI_EMBEDDING_ENDPOINT = "${local.ssm_arn_base}/OPENAI_EMBEDDING_ENDPOINT"
+    AI_FAST_MODEL             = "${local.ssm_arn_base}/AI_FAST_MODEL"
+    AI_QUALITY_MODEL          = "${local.ssm_arn_base}/AI_QUALITY_MODEL"
+
+    STRIPE_SECRET_KEY                     = "${local.ssm_arn_base}/STRIPE_SECRET_KEY"
+    STRIPE_WEBHOOK_SECRET                 = "${local.ssm_arn_base}/STRIPE_WEBHOOK_SECRET"
+    STRIPE_PRICE_CATALOG_JSON             = "${local.ssm_arn_base}/STRIPE_PRICE_CATALOG_JSON"
+    STRIPE_PRICE_BASIC_MONTHLY            = "${local.ssm_arn_base}/STRIPE_PRICE_BASIC_MONTHLY"
+    STRIPE_PRICE_PROFESSIONAL_MONTHLY     = "${local.ssm_arn_base}/STRIPE_PRICE_PROFESSIONAL_MONTHLY"
+    STRIPE_PRICE_EMPLOYER_BASIC_MONTHLY   = "${local.ssm_arn_base}/STRIPE_PRICE_EMPLOYER_BASIC_MONTHLY"
+    STRIPE_PRICE_EMPLOYER_PREMIUM_MONTHLY = "${local.ssm_arn_base}/STRIPE_PRICE_EMPLOYER_PREMIUM_MONTHLY"
+
     FLUTTERWAVE_PUBLIC_KEY        = "${local.ssm_arn_base}/FLUTTERWAVE_PUBLIC_KEY"
     FLUTTERWAVE_SECRET_KEY        = "${local.ssm_arn_base}/FLUTTERWAVE_SECRET_KEY"
     FLUTTERWAVE_SECRET_HASH       = "${local.ssm_arn_base}/FLUTTERWAVE_SECRET_HASH"
     FLUTTERWAVE_PLAN_CATALOG_JSON = "${local.ssm_arn_base}/FLUTTERWAVE_PLAN_CATALOG_JSON"
     FLUTTERWAVE_PAYMENT_OPTIONS   = "${local.ssm_arn_base}/FLUTTERWAVE_PAYMENT_OPTIONS"
-    GOOGLE_CLIENT_ID              = "${local.ssm_arn_base}/GOOGLE_CLIENT_ID"
-    GOOGLE_CLIENT_SECRET          = "${local.ssm_arn_base}/GOOGLE_CLIENT_SECRET"
-    ADZUNA_APP_ID                 = "${local.ssm_arn_base}/ADZUNA_APP_ID"
-    ADZUNA_API_KEY                = "${local.ssm_arn_base}/ADZUNA_API_KEY"
+
+    GOOGLE_CLIENT_ID     = "${local.ssm_arn_base}/GOOGLE_CLIENT_ID"
+    GOOGLE_CLIENT_SECRET = "${local.ssm_arn_base}/GOOGLE_CLIENT_SECRET"
+
+    ADZUNA_APP_ID               = "${local.ssm_arn_base}/ADZUNA_APP_ID"
+    ADZUNA_API_KEY              = "${local.ssm_arn_base}/ADZUNA_API_KEY"
+    APIFY_TOKEN                 = "${local.ssm_arn_base}/APIFY_TOKEN"
+    APIFY_JOB_TASKS_JSON        = "${local.ssm_arn_base}/APIFY_JOB_TASKS_JSON"
+    GREENHOUSE_BOARD_TOKENS     = "${local.ssm_arn_base}/GREENHOUSE_BOARD_TOKENS"
+    LEVER_SITE_TOKENS           = "${local.ssm_arn_base}/LEVER_SITE_TOKENS"
+    WORKABLE_COMPANY_TOKENS     = "${local.ssm_arn_base}/WORKABLE_COMPANY_TOKENS"
+    COMPANY_CAREER_SOURCES_JSON = "${local.ssm_arn_base}/COMPANY_CAREER_SOURCES_JSON"
+
+    NEWS_API_KEY                  = "${local.ssm_arn_base}/blog/NEWS_API_KEY"
+    UNSPLASH_ACCESS_KEY           = "${local.ssm_arn_base}/blog/UNSPLASH_ACCESS_KEY"
+    PEXELS_API_KEY                = "${local.ssm_arn_base}/blog/PEXELS_API_KEY"
+    BLOG_ADMIN_NOTIFICATION_EMAIL = "${local.ssm_arn_base}/blog/BLOG_ADMIN_NOTIFICATION_EMAIL"
+
+    SES_FROM_EMAIL    = "${local.ssm_arn_base}/SES_FROM_EMAIL"
+    SES_REGION        = "${local.ssm_arn_base}/SES_REGION"
+    S3_UPLOADS_BUCKET = "${local.ssm_arn_base}/S3_UPLOADS_BUCKET"
+
+    ATS_TOKEN_ENCRYPTION_KEY   = "${local.ssm_arn_base}/ATS_TOKEN_ENCRYPTION_KEY"
+    BOT_WEBHOOK_SECRET         = "${local.ssm_arn_base}/BOT_WEBHOOK_SECRET"
+    WEB_PUSH_VAPID_PUBLIC_KEY  = "${local.ssm_arn_base}/WEB_PUSH_VAPID_PUBLIC_KEY"
+    WEB_PUSH_VAPID_PRIVATE_KEY = "${local.ssm_arn_base}/WEB_PUSH_VAPID_PRIVATE_KEY"
+    WEB_PUSH_VAPID_SUBJECT     = "${local.ssm_arn_base}/WEB_PUSH_VAPID_SUBJECT"
+
+    SENTRY_DSN               = "${local.ssm_arn_base}/SENTRY_DSN"
+    ADMIN_BOOTSTRAP_EMAIL    = "${local.ssm_arn_base}/ADMIN_BOOTSTRAP_EMAIL"
+    ADMIN_BOOTSTRAP_PASSWORD = "${local.ssm_arn_base}/ADMIN_BOOTSTRAP_PASSWORD"
   }
 
   frontend_env = {

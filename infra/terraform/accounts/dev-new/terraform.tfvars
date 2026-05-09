@@ -8,9 +8,13 @@ name_prefix     = "afritalent-dev"
 ssm_path_prefix = "afritalent/dev"
 owner_tag       = "platform"
 
-# Using the existing Route 53 hosted zone Z06846713DL9KFNFBIRTI in this account.
-domain_name         = "afri-talent.com"
-create_route53_zone = false # zone already exists in this account
+# Domain temporarily disabled: afri-talent.com is delegated to DigitalOcean
+# nameservers, so AWS Route 53 zone records are not authoritative on the
+# public internet — ACM cannot validate via DNS through Route 53. Re-enable
+# AFTER either (a) updating the registrar to AWS NS records, or (b) adding
+# the ACM validation CNAME at DigitalOcean DNS.
+domain_name         = ""
+create_route53_zone = false
 
 # Aurora — auto-pause enabled
 aurora_min_acu                  = 0
