@@ -1,0 +1,109 @@
+# ── User-facing endpoints ─────────────────────────────────────────────────────
+
+output "cloudfront_domain_name" {
+  description = "CloudFront distribution domain (e.g. d12345.cloudfront.net). Public entry point for the app."
+  value       = module.cloudfront_waf.cloudfront_domain_name
+}
+
+output "alb_dns_name" {
+  description = "Internal ALB DNS name. Use for direct testing before DNS cutover."
+  value       = module.alb_fargate.alb_dns_name
+}
+
+output "primary_url" {
+  description = "Resolved primary URL — custom domain if configured, otherwise CloudFront default domain."
+  value       = local.has_domain ? "https://${var.domain_name}" : "https://${module.cloudfront_waf.cloudfront_domain_name}"
+}
+
+# ── DNS ──────────────────────────────────────────────────────────────────────
+
+output "route53_zone_id" {
+  description = "Route 53 hosted zone ID for var.domain_name (empty if not created)."
+  value       = local.route53_zone_id
+}
+
+output "route53_name_servers" {
+  description = "Name servers to set at the domain registrar to delegate DNS to this zone."
+  value       = local.route53_name_servers
+}
+
+output "acm_certificate_arn" {
+  description = "ACM certificate ARN used by both CloudFront and the ALB HTTPS listener."
+  value       = local.acm_certificate_arn
+}
+
+# ── Webhook URLs (config back into Stripe / Flutterwave dashboards) ──────────
+
+output "webhook_stripe_url" {
+  description = "Lambda Function URL for Stripe webhooks. Configure this in the Stripe dashboard as the webhook endpoint."
+  value       = module.lambda_functions.lambda_webhook_stripe_url
+}
+
+output "webhook_flutterwave_url" {
+  description = "Lambda Function URL for Flutterwave webhooks. Configure this in the Flutterwave dashboard."
+  value       = module.lambda_functions.lambda_webhook_flutterwave_url
+}
+
+# ── Data plane ───────────────────────────────────────────────────────────────
+
+output "aurora_cluster_endpoint" {
+  description = "Aurora writer endpoint. Apps should connect via the proxy below, not this directly."
+  value       = module.aurora.aurora_cluster_endpoint
+}
+
+output "rds_proxy_endpoint" {
+  description = "RDS Proxy endpoint. Use this in DATABASE_URL."
+  value       = module.rds_proxy.rds_proxy_endpoint
+}
+
+output "aurora_master_user_secret_arn" {
+  description = "Secrets Manager ARN holding auto-rotated Aurora master credentials. The inject-secrets.sh script reads this when computing DATABASE_URL."
+  value       = module.aurora.aurora_master_user_secret_arn
+  sensitive   = true
+}
+
+# ── Compute plane ────────────────────────────────────────────────────────────
+
+output "ecs_cluster_name" {
+  description = "ECS cluster name."
+  value       = module.ecs_fargate.ecs_cluster_name
+}
+
+output "ecr_repo_url_frontend" {
+  description = "Frontend ECR repository URL (push images here)."
+  value       = module.ecr.ecr_repo_url_frontend
+}
+
+output "ecr_repo_url_backend" {
+  description = "Backend ECR repository URL (push images here)."
+  value       = module.ecr.ecr_repo_url_backend
+}
+
+output "state_machine_orchestrator_arn" {
+  description = "Step Functions state machine ARN — invoke for orchestrator runs."
+  value       = module.lambda_functions.state_machine_orchestrator_arn
+}
+
+# ── CI/IAM ───────────────────────────────────────────────────────────────────
+
+output "github_oidc_role_arn" {
+  description = "GitHub Actions OIDC deploy role ARN. Set as the value of the AWS_DEPLOY_ROLE_ARN GitHub variable in the repo, or expose via vars.OIDC_ROLE_NAME if using just the name."
+  value       = module.iam_oidc_github.oidc_role_arn
+}
+
+output "github_oidc_role_name" {
+  description = "GitHub Actions OIDC deploy role NAME (used by deploy.yml as vars.OIDC_ROLE_NAME)."
+  value       = module.iam_oidc_github.oidc_role_name
+}
+
+# ── Observability ────────────────────────────────────────────────────────────
+
+output "dashboard_url" {
+  description = "CloudWatch dashboard URL for stack-wide visibility."
+  value       = module.observability.dashboard_url
+}
+
+output "ssm_path_prefix" {
+  description = "SSM parameter path prefix used by every secret (no leading/trailing slash)."
+  value       = module.ssm_params.ssm_parameter_path_prefix
+}

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { profile, skills, CandidateProfile, GeneratedResume } from "@/lib/api";
+import { profile, skills, billing, CandidateProfile, GeneratedResume, type BillingStatus } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { ATSScoreDisplay } from "@/components/ui/ats-score-display";
 import { LoadingState } from "@/components/ui/loading-state";
 import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
 import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
+import { PremiumGate } from "@/components/ui/premium-gate";
 import { RESUME_IMPROVEMENT_TIPS, reviewResumeInput } from "@/lib/early-tester-content";
 
 interface WorkEntry {
@@ -70,6 +71,7 @@ export default function ResumeBuilderPage() {
   const [saved, setSaved] = useState(false);
   const [savedProfile, setSavedProfile] = useState<CandidateProfile | null>(null);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
 
   // ATS scan state
   const [atsJobDescription, setAtsJobDescription] = useState("");
@@ -147,6 +149,15 @@ export default function ResumeBuilderPage() {
       router.push("/login");
     }
   }, [authLoading, router, user]);
+
+  useEffect(() => {
+    if (!user || user.role !== "CANDIDATE") return;
+    billing.status()
+      .then(setBillingStatus)
+      .catch(() => {
+        // no-op if billing endpoint fails
+      });
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -261,6 +272,27 @@ export default function ResumeBuilderPage() {
     } finally {
       setAtsLoading(false);
     }
+  }
+
+  const isProfessional = billingStatus?.plan === "PROFESSIONAL";
+
+  if (!isProfessional && billingStatus) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          <PremiumGate
+            feature="AI Resume Builder & Templates"
+            requiredPlan="Professional"
+            benefits={[
+              "AI-generated ATS-optimized resume drafts",
+              "Premium downloadable resume templates",
+              "Auto-fill your profile into any template",
+              "Unlimited ATS compatibility scans",
+            ]}
+          />
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -1,0 +1,40 @@
+# Copy to terraform.tfvars and edit. terraform.tfvars is gitignored.
+#
+# All values shown here are defaults — only override when you need to.
+
+aws_account_id = "108188564905"
+aws_region     = "us-east-1"
+environment    = "dev"
+name_prefix    = "afritalent-dev"
+ssm_path_prefix = "afritalent/dev"
+owner_tag       = "platform"
+
+# Set to your domain when ready. Empty = CloudFront default domain only.
+# Example: domain_name = "dev.afritalent.com"
+domain_name = ""
+
+# Create the Route 53 zone here? Set to false if registrar/DNS lives elsewhere.
+create_route53_zone = true
+
+# Aurora knobs
+aurora_min_acu                  = 0
+aurora_max_acu                  = 4
+aurora_seconds_until_auto_pause = 1800
+
+# ECS knobs (Spot mix: base=1 on-demand, weight=4 Spot → ~80% Spot)
+ecs_desired_count       = 1
+ecs_fargate_base        = 1
+ecs_fargate_spot_weight = 4
+
+# GitHub OIDC
+github_owner = "alozeus1"
+github_repo  = "afri-talent"
+
+# Cost
+monthly_budget_usd = 150
+budget_alert_email = "alozeus1@gmail.com"
+
+# Lambda zips — leave empty for first plan; CI fills via -var=
+# webhook_stripe_zip_path      = "../../../../dist-lambda-webhook-stripe.zip"
+# webhook_flutterwave_zip_path = "../../../../dist-lambda-webhook-flutterwave.zip"
+# orchestrator_zip_path        = "../../../../dist-lambda-orchestrator-step.zip"

@@ -3599,4 +3599,6 @@ export const templates = {
   list: () => fetchAPI<TemplateListResponse>("/api/skills/resume-templates"),
   download: (id: string, format: string) =>
     fetchAPI<TemplateDownloadResponse>(`/api/skills/resume-templates/${id}/download?format=${encodeURIComponent(format)}`),
+  fill: (id: string) =>
+    fetchAPI<TemplateDownloadResponse>(`/api/skills/resume-templates/${id}/fill`, { method: "POST" }),
 };

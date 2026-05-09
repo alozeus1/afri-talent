@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "test:unit": "NODE_OPTIONS='--max-old-space-size=4096' NEXT_UNHANDLED_REJECTION_FILTER=disabled jest --runInBand",
     "test:unit:watch": "NODE_OPTIONS='--max-old-space-size=4096' NEXT_UNHANDLED_REJECTION_FILTER=disabled jest --watch",
     "test:unit:shard:1": "NODE_OPTIONS='--max-old-space-size=4096' NEXT_UNHANDLED_REJECTION_FILTER=disabled jest --runInBand --shard=1/2",
