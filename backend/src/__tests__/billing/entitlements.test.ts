@@ -35,8 +35,12 @@ describe("DEFAULT_ENTITLEMENTS", () => {
     // These same values apply to Africa, Europe, and ROW
   });
 
-  it("EMPLOYER_FREE has 3 job posts/month", () => {
-    expect(DEFAULT_ENTITLEMENTS.EMPLOYER_FREE.jobPostsPerMonth).toBe(3);
+  it("EMPLOYER_FREE has unlimited job posts (permission to post is universal across employer tiers)", () => {
+    expect(DEFAULT_ENTITLEMENTS.EMPLOYER_FREE.jobPostsPerMonth).toBeNull();
+  });
+
+  it("EMPLOYER_BASIC has unlimited job posts", () => {
+    expect(DEFAULT_ENTITLEMENTS.EMPLOYER_BASIC.jobPostsPerMonth).toBeNull();
   });
 
   it("EMPLOYER_BASIC has talent search", () => {
