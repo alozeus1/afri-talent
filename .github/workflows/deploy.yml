@@ -81,11 +81,12 @@ jobs:
         working-directory: backend
         env:
           MOCK_AI: "1"
-        run: npm test --if-present -- --run
+        run: npm test -- --run
 
-      - name: Frontend unit tests
-        working-directory: frontend
-        run: npm test --if-present -- --run
+      # Frontend unit tests are covered by the CI workflow's `Frontend Unit
+      # Tests` job (which runs Jest via `npm run test:unit:ci`). The frontend
+      # `test` script is Playwright E2E, which needs a running app and is not
+      # appropriate to run inside the deploy build step.
 
   # ---------------------------------------------------------------------------
   # 2. Package the three Lambda functions as zip artifacts.
