@@ -145,7 +145,7 @@ jobs:
         run: terraform show -no-color tfplan > tfplan.txt
 
       - name: Upload plan artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: terraform-plan
           path: infra/terraform/tfplan.txt
@@ -256,7 +256,7 @@ jobs:
 
       - name: Upload plan artifact
         if: steps.probe.outputs.present == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: terraform-plan-dev-new
           path: infra/terraform/accounts/dev-new/tfplan-dev-new.txt
