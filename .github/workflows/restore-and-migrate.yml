@@ -266,8 +266,15 @@ jobs:
             exit 0
           fi
           echo ">> dump+restore starting"
-          pg_dump --format=custom --no-owner --no-acl --serializable-deferrable "$OLD_DATABASE_URL" \
-            | pg_restore --no-owner --no-acl --clean --if-exists --exit-on-error --verbose -d "$NEW_DATABASE_URL"
+          # Source RDS is Postgres 17.6, target Aurora is on 15.5 — pg_dump 17
+          # emits `SET transaction_timeout = 0;` in the prologue, which 15.x
+          # doesn't recognize. Use plain SQL pipe + grep to strip that single
+          # PG17-only directive, then feed to psql.
+          pg_dump --format=plain --clean --if-exists --no-owner --no-acl \
+                  --serializable-deferrable --quote-all-identifiers \
+                  "$OLD_DATABASE_URL" \
+            | grep -v '^SET transaction_timeout' \
+            | psql -v ON_ERROR_STOP=1 -d "$NEW_DATABASE_URL"
           echo ">> dump+restore complete"
           SCRIPT
           chmod +x migrate.sh
