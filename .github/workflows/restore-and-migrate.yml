@@ -133,14 +133,43 @@ jobs:
           SNAPSHOT_ARN: ${{ inputs.shared_snapshot_arn }}
         run: |
           set -euo pipefail
-          echo "Waiting for snapshot $SNAPSHOT_ARN to be available…"
+          echo "Waiting for shared snapshot $SNAPSHOT_ARN to be available…"
           aws rds wait db-snapshot-available \
             --db-snapshot-identifier "$SNAPSHOT_ARN"
-          echo "Snapshot is available."
+          echo "Shared snapshot is available."
 
-      - name: Restore temp RDS from shared snapshot
+      - name: Copy shared snapshot into a local (new-account) snapshot
+        id: localsnap
         env:
           SNAPSHOT_ARN: ${{ inputs.shared_snapshot_arn }}
+        run: |
+          set -euo pipefail
+          # Cross-account-encrypted snapshots cannot be restored directly per
+          # AWS docs. Copy locally, re-encrypting with the new account's
+          # default aws/rds KMS key (or a CMK if we make one later). Then
+          # restore from the local copy.
+          LOCAL_ID="afritalent-dev-migrator-source-$(date -u +%Y%m%d-%H%M)"
+          # Resolve the new-account default aws/rds KMS key id.
+          NEW_KMS=$(aws kms describe-key --key-id alias/aws/rds --query 'KeyMetadata.Arn' --output text)
+          echo "Copying shared snapshot → ${LOCAL_ID} (encrypted with ${NEW_KMS})…"
+
+          # Idempotent: if a copy is in progress, reuse it instead of recreating.
+          aws rds copy-db-snapshot \
+            --source-db-snapshot-identifier "$SNAPSHOT_ARN" \
+            --target-db-snapshot-identifier "$LOCAL_ID" \
+            --kms-key-id "$NEW_KMS" \
+            --copy-tags \
+            --tags Key=Purpose,Value=cross-account-migration Key=DeleteAfter,Value=2026-05-31 \
+            --query 'DBSnapshot.{Status:Status,Snapshot:DBSnapshotIdentifier}' --output json
+
+          echo "Waiting for local copy to be available (~5–8 min)…"
+          aws rds wait db-snapshot-available --db-snapshot-identifier "$LOCAL_ID"
+          echo "Local snapshot ready: $LOCAL_ID"
+          echo "id=$LOCAL_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Restore temp RDS from local snapshot
+        env:
+          LOCAL_SNAP: ${{ steps.localsnap.outputs.id }}
           DB_SUBNET_GROUP: ${{ steps.net.outputs.db_subnet_group }}
           DB_SG: ${{ steps.net.outputs.db_sg }}
         run: |
@@ -152,12 +181,12 @@ jobs:
             aws rds wait db-instance-deleted --db-instance-identifier "${TEMP_DB_INSTANCE_ID}"
           fi
 
-          echo "Restoring snapshot $SNAPSHOT_ARN as ${TEMP_DB_INSTANCE_ID}…"
+          echo "Restoring local snapshot $LOCAL_SNAP as ${TEMP_DB_INSTANCE_ID}…"
           echo "  DB subnet group: $DB_SUBNET_GROUP"
           echo "  Security group:  $DB_SG"
           aws rds restore-db-instance-from-db-snapshot \
             --db-instance-identifier "${TEMP_DB_INSTANCE_ID}" \
-            --db-snapshot-identifier "$SNAPSHOT_ARN" \
+            --db-snapshot-identifier "$LOCAL_SNAP" \
             --db-instance-class db.t4g.small \
             --no-publicly-accessible \
             --db-subnet-group-name "$DB_SUBNET_GROUP" \
@@ -363,8 +392,10 @@ jobs:
             exit 1
           fi
 
-      - name: Teardown temp RDS (always)
+      - name: Teardown temp RDS + local snapshot (always)
         if: always()
+        env:
+          LOCAL_SNAP: ${{ steps.localsnap.outputs.id }}
         run: |
           set -euo pipefail
           if aws rds describe-db-instances --db-instance-identifier "${TEMP_DB_INSTANCE_ID}" >/dev/null 2>&1; then
@@ -376,6 +407,13 @@ jobs:
               --query 'DBInstance.DBInstanceStatus' --output text || true
           else
             echo "Temp RDS already gone."
+          fi
+
+          if [ -n "${LOCAL_SNAP:-}" ]; then
+            if aws rds describe-db-snapshots --db-snapshot-identifier "${LOCAL_SNAP}" >/dev/null 2>&1; then
+              echo "Deleting local snapshot ${LOCAL_SNAP}…"
+              aws rds delete-db-snapshot --db-snapshot-identifier "${LOCAL_SNAP}" --query 'DBSnapshot.Status' --output text || true
+            fi
           fi
 
       - name: Deregister task definition
