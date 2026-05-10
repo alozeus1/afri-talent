@@ -300,7 +300,7 @@ jobs:
               taskRoleArn: $task_role,
               containerDefinitions: [{
                 name: "migrator",
-                image: "public.ecr.aws/docker/library/postgres:16-alpine",
+                image: "public.ecr.aws/docker/library/postgres:17-alpine",
                 essential: true,
                 command: ["sh", "-c", $cmd],
                 logConfiguration: {
