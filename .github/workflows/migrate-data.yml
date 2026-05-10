@@ -39,7 +39,8 @@ permissions:
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   OIDC_ROLE_NAME: ${{ vars.OIDC_ROLE_NAME || 'afritalent-dev-github-deploy' }}
-  CLUSTER_NAME: afritalent-dev-cluster
+  # Cluster name = var.name_prefix from infra/terraform (no `-cluster` suffix).
+  CLUSTER_NAME: afritalent-dev
   BACKEND_SERVICE: afritalent-dev-backend
   SSM_DATABASE_URL_PARAM: /afritalent/dev/DATABASE_URL
   TASK_FAMILY: afritalent-dev-data-migrator
