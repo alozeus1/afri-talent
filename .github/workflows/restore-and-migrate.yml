@@ -84,24 +84,17 @@ jobs:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.OIDC_ROLE_NAME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Discover network + IAM details
+      - name: Discover network + IAM + DB subnet group details
         id: net
         run: |
           set -euo pipefail
+          # Migrator Fargate task lives in ECS task subnets (private, NAT-routed).
           NET_JSON=$(aws ecs describe-services \
             --cluster "${CLUSTER_NAME}" \
             --services "${BACKEND_SERVICE}" \
             --query 'services[0].networkConfiguration.awsvpcConfiguration' \
             --output json)
           jq -n --argjson nc "$NET_JSON" '{awsvpcConfiguration: {subnets: $nc.subnets, securityGroups: $nc.securityGroups, assignPublicIp: "DISABLED"}}' > netconf.json
-
-          # Extract VPC ID from one of the subnets (used for the DB subnet group below).
-          FIRST_SUBNET=$(echo "$NET_JSON" | jq -r '.subnets[0]')
-          VPC_ID=$(aws ec2 describe-subnets --subnet-ids "$FIRST_SUBNET" --query 'Subnets[0].VpcId' --output text)
-          # Use the same private subnets as ECS tasks for the temp RDS subnet group.
-          SUBNET_LIST=$(echo "$NET_JSON" | jq -r '.subnets | join(",")')
-          # Use the same SG as ECS tasks so the migrator can reach this RDS on 5432.
-          SG_LIST=$(echo "$NET_JSON" | jq -r '.securityGroups | join(",")')
 
           BACKEND_TD=$(aws ecs describe-task-definition \
             --task-definition "${BACKEND_SERVICE}" \
@@ -110,19 +103,30 @@ jobs:
           TASK_ROLE=$(echo "$BACKEND_TD" | jq -r '.taskRoleArn')
           LOG_GROUP=$(echo "$BACKEND_TD" | jq -r '.containerDefinitions[0].logConfiguration.options."awslogs-group"')
 
-          echo "vpc_id=$VPC_ID" >> "$GITHUB_OUTPUT"
-          echo "subnets=$SUBNET_LIST" >> "$GITHUB_OUTPUT"
-          echo "security_groups=$SG_LIST" >> "$GITHUB_OUTPUT"
+          # Temp RDS lives in isolated subnets — reuse the Aurora cluster's
+          # existing DB subnet group + security group (Aurora SG already allows
+          # inbound from ECS tasks SG on 5432, so the migrator can reach it).
+          AURORA_INFO=$(aws rds describe-db-clusters \
+            --query 'DBClusters[?contains(DBClusterIdentifier, `afritalent-dev`)] | [0].{Subnet:DBSubnetGroup,SG:VpcSecurityGroups[0].VpcSecurityGroupId,Engine:Engine}' \
+            --output json)
+          DB_SUBNET_GROUP=$(echo "$AURORA_INFO" | jq -r '.Subnet')
+          DB_SG=$(echo "$AURORA_INFO" | jq -r '.SG')
+          if [ -z "$DB_SUBNET_GROUP" ] || [ "$DB_SUBNET_GROUP" = "null" ]; then
+            echo "::error::Failed to discover Aurora DB subnet group." >&2
+            exit 1
+          fi
+
           echo "exec_role_arn=$EXEC_ROLE" >> "$GITHUB_OUTPUT"
           echo "task_role_arn=$TASK_ROLE" >> "$GITHUB_OUTPUT"
           echo "log_group=$LOG_GROUP" >> "$GITHUB_OUTPUT"
+          echo "db_subnet_group=$DB_SUBNET_GROUP" >> "$GITHUB_OUTPUT"
+          echo "db_sg=$DB_SG" >> "$GITHUB_OUTPUT"
 
-          echo "VPC=$VPC_ID"
-          echo "Subnets=$SUBNET_LIST"
-          echo "SecurityGroups=$SG_LIST"
           echo "ExecRole=$EXEC_ROLE"
           echo "TaskRole=$TASK_ROLE"
           echo "LogGroup=$LOG_GROUP"
+          echo "DBSubnetGroup=$DB_SUBNET_GROUP"
+          echo "DBSG=$DB_SG"
 
       - name: Wait for shared snapshot to be visible + available
         env:
@@ -134,26 +138,11 @@ jobs:
             --db-snapshot-identifier "$SNAPSHOT_ARN"
           echo "Snapshot is available."
 
-      - name: Create DB subnet group for temp RDS
-        id: subnet_group
-        run: |
-          set -euo pipefail
-          GROUP_NAME="afritalent-dev-migrator-subnet-grp"
-          # Idempotent — create if missing.
-          if ! aws rds describe-db-subnet-groups --db-subnet-group-name "$GROUP_NAME" >/dev/null 2>&1; then
-            aws rds create-db-subnet-group \
-              --db-subnet-group-name "$GROUP_NAME" \
-              --db-subnet-group-description "Temporary subnet group for migration source RDS" \
-              --subnet-ids ${{ steps.net.outputs.subnets }} \
-              --tags Key=Purpose,Value=cross-account-migration
-          fi
-          echo "name=$GROUP_NAME" >> "$GITHUB_OUTPUT"
-
       - name: Restore temp RDS from shared snapshot
         env:
           SNAPSHOT_ARN: ${{ inputs.shared_snapshot_arn }}
-          SUBNET_GROUP: ${{ steps.subnet_group.outputs.name }}
-          SG_LIST: ${{ steps.net.outputs.security_groups }}
+          DB_SUBNET_GROUP: ${{ steps.net.outputs.db_subnet_group }}
+          DB_SG: ${{ steps.net.outputs.db_sg }}
         run: |
           set -euo pipefail
           # Pre-flight: if previous run left a temp instance behind, delete it.
@@ -163,17 +152,16 @@ jobs:
             aws rds wait db-instance-deleted --db-instance-identifier "${TEMP_DB_INSTANCE_ID}"
           fi
 
-          # Convert comma-separated SG list to JSON array for --vpc-security-group-ids
-          IFS=',' read -ra SG_ARRAY <<< "$SG_LIST"
-
           echo "Restoring snapshot $SNAPSHOT_ARN as ${TEMP_DB_INSTANCE_ID}…"
+          echo "  DB subnet group: $DB_SUBNET_GROUP"
+          echo "  Security group:  $DB_SG"
           aws rds restore-db-instance-from-db-snapshot \
             --db-instance-identifier "${TEMP_DB_INSTANCE_ID}" \
             --db-snapshot-identifier "$SNAPSHOT_ARN" \
             --db-instance-class db.t4g.small \
             --no-publicly-accessible \
-            --db-subnet-group-name "$SUBNET_GROUP" \
-            --vpc-security-group-ids "${SG_ARRAY[@]}" \
+            --db-subnet-group-name "$DB_SUBNET_GROUP" \
+            --vpc-security-group-ids "$DB_SG" \
             --no-multi-az \
             --no-auto-minor-version-upgrade \
             --copy-tags-to-snapshot \
