@@ -154,11 +154,13 @@ jobs:
           echo "Copying shared snapshot → ${LOCAL_ID} (encrypted with ${NEW_KMS})…"
 
           # Idempotent: if a copy is in progress, reuse it instead of recreating.
+          # NOTE: --copy-tags is rejected on shared/public snapshots
+          # ("Cannot copy tags for shared or public snapshots"). We only
+          # apply fresh tags on the destination.
           aws rds copy-db-snapshot \
             --source-db-snapshot-identifier "$SNAPSHOT_ARN" \
             --target-db-snapshot-identifier "$LOCAL_ID" \
             --kms-key-id "$NEW_KMS" \
-            --copy-tags \
             --tags Key=Purpose,Value=cross-account-migration Key=DeleteAfter,Value=2026-05-31 \
             --query 'DBSnapshot.{Status:Status,Snapshot:DBSnapshotIdentifier}' --output json
 
