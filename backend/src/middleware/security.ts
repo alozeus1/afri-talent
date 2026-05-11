@@ -2,12 +2,24 @@ import helmet from "helmet";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { Request, Response, NextFunction } from "express";
 
-// Helmet configuration for security headers
-export const securityHeaders = helmet({
-  contentSecurityPolicy: {
-    directives: {
+// §2.8 — Helmet hardening.
+//
+// CSP directives split by environment because /api/docs (swagger UI) ships
+// inline <script> + CDN-hosted styles, and is only mounted when docsEnabled
+// is true (dev / staging with ENABLE_API_DOCS=true). Production never serves
+// the swagger HTML, so the strict policy (no 'unsafe-inline', no CDN) is
+// fine. Violations from any environment are reported to /api/csp-report.
+//
+// `crossOriginEmbedderPolicy: false` is preserved because some ATS
+// integration partners frame our submission widget. Re-enable when the
+// operator-handoff iframe lands (Wave 4 §5.5) and that integration is
+// confirmed to set the COEP header on the inner document.
+const isProductionCsp = process.env.NODE_ENV === "production";
+
+const cspDirectives = isProductionCsp
+  ? {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'"],
       scriptSrc: ["'self'"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'"],
@@ -15,9 +27,26 @@ export const securityHeaders = helmet({
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
-    },
+      reportUri: ["/api/csp-report"],
+    }
+  : {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      reportUri: ["/api/csp-report"],
+    };
+
+export const securityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: cspDirectives,
   },
-  crossOriginEmbedderPolicy: false, // Disable for API compatibility
+  crossOriginEmbedderPolicy: false, // see §2.8 note above
   hsts: {
     maxAge: 31536000, // 1 year
     includeSubDomains: true,

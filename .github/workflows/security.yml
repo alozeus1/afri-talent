@@ -59,7 +59,7 @@ jobs:
         working-directory: ${{ matrix.workspace }}
         run: npm audit --audit-level=high
 
-  # §2.9 — Semgrep SAST. Fails the job on any HIGH/ERROR finding.
+  # §2.9 — Semgrep SAST. Fails the job on any ERROR finding.
   semgrep:
     name: Semgrep SAST
     runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
@@ -69,12 +69,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Scan
         run: |
-          semgrep ci \
+          semgrep scan \
             --config p/security-audit \
             --config p/owasp-top-ten \
             --config p/typescript \
             --config p/javascript \
-            --severity ERROR
+            --severity ERROR \
+            --error
         env:
           SEMGREP_TIMEOUT: "300"
 
@@ -86,7 +87,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run Trivy
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .

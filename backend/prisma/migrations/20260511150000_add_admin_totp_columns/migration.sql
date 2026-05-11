@@ -17,7 +17,7 @@ SET "totpGraceUntil" = NOW() + INTERVAL '7 days'
 WHERE "totpGraceUntil" IS NULL
   AND (
     u."role" = 'ADMIN'
-    OR EXISTS (SELECT 1 FROM "AdminRole" ar WHERE ar."userId" = u."id")
+    OR EXISTS (SELECT 1 FROM "AdminRole" ar WHERE ar."adminId" = u."id")
   );
 
 CREATE INDEX "User_totpGraceUntil_idx" ON "User"("totpGraceUntil");
