@@ -5,6 +5,7 @@ import prisma from "../lib/prisma.js";
 import { signToken, getTokenExpiresIn } from "../lib/jwt.js";
 import { authenticate, optionalAuth } from "../middleware/auth.js";
 import { authLimiter, registerLimiter } from "../middleware/security.js";
+import { issueCsrfToken } from "../middleware/csrf.js";
 import { validateHumanAuthSubmission } from "../middleware/bot-protection.js";
 import { blockToken } from "../lib/redis.js";
 import { Role } from "@prisma/client";
@@ -410,10 +411,16 @@ router.post("/logout", authenticate, async (req: Request, res: Response) => {
 // GET /api/auth/me
 router.get("/me", optionalAuth, async (req: Request, res: Response) => {
   try {
+    // §2.3 — issue (or refresh) a CSRF token on every /me call. SPAs hit /me
+    // on app load and after login, so this is the canonical place to seed the
+    // cookie that subsequent mutating requests will echo as X-CSRF-Token.
+    const csrfToken = issueCsrfToken(req, res);
+
     if (!req.user) {
       res.json({
         authenticated: false,
         user: null,
+        csrfToken,
       });
       return;
     }
@@ -439,6 +446,7 @@ router.get("/me", optionalAuth, async (req: Request, res: Response) => {
         avatarUrl: user.avatarUrl,
         employer: user.employer,
       },
+      csrfToken,
     });
   } catch (error) {
     console.error("Me error:", error);
