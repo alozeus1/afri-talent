@@ -1,6 +1,110 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: May 1, 2026 (CI deploy fix)
+Last updated: May 10, 2026 (cross-account migration complete; OLD App Runner stack destroyed)
+
+> [!IMPORTANT]
+> **Architecture changed on 2026-05-10.** The shared environment has moved off
+> App Runner (in old AWS account `260820061731`) and onto ECS Fargate + Aurora
+> Serverless v2 + Lambda + CloudFront/WAF in the new AWS account `108188564905`.
+> Anything below that references `*.awsapprunner.com`, `afritalent-staging-*`
+> AWS resources, or the old account ID is historical and no longer live.
+
+## Update on May 10, 2026: Cross-account migration complete
+
+The old staging stack on App Runner in account `260820061731` has been
+destroyed. The new live environment is on ECS Fargate + Aurora in account
+`108188564905`.
+
+### New environment (LIVE)
+
+- **AWS account**: `108188564905`
+- **Region**: `us-east-1`
+- **Primary URL** (CloudFront): `https://d2j3ahmgbbdup1.cloudfront.net`
+- **ALB DNS** (direct, for debugging): `afritalent-dev-alb-25816556.us-east-1.elb.amazonaws.com`
+- **Aurora cluster endpoint**: `afritalent-dev-aurora.cluster-c3mldqa7xfbn.us-east-1.rds.amazonaws.com`
+- **RDS Proxy endpoint** (use this in DATABASE_URL): `afritalent-dev-rds-proxy.proxy-c3mldqa7xfbn.us-east-1.rds.amazonaws.com`
+- **ECS cluster**: `afritalent-dev`
+- **ECS services**: `afritalent-dev-backend`, `afritalent-dev-frontend`
+- **ECR**: `108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-{backend,frontend}`
+- **GitHub OIDC role**: `arn:aws:iam::108188564905:role/afritalent-dev-github-deploy` (has AdministratorAccess for now — scope down before prod)
+- **Terraform state**: `s3://afritalent-108188564905-tfstate/dev-new/terraform.tfstate` + lock table `afritalent-108188564905-tflocks`
+- **CloudWatch dashboard**: see `terraform output dashboard_url`
+- **Lambda Function URLs** (webhooks): see `terraform output webhook_stripe_url`, `webhook_flutterwave_url`
+- **Step Functions state machine** (orchestrator): see `terraform output state_machine_orchestrator_arn`
+
+### CI/CD
+
+- **Deploy workflow**: `.github/workflows/deploy.yml` (`Deploy (new account, ECS Fargate + Lambda)`). Triggers on push to `main`. Builds + pushes images, packages Lambda zips, runs `terraform apply` against `infra/terraform/accounts/dev-new/`.
+- **Terraform validate/checkov**: `.github/workflows/terraform.yml`. Runs on PRs.
+- **Required GitHub repo variables**: `AWS_ACCOUNT_ID=108188564905`, `AWS_REGION=us-east-1`, `OIDC_ROLE_NAME=afritalent-dev-github-deploy`, `FRONTEND_API_URL=https://d2j3ahmgbbdup1.cloudfront.net`.
+- **Removed (2026-05-10)**: `.github/workflows/deploy-apprunner.yml` (old account), `migrate-data.yml`, `restore-and-migrate.yml` (one-shot migration helpers). Stale repo variables removed: `AWS_ROLE_ARN`, `ECR_REGISTRY`, `TF_STATE_BUCKET`.
+
+### What was migrated
+
+- 7 candidate accounts, 3 employer accounts, 2,427 jobs, 44 notifications, 1 saved search.
+- Method: cross-account RDS snapshot share (CMK-encrypted), restored as a temp RDS in the new VPC, `pg_dump | psql` into Aurora via a one-off Fargate task. The PG 17.6 → 15.5 mismatch was bridged by filtering `SET transaction_timeout` out of the dump prologue.
+- Verified post-migration: `https://d2j3ahmgbbdup1.cloudfront.net/api/public/stats` matches old env exactly (7/3/2427). Password and Google OAuth login both work.
+
+### Safety net retained
+
+- **RDS snapshot in old account**: `afritalent-staging-pre-migration-20260510-1902` (50 GB). Recommend keeping until 2026-06-10 then deleting:
+  ```
+  aws rds delete-db-snapshot --db-snapshot-identifier afritalent-staging-pre-migration-20260510-1902 --region us-east-1
+  ```
+
+### Old account state (post-destroy)
+
+- Old account `260820061731` no longer hosts AfriTalent. The shared account still contains unrelated student/demo workloads — do not run wholesale cleanup against it.
+- KMS keys for staging-uploads, staging-blog-ssm, and the migration-share CMK are all in `PendingDeletion` (auto-completes 2026-05-17 to 2026-05-24).
+- Secrets Manager `afritalent-staging/app-secrets` is in its default 7-day retention window.
+
+### Application changes shipped during the migration
+
+- `feat(billing): unlimited job postings on every employer tier` — `EMPLOYER_FREE` and `EMPLOYER_BASIC` `jobPostsPerMonth` set to `null` (unlimited). Pricing UI cards now show "Unlimited job postings" across all 3 employer tiers. Paid tiers differentiate via talent search, analytics, ATS, API, branded career page, priority support.
+- `fix(test): unflake board-adapter accountant test` — replaced a hardcoded mock date with a relative date to stop the time-bomb regression.
+- `fix(ci): pass NEXT_PUBLIC_API_URL into frontend Docker build` — frontend was falling back to `localhost:4000`; now baked in at build time.
+
+---
+
+## Update on May 10, 2026: Temporary staging DB public access revoked (HISTORICAL)
+
+The temporary database exposure for GitHub Actions migration work has been
+closed.
+
+- DB instance: `afritalent-staging-postgres`
+- RDS state after revert: `available`, `PubliclyAccessible=false`
+- RDS security group: `sg-0dff34cf73e8ad1b2`
+- Public inbound `tcp/5432` from `0.0.0.0/0` is no longer present
+- Remaining inbound PostgreSQL source is the internal security group
+  `sg-0dc650cf0e705b5f3`
+- GitHub repository secret `OLD_DATABASE_URL` was deleted from
+  `alozeus1/afri-talent`
+
+## Update on May 10, 2026: Temporary public staging DB access for GitHub Actions
+
+Temporary access was opened so GitHub Actions can connect to the old staging
+RDS PostgreSQL instance during migration work.
+
+- AWS account verified before change: `260820061731`
+- DB instance: `afritalent-staging-postgres`
+- DB endpoint:
+  `afritalent-staging-postgres.cm3aieqwylul.us-east-1.rds.amazonaws.com`
+- RDS state after change: `available`, `PubliclyAccessible=true`
+- RDS security group: `sg-0dff34cf73e8ad1b2`
+- Temporary inbound rule: `sgr-0d8f684cb2458a0ea`
+  - `tcp/5432` from `0.0.0.0/0`
+  - description: `Temporary GitHub Actions staging DB access - revoke after migration`
+- GitHub repository secret set: `OLD_DATABASE_URL` in `alozeus1/afri-talent`
+  at `2026-05-10T18:32:28Z`
+
+Revoke the temporary public database ingress rule when the migration is done:
+
+```bash
+aws ec2 revoke-security-group-ingress \
+  --group-id sg-0dff34cf73e8ad1b2 \
+  --security-group-rule-ids sgr-0d8f684cb2458a0ea \
+  --region us-east-1
+```
 
 ## Update on May 1, 2026: Deploy workflow repaired after Mara product knowledge build failure
 
