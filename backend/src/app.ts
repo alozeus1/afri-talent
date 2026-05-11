@@ -7,13 +7,14 @@ const pinoHttp = pinoHttpModule as unknown as typeof import("pino-http").default
 import { Role } from "@prisma/client";
 import prisma from "./lib/prisma.js";
 import logger from "./lib/logger.js";
-import { initSentry, setupExpressErrorHandler } from "./lib/sentry.js";
+import { initSentry, setupExpressErrorHandler, captureMessage } from "./lib/sentry.js";
 import { redisHealthStatus, isRedisRequired } from "./lib/redis.js";
 import { buildDegradedState } from "./lib/platform/health.js";
 import { isAnyBillingProviderConfigured } from "./lib/billing/index.js";
 import { optionalAuth } from "./middleware/auth.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import { csrfProtection, csrfErrorHandler } from "./middleware/csrf.js";
+import { validateAllowedOriginRegex } from "./lib/cors-validation.js";
 import {
   securityHeaders,
   generalLimiter,
@@ -132,7 +133,12 @@ if (isProduction) {
   app.set("trust proxy", 1);
 }
 
-// Security: CORS configuration
+// §2.7 — CORS lockdown.
+//
+// `ALLOWED_ORIGIN_REGEX` is validated at module load (lib/cors-validation):
+// the process refuses to start if the regex matches the empty string or is
+// one of the canonical "match-everything" shortcuts. A permissive deploy is
+// treated as misconfiguration, not a runtime warning.
 const allowedOrigins = [
   process.env.FRONTEND_URL || "http://localhost:3000",
   "http://localhost:3000",
@@ -143,12 +149,14 @@ const allowedOrigins = [
   "http://127.0.0.1:3100",
 ];
 const allowedOriginRegex = process.env.ALLOWED_ORIGIN_REGEX
-  ? new RegExp(process.env.ALLOWED_ORIGIN_REGEX)
+  ? validateAllowedOriginRegex(process.env.ALLOWED_ORIGIN_REGEX)
   : null;
 
 const isAllowedOrigin = (origin?: string | null) => {
   if (!origin) {
-    // Non-browser callers such as App Runner health checks won't send Origin.
+    // Non-browser callers such as health probes and server-to-server clients
+    // do not send Origin. CORS is a browser boundary, so only explicit browser
+    // origins are allowlisted below.
     return true;
   }
   if (allowedOrigins.includes(origin)) {
@@ -184,6 +192,26 @@ app.use(generalLimiter);
 // Stripe signature verification requires the raw request body bytes.
 app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoutes);
 app.use("/api/ats/webhooks", express.raw({ type: "application/json" }), atsWebhookRoutes);
+
+// §2.8 — CSP report endpoint. Browsers POST violation reports here when a
+// page running our Helmet CSP triggers a directive. Reports forward to
+// Sentry as warnings so we see drift before users hit broken UI. Body is
+// JSON but the canonical Content-Type is `application/csp-report`; both
+// shapes are accepted. The route is exempt from CSRF (browsers send these
+// without any token) and uses its own small body limit so a flood cannot
+// overwhelm log infrastructure.
+app.post(
+  "/api/csp-report",
+  express.json({ type: ["application/csp-report", "application/json"], limit: "20kb" }),
+  (req, res) => {
+    const body = req.body as { "csp-report"?: Record<string, unknown> } & Record<string, unknown>;
+    const report = body?.["csp-report"] || body || {};
+    const violated = (report as Record<string, unknown>)["violated-directive"] || "unknown";
+    captureMessage(`CSP violation: ${String(violated)}`, "warning");
+    logger.warn({ cspReport: report }, "[csp-report] violation received");
+    res.status(204).end();
+  },
+);
 
 // Body parsing with size limits (all other routes)
 app.use(express.json({ limit: "10kb" }));
