@@ -108,6 +108,19 @@ output "ssm_path_prefix" {
   value       = module.ssm_params.ssm_parameter_path_prefix
 }
 
+# ── Trust artefact bucket (Wave 1 §2.11) ─────────────────────────────────────
+# WAVE_1_TRUST_BUCKET_OUTPUTS — uncomment alongside the module block in main.tf.
+#
+# output "trust_bucket_name" {
+#   description = "Name of the separate trust artefact bucket. Set as SSM TRUST_S3_BUCKET."
+#   value       = module.s3_trust.bucket_name
+# }
+#
+# output "trust_bucket_iam_policy_arn" {
+#   description = "IAM policy ARN to attach to the ECS task role so backend tasks can write trust artefacts."
+#   value       = module.s3_trust.iam_policy_arn
+# }
+
 # ── ElastiCache Redis (Wave 1 §2.4) ──────────────────────────────────────────
 # WAVE_1_REDIS_OUTPUTS — uncomment alongside the module block in main.tf.
 #

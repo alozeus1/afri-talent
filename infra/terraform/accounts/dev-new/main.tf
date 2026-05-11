@@ -142,7 +142,53 @@ module "s3_uploads" {
   bucket_name     = "afritalent-${var.environment}-uploads-${var.aws_account_id}"
   environment     = var.environment
   allowed_origins = ["https://d2j3ahmgbbdup1.cloudfront.net", "https://afri-talent.com", "https://www.afri-talent.com"]
+
+  # §2.11 — the IAM policy now lists every prefix the bucket holds. Without
+  # `trust/candidates/` and `trust/employers/`, the backend's presigned
+  # uploads to those paths silently fail with AccessDenied. Remove the two
+  # trust entries here once the separate `s3_trust` bucket below is live and
+  # the backend's TRUST_S3_BUCKET env var is pointing at it.
+  prefix_acl = [
+    "resumes/",
+    "trust/candidates/",
+    "trust/employers/",
+  ]
 }
+
+# ---------------------------------------------------------------------------
+# Separate trust-artefact bucket (Wave 1 §2.11) — UNCOMMENT TO ENABLE.
+#
+# Recommended by the launch master prompt: keep candidate/employer KYC
+# artefacts in their own bucket so a leak in the resumes/exports bucket
+# can't reach trust artefacts and vice versa.
+#
+# Rollout:
+#   1. Uncomment the `module "s3_trust"` block + outputs in outputs.tf
+#      (look for WAVE_1_TRUST_BUCKET_OUTPUTS).
+#   2. `terraform apply` (creates bucket, KMS, IAM policy).
+#   3. Attach the new IAM policy to the ECS task role — add
+#      `${module.s3_trust.iam_policy_arn}` to the ecs-fargate `policy_arns`
+#      input alongside the existing `${module.s3_uploads.iam_policy_arn}`.
+#   4. Set the SSM `TRUST_S3_BUCKET` parameter to
+#      `${module.s3_trust.bucket_name}` and add it to the ecs_fargate
+#      `backend_secrets` map. The backend (files.ts) routes trust scopes
+#      there automatically when TRUST_S3_BUCKET is set.
+#   5. Once verified working, remove `trust/candidates/` and
+#      `trust/employers/` from the s3_uploads `prefix_acl` above and
+#      apply again.
+#   6. Optional: copy any existing trust/* objects from the uploads bucket
+#      to the trust bucket (aws s3 sync s3://uploads/trust s3://trust)
+#      before tightening the IAM.
+#
+# module "s3_trust" {
+#   source = "../../modules/s3"
+#
+#   bucket_name     = "afritalent-${var.environment}-trust-${var.aws_account_id}"
+#   environment     = var.environment
+#   allowed_origins = ["https://d2j3ahmgbbdup1.cloudfront.net", "https://afri-talent.com", "https://www.afri-talent.com"]
+#   prefix_acl      = ["trust/candidates/", "trust/employers/"]
+# }
+# ---------------------------------------------------------------------------
 
 module "ecs_fargate" {
   source = "../../modules/ecs-fargate"
