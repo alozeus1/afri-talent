@@ -13,6 +13,7 @@ vi.mock("../lib/prisma.js", () => ({
         user: {
             findUnique: vi.fn(),
             create: vi.fn(),
+            update: vi.fn(),
         },
         employer: {
             create: vi.fn(),

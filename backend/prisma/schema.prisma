@@ -716,6 +716,10 @@ model User {
   deletedAt                DateTime?
   phoneNumber              String?                  @db.VarChar(30)
   phoneVerifiedAt          DateTime?
+  // §2.10 admin TOTP MFA
+  totpSecretEncrypted      String?
+  totpEnrolledAt           DateTime?
+  totpGraceUntil           DateTime?
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 

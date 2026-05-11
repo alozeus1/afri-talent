@@ -38,3 +38,59 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/dependency-review-action@v4
+
+  # §2.9 — block PRs that introduce High/Critical npm vulns.
+  npm-audit:
+    name: npm audit (high+)
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install
+        working-directory: ${{ matrix.workspace }}
+        run: npm ci
+      - name: Audit high+
+        working-directory: ${{ matrix.workspace }}
+        run: npm audit --audit-level=high
+
+  # §2.9 — Semgrep SAST. Fails the job on any ERROR finding.
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    container:
+      image: returntocorp/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan
+        run: |
+          semgrep scan \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --config p/typescript \
+            --config p/javascript \
+            --severity ERROR \
+            --error
+        env:
+          SEMGREP_TIMEOUT: "300"
+
+  # §2.9 — Trivy filesystem scan. Catches vulnerable lockfiles + IaC misconfigs
+  # without needing the built images. Fails on HIGH/CRITICAL.
+  trivy-fs:
+    name: Trivy FS Scan
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
