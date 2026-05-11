@@ -1,14 +1,22 @@
 import jwt, { SignOptions, VerifyOptions } from "jsonwebtoken";
 import { Role } from "@prisma/client";
 
-// Security: JWT secret validation
+// JWT_SECRET is required at module load in EVERY environment. There is no
+// fallback. Tests provide a fixed test value via vitest.config.ts.
+// Public-launch plan §2.1.
 const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET && process.env.NODE_ENV === "production") {
-  throw new Error("JWT_SECRET must be set in production environment");
+if (!JWT_SECRET) {
+  throw new Error(
+    "JWT_SECRET is required. No development fallback exists; set a unique 32+ byte value via .env (local) or SSM (deployed).",
+  );
+}
+if (Buffer.byteLength(JWT_SECRET, "utf8") < 32) {
+  throw new Error(
+    `JWT_SECRET must be at least 32 bytes (got ${Buffer.byteLength(JWT_SECRET, "utf8")} bytes). Generate one with: openssl rand -base64 48`,
+  );
 }
 
-const FALLBACK_SECRET = "dev-only-secret-change-in-production";
-const SECRET = JWT_SECRET || FALLBACK_SECRET;
+const SECRET: string = JWT_SECRET;
 
 // Configurable token expiration (default: 7 days)
 // Using number of seconds for type safety

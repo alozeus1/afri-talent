@@ -26,6 +26,12 @@ export function validateRuntimeEnv(): void {
   requireEnv("FRONTEND_URL");
 
   if (nodeEnv === "production" || nodeEnv === "staging") {
+    // §2.1 startup self-test: fail fast on missing critical production env.
+    // JWT_SECRET also throws at module load in jwt.ts; this list catches the
+    // rest of the production essentials so a misconfigured deploy never serves
+    // traffic.
     requireEnv("JWT_SECRET");
+    requireEnv("ANTHROPIC_API_KEY");
+    requireEnv("SENTRY_DSN");
   }
 }

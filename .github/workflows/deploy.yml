@@ -167,16 +167,33 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Compute build provenance
+        id: provenance
+        run: |
+          GIT_SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          APP_RELEASE="v$(date -u +%Y%m%d)-${GIT_SHA_SHORT}"
+          BUILD_TIMESTAMP=$(date -u +%FT%TZ)
+          echo "git_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "app_release=${APP_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "build_timestamp=${BUILD_TIMESTAMP}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Build provenance — release=${APP_RELEASE} sha=${{ github.sha }} ts=${BUILD_TIMESTAMP}"
+
       - name: Build & push backend image
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           REPO: afritalent-dev-backend
           SHA_TAG: ${{ github.sha }}
+          GIT_SHA: ${{ steps.provenance.outputs.git_sha }}
+          APP_RELEASE: ${{ steps.provenance.outputs.app_release }}
+          BUILD_TIMESTAMP: ${{ steps.provenance.outputs.build_timestamp }}
         run: |
           IMAGE="$REGISTRY/$REPO"
           docker buildx build \
             --platform linux/amd64 \
             --push \
+            --build-arg GIT_SHA="$GIT_SHA" \
+            --build-arg APP_RELEASE="$APP_RELEASE" \
+            --build-arg BUILD_TIMESTAMP="$BUILD_TIMESTAMP" \
             -t "$IMAGE:$SHA_TAG" \
             -t "$IMAGE:latest" \
             ./backend
@@ -209,6 +226,9 @@ jobs:
             --build-arg NEXT_PUBLIC_SENTRY_DSN="$NEXT_PUBLIC_SENTRY_DSN" \
             --build-arg SENTRY_ORG="$SENTRY_ORG" \
             --build-arg SENTRY_PROJECT="$SENTRY_PROJECT" \
+            --build-arg GIT_SHA="${{ steps.provenance.outputs.git_sha }}" \
+            --build-arg APP_RELEASE="${{ steps.provenance.outputs.app_release }}" \
+            --build-arg BUILD_TIMESTAMP="${{ steps.provenance.outputs.build_timestamp }}" \
             -t "$IMAGE:$SHA_TAG" \
             -t "$IMAGE:latest" \
             ./frontend
