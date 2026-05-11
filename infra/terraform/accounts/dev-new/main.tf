@@ -182,6 +182,9 @@ module "ecs_fargate" {
     GOOGLE_CLIENT_ID     = "${local.ssm_arn_base}/GOOGLE_CLIENT_ID"
     GOOGLE_CLIENT_SECRET = "${local.ssm_arn_base}/GOOGLE_CLIENT_SECRET"
 
+    GITHUB_CLIENT_ID     = "${local.ssm_arn_base}/GITHUB_CLIENT_ID"
+    GITHUB_CLIENT_SECRET = "${local.ssm_arn_base}/GITHUB_CLIENT_SECRET"
+
     ADZUNA_APP_ID               = "${local.ssm_arn_base}/ADZUNA_APP_ID"
     ADZUNA_API_KEY              = "${local.ssm_arn_base}/ADZUNA_API_KEY"
     APIFY_TOKEN                 = "${local.ssm_arn_base}/APIFY_TOKEN"

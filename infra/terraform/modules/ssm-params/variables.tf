@@ -36,6 +36,8 @@ variable "optional_params" {
   type        = list(string)
   default = [
     "FLUTTERWAVE_PAYMENT_OPTIONS",
+    "GITHUB_CLIENT_ID",
+    "GITHUB_CLIENT_SECRET",
     "APPLE_CLIENT_ID",
     "ADZUNA_APP_ID",
     "ADZUNA_API_KEY",
