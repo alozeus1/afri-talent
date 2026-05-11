@@ -382,16 +382,20 @@ describe("Phase 1/2 quality integration suite", () => {
     expect(res.status).toBe(200);
     expect(res.body.openapi).toBe("3.0.3");
     expect(res.body.paths["/api/auth/oauth/google/callback"]).toBeDefined();
-    expect(res.body.paths["/api/auth/oauth/apple/callback"]).toBeDefined();
+    expect(res.body.paths["/api/auth/oauth/github/callback"]).toBeDefined();
     expect(res.body.paths["/api/auth/email/send-verification"]).toBeDefined();
     expect(res.body.paths["/api/pricing"]).toBeDefined();
   });
 
   it("exposes OAuth providers endpoint for frontend CTAs", async () => {
     const prevGoogle = process.env.GOOGLE_CLIENT_ID;
-    const prevApple = process.env.APPLE_CLIENT_ID;
+    const prevGoogleSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const prevGithub = process.env.GITHUB_CLIENT_ID;
+    const prevGithubSecret = process.env.GITHUB_CLIENT_SECRET;
     process.env.GOOGLE_CLIENT_ID = "google-client-id";
-    process.env.APPLE_CLIENT_ID = "apple-client-id";
+    process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
+    process.env.GITHUB_CLIENT_ID = "github-client-id";
+    process.env.GITHUB_CLIENT_SECRET = "github-client-secret";
 
     const res = await request(app).get("/api/auth/oauth/providers");
 
@@ -399,12 +403,14 @@ describe("Phase 1/2 quality integration suite", () => {
     expect(res.body.providers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ provider: "google", enabled: true }),
-        expect.objectContaining({ provider: "apple", enabled: true }),
+        expect.objectContaining({ provider: "github", enabled: true }),
       ]),
     );
 
     process.env.GOOGLE_CLIENT_ID = prevGoogle;
-    process.env.APPLE_CLIENT_ID = prevApple;
+    process.env.GOOGLE_CLIENT_SECRET = prevGoogleSecret;
+    process.env.GITHUB_CLIENT_ID = prevGithub;
+    process.env.GITHUB_CLIENT_SECRET = prevGithubSecret;
   });
 
   it("resolves pricing region from explicit query and geo header", async () => {
