@@ -82,6 +82,40 @@ module "rds_proxy" {
   secret_kms_key_arn        = module.aurora.aurora_kms_key_arn
 }
 
+# ---------------------------------------------------------------------------
+# ElastiCache Redis (Wave 1 §2.4) — UNCOMMENT TO ENABLE.
+#
+# The application ships with `REDIS_REQUIRED` defaulting to false, so the
+# backend works without Redis on day-1. To roll out:
+#
+#   1. Uncomment the `module "elasticache_redis"` block below + the matching
+#      output in outputs.tf (look for "WAVE_1_REDIS_OUTPUTS").
+#   2. `terraform plan` in this directory — review the new SG, KMS key,
+#      Secrets Manager entry, and replication group.
+#   3. `terraform apply` (~10 minutes for the cluster to come up).
+#   4. Compose REDIS_URL from the AUTH secret + primary endpoint and write
+#      to SSM. Full snippet in infra/terraform/modules/elasticache-redis/README.md.
+#   5. Verify reachable from a backend task:
+#        aws ecs execute-command --cluster afritalent-dev \
+#          --task <task-id> --container backend --interactive \
+#          --command "redis-cli -u $REDIS_URL --no-auth-warning ping"
+#   6. Add `REDIS_URL = "${local.ssm_arn_base}/REDIS_URL"` to backend_secrets.
+#   7. Once verified: set `REDIS_REQUIRED=true` in SSM and add to backend_env.
+#      ECS picks up env on next deployment; existing tasks finish out gracefully.
+#
+# module "elasticache_redis" {
+#   source = "../../modules/elasticache-redis"
+#
+#   name_prefix                = var.name_prefix
+#   vpc_id                     = module.vpc.vpc_id
+#   subnet_ids                 = module.vpc.private_subnet_ids
+#   ingress_security_group_ids = [module.vpc.sg_ecs_tasks_id]
+#   # node_type                = "cache.t4g.small"  # for prod uplift
+#   # num_cache_clusters       = 2                  # Multi-AZ + automatic failover
+#   tags                       = local.tags
+# }
+# ---------------------------------------------------------------------------
+
 module "ssm_params" {
   source = "../../modules/ssm-params"
 

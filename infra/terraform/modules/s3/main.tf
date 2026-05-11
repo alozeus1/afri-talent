@@ -70,7 +70,12 @@ resource "aws_s3_bucket_cors_configuration" "uploads" {
   cors_rule {
     allowed_origins = var.allowed_origins
     allowed_methods = ["PUT"]
-    allowed_headers = ["Content-Type", "Content-Length"]
+    allowed_headers = [
+      "Content-Type",
+      "Content-Length",
+      "x-amz-server-side-encryption",
+      "x-amz-server-side-encryption-aws-kms-key-id",
+    ]
     expose_headers  = ["ETag"]
     max_age_seconds = 300
   }

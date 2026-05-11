@@ -120,3 +120,16 @@ output "ssm_path_prefix" {
 #   description = "IAM policy ARN to attach to the ECS task role so backend tasks can write trust artefacts."
 #   value       = module.s3_trust.iam_policy_arn
 # }
+
+# ── ElastiCache Redis (Wave 1 §2.4) ──────────────────────────────────────────
+# WAVE_1_REDIS_OUTPUTS — uncomment alongside the module block in main.tf.
+#
+# output "redis_primary_endpoint" {
+#   description = "Primary endpoint hostname. Use to compose rediss:// REDIS_URL for SSM."
+#   value       = module.elasticache_redis.primary_endpoint_address
+# }
+#
+# output "redis_auth_secret_name" {
+#   description = "Secrets Manager name holding the Redis AUTH token. Read with aws secretsmanager get-secret-value."
+#   value       = module.elasticache_redis.auth_secret_name
+# }

@@ -24,6 +24,14 @@ describe("bucketForScope (§2.11)", () => {
     expect(bucketForScope("employer-verification")).toBe("trust-bucket");
   });
 
+  it("trust scopes can use TRUST_S3_BUCKET even when the main bucket is unset", () => {
+    vi.stubEnv("S3_UPLOADS_BUCKET", "");
+    vi.stubEnv("TRUST_S3_BUCKET", "trust-bucket");
+    expect(bucketForScope("resume")).toBeUndefined();
+    expect(bucketForScope("candidate-verification")).toBe("trust-bucket");
+    expect(bucketForScope("employer-verification")).toBe("trust-bucket");
+  });
+
   it("trust scopes fall back to the main bucket when TRUST_S3_BUCKET is unset (migration window)", () => {
     vi.stubEnv("S3_UPLOADS_BUCKET", "main-uploads");
     vi.stubEnv("TRUST_S3_BUCKET", "");
