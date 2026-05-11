@@ -14,6 +14,7 @@ import { isAnyBillingProviderConfigured } from "./lib/billing/index.js";
 import { optionalAuth } from "./middleware/auth.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import { csrfProtection, csrfErrorHandler } from "./middleware/csrf.js";
+import { adminTotpGate } from "./middleware/admin-totp-gate.js";
 import { validateAllowedOriginRegex } from "./lib/cors-validation.js";
 import {
   securityHeaders,
@@ -80,6 +81,7 @@ import adminAuditRoutes from "./routes/admin-audit.js";
 import adminAlertsRoutes from "./routes/admin-alerts.js";
 import adminBulkRoutes from "./routes/admin-bulk.js";
 import adminBlogRoutes from "./routes/admin-blog.js";
+import adminTotpRoutes from "./routes/admin-totp.js";
 // AI Skills routes (premium, additive)
 import skillsResumeBuilderRoutes from "./routes/skills/resume-builder.js";
 import skillsResumeTemplateRoutes from "./routes/skills/resume-templates.js";
@@ -404,6 +406,9 @@ app.use("/api/auth/phone", phoneVerificationRoutes);
 app.use("/api/jobs", jobsRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/resources", resourcesRoutes);
+// §2.10 — admin TOTP gate. Skips /api/admin/totp/* (admins enrol there).
+// Test-mode bypass via `x-admin-totp-test-bypass: enforce` header.
+app.use("/api/admin", adminTotpGate);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/audit-logs", adminAuditRoutes);
 app.use("/api/admin/alerts", adminAlertsRoutes);
@@ -449,6 +454,7 @@ app.use("/api/university-partners", universityPartnersRoutes);
 app.use("/api/employer/ai", employerAiRoutes);
 app.use("/api/trust", trustRoutes);
 app.use("/api/admin/trust", adminTrustRoutes);
+app.use("/api/admin/totp", adminTotpRoutes);
 app.use("/api/admin/rag", adminRagRoutes);
 app.use("/api/admin/blog", adminBlogRoutes);
 app.use("/api/bots", botsRoutes);
