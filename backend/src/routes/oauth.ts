@@ -129,6 +129,168 @@ router.post("/google/callback", authLimiter, async (req: Request, res: Response)
   }
 });
 
+// ---------- GitHub OAuth ----------
+
+const githubCallbackSchema = z.object({
+  code: z.string().min(1),
+  redirectUri: z.string().url().optional(),
+});
+
+interface GithubUser {
+  id: number;
+  login: string;
+  name: string | null;
+  email: string | null;
+  avatar_url?: string;
+}
+
+interface GithubEmail {
+  email: string;
+  primary: boolean;
+  verified: boolean;
+}
+
+async function exchangeGithubCode(code: string, redirectUri: string): Promise<{
+  providerUserId: string;
+  email?: string;
+  name: string;
+  avatarUrl?: string;
+  emailVerified: boolean;
+}> {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    const error = new Error("GitHub OAuth is not configured");
+    error.name = "OAUTH_MISSING_CONFIG";
+    throw error;
+  }
+
+  const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    const error = new Error("GitHub token exchange failed");
+    error.name = "OAUTH_PROVIDER_UNAVAILABLE";
+    throw error;
+  }
+
+  const tokenPayload = (await tokenRes.json()) as {
+    access_token?: string;
+    error?: string;
+    error_description?: string;
+  };
+  if (!tokenPayload.access_token) {
+    const error = new Error(tokenPayload.error_description || "GitHub did not return an access token");
+    error.name =
+      tokenPayload.error === "redirect_uri_mismatch"
+        ? "OAUTH_CALLBACK_MISMATCH"
+        : "OAUTH_PROVIDER_UNAVAILABLE";
+    throw error;
+  }
+
+  const userRes = await fetch("https://api.github.com/user", {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${tokenPayload.access_token}`,
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+  if (!userRes.ok) {
+    const error = new Error("Failed to fetch GitHub user profile");
+    error.name = "OAUTH_PROVIDER_UNAVAILABLE";
+    throw error;
+  }
+  const user = (await userRes.json()) as GithubUser;
+
+  // GitHub returns `email: null` when the user's email is private; fetch the
+  // emails list to find their verified primary address.
+  let primaryEmail: string | undefined = user.email ?? undefined;
+  let emailVerified = false;
+  const emailsRes = await fetch("https://api.github.com/user/emails", {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${tokenPayload.access_token}`,
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+  if (emailsRes.ok) {
+    const emails = (await emailsRes.json()) as GithubEmail[];
+    const verifiedPrimary = emails.find((e) => e.primary && e.verified);
+    if (verifiedPrimary) {
+      primaryEmail = verifiedPrimary.email;
+      emailVerified = true;
+    } else {
+      const verifiedAny = emails.find((e) => e.verified);
+      if (verifiedAny) {
+        primaryEmail = primaryEmail || verifiedAny.email;
+        emailVerified = true;
+      }
+    }
+  }
+
+  return {
+    providerUserId: String(user.id),
+    email: primaryEmail,
+    name: user.name || user.login || "GitHub User",
+    avatarUrl: user.avatar_url,
+    emailVerified,
+  };
+}
+
+router.post("/github/callback", authLimiter, async (req: Request, res: Response) => {
+  try {
+    const { code, redirectUri } = githubCallbackSchema.parse(req.body);
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const finalRedirect = redirectUri || `${frontendUrl}/auth/callback`;
+
+    const profile = await exchangeGithubCode(code, finalRedirect);
+
+    return await handleOAuthLogin(res, {
+      provider: OAuthProvider.GITHUB,
+      providerUserId: profile.providerUserId,
+      email: profile.email,
+      name: profile.name,
+      avatarUrl: profile.avatarUrl,
+      emailVerified: profile.emailVerified,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Invalid request", details: error.issues });
+      return;
+    }
+    const code =
+      error instanceof Error && error.name.startsWith("OAUTH_")
+        ? error.name
+        : "OAUTH_EXCHANGE_FAILED";
+    console.error("GitHub OAuth error:", {
+      code,
+      message: error instanceof Error ? error.message : "unknown",
+    });
+    const status = code === "OAUTH_MISSING_CONFIG" ? 503 : code === "OAUTH_CALLBACK_MISMATCH" ? 400 : 502;
+    res.status(status).json({
+      error: "OAuth authentication failed",
+      code,
+      message:
+        code === "OAUTH_CALLBACK_MISMATCH"
+          ? "The GitHub OAuth callback URL is not registered for this environment."
+          : code === "OAUTH_MISSING_CONFIG"
+            ? "GitHub sign-in is not configured for this environment."
+            : "GitHub is unavailable or rejected the sign-in request.",
+    });
+  }
+});
+
 // ---------- Apple OAuth ----------
 
 const appleCallbackSchema = z.object({
@@ -195,7 +357,14 @@ interface OAuthProfile {
 }
 
 function providerDisplayName(provider: OAuthProvider): string {
-  return provider === OAuthProvider.GOOGLE ? "Google" : "Apple";
+  switch (provider) {
+    case OAuthProvider.GOOGLE:
+      return "Google";
+    case OAuthProvider.GITHUB:
+      return "GitHub";
+    case OAuthProvider.APPLE:
+      return "Apple";
+  }
 }
 
 async function handleOAuthLogin(res: Response, profile: OAuthProfile) {
@@ -388,6 +557,12 @@ router.get("/providers", (_req: Request, res: Response) => {
     providers.push({ provider: "google", clientId: googleId, enabled: true });
   }
 
+  const githubId = process.env.GITHUB_CLIENT_ID;
+  const githubSecret = process.env.GITHUB_CLIENT_SECRET;
+  if (githubId && githubSecret) {
+    providers.push({ provider: "github", clientId: githubId, enabled: true });
+  }
+
   const appleId = process.env.APPLE_CLIENT_ID;
   if (appleId) {
     providers.push({ provider: "apple", clientId: appleId, enabled: true });
@@ -399,6 +574,7 @@ router.get("/providers", (_req: Request, res: Response) => {
 router.get("/diagnostics", (_req: Request, res: Response) => {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
   const googleConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  const githubConfigured = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
   const appleConfigured = Boolean(process.env.APPLE_CLIENT_ID);
 
   res.json({
@@ -407,6 +583,14 @@ router.get("/diagnostics", (_req: Request, res: Response) => {
       google: {
         configured: googleConfigured,
         clientSecretConfigured: Boolean(process.env.GOOGLE_CLIENT_SECRET),
+        requiredCallbackUrls: [
+          `${frontendUrl}/auth/callback`,
+          "http://localhost:3000/auth/callback",
+        ],
+      },
+      github: {
+        configured: githubConfigured,
+        clientSecretConfigured: Boolean(process.env.GITHUB_CLIENT_SECRET),
         requiredCallbackUrls: [
           `${frontendUrl}/auth/callback`,
           "http://localhost:3000/auth/callback",

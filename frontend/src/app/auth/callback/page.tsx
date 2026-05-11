@@ -8,7 +8,7 @@ import { trackEvent } from "@/lib/analytics";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-type OAuthProvider = "google" | "apple";
+type OAuthProvider = "google" | "github" | "apple";
 
 function readStoredOAuthState(): { state: string | null; provider: OAuthProvider | null } {
   if (typeof window === "undefined") {
@@ -19,7 +19,10 @@ function readStoredOAuthState(): { state: string | null; provider: OAuthProvider
   const provider = sessionStorage.getItem("oauth_provider");
   return {
     state,
-    provider: provider === "google" || provider === "apple" ? provider : null,
+    provider:
+      provider === "google" || provider === "github" || provider === "apple"
+        ? (provider as OAuthProvider)
+        : null,
   };
 }
 
@@ -59,8 +62,8 @@ function OAuthCallbackInner() {
     const encodedUser = searchParams.get("user");
     const { state: storedState, provider: storedProvider } = readStoredOAuthState();
     const provider: OAuthProvider =
-      providerParam === "apple" || providerParam === "google"
-        ? providerParam
+      providerParam === "apple" || providerParam === "google" || providerParam === "github"
+        ? (providerParam as OAuthProvider)
         : idToken
           ? "apple"
           : (storedProvider || "google");
@@ -76,7 +79,7 @@ function OAuthCallbackInner() {
       return;
     }
 
-    if (!code && provider === "google") {
+    if (!code && (provider === "google" || provider === "github")) {
       trackEvent("oauth_error", {
         provider,
         stage: "missing_code",
@@ -109,10 +112,12 @@ function OAuthCallbackInner() {
             ? `${window.location.origin}/auth/apple/callback`
             : `${window.location.origin}/auth/callback`;
 
-        const endpoint =
-          provider === "apple"
-            ? `${API_URL}/api/auth/oauth/apple/callback`
-            : `${API_URL}/api/auth/oauth/google/callback`;
+        const endpointByProvider: Record<OAuthProvider, string> = {
+          google: `${API_URL}/api/auth/oauth/google/callback`,
+          github: `${API_URL}/api/auth/oauth/github/callback`,
+          apple: `${API_URL}/api/auth/oauth/apple/callback`,
+        };
+        const endpoint = endpointByProvider[provider];
 
         let parsedAppleUser: { name?: string; email?: string } | undefined;
         if (encodedUser) {
