@@ -27,6 +27,8 @@ import {
 import { recordLatencyMetric, recordOpsEvent } from "../lib/ops/events.js";
 import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import logger from "../lib/logger.js";
+import { classifyJobField as classifyTaxonomyField } from "../lib/ai/skills/job-field-classifier.js";
+import { normalizeCompany, normalizeLocation } from "../lib/jobs/normalize.js";
 
 const router = Router();
 
@@ -429,6 +431,19 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
       jobRisk.level === TrustRiskLevel.HIGH ||
       jobRisk.level === TrustRiskLevel.CRITICAL;
     const publishedAt = requiresModeration ? null : new Date();
+
+    // §4.1 — classify under the controlled taxonomy (LLM-primary, keyword fallback).
+    const classification = await classifyTaxonomyField({
+      title: jobData.title,
+      description: jobData.description,
+      companyName: employer.companyName,
+      seniority: jobData.seniority,
+      tags: jobData.tags ?? [],
+    });
+
+    // §4.5 — store canonical company + location forms alongside the raw values.
+    const normalizedCompany = normalizeCompany(employer.companyName);
+    const normalizedLocation = normalizeLocation(jobData.location);
     const intelligence = buildJobIntelligenceUpdate({
       title: jobData.title,
       description: jobData.description,
@@ -456,6 +471,7 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
     const job = await prisma.job.create({
       data: {
         ...jobData,
+        location: normalizedLocation.display || jobData.location,
         slug: generateSlug(jobData.title),
         tags: jobData.tags || [],
         status: requiresModeration ? JobStatus.PENDING_REVIEW : JobStatus.PUBLISHED,
@@ -465,7 +481,10 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
         riskLevel: jobRisk.level,
         trustFlags: jobRisk.flags,
         qualityCheckedAt: requiresModeration ? null : new Date(),
-        sourceName: employer.companyName,
+        sourceName: normalizedCompany || employer.companyName,
+        taxonomyField: classification.field,
+        taxonomyVersion: classification.version,
+        taxonomyConfidence: classification.confidence,
         ...intelligence,
       },
     });
