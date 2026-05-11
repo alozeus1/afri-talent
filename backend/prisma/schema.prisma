@@ -914,6 +914,9 @@ model Job {
   applicationUrl             String?
   companyCareerSourceId      String?
   sourceFingerprint          String?               @db.VarChar(80)
+  // §4.2 — tri-key dedup K1 (`normCompany:normTitle:normCity`). Persisted
+  // for O(1) lookup on insert; populated by the ingest write-path.
+  dedupKeyV2                 String?               @db.VarChar(255)
   sourceLineage              Json?
   sourceFirstSeenAt          DateTime?
   sourceLastSeenAt           DateTime?
@@ -964,6 +967,7 @@ model Job {
   @@index([jobSource])
   @@index([sourceId])
   @@index([sourceFingerprint])
+  @@index([dedupKeyV2])
   @@index([companyCareerSourceId])
   @@index([isExpired, status])
   @@index([expiresAt])
