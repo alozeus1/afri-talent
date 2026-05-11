@@ -8,6 +8,8 @@ import { Role } from "@prisma/client";
 
 const router = Router();
 
+import { bucketForScope } from "../lib/upload-buckets.js";
+
 const BUCKET = process.env.S3_UPLOADS_BUCKET;
 const REGION = process.env.AWS_REGION || "us-east-1";
 const PRESIGN_EXPIRY_SECONDS = 300; // 5 minutes
@@ -74,8 +76,12 @@ router.post("/presign", authenticate, async (req: Request, res: Response) => {
 
     const s3Key = `${scopePrefix}/${nanoid()}.${ext}`;
 
+    // §2.11 — trust scopes target TRUST_S3_BUCKET when available; falls back
+    // to the main uploads bucket otherwise. Resume scope always uses BUCKET.
+    const targetBucket = bucketForScope(data.scope) ?? BUCKET;
+
     const command = new PutObjectCommand({
-      Bucket: BUCKET,
+      Bucket: targetBucket,
       Key: s3Key,
       ContentType: data.contentType,
       ContentLength: data.fileSizeBytes,
