@@ -1,5 +1,22 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
+const CSRF_COOKIE_NAME = "afri_csrf";
+
+// §2.3 — read the CSRF token written by /api/auth/me. The cookie is not
+// HttpOnly on purpose; document.cookie can see it from same-origin JS.
+function readCsrfCookie(): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie.match(
+    new RegExp(`(?:^|;\\s*)${CSRF_COOKIE_NAME}=([^;]*)`),
+  );
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
+function isMutating(method: string | undefined): boolean {
+  const m = (method || "GET").toUpperCase();
+  return m !== "GET" && m !== "HEAD" && m !== "OPTIONS";
+}
+
 interface FetchOptions extends RequestInit {
   token?: string;
 }
@@ -28,6 +45,15 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
 
+  // §2.3 — attach CSRF token on mutating requests (the backend skips this for
+  // exempt routes; sending it always is harmless but tighten to non-GET only).
+  if (isMutating(fetchOptions.method)) {
+    const csrf = readCsrfCookie();
+    if (csrf) {
+      (headers as Record<string, string>)["X-CSRF-Token"] = csrf;
+    }
+  }
+
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...fetchOptions,
     headers,
@@ -50,6 +76,14 @@ async function fetchMultipartAPI<T>(endpoint: string, options: Omit<FetchOptions
 
   if (token) {
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+  }
+
+  // §2.3 — same CSRF rule for multipart uploads.
+  if (isMutating(fetchOptions.method)) {
+    const csrf = readCsrfCookie();
+    if (csrf) {
+      (headers as Record<string, string>)["X-CSRF-Token"] = csrf;
+    }
   }
 
   const response = await fetch(`${API_URL}${endpoint}`, {

@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import pinoHttpModule from "pino-http";
 const pinoHttp = pinoHttpModule as unknown as typeof import("pino-http").default;
@@ -10,6 +11,7 @@ import { redisHealthStatus } from "./lib/redis.js";
 import { buildDegradedState } from "./lib/platform/health.js";
 import { isAnyBillingProviderConfigured } from "./lib/billing/index.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
+import { csrfProtection, csrfErrorHandler } from "./middleware/csrf.js";
 import {
   securityHeaders,
   generalLimiter,
@@ -178,6 +180,15 @@ app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 
 // Security: Request sanitization
 app.use(sanitizeRequest);
+
+// Cookie parser — required by the CSRF middleware below (reads req.cookies).
+app.use(cookieParser());
+
+// §2.3 — CSRF protection (double-submit cookie). Must run AFTER cookie/body
+// parsing (already done above) but BEFORE the route handlers so it can gate
+// mutations. Webhooks, health probes, OAuth start/callback, and auth entry
+// points are exempt — see middleware/csrf.ts `skipCsrfProtection`.
+app.use(csrfProtection);
 
 // Health check endpoint (for load balancers, k8s probes)
 const healthHandler = async (_req: express.Request, res: express.Response) => {
@@ -410,6 +421,10 @@ app.use(
   orchestratorLimiter,
   orchestratorRoutes
 );
+
+// CSRF error handler — converts invalidCsrfTokenError into a 403 JSON
+// response. Must run before the Sentry/global error handlers.
+app.use(csrfErrorHandler);
 
 // Sentry error handler (must be before any other error middleware and after all controllers)
 setupExpressErrorHandler(app);
