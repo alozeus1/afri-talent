@@ -173,9 +173,11 @@ jobs:
           GIT_SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
           APP_RELEASE="v$(date -u +%Y%m%d)-${GIT_SHA_SHORT}"
           BUILD_TIMESTAMP=$(date -u +%FT%TZ)
-          echo "git_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          echo "app_release=${APP_RELEASE}" >> "$GITHUB_OUTPUT"
-          echo "build_timestamp=${BUILD_TIMESTAMP}" >> "$GITHUB_OUTPUT"
+          {
+            echo "git_sha=${{ github.sha }}"
+            echo "app_release=${APP_RELEASE}"
+            echo "build_timestamp=${BUILD_TIMESTAMP}"
+          } >> "$GITHUB_OUTPUT"
           echo "::notice::Build provenance — release=${APP_RELEASE} sha=${{ github.sha }} ts=${BUILD_TIMESTAMP}"
 
       - name: Build & push backend image
