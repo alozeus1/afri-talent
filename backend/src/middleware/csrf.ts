@@ -11,7 +11,7 @@ import jwt from "jsonwebtoken";
 // caller cannot yet hold a token, or the route uses a stronger gate
 // (signature verification / OAuth state cookie).
 
-const isTest = process.env.NODE_ENV === "test";
+const isTestMode = process.env.NODE_ENV === "test" || process.env.E2E === "1";
 const isProduction = process.env.NODE_ENV === "production";
 
 const TEST_BYPASS_HEADER = "x-csrf-test-bypass";
@@ -93,7 +93,7 @@ const {
   ignoredMethods: ["GET", "HEAD", "OPTIONS"],
   skipCsrfProtection: (req: Request) => {
     // Test mode bypass: tests opt in via header to exercise the gate.
-    if (isTest && req.headers[TEST_BYPASS_HEADER] !== "enforce") return true;
+    if (isTestMode && req.headers[TEST_BYPASS_HEADER] !== "enforce") return true;
     return isExempt(req);
   },
 });
