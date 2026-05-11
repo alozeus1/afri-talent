@@ -8,7 +8,7 @@ import { Role } from "@prisma/client";
 import prisma from "./lib/prisma.js";
 import logger from "./lib/logger.js";
 import { initSentry, setupExpressErrorHandler } from "./lib/sentry.js";
-import { redisHealthStatus } from "./lib/redis.js";
+import { redisHealthStatus, isRedisRequired } from "./lib/redis.js";
 import { buildDegradedState } from "./lib/platform/health.js";
 import { isAnyBillingProviderConfigured } from "./lib/billing/index.js";
 import { optionalAuth } from "./middleware/auth.js";
@@ -306,6 +306,24 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
     await prisma.$queryRaw`SELECT 1`;
     const redis = await redisHealthStatus();
     const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
+
+    // §2.4 — when REDIS_REQUIRED=true, a non-connected Redis means not-ready.
+    if (isRedisRequired() && redis !== "connected") {
+      res.status(503).json({
+        status: "not_ready",
+        ...serviceMetadata,
+        checks: {
+          database: "ok",
+          redis,
+          billing,
+        },
+        degraded: true,
+        reason: "redis_required_but_unavailable",
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
     res.json({
       status: "ready",
       ...serviceMetadata,
