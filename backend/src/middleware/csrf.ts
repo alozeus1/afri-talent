@@ -19,6 +19,7 @@ const TEST_BYPASS_HEADER = "x-csrf-test-bypass";
 const EXEMPT_PREFIXES = [
   "/api/webhooks",       // Stripe / Flutterwave — signature-verified
   "/api/ats/webhooks",   // ATS integrations — signature-verified
+  "/api/csp-report",     // §2.8 — browser-emitted, no token available
   "/api/health",
   "/api/ready",
   "/api/live",
