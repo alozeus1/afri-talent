@@ -46,6 +46,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# §2.5 build provenance — injected by deploy.yml. Available to the Node
+# runtime (server.js) and to any /api route that wants to surface it.
+ARG GIT_SHA="unknown"
+ARG APP_RELEASE="local"
+ARG BUILD_TIMESTAMP=""
+ENV GIT_SHA=$GIT_SHA \
+    APP_RELEASE=$APP_RELEASE \
+    BUILD_TIMESTAMP=$BUILD_TIMESTAMP
+
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
