@@ -23,12 +23,11 @@ function trackOAuthEvent(action: string, provider: string) {
   });
 }
 
-function createOAuthState(provider: "google" | "github" | "apple"): string {
-  const randomPart = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  const state = `${provider}:${randomPart}`;
-  sessionStorage.setItem("oauth_state", state);
+// §2.2 — provider state is issued by the backend (HttpOnly cookie + signed
+// JWT). Frontend just remembers which provider the user picked so
+// /auth/callback can route the code to the right backend endpoint.
+function rememberProvider(provider: "google" | "github"): void {
   sessionStorage.setItem("oauth_provider", provider);
-  return state;
 }
 
 export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
@@ -58,87 +57,56 @@ export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
       });
   }, [mode]);
 
-  const handleGoogleLogin = useCallback(async () => {
-    const google = providers.find((p) => p.provider === "google");
-    if (!google) {
+  const startProviderFlow = useCallback(
+    async (provider: "google" | "github") => {
+      setLoading(provider);
+      trackOAuthEvent("oauth_start", provider);
+      try {
+        const res = await fetch(`${API_URL}/api/auth/oauth/${provider}/start`, {
+          method: "GET",
+          credentials: "include",
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to start ${provider} OAuth (${res.status})`);
+        }
+        const data = (await res.json()) as { authorizeUrl?: string };
+        if (!data.authorizeUrl) {
+          throw new Error(`Missing authorizeUrl from ${provider} OAuth start`);
+        }
+        rememberProvider(provider);
+        window.location.href = data.authorizeUrl;
+      } catch (err) {
+        setLoading(null);
+        onErrorRef.current?.(
+          err instanceof Error
+            ? err.message
+            : `Could not start ${provider === "google" ? "Google" : "GitHub"} sign-in.`,
+        );
+      }
+    },
+    [],
+  );
+
+  const handleGoogleLogin = useCallback(() => {
+    if (!providers.find((p) => p.provider === "google")) {
       onErrorRef.current?.("Google sign in is not available right now.");
       return;
     }
+    void startProviderFlow("google");
+  }, [providers, startProviderFlow]);
 
-    setLoading("google");
-    trackOAuthEvent("oauth_start", "google");
-
-    const redirectUri = `${window.location.origin}/auth/callback`;
-    const state = createOAuthState("google");
-    const params = new URLSearchParams({
-      client_id: google.clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: "openid email profile",
-      access_type: "offline",
-      prompt: "select_account",
-      state,
-    });
-
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-  }, [providers]);
-
-  const handleGithubLogin = useCallback(async () => {
-    const github = providers.find((p) => p.provider === "github");
-    if (!github) {
+  const handleGithubLogin = useCallback(() => {
+    if (!providers.find((p) => p.provider === "github")) {
       onErrorRef.current?.("GitHub sign in is not available right now.");
       return;
     }
-
-    setLoading("github");
-    trackOAuthEvent("oauth_start", "github");
-
-    const redirectUri = `${window.location.origin}/auth/callback`;
-    const state = createOAuthState("github");
-    const params = new URLSearchParams({
-      client_id: github.clientId,
-      redirect_uri: redirectUri,
-      // user:email is required to read the (often-private) primary email from
-      // the GitHub API; "read:user" gives us the name/avatar.
-      scope: "read:user user:email",
-      state,
-      allow_signup: "true",
-    });
-
-    window.location.href = `https://github.com/login/oauth/authorize?${params}`;
-  }, [providers]);
-
-  const handleAppleLogin = useCallback(async () => {
-    const apple = providers.find((p) => p.provider === "apple");
-    if (!apple) {
-      onErrorRef.current?.("Apple sign in is not available right now.");
-      return;
-    }
-
-    setLoading("apple");
-    trackOAuthEvent("oauth_start", "apple");
-
-    const redirectUri = `${window.location.origin}/auth/apple/callback`;
-    const state = createOAuthState("apple");
-    const nonce = Math.random().toString(36).slice(2);
-    const params = new URLSearchParams({
-      client_id: apple.clientId,
-      redirect_uri: redirectUri,
-      response_type: "code id_token",
-      scope: "name email",
-      response_mode: "form_post",
-      state,
-      nonce,
-    });
-
-    window.location.href = `https://appleid.apple.com/auth/authorize?${params}`;
-  }, [providers]);
+    void startProviderFlow("github");
+  }, [providers, startProviderFlow]);
 
   const googleEnabled = providers.some((p) => p.provider === "google");
   const githubEnabled = providers.some((p) => p.provider === "github");
-  const appleEnabled = providers.some((p) => p.provider === "apple");
 
-  if (!googleEnabled && !githubEnabled && !appleEnabled) return null;
+  if (!googleEnabled && !githubEnabled) return null;
 
   return (
     <div className="mt-6">
@@ -191,23 +159,6 @@ export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
           </button>
         )}
 
-        {appleEnabled && (
-          <button
-            type="button"
-            onClick={handleAppleLogin}
-            disabled={loading !== null}
-            className="w-full flex items-center justify-center gap-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-black px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 disabled:opacity-50 transition-colors"
-          >
-            {loading === "apple" ? (
-              <div className="w-5 h-5 border-2 border-gray-500 border-t-white rounded-full animate-spin" />
-            ) : (
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
-              </svg>
-            )}
-            {mode === "login" ? "Sign in with Apple" : "Sign up with Apple"}
-          </button>
-        )}
       </div>
     </div>
   );

@@ -4,12 +4,14 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import pinoHttpModule from "pino-http";
 const pinoHttp = pinoHttpModule as unknown as typeof import("pino-http").default;
+import { Role } from "@prisma/client";
 import prisma from "./lib/prisma.js";
 import logger from "./lib/logger.js";
 import { initSentry, setupExpressErrorHandler } from "./lib/sentry.js";
 import { redisHealthStatus } from "./lib/redis.js";
 import { buildDegradedState } from "./lib/platform/health.js";
 import { isAnyBillingProviderConfigured } from "./lib/billing/index.js";
+import { optionalAuth } from "./middleware/auth.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import { csrfProtection, csrfErrorHandler } from "./middleware/csrf.js";
 import {
@@ -94,15 +96,24 @@ const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 const isTest = process.env.NODE_ENV === "test";
 const docsEnabled = process.env.ENABLE_API_DOCS === "true" || !isProduction;
+// §2.5 build provenance — values injected via Docker --build-arg in deploy.yml.
+// APP_RELEASE/GIT_SHA/BUILD_TIMESTAMP are the canonical names; legacy fallbacks
+// (RELEASE_VERSION, GITHUB_SHA, etc.) are preserved for older deploy paths.
 const serviceMetadata = {
   service: "afritalent-backend",
   environment: process.env.APP_ENV || process.env.NODE_ENV || "development",
-  release: process.env.RELEASE_VERSION || process.env.IMAGE_TAG || "local",
+  release:
+    process.env.APP_RELEASE
+    || process.env.RELEASE_VERSION
+    || process.env.IMAGE_TAG
+    || "local",
   commitSha:
-    process.env.GITHUB_SHA
+    process.env.GIT_SHA
+    || process.env.GITHUB_SHA
     || process.env.VERCEL_GIT_COMMIT_SHA
     || process.env.RENDER_GIT_COMMIT
     || "unknown",
+  buildTimestamp: process.env.BUILD_TIMESTAMP || null,
 };
 
 // Request ID middleware (must be first)
@@ -162,7 +173,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token", "x-csrf-test-bypass"],
   maxAge: 86400,
 }));
 
@@ -190,10 +201,29 @@ app.use(cookieParser());
 // points are exempt — see middleware/csrf.ts `skipCsrfProtection`.
 app.use(csrfProtection);
 
-// Health check endpoint (for load balancers, k8s probes)
-const healthHandler = async (_req: express.Request, res: express.Response) => {
+// Health check endpoint (for load balancers, k8s probes).
+//
+// §2.6 info-leak fix: anonymous callers get the minimal `{status: "ok"}`
+// payload only. Admin callers get the rich payload (release, commitSha,
+// db/redis/billing checks) by passing `?verbose=1`.
+function wantsVerbose(req: express.Request): boolean {
+  return req.query.verbose === "1" || req.query.verbose === "true";
+}
+
+const healthHandler = async (req: express.Request, res: express.Response) => {
+  const verbose = wantsVerbose(req);
+
+  if (verbose && (!req.user || req.user.role !== Role.ADMIN)) {
+    res.status(403).json({ error: "Admin role required for verbose health" });
+    return;
+  }
+
   // Skip DB check in test environment — no DB required to run tests
   if (isTest) {
+    if (!verbose) {
+      res.json({ status: "ok" });
+      return;
+    }
     res.json({
       status: "ok",
       ...serviceMetadata,
@@ -211,6 +241,10 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
 
   try {
     await prisma.$queryRaw`SELECT 1`;
+    if (!verbose) {
+      res.json({ status: "ok" });
+      return;
+    }
     const redis = await redisHealthStatus();
     const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
     const degraded = buildDegradedState({ redis, billing });
@@ -227,6 +261,10 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
       timestamp: new Date().toISOString(),
     });
   } catch {
+    if (!verbose) {
+      res.status(500).json({ status: "error" });
+      return;
+    }
     const redis = await redisHealthStatus();
     const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
     res.status(500).json({
@@ -244,8 +282,8 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
   }
 };
 
-app.get("/health", healthHandler);
-app.get("/api/health", healthHandler);
+app.get("/health", optionalAuth, healthHandler);
+app.get("/api/health", optionalAuth, healthHandler);
 
 // Readiness check (for k8s readiness probes)
 const readyHandler = async (_req: express.Request, res: express.Response) => {
