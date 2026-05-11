@@ -885,6 +885,13 @@ model Job {
   location    String
   type        String
   jobField    String?   @db.VarChar(80)
+  // §4.1 — controlled taxonomy fields. `jobField` is the legacy free-text
+  // tag; `taxonomyField` is the new controlled-vocabulary value (one of
+  // the strings in src/lib/jobs/taxonomy.ts JOB_TAXONOMY). Reads/filters
+  // should prefer `taxonomyField` once backfill completes.
+  taxonomyField      String? @db.VarChar(40)
+  taxonomyVersion    Int?
+  taxonomyConfidence Float?
   workplaceType String? @db.VarChar(32)
   seniority   String
   salaryMin   Int?
@@ -950,6 +957,7 @@ model Job {
   @@index([location])
   @@index([type])
   @@index([jobField])
+  @@index([taxonomyField])
   @@index([workplaceType])
   @@index([seniority])
   @@index([visaSponsorship])

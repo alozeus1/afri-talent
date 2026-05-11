@@ -24,6 +24,8 @@ import {
   pushAtsCandidateStageUpdate,
   verifyAtsWebhookSignature,
 } from "./providers.js";
+import { classifyJobField as classifyTaxonomyField } from "../ai/skills/job-field-classifier.js";
+import { normalizeLocation } from "../jobs/normalize.js";
 
 type ATSConnectionRecord = Prisma.ATSConnectionGetPayload<{
   include: {
@@ -621,16 +623,32 @@ async function importJobsFromConnection(params: {
       rawData: job.rawData ?? null,
     };
 
+    // §4.1 — controlled-taxonomy classification at ingest, same path as the
+    // aggregator and employer flows.
+    const classification = await classifyTaxonomyField({
+      title: job.title,
+      description: job.description ?? undefined,
+      seniority: job.seniority ?? undefined,
+      tags: job.tags ?? [],
+    });
+
+    // §4.5 — canonical location form. Company normalisation is handled at the
+    // employer record, not per imported job.
+    const normalizedLocation = normalizeLocation(job.location || "Remote");
+
     const data = {
       title: job.title,
       description: job.description || "Imported from ATS",
-      location: job.location || "Remote",
+      location: normalizedLocation.display || job.location || "Remote",
       type: job.type || "FULL_TIME",
       seniority: job.seniority || "Mid-level",
       salaryMin: job.salaryMin,
       salaryMax: job.salaryMax,
       currency: job.currency,
       tags: job.tags,
+      taxonomyField: classification.field,
+      taxonomyVersion: classification.version,
+      taxonomyConfidence: classification.confidence,
       status: JobStatus.PUBLISHED,
       publishedAt: job.postedAt || new Date(),
       visaSponsorship: job.visaSponsorship,
