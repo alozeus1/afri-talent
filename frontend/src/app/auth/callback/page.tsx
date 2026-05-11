@@ -10,23 +10,18 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 type OAuthProvider = "google" | "github";
 
-function readStoredOAuthState(): { state: string | null; provider: OAuthProvider | null } {
-  if (typeof window === "undefined") {
-    return { state: null, provider: null };
-  }
-
-  const state = sessionStorage.getItem("oauth_state");
+// §2.2 — state for Google + GitHub is held in an HttpOnly cookie set by the
+// backend; only the chosen provider is echoed via sessionStorage so this
+// page can route to the right backend endpoint.
+function readStoredOAuthProvider(): OAuthProvider | null {
+  if (typeof window === "undefined") return null;
   const provider = sessionStorage.getItem("oauth_provider");
-  return {
-    state,
-    provider:
-      provider === "google" || provider === "github"
-        ? (provider as OAuthProvider)
-        : null,
-  };
+  return provider === "google" || provider === "github"
+    ? (provider as OAuthProvider)
+    : null;
 }
 
-function clearStoredOAuthState() {
+function clearStoredOAuthSession() {
   if (typeof window === "undefined") return;
   sessionStorage.removeItem("oauth_state");
   sessionStorage.removeItem("oauth_provider");
@@ -58,7 +53,7 @@ function OAuthCallbackInner() {
     const errorParam = searchParams.get("error");
     const providerParam = searchParams.get("provider");
     const stateParam = searchParams.get("state");
-    const { state: storedState, provider: storedProvider } = readStoredOAuthState();
+    const storedProvider = readStoredOAuthProvider();
     const provider: OAuthProvider =
       providerParam === "google" || providerParam === "github"
         ? (providerParam as OAuthProvider)
@@ -71,7 +66,7 @@ function OAuthCallbackInner() {
         error: errorParam,
       });
       setError(describeOAuthError(errorParam));
-      clearStoredOAuthState();
+      clearStoredOAuthSession();
       return;
     }
 
@@ -81,17 +76,17 @@ function OAuthCallbackInner() {
         stage: "missing_code",
       });
       setError("No authorization code was received from the provider. Try signing in again.");
-      clearStoredOAuthState();
+      clearStoredOAuthSession();
       return;
     }
 
-    if (stateParam && storedState && stateParam !== storedState) {
+    if ((provider === "google" || provider === "github") && !stateParam) {
       trackEvent("oauth_error", {
         provider,
-        stage: "state_validation",
+        stage: "missing_state",
       });
-      setError("Authentication state mismatch. Please try signing in again.");
-      clearStoredOAuthState();
+      setError("The provider did not return a state value. Please try signing in again.");
+      clearStoredOAuthSession();
       return;
     }
 
@@ -110,7 +105,7 @@ function OAuthCallbackInner() {
         };
         const endpoint = endpointByProvider[provider];
 
-        const payload = { code, redirectUri };
+        const payload = { code, state: stateParam, redirectUri };
 
         const res = await fetch(endpoint, {
           method: "POST",
@@ -131,7 +126,7 @@ function OAuthCallbackInner() {
           provider,
           is_new_user: Boolean(data.isNewUser),
         });
-        clearStoredOAuthState();
+        clearStoredOAuthSession();
 
         // Redirect based on role
         const role = data.user?.role;
@@ -148,7 +143,7 @@ function OAuthCallbackInner() {
           stage: "exchange",
         });
         setError(describeOAuthError(err instanceof Error ? err.message : "Authentication failed"));
-        clearStoredOAuthState();
+        clearStoredOAuthSession();
       }
     };
 

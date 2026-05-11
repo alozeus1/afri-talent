@@ -5,6 +5,13 @@ import { signToken, getTokenExpiresIn } from "../lib/jwt.js";
 import { authLimiter } from "../middleware/security.js";
 import { OAuthProvider, Role } from "@prisma/client";
 import { issueEmailVerification } from "./email-verification.js";
+import {
+  generateOAuthState,
+  verifyOAuthState,
+  buildOAuthStateCookie,
+  buildClearOAuthStateCookie,
+  readOAuthStateCookie,
+} from "../lib/oauth-state.js";
 
 const router = Router();
 
@@ -25,12 +32,46 @@ function setAuthCookie(res: Response, token: string): void {
 
 // ---------- Google OAuth ----------
 
+// §2.2 — server issues state + PKCE. Frontend never holds the state secret.
+router.get("/google/start", authLimiter, (_req: Request, res: Response) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    res.status(503).json({
+      error: "Google sign-in is not configured for this environment.",
+      code: "OAUTH_MISSING_CONFIG",
+    });
+    return;
+  }
+  const { state, codeChallenge, cookieValue } = generateOAuthState("google");
+  res.setHeader("Set-Cookie", buildOAuthStateCookie(cookieValue));
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: `${frontendUrl}/auth/callback`,
+    response_type: "code",
+    scope: "openid email profile",
+    access_type: "offline",
+    prompt: "select_account",
+    state,
+    code_challenge: codeChallenge!,
+    code_challenge_method: "S256",
+  });
+  res.json({
+    authorizeUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+  });
+});
+
 const googleCallbackSchema = z.object({
   code: z.string().min(1),
+  state: z.string().min(1),
   redirectUri: z.string().url().optional(),
 });
 
-async function exchangeGoogleCode(code: string, redirectUri: string): Promise<{
+async function exchangeGoogleCode(
+  code: string,
+  redirectUri: string,
+  codeVerifier: string | undefined,
+): Promise<{
   sub: string;
   email: string;
   name: string;
@@ -45,16 +86,21 @@ async function exchangeGoogleCode(code: string, redirectUri: string): Promise<{
     throw error;
   }
 
+  const tokenBody = new URLSearchParams({
+    code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: "authorization_code",
+  });
+  if (codeVerifier) {
+    tokenBody.set("code_verifier", codeVerifier);
+  }
+
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    }),
+    body: tokenBody,
   });
 
   if (!tokenRes.ok) {
@@ -88,11 +134,32 @@ async function exchangeGoogleCode(code: string, redirectUri: string): Promise<{
 
 router.post("/google/callback", authLimiter, async (req: Request, res: Response) => {
   try {
-    const { code, redirectUri } = googleCallbackSchema.parse(req.body);
+    const { code, state, redirectUri } = googleCallbackSchema.parse(req.body);
+
+    // §2.2 — server-side state + PKCE verification. State JWT carries the
+    // code_verifier; we use it on the token-exchange call and clear the cookie
+    // so it can't be replayed.
+    const verification = verifyOAuthState(
+      readOAuthStateCookie(req.headers.cookie),
+      state,
+      "google",
+    );
+    if (!verification.ok) {
+      console.error("Google OAuth state validation failed", { reason: verification.reason });
+      res.setHeader("Set-Cookie", buildClearOAuthStateCookie());
+      res.status(400).json({
+        error: "OAuth state validation failed.",
+        code: "OAUTH_STATE_INVALID",
+        reason: verification.reason,
+      });
+      return;
+    }
+    res.setHeader("Set-Cookie", buildClearOAuthStateCookie());
+
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const finalRedirect = redirectUri || `${frontendUrl}/auth/callback`;
 
-    const profile = await exchangeGoogleCode(code, finalRedirect);
+    const profile = await exchangeGoogleCode(code, finalRedirect, verification.codeVerifier);
 
     return await handleOAuthLogin(res, {
       provider: OAuthProvider.GOOGLE,
@@ -131,8 +198,36 @@ router.post("/google/callback", authLimiter, async (req: Request, res: Response)
 
 // ---------- GitHub OAuth ----------
 
+// §2.2 — server issues state. GitHub does not support PKCE in the same form
+// as Google's OAuth2, so we use signed-cookie state alone (still a meaningful
+// improvement over the previous client-stored sessionStorage state).
+router.get("/github/start", authLimiter, (_req: Request, res: Response) => {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  if (!clientId) {
+    res.status(503).json({
+      error: "GitHub sign-in is not configured for this environment.",
+      code: "OAUTH_MISSING_CONFIG",
+    });
+    return;
+  }
+  const { state, cookieValue } = generateOAuthState("github");
+  res.setHeader("Set-Cookie", buildOAuthStateCookie(cookieValue));
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: `${frontendUrl}/auth/callback`,
+    scope: "read:user user:email",
+    state,
+    allow_signup: "true",
+  });
+  res.json({
+    authorizeUrl: `https://github.com/login/oauth/authorize?${params.toString()}`,
+  });
+});
+
 const githubCallbackSchema = z.object({
   code: z.string().min(1),
+  state: z.string().min(1),
   redirectUri: z.string().url().optional(),
 });
 
@@ -250,7 +345,25 @@ async function exchangeGithubCode(code: string, redirectUri: string): Promise<{
 
 router.post("/github/callback", authLimiter, async (req: Request, res: Response) => {
   try {
-    const { code, redirectUri } = githubCallbackSchema.parse(req.body);
+    const { code, state, redirectUri } = githubCallbackSchema.parse(req.body);
+
+    const verification = verifyOAuthState(
+      readOAuthStateCookie(req.headers.cookie),
+      state,
+      "github",
+    );
+    if (!verification.ok) {
+      console.error("GitHub OAuth state validation failed", { reason: verification.reason });
+      res.setHeader("Set-Cookie", buildClearOAuthStateCookie());
+      res.status(400).json({
+        error: "OAuth state validation failed.",
+        code: "OAUTH_STATE_INVALID",
+        reason: verification.reason,
+      });
+      return;
+    }
+    res.setHeader("Set-Cookie", buildClearOAuthStateCookie());
+
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const finalRedirect = redirectUri || `${frontendUrl}/auth/callback`;
 
