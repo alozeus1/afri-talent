@@ -12,6 +12,7 @@ function deriveKey(): Buffer {
 
 const KEY = deriveKey();
 const IV_LENGTH = 12;
+const TAG_LENGTH = 16;
 
 export function encryptString(value: string): string {
   const iv = crypto.randomBytes(IV_LENGTH);
@@ -30,7 +31,10 @@ export function decryptString(payload: string | null | undefined): string | null
     const iv = Buffer.from(ivB64, "base64");
     const tag = Buffer.from(tagB64, "base64");
     const encrypted = Buffer.from(dataB64, "base64");
-    const decipher = crypto.createDecipheriv("aes-256-gcm", KEY, iv);
+    if (tag.length !== TAG_LENGTH) return null;
+    const decipher = crypto.createDecipheriv("aes-256-gcm", KEY, iv, {
+      authTagLength: TAG_LENGTH,
+    });
     decipher.setAuthTag(tag);
     const value = Buffer.concat([decipher.update(encrypted), decipher.final()]);
     return value.toString("utf8");

@@ -81,7 +81,9 @@ export function decryptTotpSecret(encoded: string): string {
   const iv = blob.subarray(0, IV_LENGTH);
   const tag = blob.subarray(IV_LENGTH, IV_LENGTH + TAG_LENGTH);
   const ct = blob.subarray(IV_LENGTH + TAG_LENGTH);
-  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv, {
+    authTagLength: TAG_LENGTH,
+  });
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
 }
