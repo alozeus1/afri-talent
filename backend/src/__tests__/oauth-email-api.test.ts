@@ -64,12 +64,10 @@ describe("OAuth + Email Verification API", () => {
     const previousGoogleSecret = process.env.GOOGLE_CLIENT_SECRET;
     const previousGithub = process.env.GITHUB_CLIENT_ID;
     const previousGithubSecret = process.env.GITHUB_CLIENT_SECRET;
-    const previousApple = process.env.APPLE_CLIENT_ID;
     process.env.GOOGLE_CLIENT_ID = "google-client-id";
     process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
     process.env.GITHUB_CLIENT_ID = "github-client-id";
     process.env.GITHUB_CLIENT_SECRET = "github-client-secret";
-    process.env.APPLE_CLIENT_ID = "apple-client-id";
 
     const res = await request(app).get("/api/auth/oauth/providers");
     expect(res.status).toBe(200);
@@ -77,7 +75,6 @@ describe("OAuth + Email Verification API", () => {
       expect.arrayContaining([
         expect.objectContaining({ provider: "google", clientId: "google-client-id", enabled: true }),
         expect.objectContaining({ provider: "github", clientId: "github-client-id", enabled: true }),
-        expect.objectContaining({ provider: "apple", enabled: true }),
       ]),
     );
 
@@ -85,7 +82,6 @@ describe("OAuth + Email Verification API", () => {
     process.env.GOOGLE_CLIENT_SECRET = previousGoogleSecret;
     process.env.GITHUB_CLIENT_ID = previousGithub;
     process.env.GITHUB_CLIENT_SECRET = previousGithubSecret;
-    process.env.APPLE_CLIENT_ID = previousApple;
   });
 
   it("hides GitHub provider when GITHUB_CLIENT_SECRET is missing", async () => {

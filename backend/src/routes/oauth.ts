@@ -404,60 +404,6 @@ router.post("/github/callback", authLimiter, async (req: Request, res: Response)
   }
 });
 
-// ---------- Apple OAuth ----------
-
-const appleCallbackSchema = z.object({
-  code: z.string().min(1),
-  idToken: z.string().min(1),
-  user: z.object({
-    name: z.string().optional(),
-    email: z.string().email().optional(),
-  }).optional(),
-});
-
-function decodeJwtPayload(token: string): Record<string, unknown> {
-  const parts = token.split(".");
-  if (parts.length !== 3) throw new Error("Invalid JWT");
-  const payload = Buffer.from(parts[1], "base64url").toString("utf-8");
-  return JSON.parse(payload);
-}
-
-router.post("/apple/callback", authLimiter, async (req: Request, res: Response) => {
-  try {
-    const { idToken, user } = appleCallbackSchema.parse(req.body);
-
-    const payload = decodeJwtPayload(idToken) as {
-      sub: string;
-      email?: string;
-      email_verified?: string | boolean;
-    };
-
-    if (!payload.sub) {
-      res.status(400).json({ error: "Invalid Apple ID token" });
-      return;
-    }
-
-    const email = payload.email || user?.email;
-    const name = user?.name || email?.split("@")[0] || "Apple User";
-    const emailVerified = payload.email_verified === true || payload.email_verified === "true";
-
-    return await handleOAuthLogin(res, {
-      provider: OAuthProvider.APPLE,
-      providerUserId: payload.sub,
-      email: email || undefined,
-      name,
-      emailVerified,
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      res.status(400).json({ error: "Invalid request", details: error.issues });
-      return;
-    }
-    console.error("Apple OAuth error:", error);
-    res.status(500).json({ error: "OAuth authentication failed" });
-  }
-});
-
 // ---------- Shared OAuth Logic ----------
 
 interface OAuthProfile {
@@ -475,8 +421,6 @@ function providerDisplayName(provider: OAuthProvider): string {
       return "Google";
     case OAuthProvider.GITHUB:
       return "GitHub";
-    case OAuthProvider.APPLE:
-      return "Apple";
   }
 }
 
@@ -676,11 +620,6 @@ router.get("/providers", (_req: Request, res: Response) => {
     providers.push({ provider: "github", clientId: githubId, enabled: true });
   }
 
-  const appleId = process.env.APPLE_CLIENT_ID;
-  if (appleId) {
-    providers.push({ provider: "apple", clientId: appleId, enabled: true });
-  }
-
   res.json({ providers });
 });
 
@@ -688,7 +627,6 @@ router.get("/diagnostics", (_req: Request, res: Response) => {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
   const googleConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
   const githubConfigured = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
-  const appleConfigured = Boolean(process.env.APPLE_CLIENT_ID);
 
   res.json({
     environment: process.env.NODE_ENV || "development",
@@ -707,13 +645,6 @@ router.get("/diagnostics", (_req: Request, res: Response) => {
         requiredCallbackUrls: [
           `${frontendUrl}/auth/callback`,
           "http://localhost:3000/auth/callback",
-        ],
-      },
-      apple: {
-        configured: appleConfigured,
-        requiredCallbackUrls: [
-          `${frontendUrl}/auth/apple/callback`,
-          "http://localhost:3000/auth/apple/callback",
         ],
       },
     },

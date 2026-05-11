@@ -13,6 +13,9 @@ export default defineConfig({
       NODE_ENV: "test",
       MOCK_AI: "1",
       ORCHESTRATOR_TOKEN_BUDGET_MAX: "120000",
+      // §2.1: jwt.ts requires JWT_SECRET at module load in every environment,
+      // including tests. Fixed 70-byte value — deterministic, never used outside tests.
+      JWT_SECRET: "test-jwt-secret-do-not-use-in-production-32-bytes-min-padding-padding",
     },
     include: ["src/**/*.test.ts"],
     // Generous timeout for supertest HTTP round-trips; actual suite runs in < 5 s

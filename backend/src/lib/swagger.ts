@@ -210,11 +210,29 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
-      "/api/auth/oauth/apple/callback": {
+      "/api/auth/oauth/github/callback": {
         post: {
           tags: ["Auth"],
-          summary: "Apple OAuth callback",
-          responses: { "200": { description: "User signed in" } },
+          summary: "GitHub OAuth callback",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["code"],
+                  properties: {
+                    code: { type: "string" },
+                    redirectUri: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "200": { description: "Existing user signed in" },
+            "201": { description: "New user created via OAuth" },
+          },
         },
       },
       "/api/auth/oauth/providers": {
