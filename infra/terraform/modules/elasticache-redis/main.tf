@@ -151,8 +151,8 @@ resource "aws_elasticache_replication_group" "redis" {
   kms_key_id                 = aws_kms_key.redis.arn
   auth_token                 = random_password.auth_token.result
 
-  automatic_failover_enabled = var.num_cache_clusters > 1
-  multi_az_enabled           = var.num_cache_clusters > 1
+  automatic_failover_enabled = true
+  multi_az_enabled           = true
 
   snapshot_retention_limit = var.snapshot_retention_days
   snapshot_window          = "03:00-05:00"

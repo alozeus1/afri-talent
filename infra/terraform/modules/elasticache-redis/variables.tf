@@ -40,13 +40,13 @@ variable "node_type" {
 }
 
 variable "num_cache_clusters" {
-  description = "Number of nodes in the replication group (1 primary + N-1 replicas). 2 enables Multi-AZ failover, which is required for production."
+  description = "Number of nodes in the replication group (1 primary + N-1 replicas). Must be at least 2 because Multi-AZ automatic failover is always enabled."
   type        = number
   default     = 2
 
   validation {
-    condition     = var.num_cache_clusters >= 1 && var.num_cache_clusters <= 6
-    error_message = "num_cache_clusters must be between 1 and 6."
+    condition     = var.num_cache_clusters >= 2 && var.num_cache_clusters <= 6
+    error_message = "num_cache_clusters must be between 2 and 6."
   }
 }
 
