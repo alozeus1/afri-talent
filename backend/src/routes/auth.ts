@@ -272,6 +272,9 @@ router.post("/login", authLimiter, validateHumanAuthSubmission, async (req: Requ
       where: { email: data.email },
       include: {
         employer: true,
+        adminRole: {
+          select: { id: true },
+        },
         oauthAccounts: {
           select: { provider: true },
         },
@@ -341,6 +344,19 @@ router.post("/login", authLimiter, validateHumanAuthSubmission, async (req: Requ
       });
       res.status(401).json({ error: "Invalid email or password" });
       return;
+    }
+
+    // §2.10 — admins created after the migration do not get the SQL backfill.
+    // Start their enrolment grace window on first successful password login.
+    if (
+      (user.role === Role.ADMIN || user.adminRole !== null)
+      && !user.totpEnrolledAt
+      && !user.totpGraceUntil
+    ) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { totpGraceUntil: new Date(Date.now() + COOKIE_MAX_AGE_MS) },
+      });
     }
 
     const token = signToken({
