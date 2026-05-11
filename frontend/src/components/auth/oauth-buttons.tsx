@@ -23,12 +23,11 @@ function trackOAuthEvent(action: string, provider: string) {
   });
 }
 
-function createOAuthState(provider: "google" | "github" | "apple"): string {
-  const randomPart = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  const state = `${provider}:${randomPart}`;
-  sessionStorage.setItem("oauth_state", state);
+// §2.2 — provider state is issued by the backend (HttpOnly cookie + signed
+// JWT). Frontend just remembers which provider the user picked so
+// /auth/callback can route the code to the right backend endpoint.
+function rememberProvider(provider: "google" | "github" | "apple"): void {
   sessionStorage.setItem("oauth_provider", provider);
-  return state;
 }
 
 export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
@@ -58,56 +57,55 @@ export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
       });
   }, [mode]);
 
-  const handleGoogleLogin = useCallback(async () => {
-    const google = providers.find((p) => p.provider === "google");
-    if (!google) {
+  const startProviderFlow = useCallback(
+    async (provider: "google" | "github") => {
+      setLoading(provider);
+      trackOAuthEvent("oauth_start", provider);
+      try {
+        const res = await fetch(`${API_URL}/api/auth/oauth/${provider}/start`, {
+          method: "GET",
+          credentials: "include",
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to start ${provider} OAuth (${res.status})`);
+        }
+        const data = (await res.json()) as { authorizeUrl?: string };
+        if (!data.authorizeUrl) {
+          throw new Error(`Missing authorizeUrl from ${provider} OAuth start`);
+        }
+        rememberProvider(provider);
+        window.location.href = data.authorizeUrl;
+      } catch (err) {
+        setLoading(null);
+        onErrorRef.current?.(
+          err instanceof Error
+            ? err.message
+            : `Could not start ${provider === "google" ? "Google" : "GitHub"} sign-in.`,
+        );
+      }
+    },
+    [],
+  );
+
+  const handleGoogleLogin = useCallback(() => {
+    if (!providers.find((p) => p.provider === "google")) {
       onErrorRef.current?.("Google sign in is not available right now.");
       return;
     }
+    void startProviderFlow("google");
+  }, [providers, startProviderFlow]);
 
-    setLoading("google");
-    trackOAuthEvent("oauth_start", "google");
-
-    const redirectUri = `${window.location.origin}/auth/callback`;
-    const state = createOAuthState("google");
-    const params = new URLSearchParams({
-      client_id: google.clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: "openid email profile",
-      access_type: "offline",
-      prompt: "select_account",
-      state,
-    });
-
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-  }, [providers]);
-
-  const handleGithubLogin = useCallback(async () => {
-    const github = providers.find((p) => p.provider === "github");
-    if (!github) {
+  const handleGithubLogin = useCallback(() => {
+    if (!providers.find((p) => p.provider === "github")) {
       onErrorRef.current?.("GitHub sign in is not available right now.");
       return;
     }
+    void startProviderFlow("github");
+  }, [providers, startProviderFlow]);
 
-    setLoading("github");
-    trackOAuthEvent("oauth_start", "github");
-
-    const redirectUri = `${window.location.origin}/auth/callback`;
-    const state = createOAuthState("github");
-    const params = new URLSearchParams({
-      client_id: github.clientId,
-      redirect_uri: redirectUri,
-      // user:email is required to read the (often-private) primary email from
-      // the GitHub API; "read:user" gives us the name/avatar.
-      scope: "read:user user:email",
-      state,
-      allow_signup: "true",
-    });
-
-    window.location.href = `https://github.com/login/oauth/authorize?${params}`;
-  }, [providers]);
-
+  // Apple OAuth left intact on develop until Wave 2 (PR #69) merges and
+  // removes it entirely. Apple was excluded from §2.2 state hardening on
+  // purpose — the provider is being deleted, not migrated.
   const handleAppleLogin = useCallback(async () => {
     const apple = providers.find((p) => p.provider === "apple");
     if (!apple) {
@@ -119,7 +117,9 @@ export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
     trackOAuthEvent("oauth_start", "apple");
 
     const redirectUri = `${window.location.origin}/auth/apple/callback`;
-    const state = createOAuthState("apple");
+    rememberProvider("apple");
+    const legacyState = `apple:${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+    sessionStorage.setItem("oauth_state", legacyState);
     const nonce = Math.random().toString(36).slice(2);
     const params = new URLSearchParams({
       client_id: apple.clientId,
@@ -127,7 +127,7 @@ export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
       response_type: "code id_token",
       scope: "name email",
       response_mode: "form_post",
-      state,
+      state: legacyState,
       nonce,
     });
 
