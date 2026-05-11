@@ -1,8 +1,14 @@
 import crypto from "crypto";
 import type { SemanticConfig } from "./types.js";
 
-const DEFAULT_DIMENSIONS = clampDimensions(parseInt(process.env.SEMANTIC_EMBEDDING_DIMENSIONS || "256", 10));
 const DEFAULT_PROVIDER = (process.env.SEMANTIC_EMBEDDING_PROVIDER || "hash").trim().toLowerCase();
+// Default dim choice mirrors the storage target: openai-backed flows write
+// into vector(1536) columns; hash-backed staging flows still use 256 in the
+// SemanticDocument double-precision array column.
+const PROVIDER_DEFAULT_DIMENSIONS = DEFAULT_PROVIDER === "openai" ? 1536 : 256;
+const DEFAULT_DIMENSIONS = clampDimensions(
+  parseInt(process.env.SEMANTIC_EMBEDDING_DIMENSIONS || String(PROVIDER_DEFAULT_DIMENSIONS), 10),
+);
 const DEFAULT_MODEL = (
   process.env.SEMANTIC_EMBEDDING_MODEL
   || (DEFAULT_PROVIDER === "openai" ? "text-embedding-3-small" : "hash-v1")
@@ -121,15 +127,29 @@ async function generateOpenAIEmbedding(text: string, model: string, dimensions: 
   return l2Normalize(embedding);
 }
 
-export async function resolveEmbedding(text: string, manualEmbedding?: number[]): Promise<{
+export interface ResolveEmbeddingOptions {
+  manualEmbedding?: number[];
+  dimensions?: number;
+  model?: string;
+}
+
+export async function resolveEmbedding(
+  text: string,
+  optionsOrManual?: ResolveEmbeddingOptions | number[],
+): Promise<{
   embedding: number[];
   provider: string;
   model: string;
   dimensions: number;
 }> {
-  if (manualEmbedding && manualEmbedding.length > 0) {
-    const dimensions = clampDimensions(manualEmbedding.length);
-    const normalized = l2Normalize(manualEmbedding.slice(0, dimensions));
+  // Back-compat: callers used to pass `manualEmbedding` positionally.
+  const options: ResolveEmbeddingOptions = Array.isArray(optionsOrManual)
+    ? { manualEmbedding: optionsOrManual }
+    : (optionsOrManual ?? {});
+
+  if (options.manualEmbedding && options.manualEmbedding.length > 0) {
+    const dimensions = clampDimensions(options.manualEmbedding.length);
+    const normalized = l2Normalize(options.manualEmbedding.slice(0, dimensions));
     return {
       embedding: normalized,
       provider: "manual",
@@ -143,21 +163,24 @@ export async function resolveEmbedding(text: string, manualEmbedding?: number[])
     throw new Error("Semantic embeddings are disabled for this environment");
   }
 
+  const dimensions = options.dimensions ? clampDimensions(options.dimensions) : config.dimensions;
+  const model = options.model ?? config.model;
+
   if (config.provider === "openai") {
-    const embedding = await generateOpenAIEmbedding(text, config.model, config.dimensions);
+    const embedding = await generateOpenAIEmbedding(text, model, dimensions);
     return {
       embedding,
       provider: config.provider,
-      model: config.model,
+      model,
       dimensions: embedding.length,
     };
   }
 
   return {
-    embedding: generateHashEmbedding(text, config.dimensions),
+    embedding: generateHashEmbedding(text, dimensions),
     provider: config.provider,
-    model: config.model,
-    dimensions: config.dimensions,
+    model,
+    dimensions,
   };
 }
 
