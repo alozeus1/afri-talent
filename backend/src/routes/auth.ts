@@ -349,7 +349,7 @@ router.post("/login", authLimiter, validateHumanAuthSubmission, async (req: Requ
     // §2.10 — admins created after the migration do not get the SQL backfill.
     // Start their enrolment grace window on first successful password login.
     if (
-      (user.role === Role.ADMIN || user.adminRole !== null)
+      (user.role === Role.ADMIN || user.adminRole != null)
       && !user.totpEnrolledAt
       && !user.totpGraceUntil
     ) {
