@@ -26,6 +26,7 @@ import {
 } from "./providers.js";
 import { classifyJobField as classifyTaxonomyField } from "../ai/skills/job-field-classifier.js";
 import { classifyApplyStrategy } from "../jobs/apply-strategy.js";
+import { resolveEffectiveApplyStrategy } from "../apply/caps.js";
 import { normalizeLocation } from "../jobs/normalize.js";
 
 type ATSConnectionRecord = Prisma.ATSConnectionGetPayload<{
@@ -646,6 +647,11 @@ async function importJobsFromConnection(params: {
       description: job.description ?? undefined,
       sourceUrl: job.sourceUrl ?? undefined,
     });
+    // §5.9 — downgrade EMAIL_DRAFT to ASSISTED_REDIRECT for opted-out domains.
+    const atsApplyEffective = await resolveEffectiveApplyStrategy(prisma, {
+      applyStrategy: applyDecision.strategy,
+      applyEmailDetected: applyDecision.applyEmailDetected,
+    });
 
     const data = {
       title: job.title,
@@ -660,8 +666,10 @@ async function importJobsFromConnection(params: {
       taxonomyField: classification.field,
       taxonomyVersion: classification.version,
       taxonomyConfidence: classification.confidence,
-      applyStrategy: applyDecision.strategy,
-      applyEmailDetected: applyDecision.applyEmailDetected ?? null,
+      applyStrategy: atsApplyEffective.effective,
+      applyEmailDetected: atsApplyEffective.downgradedFromEmailDraft
+        ? null
+        : applyDecision.applyEmailDetected ?? null,
       applyFormDomain: applyDecision.applyFormDomain ?? null,
       status: JobStatus.PUBLISHED,
       publishedAt: job.postedAt || new Date(),

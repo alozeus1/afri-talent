@@ -29,6 +29,7 @@ import { dispatch as dispatchNotification } from "../lib/notifications/dispatche
 import logger from "../lib/logger.js";
 import { classifyJobField as classifyTaxonomyField } from "../lib/ai/skills/job-field-classifier.js";
 import { classifyApplyStrategy } from "../lib/jobs/apply-strategy.js";
+import { resolveEffectiveApplyStrategy } from "../lib/apply/caps.js";
 import { normalizeCompany, normalizeLocation } from "../lib/jobs/normalize.js";
 
 const router = Router();
@@ -472,6 +473,16 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
       description: jobData.description,
       applicationUrl: jobData.applicationUrl ?? undefined,
     });
+    // §5.9 — downgrade EMAIL_DRAFT to ASSISTED_REDIRECT when the employer's
+    // domain has opted out.
+    const applyEffective = await resolveEffectiveApplyStrategy(prisma, {
+      applyStrategy: applyDecision.strategy,
+      applyEmailDetected: applyDecision.applyEmailDetected,
+    });
+    const applyStrategy = applyEffective.effective;
+    const applyEmailDetected = applyEffective.downgradedFromEmailDraft
+      ? null
+      : applyDecision.applyEmailDetected ?? null;
     const intelligence = buildJobIntelligenceUpdate({
       title: jobData.title,
       description: jobData.description,
@@ -513,8 +524,8 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
         taxonomyField: classification.field,
         taxonomyVersion: classification.version,
         taxonomyConfidence: classification.confidence,
-        applyStrategy: applyDecision.strategy,
-        applyEmailDetected: applyDecision.applyEmailDetected ?? null,
+        applyStrategy,
+        applyEmailDetected,
         applyFormDomain: applyDecision.applyFormDomain ?? null,
         ...intelligence,
       },

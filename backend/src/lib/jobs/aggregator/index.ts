@@ -35,6 +35,7 @@ import type { BaseJobSource, JobQuery } from "./sources/base.js";
 import { classifyJobField, normalizeWorkplaceType } from "./taxonomy.js";
 import { classifyJobField as classifyTaxonomyField } from "../../ai/skills/job-field-classifier.js";
 import { classifyApplyStrategy } from "../apply-strategy.js";
+import { resolveEffectiveApplyStrategy } from "../../apply/caps.js";
 import { normalizeCompany, normalizeLocation } from "../normalize.js";
 import { buildDedupKeys, findDuplicate, type DedupMatch } from "../dedup.js";
 
@@ -626,6 +627,16 @@ export class JobAggregator {
       applicationUrl: job.applicationUrl,
     });
 
+    // §5.9 — if the classifier picked EMAIL_DRAFT and the employer's domain
+    // is on the opt-out list, downgrade to ASSISTED_REDIRECT so the
+    // candidate sees the right CTA from the start.
+    const effective = await resolveEffectiveApplyStrategy(this.prisma, {
+      applyStrategy: applyDecision.strategy,
+      applyEmailDetected: applyDecision.applyEmailDetected,
+    });
+    const finalStrategy = effective.effective;
+    const finalApplyEmail = effective.downgradedFromEmailDraft ? null : applyDecision.applyEmailDetected ?? null;
+
     const jobData = {
       title: job.title,
       slug,
@@ -641,8 +652,8 @@ export class JobAggregator {
       taxonomyVersion: classification.version,
       taxonomyConfidence: classification.confidence,
       dedupKeyV2: dedupKeys.k1,
-      applyStrategy: applyDecision.strategy,
-      applyEmailDetected: applyDecision.applyEmailDetected ?? null,
+      applyStrategy: finalStrategy,
+      applyEmailDetected: finalApplyEmail,
       applyFormDomain: applyDecision.applyFormDomain ?? null,
       workplaceType: job.workplaceType ?? normalizeWorkplaceType(job.locationType),
       seniority: job.seniority || "Mid-level",
