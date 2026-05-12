@@ -257,12 +257,16 @@ router.post(
       try {
         envelopeBytes = Buffer.byteLength(JSON.stringify(parsed), "utf8");
       } catch {
-        res.status(400).json({ error: "Request body could not be serialized" });
+        res.status(400).json({
+          error: "Request body could not be serialized",
+          code: "RESUME_NOT_SERIALIZABLE",
+        });
         return;
       }
       if (envelopeBytes > ATS_RUBRIC_ROW_MAX_BYTES) {
         res.status(413).json({
           error: "Request body too large",
+          code: "RESUME_TOO_LARGE",
           limit_bytes: ATS_RUBRIC_ROW_MAX_BYTES,
           received_bytes: envelopeBytes,
         });
@@ -279,7 +283,29 @@ router.post(
       res.json(result);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ error: "Validation failed", details: error.issues });
+        // The Zod .refine() on resumeContentSchema (PR #1) fires a known
+        // message when the per-field 256 KB cap is exceeded. Detect that
+        // case and emit a distinctive code so the FE can route to a
+        // size-specific 400 toast instead of a generic validation toast.
+        const sizeIssue = error.issues.find(
+          (i) =>
+            typeof i.message === "string" &&
+            i.message.includes("exceeds") &&
+            i.message.includes("bytes")
+        );
+        if (sizeIssue) {
+          res.status(400).json({
+            error: "Resume content field exceeds the per-field size limit",
+            code: "RESUME_FIELD_TOO_LARGE",
+            details: error.issues,
+          });
+          return;
+        }
+        res.status(400).json({
+          error: "Validation failed",
+          code: "VALIDATION_FAILED",
+          details: error.issues,
+        });
         return;
       }
       // Never log raw resume content. Hash-based identifiers only —
@@ -288,7 +314,10 @@ router.post(
         { error, userId: req.user?.userId },
         "[resume-builder] ats-rubric/score failed"
       );
-      res.status(500).json({ error: "Failed to score resume against rubric" });
+      res.status(500).json({
+        error: "Failed to score resume against rubric",
+        code: "ATS_RUBRIC_INTERNAL_ERROR",
+      });
     }
   }
 );
