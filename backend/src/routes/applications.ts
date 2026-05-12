@@ -19,6 +19,7 @@ import {
   validateAcknowledgements,
 } from "../lib/apply/state-machine.js";
 import { dispatchApply } from "../lib/apply/dispatch.js";
+import { checkApplyCaps } from "../lib/apply/caps.js";
 import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import { requireAccountStanding } from "../middleware/account-standing.js";
 import { assessApplicationRisk } from "../lib/trust/risk.js";
@@ -576,6 +577,23 @@ router.post(
             requiredAcknowledgements: REQUIRED_ACKNOWLEDGEMENTS,
           },
           reused: true,
+        });
+        return;
+      }
+
+      // §5.9 — per-candidate apply caps. Only enforced on NEW drafts;
+      // re-opening an existing draft is the same candidate's own row and
+      // shouldn't be capped (the caller hit `existing` above).
+      const capDecision = await checkApplyCaps(prisma, req.user!.userId, data.jobId);
+      if (!capDecision.ok) {
+        res.status(429).json({
+          error:
+            capDecision.code === "PER_JOB_CAP"
+              ? "You have already applied to this role recently."
+              : "You have reached the per-employer apply cap for the last 30 days.",
+          code:
+            capDecision.code === "PER_JOB_CAP" ? "APPLY_CAP_PER_JOB" : "APPLY_CAP_PER_EMPLOYER",
+          nextAllowedAt: capDecision.nextAllowedAt,
         });
         return;
       }

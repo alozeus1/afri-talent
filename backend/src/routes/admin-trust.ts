@@ -25,6 +25,7 @@ import {
 } from "../lib/trust/service.js";
 import { createUserNotification } from "../lib/notifications.js";
 import { verificationEmail } from "../lib/email.js";
+import { defaultOptOutExpiry } from "../lib/apply/caps.js";
 
 const router = Router();
 
@@ -867,5 +868,98 @@ router.post("/reports/:id/action", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §5.9 — employer EMAIL_DRAFT opt-out registry.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const optOutCreateSchema = z.object({
+  domain: z.string().min(3).max(255),
+  reason: z.string().max(500).optional(),
+  expiresAt: z.string().datetime().optional(),
+});
+
+// GET /api/admin/trust/employer-opt-outs — list active + expired.
+router.get(
+  "/employer-opt-outs",
+  authenticate,
+  authorize(Role.ADMIN),
+  async (_req: Request, res: Response) => {
+    try {
+      const rows = await prisma.employerApplyOptOut.findMany({
+        orderBy: [{ optedOutAt: "desc" }],
+        take: 500,
+      });
+      const now = Date.now();
+      res.json({
+        optOuts: rows.map((r) => ({
+          ...r,
+          isActive: r.expiresAt.getTime() > now,
+        })),
+      });
+    } catch (error) {
+      logger.error({ err: (error as Error).message }, "[admin-trust] list opt-outs failed");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// POST /api/admin/trust/employer-opt-outs — manual add (ADMIN source).
+router.post(
+  "/employer-opt-outs",
+  authenticate,
+  authorize(Role.ADMIN),
+  async (req: Request, res: Response) => {
+    try {
+      const parsed = optOutCreateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid payload", details: parsed.error.issues });
+        return;
+      }
+      const domain = parsed.data.domain.toLowerCase().trim();
+      const expiresAt = parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : defaultOptOutExpiry();
+      const row = await prisma.employerApplyOptOut.upsert({
+        where: { domain },
+        create: {
+          domain,
+          expiresAt,
+          source: "ADMIN",
+          reason: parsed.data.reason ?? null,
+        },
+        update: {
+          expiresAt,
+          source: "ADMIN",
+          reason: parsed.data.reason ?? null,
+          optedOutAt: new Date(),
+        },
+      });
+      res.status(201).json(row);
+    } catch (error) {
+      logger.error({ err: (error as Error).message }, "[admin-trust] create opt-out failed");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// DELETE /api/admin/trust/employer-opt-outs/:domain — lift the opt-out.
+router.delete(
+  "/employer-opt-outs/:domain",
+  authenticate,
+  authorize(Role.ADMIN),
+  async (req: Request, res: Response) => {
+    try {
+      const domain = req.params.domain.toLowerCase().trim();
+      await prisma.employerApplyOptOut.delete({ where: { domain } });
+      res.status(204).send();
+    } catch (error) {
+      if ((error as { code?: string }).code === "P2025") {
+        res.status(404).json({ error: "Opt-out not found" });
+        return;
+      }
+      logger.error({ err: (error as Error).message }, "[admin-trust] delete opt-out failed");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
 
 export default router;

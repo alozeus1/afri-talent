@@ -96,6 +96,13 @@ enum CandidateApplyResponse {
   NO_RESPONSE_TIMEOUT
 }
 
+// §5.9 — provenance of an EmployerApplyOptOut row.
+enum EmployerOptOutSource {
+  EMAIL  // arrived via the SES inbound rule (wired up in PR Q)
+  ADMIN  // created manually by an admin
+  API    // programmatic add for partner integrations
+}
+
 enum ReviewStatus {
   PENDING
   REVIEWED
@@ -1117,6 +1124,23 @@ model Application {
   // §5.1 — admin queue + per-track worker scans.
   @@index([submissionStatus])
   @@index([submittedAt(sort: Desc)])
+}
+
+// §5.9 — employer opt-out from the EMAIL_DRAFT track. The apply-strategy
+// classifier downgrades EMAIL_DRAFT → ASSISTED_REDIRECT for jobs whose
+// detected apply-email domain matches an unexpired row. Default 12-month
+// window per master prompt §5.9.
+model EmployerApplyOptOut {
+  id         String               @id @default(uuid())
+  domain     String               @unique @db.VarChar(255)
+  optedOutAt DateTime             @default(now())
+  expiresAt  DateTime
+  source     EmployerOptOutSource
+  reason     String?
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  @@index([expiresAt])
 }
 
 // §5.6 — one row per click-out attempt. The 24h-nudge worker reads PENDING
