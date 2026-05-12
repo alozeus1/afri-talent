@@ -34,6 +34,7 @@ import {
 import type { BaseJobSource, JobQuery } from "./sources/base.js";
 import { classifyJobField, normalizeWorkplaceType } from "./taxonomy.js";
 import { classifyJobField as classifyTaxonomyField } from "../../ai/skills/job-field-classifier.js";
+import { classifyApplyStrategy } from "../apply-strategy.js";
 import { normalizeCompany, normalizeLocation } from "../normalize.js";
 import { buildDedupKeys, findDuplicate, type DedupMatch } from "../dedup.js";
 
@@ -615,6 +616,16 @@ export class JobAggregator {
       sourceName: job.company,
     });
 
+    // §5.2 — apply pathway routing. Uses the vendor on `job.source`
+    // (GREENHOUSE/LEVER/...) — not the DB `jobSource: "AGGREGATED"` we write
+    // below — so the classifier can match per-vendor ATS partner flags.
+    const applyDecision = classifyApplyStrategy({
+      jobSource: job.source,
+      description: job.description,
+      sourceUrl: job.sourceUrl,
+      applicationUrl: job.applicationUrl,
+    });
+
     const jobData = {
       title: job.title,
       slug,
@@ -630,6 +641,9 @@ export class JobAggregator {
       taxonomyVersion: classification.version,
       taxonomyConfidence: classification.confidence,
       dedupKeyV2: dedupKeys.k1,
+      applyStrategy: applyDecision.strategy,
+      applyEmailDetected: applyDecision.applyEmailDetected ?? null,
+      applyFormDomain: applyDecision.applyFormDomain ?? null,
       workplaceType: job.workplaceType ?? normalizeWorkplaceType(job.locationType),
       seniority: job.seniority || "Mid-level",
       salaryMin: job.salary?.min,

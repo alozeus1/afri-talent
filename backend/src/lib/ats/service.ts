@@ -25,6 +25,7 @@ import {
   verifyAtsWebhookSignature,
 } from "./providers.js";
 import { classifyJobField as classifyTaxonomyField } from "../ai/skills/job-field-classifier.js";
+import { classifyApplyStrategy } from "../jobs/apply-strategy.js";
 import { normalizeLocation } from "../jobs/normalize.js";
 
 type ATSConnectionRecord = Prisma.ATSConnectionGetPayload<{
@@ -636,6 +637,16 @@ async function importJobsFromConnection(params: {
     // employer record, not per imported job.
     const normalizedLocation = normalizeLocation(job.location || "Remote");
 
+    // §5.2 — ATS-imported jobs route to the matching ATS_API_* track when
+    // the per-vendor partner flag is on, else fall back to OPERATOR_HANDOFF /
+    // ASSISTED_REDIRECT. params.provider is the ATSProvider enum
+    // (GREENHOUSE/LEVER/ASHBY/WORKABLE/…) — same shape the classifier reads.
+    const applyDecision = classifyApplyStrategy({
+      jobSource: params.provider,
+      description: job.description ?? undefined,
+      sourceUrl: job.sourceUrl ?? undefined,
+    });
+
     const data = {
       title: job.title,
       description: job.description || "Imported from ATS",
@@ -649,6 +660,9 @@ async function importJobsFromConnection(params: {
       taxonomyField: classification.field,
       taxonomyVersion: classification.version,
       taxonomyConfidence: classification.confidence,
+      applyStrategy: applyDecision.strategy,
+      applyEmailDetected: applyDecision.applyEmailDetected ?? null,
+      applyFormDomain: applyDecision.applyFormDomain ?? null,
       status: JobStatus.PUBLISHED,
       publishedAt: job.postedAt || new Date(),
       visaSponsorship: job.visaSponsorship,
