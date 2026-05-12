@@ -1580,6 +1580,14 @@ model CandidateResumeVersion {
   plainText          String                     @db.Text
   keywords           String[]
   score              Int?
+  // Wave 5 PR #1: ATS rubric tailoring fields. `originalContent` holds the
+  // unedited resume snapshot; `optimizedContent` holds the rubric-tailored
+  // resume; `atsScore` / `matchScore` are the 0–100 outputs of the ATS rubric
+  // scoring service (Wave 5 PR #2).
+  originalContent    Json?
+  optimizedContent   Json?
+  atsScore           Int?
+  matchScore         Int?
   notes              String[]
   isPrimary          Boolean                    @default(false)
   createdAt          DateTime                   @default(now())
@@ -1591,6 +1599,7 @@ model CandidateResumeVersion {
   @@index([userId, isPrimary, updatedAt(sort: Desc)])
   @@index([jobId, createdAt(sort: Desc)])
   @@index([status, updatedAt(sort: Desc)])
+  @@index([jobId, atsScore(sort: Desc)])
 }
 
 model CandidateAgentTask {
