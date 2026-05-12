@@ -89,11 +89,11 @@ const APPLY_EMAIL_LOCAL_PARTS: ReadonlyArray<string> = [
 ];
 
 // `mailto:` URI parser. Allows the optional `?subject=…` tail.
-const MAILTO_RX = /mailto:([\w.+\-]+@[\w.\-]+\.[A-Za-z]{2,})(?:\?[^\s"'<>]*)?/i;
+const MAILTO_RX = /mailto:([\w.+-]+@[\w.-]+\.[A-Za-z]{2,})(?:\?[^\s"'<>]*)?/i;
 
 // Generic email RX, then we filter by APPLY_EMAIL_LOCAL_PARTS for the strict
 // "apply-side" check. Captures the address for `applyEmailDetected`.
-const EMAIL_RX = /([A-Za-z0-9._+\-]+)@([A-Za-z0-9.\-]+\.[A-Za-z]{2,})/g;
+const EMAIL_RX = /([A-Za-z0-9._+-]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
 
 function isAtsApiEnabled(strategy: keyof typeof ATS_API_FLAGS): boolean {
   const flag = ATS_API_FLAGS[strategy];
