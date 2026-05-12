@@ -226,6 +226,14 @@ export function normalizeTitle(raw: string | null | undefined): string {
     title = title.replace(rx, " ").trim();
   }
 
+  // §4.2 — drop a trailing comma-qualifier clause so "Backend Engineer,
+  // Payments" canonicalises to "Backend Engineer" for dedup. Runs after the
+  // seniority strip so "Engineer, Senior" still gets handled correctly.
+  const commaIdx = title.indexOf(",");
+  if (commaIdx > 0) {
+    title = title.slice(0, commaIdx).trim();
+  }
+
   return title.toLowerCase();
 }
 
