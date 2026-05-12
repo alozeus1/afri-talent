@@ -920,6 +920,9 @@ model Job {
   // Job expiry tracking
   expiresAt        DateTime? // when the listing expires (from source or heuristic)
   lastCheckedAt    DateTime? // last time we verified the listing is still live
+  // §4.4 — incremented by the stale-check worker on each failed re-fetch;
+  // reset to 0 on a successful one. Flips isExpired=true after 3 strikes.
+  staleCheckFailures Int            @default(0)
   isExpired        Boolean        @default(false)
   riskScore        Int            @default(0)
   riskLevel        TrustRiskLevel @default(LOW)

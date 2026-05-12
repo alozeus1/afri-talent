@@ -348,9 +348,26 @@ router.get("/:slug", async (req: Request, res: Response) => {
       return;
     }
 
-    // Only show published, non-expired jobs to public
-    if (job.status !== JobStatus.PUBLISHED || job.isExpired) {
+    if (job.status !== JobStatus.PUBLISHED) {
       res.status(404).json({ error: "Job not found" });
+      return;
+    }
+
+    // §4.4 — JOB_EXPIRED_RESPONSE_MODE controls how expired listings respond:
+    //   "410"                  → HTTP 410 Gone (signals permanent removal to
+    //                            crawlers; aligned with Google for Jobs).
+    //   "200_WITH_NO_JSONLD"   → HTTP 200 with the payload but emitNoJsonLd=true
+    //                            so the frontend can render a notice instead of
+    //                            structured data. Default.
+    if (job.isExpired) {
+      const mode = (process.env.JOB_EXPIRED_RESPONSE_MODE || "200_WITH_NO_JSONLD").toUpperCase();
+      if (mode === "410") {
+        res.status(410).json({ error: "Job expired", code: "JOB_EXPIRED", slug: req.params.slug });
+        return;
+      }
+      const expiredPayload = { ...serializeJob(job), emitNoJsonLd: true };
+      res.setHeader("X-Cache", "MISS");
+      res.status(200).json(expiredPayload);
       return;
     }
 

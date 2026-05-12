@@ -18,6 +18,7 @@ import { runJobMatcherCycle } from "./job-matcher.js";
 import { runAlertDispatchCycle } from "./alert-sender.js";
 import { runAutoApplyCycle, AUTO_APPLY_INTERVAL_MS } from "./auto-apply.js";
 import { runJobCleanupCycle, CLEANUP_INTERVAL_MS } from "./job-cleanup.js";
+import { runJobStaleCheckCycle, STALE_CHECK_INTERVAL_MS } from "./job-stale-check.js";
 import { runOperationalSnapshotCycle } from "./operational-snapshot.js";
 import { runBillingReconciliationWorker } from "./billing-reconciliation.js";
 import { runCandidateRetentionWorker } from "./candidate-retention.js";
@@ -222,6 +223,16 @@ export function startScheduler(): void {
   // Daily cleanup of stale/expired job listings
   intervals.push(
     setInterval(() => void safeRun("job-cleanup", runJobCleanupCycle), CLEANUP_INTERVAL_MS)
+  );
+
+  // §4.4 — hourly stale-check sweep over the AGING batch.
+  intervals.push(
+    setInterval(
+      () => void safeRun("job-stale-check", async () => {
+        await runJobStaleCheckCycle();
+      }),
+      STALE_CHECK_INTERVAL_MS,
+    )
   );
 
   const opsDelay = setTimeout(() => {
