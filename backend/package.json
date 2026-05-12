@@ -29,6 +29,7 @@
     "@sentry/profiling-node": "^10.43.0",
     "@types/cookie-parser": "^1.4.10",
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.76.7",
     "cheerio": "^1.2.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

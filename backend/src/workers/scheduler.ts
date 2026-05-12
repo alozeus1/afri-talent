@@ -20,6 +20,8 @@ import { runAutoApplyCycle, AUTO_APPLY_INTERVAL_MS } from "./auto-apply.js";
 import { runJobCleanupCycle, CLEANUP_INTERVAL_MS } from "./job-cleanup.js";
 import { runJobStaleCheckCycle, STALE_CHECK_INTERVAL_MS } from "./job-stale-check.js";
 import { runApplyClickoutNudgeCycle, APPLY_CLICKOUT_NUDGE_INTERVAL_MS } from "./apply-clickout-nudge.js";
+import { runApplyStuckMonitorCycle, APPLY_STUCK_MONITOR_INTERVAL_MS } from "./apply-stuck-monitor.js";
+import { startApplyBatchWorker } from "./apply-batch-worker.js";
 import { runOperationalSnapshotCycle } from "./operational-snapshot.js";
 import { runBillingReconciliationWorker } from "./billing-reconciliation.js";
 import { runCandidateRetentionWorker } from "./candidate-retention.js";
@@ -245,6 +247,19 @@ export function startScheduler(): void {
       APPLY_CLICKOUT_NUDGE_INTERVAL_MS,
     )
   );
+
+  // §5.8 — hourly stuck-application monitor (DLQ surrogate).
+  intervals.push(
+    setInterval(
+      () => void safeRun("apply-stuck-monitor", async () => {
+        await runApplyStuckMonitorCycle();
+      }),
+      APPLY_STUCK_MONITOR_INTERVAL_MS,
+    )
+  );
+
+  // §5.8 — BullMQ apply-batch consumer (no-op when APPLY_QUEUES_ENABLED=0).
+  startApplyBatchWorker();
 
   const opsDelay = setTimeout(() => {
     void safeRun("ops-snapshot", runOperationalSnapshotCycle);
