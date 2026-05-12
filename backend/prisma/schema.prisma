@@ -42,6 +42,49 @@ enum ApplicationStatus {
   ACCEPTED
 }
 
+// §5.1 — apply pathway routing. One value per submission track. The
+// classifier in backend/src/lib/jobs/apply-strategy.ts (PR O) picks one of
+// these at ingest; the per-application submission worker (PR Q–T) dispatches
+// on it.
+enum ApplyStrategy {
+  ATS_API_GREENHOUSE
+  ATS_API_LEVER
+  ATS_API_ASHBY
+  ATS_API_WORKABLE
+  EMAIL_DRAFT
+  OPERATOR_HANDOFF
+  ASSISTED_REDIRECT
+}
+
+// §5.1 — Draft → Preview → Submit lifecycle for an Application.
+//   NOT_SUBMITTED              fresh record; track not yet started.
+//   DRAFTING                   tailored content ready for candidate preview.
+//   AWAITING_USER_CONFIRMATION drafted, candidate has not yet clicked Submit.
+//   SUBMITTING                 worker is dispatching against the track.
+//   SUBMITTED                  proof received; final state.
+//   FAILED                     unrecoverable; lastSubmissionError populated.
+enum SubmissionStatus {
+  NOT_SUBMITTED
+  DRAFTING
+  AWAITING_USER_CONFIRMATION
+  SUBMITTING
+  SUBMITTED
+  FAILED
+}
+
+// §5.1 — what kind of artefact proves a submission actually happened. Each
+// track lands a different kind:
+//   ATS_API           → ATS_ID (provider_application_id)
+//   EMAIL_DRAFT       → EMAIL_MESSAGE_ID (SES MessageId)
+//   OPERATOR_HANDOFF  → SCREENCAST_URL (S3 PUT URL)
+//   ASSISTED_REDIRECT → CLICKOUT_TIMESTAMP
+enum SubmissionProofKind {
+  ATS_ID
+  EMAIL_MESSAGE_ID
+  SCREENCAST_URL
+  CLICKOUT_TIMESTAMP
+}
+
 enum ReviewStatus {
   PENDING
   REVIEWED
@@ -892,6 +935,14 @@ model Job {
   taxonomyField      String? @db.VarChar(40)
   taxonomyVersion    Int?
   taxonomyConfidence Float?
+  // §5.1 — apply pathway routing. Computed at ingest by
+  // backend/src/lib/jobs/apply-strategy.ts (PR O). The strategy is the
+  // single source of truth the per-application submission tracks (PR Q–T)
+  // dispatch on. applyEmailDetected/applyFormDomain carry the parsed
+  // artefacts the EMAIL_DRAFT and OPERATOR_HANDOFF tracks need.
+  applyStrategy       ApplyStrategy?
+  applyEmailDetected  String?
+  applyFormDomain     String?
   workplaceType String? @db.VarChar(32)
   seniority   String
   salaryMin   Int?
@@ -971,6 +1022,7 @@ model Job {
   @@index([sourceId])
   @@index([sourceFingerprint])
   @@index([dedupKeyV2])
+  @@index([applyStrategy])
   @@index([companyCareerSourceId])
   @@index([isExpired, status])
   @@index([expiresAt])
@@ -1017,6 +1069,19 @@ model Application {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
+  // §5.1 — Draft → Preview → Submit state machine. submissionStatus tracks
+  // the apply-pathway lifecycle separately from the employer-facing `status`
+  // (which is REVIEWING/SHORTLISTED/etc.). The submission proof fields land
+  // when the chosen track records evidence of a real submission.
+  submissionStatus                SubmissionStatus     @default(NOT_SUBMITTED)
+  submissionProvider              String?
+  submissionProviderApplicationId String?
+  submissionProofKind             SubmissionProofKind?
+  submissionProofRef              String?
+  submittedAt                     DateTime?
+  submissionAttempts              Int                  @default(0)
+  lastSubmissionError             String?
+
   jobId String
   job   Job    @relation(fields: [jobId], references: [id])
 
@@ -1037,6 +1102,9 @@ model Application {
   @@index([status])
   @@index([createdAt(sort: Desc)])
   @@index([riskLevel, riskScore])
+  // §5.1 — admin queue + per-track worker scans.
+  @@index([submissionStatus])
+  @@index([submittedAt(sort: Desc)])
 }
 
 // ──────────────── AI Skills Models ────────────────
