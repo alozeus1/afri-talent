@@ -1,6 +1,9 @@
-// POST /api/skills/resume-builder/generate — generate a resume with Claude
-// POST /api/skills/resume-builder/save      — save / update the user's resume
-// GET  /api/skills/resume-builder/my-resume — fetch the user's saved resume
+// POST /api/skills/resume-builder/generate           — generate a resume with Claude
+// POST /api/skills/resume-builder/save               — save / update the user's resume
+// GET  /api/skills/resume-builder/my-resume          — fetch the user's saved resume
+// POST /api/skills/resume-builder/scan-ats           — quick ATS keyword scan (existing)
+// POST /api/skills/resume-builder/translate          — translate a resume
+// POST /api/skills/resume-builder/ats-rubric/score   — Wave 5 PR #2: ATS rubric scoring + persistence
 //
 // All routes require PROFESSIONAL subscription.
 
@@ -16,6 +19,11 @@ import { buildResume } from "../../lib/ai/skills/resume-builder.js";
 import { embedUserResume } from "../../lib/ai/skills/job-matcher.js";
 import { scanResumeAts } from "../../lib/ai/skills/ats-scanner.js";
 import { translateResume, type SupportedTranslationLanguage } from "../../lib/ai/skills/resume-translator.js";
+import { scoreAtsRubric } from "../../services/ats-rubric.js";
+import {
+  ATS_RUBRIC_ROW_MAX_BYTES,
+  atsRubricRequestSchema,
+} from "../../lib/resume/rubric-schema.js";
 
 const router = Router();
 
@@ -217,6 +225,70 @@ router.post(
       }
       logger.error({ error, userId: req.user?.userId }, "[resume-builder] translate failed");
       res.status(500).json({ error: "Failed to translate resume" });
+    }
+  }
+);
+
+// ── POST /api/skills/resume-builder/ats-rubric/score ─────────────────────────
+// Wave 5 PR #2 — score a resume against a target job using a weighted rubric
+// and persist the result. The route handler derives `userId` from `req.user`
+// and NEVER trusts a candidate identifier from the request body
+// (security-engineer hard-block). Defense-in-depth layers:
+//   1. Express body-parser per-route limit (1 MB) configured in app.ts
+//   2. Zod resumeContentSchema per-field 256 KB cap (PR #1)
+//   3. Combined envelope cap (768 KB) enforced just below
+//   4. Per-user AI quotas + generateLimiter rate limit (existing)
+router.post(
+  "/ats-rubric/score",
+  generateLimiter,
+  authenticate,
+  authorize(Role.CANDIDATE),
+  requirePlan(SubscriptionPlan.PROFESSIONAL),
+  async (req: Request, res: Response): Promise<void> => {
+    if (!checkSkillsEnabled(res)) return;
+
+    try {
+      const parsed = atsRubricRequestSchema.parse(req.body);
+
+      // Envelope check: combined request body must not exceed
+      // ATS_RUBRIC_ROW_MAX_BYTES. Runs AFTER Zod so we know the shape is
+      // valid before doing the serialization work.
+      let envelopeBytes = 0;
+      try {
+        envelopeBytes = Buffer.byteLength(JSON.stringify(parsed), "utf8");
+      } catch {
+        res.status(400).json({ error: "Request body could not be serialized" });
+        return;
+      }
+      if (envelopeBytes > ATS_RUBRIC_ROW_MAX_BYTES) {
+        res.status(413).json({
+          error: "Request body too large",
+          limit_bytes: ATS_RUBRIC_ROW_MAX_BYTES,
+          received_bytes: envelopeBytes,
+        });
+        return;
+      }
+
+      const userId = req.user!.userId;
+      const result = await scoreAtsRubric({
+        userId,
+        resumeContent: parsed.resumeContent,
+        targetJobId: parsed.targetJobId ?? null,
+        targetJobDescription: parsed.targetJobDescription ?? null,
+      });
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Validation failed", details: error.issues });
+        return;
+      }
+      // Never log raw resume content. Hash-based identifiers only —
+      // userId is short and not PII-grade, so logged as-is.
+      logger.error(
+        { error, userId: req.user?.userId },
+        "[resume-builder] ats-rubric/score failed"
+      );
+      res.status(500).json({ error: "Failed to score resume against rubric" });
     }
   }
 );

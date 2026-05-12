@@ -215,6 +215,21 @@ app.post(
   },
 );
 
+// Wave 5 PR #2 — ATS rubric scoring accepts resume content payloads bounded
+// by the Zod 256 KB per-field cap (originalContent + optimizedContent) plus
+// envelope overhead. Mount a path-scoped body parser BEFORE the global
+// 10 KB parser so the larger limit applies on this route only. Layered cap:
+//   Express body-parser (1 MB, here)
+//   → Zod resumeContentSchema 256 KB per-field cap (PR #1)
+//   → Route-level envelope check 768 KB (PR #2)
+//   → Per-user AI quotas + skillsLimiter rate limit (existing)
+// Mirrors the existing Stripe webhook (line 195) + CSP report (line 205)
+// pattern: path-scoped parser registered before the global one.
+app.use(
+  "/api/skills/resume-builder/ats-rubric",
+  express.json({ limit: "1mb" })
+);
+
 // Body parsing with size limits (all other routes)
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
