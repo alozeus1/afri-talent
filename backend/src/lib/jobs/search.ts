@@ -1,4 +1,4 @@
-import { JobStatus, Prisma, Role } from "@prisma/client";
+import { EmployerVerificationLevel, JobStatus, Prisma, Role } from "@prisma/client";
 import type { Request } from "express";
 import prisma from "../prisma.js";
 import {
@@ -142,6 +142,127 @@ function hasSearchIntentMatch(job: PublicJobRecord, query?: string): boolean {
 
   const descriptionHits = queryTokens.filter((token) => description.includes(token)).length;
   return queryTokens.length === 1 ? descriptionHits > 0 : descriptionHits >= 2;
+}
+
+// §4.3 — verified-employer boost. Employers past UNVERIFIED have completed
+// at least one identity gate (email-domain, business-doc, manual review, or
+// premium-trusted); the boost rewards that with +12 on the final score and
+// pushes verified rows up the ranking before the post-sort diversity cap
+// trims employer over-representation.
+export const VERIFIED_EMPLOYER_BOOST = 12;
+
+// §4.3 — diversity cap. Top 30 results may contain ≤ 3 listings from the same
+// employer unless the user's query explicitly names that employer.
+export const DIVERSITY_CAP_TOP_N = 30;
+export const DIVERSITY_CAP_MAX_PER_EMPLOYER = 3;
+
+const VERIFIED_LEVELS: ReadonlySet<EmployerVerificationLevel> = new Set([
+  EmployerVerificationLevel.EMAIL_DOMAIN_VERIFIED,
+  EmployerVerificationLevel.BUSINESS_DOC_VERIFIED,
+  EmployerVerificationLevel.MANUAL_REVIEW_APPROVED,
+  EmployerVerificationLevel.PREMIUM_TRUSTED,
+]);
+
+function isVerifiedEmployer(job: PublicJobRecord): boolean {
+  const level = job.employer?.trustProfile?.verificationLevel as EmployerVerificationLevel | undefined;
+  return level ? VERIFIED_LEVELS.has(level) : false;
+}
+
+// Use the displayed company name when present; fall back to the aggregated
+// `sourceName`. Returns null when neither is set (rare; treat as non-grouped).
+function employerKeyFor(job: PublicJobRecord): string | null {
+  const raw = job.employer?.companyName ?? job.sourceName ?? null;
+  if (!raw) return null;
+  return raw.toLowerCase().trim();
+}
+
+// Generic suffix tokens we strip when deciding whether a query references an
+// employer — `bosch` matters, `group` and `inc` don't.
+const EMPLOYER_NAME_STOPWORDS: ReadonlySet<string> = new Set([
+  "group", "inc", "ltd", "llc", "co", "company", "corp", "corporation", "gmbh", "the", "and",
+]);
+
+function queryNamesEmployer(query: string | undefined, employerKey: string): boolean {
+  if (!query) return false;
+  const normalizedQuery = query.toLowerCase().trim();
+  if (!normalizedQuery) return false;
+
+  const employerTokens = employerKey
+    .split(/[\s,]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 3 && !EMPLOYER_NAME_STOPWORDS.has(t));
+  if (employerTokens.length === 0) return false;
+
+  const queryTokens = normalizedQuery.split(/\s+/).filter((t) => t.length > 0);
+
+  // Token-level overlap: any significant employer token appearing in any
+  // query token (or vice versa) counts as "the query names this employer".
+  // This intentionally lets "bosch engineer" match employer "Bosch Group".
+  return employerTokens.some((empTok) =>
+    queryTokens.some((qTok) => qTok === empTok || qTok.includes(empTok) || empTok.includes(qTok)),
+  );
+}
+
+export function applyVerifiedEmployerBoost(
+  results: ReturnType<typeof scoreJobForSearch<PublicJobRecord>>[],
+): ReturnType<typeof scoreJobForSearch<PublicJobRecord>>[] {
+  return results.map((result) => {
+    if (!isVerifiedEmployer(result.job)) return result;
+    const nextScore = clampScore(result.score + VERIFIED_EMPLOYER_BOOST);
+    return {
+      ...result,
+      score: nextScore,
+      explanation: {
+        ...result.explanation,
+        score: nextScore,
+        reasons: [...result.explanation.reasons, `verified employer (+${VERIFIED_EMPLOYER_BOOST})`],
+        components: {
+          ...result.explanation.components,
+          relevance: clampScore(result.explanation.components.relevance + VERIFIED_EMPLOYER_BOOST),
+        },
+      },
+    };
+  });
+}
+
+// Walks the sorted results in score order. The first DIVERSITY_CAP_TOP_N items
+// that fit the cap (≤ DIVERSITY_CAP_MAX_PER_EMPLOYER per employer, modulo
+// query-named employers) become the new top of the list. Overflow falls
+// through into position 31+ preserving its relative ranking order, so the
+// items aren't lost — just demoted.
+export function applyEmployerDiversityCap(
+  sorted: ReturnType<typeof scoreJobForSearch<PublicJobRecord>>[],
+  query?: string,
+): ReturnType<typeof scoreJobForSearch<PublicJobRecord>>[] {
+  const counts = new Map<string, number>();
+  const promoted: typeof sorted = [];
+  const demoted: typeof sorted = [];
+
+  for (const result of sorted) {
+    if (promoted.length >= DIVERSITY_CAP_TOP_N) {
+      demoted.push(result);
+      continue;
+    }
+    const employerKey = employerKeyFor(result.job);
+    if (!employerKey) {
+      promoted.push(result);
+      continue;
+    }
+    if (queryNamesEmployer(query, employerKey)) {
+      promoted.push(result);
+      counts.set(employerKey, (counts.get(employerKey) ?? 0) + 1);
+      continue;
+    }
+    const current = counts.get(employerKey) ?? 0;
+    if (current >= DIVERSITY_CAP_MAX_PER_EMPLOYER) {
+      demoted.push(result);
+    } else {
+      promoted.push(result);
+      counts.set(employerKey, current + 1);
+    }
+  }
+
+  return [...promoted, ...demoted];
 }
 
 function boostTitleIntent<TJob extends PublicJobRecord>(
@@ -373,11 +494,19 @@ export async function fetchRankedJobs(input: {
   )
     .filter((result) => hasSearchIntentMatch(result.job, input.preferenceContext?.query))
     .map((result) => boostTitleIntent(result, input.preferenceContext?.query));
+  // §4.3 — verified employer boost runs BEFORE sort so it influences the
+  // ranking; the diversity cap runs AFTER sort so it only re-orders the final
+  // ranking without changing per-row scores.
+  const boosted = applyVerifiedEmployerBoost(collapsed);
   const sorted = sortRankedResults(
-    boostSemanticRanking(collapsed, input.preferenceContext?.query),
+    boostSemanticRanking(boosted, input.preferenceContext?.query),
     input.sortBy ?? "relevance",
   );
-  const ranked = sorted.map((result) => ({
+  const capped =
+    (input.sortBy ?? "relevance") === "relevance"
+      ? applyEmployerDiversityCap(sorted, input.preferenceContext?.query)
+      : sorted;
+  const ranked = capped.map((result) => ({
     ...result.job,
     discovery: result.discovery,
     rankingExplanation: result.explanation,

@@ -1,5 +1,9 @@
 import { render } from "@testing-library/react";
-import { JobJsonLd } from "../job-jsonld";
+import {
+  JobJsonLd,
+  JSONLD_VALID_THROUGH_DAYS,
+  computeJsonLdValidThrough,
+} from "../job-jsonld";
 import { Job } from "@/lib/api";
 
 const baseJob: Job = {
@@ -57,5 +61,49 @@ describe("JobJsonLd", () => {
 
     const script = container.querySelector("script[type='application/ld+json']");
     expect(script).toBeNull();
+  });
+
+  it("does not render schema when the backend signals emitNoJsonLd (200_WITH_NO_JSONLD mode)", () => {
+    const { container } = render(
+      <JobJsonLd job={{ ...baseJob, emitNoJsonLd: true } as Job & { emitNoJsonLd?: boolean }} />,
+    );
+    const script = container.querySelector("script[type='application/ld+json']");
+    expect(script).toBeNull();
+  });
+
+  describe("§4.4 — validThrough = min(expiresAt, datePosted + 60 days)", () => {
+    const POSTED = new Date("2026-03-01T00:00:00.000Z");
+    const SIXTY_DAY_CAP = new Date(POSTED.getTime() + JSONLD_VALID_THROUGH_DAYS * 86_400_000);
+
+    it("falls back to datePosted + 60 days when expiresAt is missing", () => {
+      const out = computeJsonLdValidThrough(null, POSTED);
+      expect(out).toBe(SIXTY_DAY_CAP.toISOString());
+    });
+
+    it("uses expiresAt when it lands before the 60-day cap", () => {
+      const earlier = new Date(POSTED.getTime() + 10 * 86_400_000);
+      expect(computeJsonLdValidThrough(earlier, POSTED)).toBe(earlier.toISOString());
+    });
+
+    it("caps at datePosted + 60 days when expiresAt is later", () => {
+      const farFuture = new Date(POSTED.getTime() + 365 * 86_400_000);
+      expect(computeJsonLdValidThrough(farFuture, POSTED)).toBe(SIXTY_DAY_CAP.toISOString());
+    });
+
+    it("emits the capped value as the JSON-LD validThrough", () => {
+      const farFuture = new Date(POSTED.getTime() + 365 * 86_400_000);
+      const { container } = render(
+        <JobJsonLd
+          job={{
+            ...baseJob,
+            publishedAt: POSTED.toISOString(),
+            createdAt: POSTED.toISOString(),
+            expiresAt: farFuture.toISOString(),
+          }}
+        />,
+      );
+      const parsed = JSON.parse(container.querySelector("script[type='application/ld+json']")?.textContent || "{}") as { validThrough?: string };
+      expect(parsed.validThrough).toBe(SIXTY_DAY_CAP.toISOString());
+    });
   });
 });

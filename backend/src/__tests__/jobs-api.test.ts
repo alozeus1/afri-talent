@@ -260,15 +260,29 @@ describe("Jobs API", () => {
             expect(res.body.slug).toBe("frontend-engineer-123");
         });
 
-        it("returns 404 for expired jobs", async () => {
+        it("returns 200 with emitNoJsonLd flag for expired jobs (§4.4 default)", async () => {
             (prisma.job.findUnique as any).mockResolvedValueOnce({
                 ...DUMMY_JOB,
                 isExpired: true,
             });
 
             const res = await request(app).get("/api/jobs/frontend-engineer-123");
-            expect(res.status).toBe(404);
-            expect(res.body.error).toBe("Job not found");
+            expect(res.status).toBe(200);
+            expect(res.body.emitNoJsonLd).toBe(true);
+            expect(res.body.id).toBe("job123");
+        });
+
+        it("returns 410 Gone for expired jobs when JOB_EXPIRED_RESPONSE_MODE=410", async () => {
+            vi.stubEnv("JOB_EXPIRED_RESPONSE_MODE", "410");
+            (prisma.job.findUnique as any).mockResolvedValueOnce({
+                ...DUMMY_JOB,
+                isExpired: true,
+            });
+
+            const res = await request(app).get("/api/jobs/frontend-engineer-123");
+            expect(res.status).toBe(410);
+            expect(res.body.code).toBe("JOB_EXPIRED");
+            vi.unstubAllEnvs();
         });
     });
 
