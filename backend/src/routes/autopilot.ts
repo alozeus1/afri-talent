@@ -24,6 +24,7 @@ import {
   SubscriptionPlan,
 } from "@prisma/client";
 import { generateQuickCoverLetter } from "../lib/ai/cover-letter.js";
+import { getApplyQueue } from "../lib/queues/apply-queues.js";
 import { getUserEntitlements } from "../lib/billing/entitlements.js";
 import {
   buildFollowUpDraft,
@@ -801,7 +802,22 @@ router.post(
         },
       });
 
-      void processBatch(batch.id, userId, jobIds, customMessage);
+      // §5.8 — fan out to BullMQ when enabled, else fall back to the legacy
+      // in-process loop. Inline mode keeps dev + Redis-less staging green.
+      const batchQueue = getApplyQueue("apply-batch-queue");
+      if (batchQueue) {
+        await Promise.all(
+          jobIds.map((jobId) =>
+            batchQueue.add(
+              "apply-batch-job",
+              { batchId: batch.id, candidateId: userId, jobId, customMessage },
+              { jobId: `${batch.id}:${jobId}` }, // idempotency key
+            ),
+          ),
+        );
+      } else {
+        void processBatch(batch.id, userId, jobIds, customMessage);
+      }
 
       res.status(202).json({
         batchId: batch.id,
