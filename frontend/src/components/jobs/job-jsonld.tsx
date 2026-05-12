@@ -2,13 +2,37 @@ import { Job } from "@/lib/api";
 import { normalizeJobDescription } from "@/lib/job-description";
 import { salaryPeriodSchemaUnit } from "@/lib/salary";
 
+// §4.4 — JobPosting JSON-LD requires a validThrough date for Google for Jobs.
+// We cap it at `datePosted + 60 days` so Search drops the listing even if the
+// employer never set an explicit expiry — matches the master prompt formula
+// `validThrough = min(expiresAt, datePosted + 60 days)`.
+export const JSONLD_VALID_THROUGH_DAYS = 60;
+
+export function computeJsonLdValidThrough(
+  expiresAt: string | Date | null | undefined,
+  datePosted: string | Date | null | undefined,
+): string | null {
+  const expiry = expiresAt ? new Date(expiresAt) : null;
+  const posted = datePosted ? new Date(datePosted) : null;
+  const cap = posted ? new Date(posted.getTime() + JSONLD_VALID_THROUGH_DAYS * 86400000) : null;
+
+  if (expiry && cap) {
+    return (expiry.getTime() < cap.getTime() ? expiry : cap).toISOString();
+  }
+  if (expiry) return expiry.toISOString();
+  if (cap) return cap.toISOString();
+  return null;
+}
+
 interface JobJsonLdProps {
-  job: Job;
+  job: Job & { emitNoJsonLd?: boolean };
 }
 
 export function JobJsonLd({ job }: JobJsonLdProps) {
-  const expiresAt = job.expiresAt ? new Date(job.expiresAt) : null;
-  if (job.isExpired) return null;
+  // §4.4 — when the backend signals an expired listing in 200_WITH_NO_JSONLD
+  // mode, the frontend renders the notice but drops the structured data so
+  // Google Search doesn't keep showing the dead listing.
+  if (job.isExpired || job.emitNoJsonLd) return null;
 
   const employmentTypeMap: Record<string, string> = {
     "full-time": "FULL_TIME",
@@ -24,13 +48,16 @@ export function JobJsonLd({ job }: JobJsonLdProps) {
   const isRemote = job.location?.toLowerCase().includes("remote");
   const cleanedDescription = normalizeJobDescription(job.description).replace(/\s+/g, " ").trim();
 
+  const datePosted = job.publishedAt || job.createdAt;
+  const validThrough = computeJsonLdValidThrough(job.expiresAt ?? null, datePosted);
+
   const jsonLd: Record<string, unknown> = {
     "@context": "https://schema.org/",
     "@type": "JobPosting",
     title: job.title,
     description: cleanedDescription,
-    datePosted: job.publishedAt || job.createdAt,
-    validThrough: expiresAt?.toISOString(),
+    datePosted,
+    validThrough,
     employmentType: employmentTypeMap[job.type?.toLowerCase()] || "FULL_TIME",
     hiringOrganization: {
       "@type": "Organization",

@@ -885,6 +885,13 @@ model Job {
   location    String
   type        String
   jobField    String?   @db.VarChar(80)
+  // §4.1 — controlled taxonomy fields. `jobField` is the legacy free-text
+  // tag; `taxonomyField` is the new controlled-vocabulary value (one of
+  // the strings in src/lib/jobs/taxonomy.ts JOB_TAXONOMY). Reads/filters
+  // should prefer `taxonomyField` once backfill completes.
+  taxonomyField      String? @db.VarChar(40)
+  taxonomyVersion    Int?
+  taxonomyConfidence Float?
   workplaceType String? @db.VarChar(32)
   seniority   String
   salaryMin   Int?
@@ -920,6 +927,9 @@ model Job {
   // Job expiry tracking
   expiresAt        DateTime? // when the listing expires (from source or heuristic)
   lastCheckedAt    DateTime? // last time we verified the listing is still live
+  // §4.4 — incremented by the stale-check worker on each failed re-fetch;
+  // reset to 0 on a successful one. Flips isExpired=true after 3 strikes.
+  staleCheckFailures Int            @default(0)
   isExpired        Boolean        @default(false)
   riskScore        Int            @default(0)
   riskLevel        TrustRiskLevel @default(LOW)
@@ -950,6 +960,7 @@ model Job {
   @@index([location])
   @@index([type])
   @@index([jobField])
+  @@index([taxonomyField])
   @@index([workplaceType])
   @@index([seniority])
   @@index([visaSponsorship])

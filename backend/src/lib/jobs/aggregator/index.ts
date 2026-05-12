@@ -33,6 +33,8 @@ import {
 } from "./sources/company-careers.js";
 import type { BaseJobSource, JobQuery } from "./sources/base.js";
 import { classifyJobField, normalizeWorkplaceType } from "./taxonomy.js";
+import { classifyJobField as classifyTaxonomyField } from "../../ai/skills/job-field-classifier.js";
+import { normalizeCompany, normalizeLocation } from "../normalize.js";
 
 interface AggregatedJobGroup {
   canonical: AggregatedJob;
@@ -565,17 +567,37 @@ export class JobAggregator {
       relatedJobs,
     );
 
+    // §4.1 — controlled taxonomy classification runs inline at ingest. Falls
+    // back to keyword path when LLM is unavailable, MOCK_AI=1, or confidence
+    // < 0.6. Legacy `jobField` stays alongside for back-compat until the
+    // consumer cutover (separate frontend PR).
+    const classification = await classifyTaxonomyField({
+      title: job.title,
+      description: job.description,
+      companyName: job.company,
+      seniority: job.seniority ?? undefined,
+      tags: job.skills,
+    });
+
+    // §4.5 — write normalised canonical forms for company + location so the
+    // dedup key (PR K) and search facets can match without re-running these.
+    const normalizedCompany = normalizeCompany(job.company);
+    const normalizedLocation = normalizeLocation(job.location, job.locationType);
+
     const jobData = {
       title: job.title,
       slug,
       description: job.description,
-      location: job.location,
+      location: normalizedLocation.display || job.location,
       type: job.jobType,
       jobField: job.jobField ?? classifyJobField({
         title: job.title,
         description: job.description,
         tags: job.skills,
       }),
+      taxonomyField: classification.field,
+      taxonomyVersion: classification.version,
+      taxonomyConfidence: classification.confidence,
       workplaceType: job.workplaceType ?? normalizeWorkplaceType(job.locationType),
       seniority: job.seniority || "Mid-level",
       salaryMin: job.salary?.min,
@@ -590,7 +612,7 @@ export class JobAggregator {
       jobSource: "AGGREGATED" as const,
       sourceUrl: job.sourceUrl,
       sourceId: job.externalId,
-      sourceName: job.company,
+      sourceName: normalizedCompany || job.company,
       expiresAt: job.expiresAt || null,
       companyCareerSourceId: job.companyCareerSourceId ?? null,
       lastCheckedAt: new Date(),
