@@ -28,6 +28,7 @@ import { recordLatencyMetric, recordOpsEvent } from "../lib/ops/events.js";
 import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import logger from "../lib/logger.js";
 import { classifyJobField as classifyTaxonomyField } from "../lib/ai/skills/job-field-classifier.js";
+import { classifyApplyStrategy } from "../lib/jobs/apply-strategy.js";
 import { normalizeCompany, normalizeLocation } from "../lib/jobs/normalize.js";
 
 const router = Router();
@@ -461,6 +462,16 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
     // §4.5 — store canonical company + location forms alongside the raw values.
     const normalizedCompany = normalizeCompany(employer.companyName);
     const normalizedLocation = normalizeLocation(jobData.location);
+
+    // §5.2 — employer-posted jobs default to ASSISTED_REDIRECT (the candidate
+    // applies through us → onboarding flow). The classifier still inspects
+    // the description so a "send your CV to careers@…" employer post routes
+    // to EMAIL_DRAFT correctly.
+    const applyDecision = classifyApplyStrategy({
+      jobSource: "EMPLOYER_POSTED",
+      description: jobData.description,
+      applicationUrl: jobData.applicationUrl ?? undefined,
+    });
     const intelligence = buildJobIntelligenceUpdate({
       title: jobData.title,
       description: jobData.description,
@@ -502,6 +513,9 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
         taxonomyField: classification.field,
         taxonomyVersion: classification.version,
         taxonomyConfidence: classification.confidence,
+        applyStrategy: applyDecision.strategy,
+        applyEmailDetected: applyDecision.applyEmailDetected ?? null,
+        applyFormDomain: applyDecision.applyFormDomain ?? null,
         ...intelligence,
       },
     });
