@@ -11,10 +11,31 @@
 
 import { z } from "zod/v4";
 
+// Defense-in-depth cap on serialized resume content size. The route layer
+// still enforces rate limiting + per-user quotas + auth-derived candidateId,
+// but this stops a payload from blowing past a reasonable JSONB row size
+// before it ever reaches Prisma. 256 KB comfortably fits any real resume
+// (typical AI-tailored output is < 20 KB) while keeping the Aurora row
+// inside the 8 KB / TOAST-friendly range plus headroom for AI rewrites.
+export const RESUME_CONTENT_MAX_BYTES = 256 * 1024;
+
 export const resumeContentSchema = z
   .record(z.string(), z.unknown())
+  .refine(
+    (value) => {
+      try {
+        return Buffer.byteLength(JSON.stringify(value), "utf8") <= RESUME_CONTENT_MAX_BYTES;
+      } catch {
+        // JSON.stringify throws on circular references — treat as invalid.
+        return false;
+      }
+    },
+    {
+      message: `Resume content exceeds ${RESUME_CONTENT_MAX_BYTES} bytes when serialized as JSON`,
+    }
+  )
   .describe(
-    "Resume body content. Loose JSON shape — the resume-builder AI skill owns the canonical schema and may add fields without migrations."
+    "Resume body content. Loose JSON shape — the resume-builder AI skill owns the canonical schema and may add fields without migrations. Capped at 256 KB serialized."
   );
 
 export const resumeVersionScoresSchema = z.object({

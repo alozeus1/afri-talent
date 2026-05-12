@@ -6,6 +6,8 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  RESUME_CONTENT_MAX_BYTES,
+  resumeContentSchema,
   resumeVersionCreateSchema,
   resumeVersionScoresSchema,
   resumeVersionUpdateSchema,
@@ -91,5 +93,35 @@ describe("resumeVersionUpdateSchema", () => {
     expect(
       resumeVersionUpdateSchema.safeParse({ atsScore: 75 }).success
     ).toBe(true);
+  });
+});
+
+describe("resumeContentSchema serialized-size cap", () => {
+  it("accepts a small resume content payload", () => {
+    expect(
+      resumeContentSchema.safeParse({ summary: "Senior engineer with 10y exp" }).success
+    ).toBe(true);
+  });
+
+  it("accepts a payload exactly at the cap", () => {
+    // Pad a value so that JSON.stringify({ k: "<pad>" }) lands at the cap.
+    // Envelope is `{"k":"…"}` = 8 chars, so the padding length = cap - 8.
+    const padding = "a".repeat(RESUME_CONTENT_MAX_BYTES - 8);
+    expect(resumeContentSchema.safeParse({ k: padding }).success).toBe(true);
+  });
+
+  it("rejects a payload larger than the cap", () => {
+    const tooBig = "a".repeat(RESUME_CONTENT_MAX_BYTES);
+    const result = resumeContentSchema.safeParse({ k: tooBig });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a too-large originalContent inside resumeVersionCreateSchema", () => {
+    const tooBig = "a".repeat(RESUME_CONTENT_MAX_BYTES);
+    const result = resumeVersionCreateSchema.safeParse({
+      candidateId: validUuid,
+      originalContent: { k: tooBig },
+    });
+    expect(result.success).toBe(false);
   });
 });
