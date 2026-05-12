@@ -51,6 +51,14 @@ export function validateAcknowledgements(
 }
 
 // Allowed transitions. Anything not in this map is a hard error.
+//
+// §5.6 added two edges so the Track D (assisted redirect) flow can park an
+// Application in AWAITING_USER_CONFIRMATION between the click-out and the
+// candidate's confirm/deny response:
+//
+//   SUBMITTING                    → AWAITING_USER_CONFIRMATION  (dispatcher requests wait)
+//   AWAITING_USER_CONFIRMATION    → SUBMITTED  (clickout-confirm)
+//   AWAITING_USER_CONFIRMATION    → FAILED     (clickout-deny / 7d timeout)
 const ALLOWED: Record<SubmissionStatus, ReadonlySet<SubmissionStatus>> = {
   [SubmissionStatus.NOT_SUBMITTED]: new Set([SubmissionStatus.DRAFTING]),
   [SubmissionStatus.DRAFTING]: new Set([
@@ -60,10 +68,12 @@ const ALLOWED: Record<SubmissionStatus, ReadonlySet<SubmissionStatus>> = {
   ]),
   [SubmissionStatus.AWAITING_USER_CONFIRMATION]: new Set([
     SubmissionStatus.SUBMITTING,
+    SubmissionStatus.SUBMITTED,
     SubmissionStatus.FAILED,
   ]),
   [SubmissionStatus.SUBMITTING]: new Set([
     SubmissionStatus.SUBMITTED,
+    SubmissionStatus.AWAITING_USER_CONFIRMATION,
     SubmissionStatus.FAILED,
   ]),
   [SubmissionStatus.SUBMITTED]: new Set(),

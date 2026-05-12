@@ -23,7 +23,7 @@
 // redirect from "we clicked out" into "we confirmed it landed" still ship in
 // PR R — but the immediate proof (timestamp) is already real here.
 
-import { ApplyStrategy, SubmissionProofKind } from "@prisma/client";
+import { ApplyStrategy, SubmissionProofKind, SubmissionStatus } from "@prisma/client";
 
 export interface DispatchInput {
   applicationId: string;
@@ -40,6 +40,13 @@ export interface DispatchSuccess {
   proofRef: string;
   provider?: string;
   providerApplicationId?: string;
+  // §5.6 — tracks that finish asynchronously (e.g. ASSISTED_REDIRECT waits
+  // for the candidate's clickout-confirm) request a non-terminal next state.
+  // Omit to settle the Application directly to SUBMITTED.
+  nextStatus?: SubmissionStatus;
+  // §5.6 — when true, the route handler creates an ApplyAttempt row alongside
+  // the Application update so the 24h-nudge worker can pick it up.
+  createApplyAttempt?: boolean;
 }
 
 export interface DispatchFailure {
@@ -62,9 +69,11 @@ const NOT_YET_IMPLEMENTED: Record<ApplyStrategy, string | null> = {
 export async function dispatchApply(input: DispatchInput): Promise<DispatchResult> {
   switch (input.applyStrategy) {
     case ApplyStrategy.ASSISTED_REDIRECT: {
-      // §5.6 — record the clickout timestamp now; the per-application
-      // ApplyAttempt model and 24h nudge ship in PR R. Until then the
-      // candidate sees SUBMITTED + a clickout reference they can re-open.
+      // §5.6 — record the clickout, but park the Application in
+      // AWAITING_USER_CONFIRMATION. The route handler creates an
+      // ApplyAttempt row; the 24h-nudge worker pings the candidate; their
+      // clickout-confirm / clickout-deny finalises to SUBMITTED / FAILED;
+      // 7-day silence transitions to NO_RESPONSE_TIMEOUT + FAILED.
       const clickoutAt = new Date().toISOString();
       const ref = input.applicationUrl ?? input.sourceUrl ?? "";
       return {
@@ -72,6 +81,8 @@ export async function dispatchApply(input: DispatchInput): Promise<DispatchResul
         proofKind: SubmissionProofKind.CLICKOUT_TIMESTAMP,
         proofRef: `${clickoutAt}|${ref}`,
         provider: "clickout",
+        nextStatus: SubmissionStatus.AWAITING_USER_CONFIRMATION,
+        createApplyAttempt: true,
       };
     }
     default: {

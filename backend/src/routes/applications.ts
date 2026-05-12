@@ -747,11 +747,15 @@ router.post(
       });
 
       if (result.ok) {
+        const nextStatus = result.nextStatus ?? SubmissionStatus.SUBMITTED;
         const settled = await prisma.application.update({
           where: { id: submitting.id },
           data: {
-            submissionStatus: SubmissionStatus.SUBMITTED,
-            submittedAt: new Date(),
+            submissionStatus: nextStatus,
+            // submittedAt is only stamped on the terminal SUBMITTED state;
+            // tracks that park in AWAITING_USER_CONFIRMATION (Track D §5.6)
+            // get it on clickout-confirm.
+            submittedAt: nextStatus === SubmissionStatus.SUBMITTED ? new Date() : null,
             submissionProofKind: result.proofKind,
             submissionProofRef: result.proofRef,
             submissionProvider: result.provider ?? null,
@@ -759,6 +763,17 @@ router.post(
             lastSubmissionError: null,
           },
         });
+        // §5.6 — Track D records each click-out so the 24h-nudge worker has
+        // something to read.
+        if (result.createApplyAttempt) {
+          await prisma.applyAttempt.create({
+            data: {
+              applicationId: settled.id,
+              sourceUrl: application.job.sourceUrl,
+              applicationUrl: application.job.applicationUrl,
+            },
+          });
+        }
         recordOpsEvent({
           metricName: "apply_pathway_submit",
           category: "applications",
@@ -769,6 +784,7 @@ router.post(
             applicationId: settled.id,
             applyStrategy: application.job.applyStrategy,
             proofKind: result.proofKind,
+            nextStatus,
           },
         });
         res.status(200).json({
@@ -776,6 +792,7 @@ router.post(
           submissionStatus: settled.submissionStatus,
           submittedAt: settled.submittedAt,
           submissionProofKind: settled.submissionProofKind,
+          awaitingClickoutConfirmation: nextStatus === SubmissionStatus.AWAITING_USER_CONFIRMATION,
         });
         return;
       }
@@ -804,6 +821,112 @@ router.post(
       console.error("Submit error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §5.6 — Track D click-out telemetry (assisted redirect).
+//
+// After a successful /submit against an ASSISTED_REDIRECT job, the Application
+// is parked in AWAITING_USER_CONFIRMATION. The candidate's frontend opens the
+// apply URL in a new tab; when they return, two buttons appear:
+//   "Yes, I applied" → POST /api/applications/:id/clickout-confirm → SUBMITTED
+//   "No, I didn't"   → POST /api/applications/:id/clickout-deny    → FAILED
+// The apply-clickout-nudge worker handles the 24h reminder + 7-day timeout.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function settleClickoutResponse(
+  req: Request,
+  res: Response,
+  outcome: "CONFIRMED_COMPLETED" | "DENIED_COMPLETED",
+) {
+  try {
+    const application = await prisma.application.findUnique({
+      where: { id: req.params.id },
+      include: { applyAttempts: { where: { candidateResponse: "PENDING" }, orderBy: { createdAt: "desc" }, take: 1 } },
+    });
+    if (!application) {
+      res.status(404).json({ error: "Application not found" });
+      return;
+    }
+    if (application.candidateId !== req.user!.userId) {
+      res.status(403).json({ error: "Not authorised for this application" });
+      return;
+    }
+    if (application.submissionStatus !== SubmissionStatus.AWAITING_USER_CONFIRMATION) {
+      res.status(409).json({
+        error: "Application is not awaiting clickout confirmation",
+        code: "NOT_AWAITING_CONFIRMATION",
+        submissionStatus: application.submissionStatus,
+      });
+      return;
+    }
+    const attempt = application.applyAttempts[0];
+    if (!attempt) {
+      res.status(409).json({ error: "No pending click-out to confirm", code: "NO_PENDING_ATTEMPT" });
+      return;
+    }
+
+    const now = new Date();
+    const isConfirm = outcome === "CONFIRMED_COMPLETED";
+
+    await prisma.$transaction([
+      prisma.applyAttempt.update({
+        where: { id: attempt.id },
+        data: { candidateResponse: outcome, respondedAt: now },
+      }),
+      prisma.application.update({
+        where: { id: application.id },
+        data: isConfirm
+          ? {
+              submissionStatus: SubmissionStatus.SUBMITTED,
+              submittedAt: now,
+              // Upgrade the proof reference with the confirmation timestamp
+              // so a later audit can see when the candidate signed off.
+              submissionProofRef: `${application.submissionProofRef ?? ""}|confirmed:${now.toISOString()}`,
+              lastSubmissionError: null,
+            }
+          : {
+              submissionStatus: SubmissionStatus.FAILED,
+              lastSubmissionError: "Candidate denied completion of the external application",
+            },
+      }),
+    ]);
+
+    recordOpsEvent({
+      metricName: "apply_pathway_clickout_response",
+      category: "applications",
+      outcome: isConfirm ? "success" : "failure",
+      severity: "info",
+      details: { applicationId: application.id, response: outcome },
+    });
+
+    res.status(200).json({
+      applicationId: application.id,
+      submissionStatus: isConfirm ? SubmissionStatus.SUBMITTED : SubmissionStatus.FAILED,
+      respondedAt: now,
+    });
+  } catch (error) {
+    console.error("Clickout response error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+router.post(
+  "/:id/clickout-confirm",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  async (req: Request, res: Response) => {
+    await settleClickoutResponse(req, res, "CONFIRMED_COMPLETED");
+  },
+);
+
+router.post(
+  "/:id/clickout-deny",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  async (req: Request, res: Response) => {
+    await settleClickoutResponse(req, res, "DENIED_COMPLETED");
   },
 );
 
