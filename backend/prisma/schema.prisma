@@ -85,6 +85,17 @@ enum SubmissionProofKind {
   CLICKOUT_TIMESTAMP
 }
 
+// §5.6 — Track D (assisted-redirect) telemetry. PENDING is the initial
+// state on click-out; the candidate's confirm/deny endpoints move it to
+// CONFIRMED_COMPLETED / DENIED_COMPLETED; the apply-clickout-nudge worker
+// sets NO_RESPONSE_TIMEOUT after 7 days of silence.
+enum CandidateApplyResponse {
+  PENDING
+  CONFIRMED_COMPLETED
+  DENIED_COMPLETED
+  NO_RESPONSE_TIMEOUT
+}
+
 enum ReviewStatus {
   PENDING
   REVIEWED
@@ -1095,6 +1106,7 @@ model Application {
   trustCases          TrustCase[]
   atsLink             ATSApplicationLink?
   candidateAgentTasks CandidateAgentTask[]
+  applyAttempts       ApplyAttempt[]
 
   @@unique([jobId, candidateId])
   @@index([jobId])
@@ -1105,6 +1117,27 @@ model Application {
   // §5.1 — admin queue + per-track worker scans.
   @@index([submissionStatus])
   @@index([submittedAt(sort: Desc)])
+}
+
+// §5.6 — one row per click-out attempt. The 24h-nudge worker reads PENDING
+// rows + sends the candidate a "did you complete the application?" prompt;
+// rows still PENDING after 7 days transition to NO_RESPONSE_TIMEOUT and
+// move the parent Application to FAILED.
+model ApplyAttempt {
+  id                String                 @id @default(uuid())
+  applicationId     String
+  application       Application            @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  clickedAt         DateTime               @default(now())
+  sourceUrl         String?
+  applicationUrl    String?
+  nudgeSentAt       DateTime?
+  candidateResponse CandidateApplyResponse @default(PENDING)
+  respondedAt       DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@index([applicationId, createdAt(sort: Desc)])
+  @@index([candidateResponse, clickedAt])
 }
 
 // ──────────────── AI Skills Models ────────────────

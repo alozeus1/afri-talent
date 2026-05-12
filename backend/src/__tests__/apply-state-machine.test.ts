@@ -65,6 +65,19 @@ describe("§5.7 — transition + canTransition", () => {
     expect(canTransition(SubmissionStatus.FAILED, SubmissionStatus.DRAFTING)).toBe(true);
   });
 
+  // §5.6 — Track D edges.
+  it("permits SUBMITTING → AWAITING_USER_CONFIRMATION (Track D parks here)", () => {
+    expect(canTransition(SubmissionStatus.SUBMITTING, SubmissionStatus.AWAITING_USER_CONFIRMATION)).toBe(true);
+  });
+
+  it("permits AWAITING_USER_CONFIRMATION → SUBMITTED (clickout-confirm)", () => {
+    expect(canTransition(SubmissionStatus.AWAITING_USER_CONFIRMATION, SubmissionStatus.SUBMITTED)).toBe(true);
+  });
+
+  it("permits AWAITING_USER_CONFIRMATION → FAILED (clickout-deny / 7d timeout)", () => {
+    expect(canTransition(SubmissionStatus.AWAITING_USER_CONFIRMATION, SubmissionStatus.FAILED)).toBe(true);
+  });
+
   it("rejects illegal jumps like NOT_SUBMITTED → SUBMITTED", () => {
     const r = transition(SubmissionStatus.NOT_SUBMITTED, SubmissionStatus.SUBMITTED);
     expect(r.ok).toBe(false);
@@ -108,7 +121,7 @@ describe("§5.7 — dispatchApply", () => {
     applicationUrl: null,
   };
 
-  it("ASSISTED_REDIRECT records a CLICKOUT_TIMESTAMP with the apply URL", async () => {
+  it("ASSISTED_REDIRECT records a CLICKOUT_TIMESTAMP with the apply URL and parks the application", async () => {
     const result = await dispatchApply({
       ...base,
       applyStrategy: "ASSISTED_REDIRECT",
@@ -119,6 +132,10 @@ describe("§5.7 — dispatchApply", () => {
       expect(result.proofKind).toBe("CLICKOUT_TIMESTAMP");
       expect(result.proofRef.endsWith("|https://example.com/apply/abc")).toBe(true);
       expect(result.provider).toBe("clickout");
+      // §5.6 — Track D parks the application in AWAITING_USER_CONFIRMATION
+      // and asks the route to create an ApplyAttempt row for the nudge worker.
+      expect(result.nextStatus).toBe("AWAITING_USER_CONFIRMATION");
+      expect(result.createApplyAttempt).toBe(true);
     }
   });
 
