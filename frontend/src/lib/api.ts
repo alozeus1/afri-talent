@@ -3417,6 +3417,44 @@ export interface GeneratedResume {
   source: "ai" | "template";
 }
 
+// ── Resume builder rubric types ──────────────────────────────────────────────
+// Mirror of backend/src/lib/resume/rubric-schema.ts (verified verbatim against
+// commit 630696a). The `criteria` array is intentionally extensible — adding
+// `seniority_signals` / `ats_compatibility_format` to the backend rubric
+// requires zero frontend changes, since the UI iterates the array.
+export type ResumeContent = Record<string, unknown>;
+
+export interface RubricCriterion {
+  key: string;
+  label: string;
+  score: number;     // 0..100 integer
+  weight: number;    // 0..100 integer; sums to 100 across criteria
+  notes: string[];
+  present?: string[];
+  missing?: string[];
+}
+
+export interface AtsRubricResponse {
+  resumeVersionId: string | null;
+  atsScore: number;
+  matchScore: number | null;
+  criteria: RubricCriterion[];
+  suggestions: string[];
+  optimizedContent: ResumeContent | null;
+  source: "ai" | "template";
+}
+
+// Thrown by `skills.scoreAtsRubric` on non-2xx so callers can read the
+// distinctive backend code (RESUME_TOO_LARGE / RESUME_FIELD_TOO_LARGE / etc.)
+// and the size hints the route surfaces with 413/400 responses.
+export interface AtsRubricError {
+  status: number;
+  code?: string;
+  message?: string;
+  limit_bytes?: number;
+  received_bytes?: number;
+}
+
 export interface JobMatch {
   jobId: string;
   title: string;
@@ -3570,6 +3608,56 @@ export const skills = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  // Wave 5 — ATS rubric scoring. Uses direct fetch (not fetchAPI) so the error
+  // body's `code` / `limit_bytes` / `received_bytes` fields survive the
+  // throw; fetchAPI flattens those into a single Error message and we lose
+  // the distinctive error codes from PR #92.
+  // Source of truth: backend/src/lib/resume/rubric-schema.ts @ 630696a,
+  //                  backend/src/routes/skills/resume-builder.ts @ 3a07488.
+  scoreAtsRubric: async (data: {
+    resumeContent: ResumeContent;
+    targetJobId?: string;
+    targetJobDescription?: string;
+  }): Promise<AtsRubricResponse> => {
+    // Omit undefined keys to match the backend's
+    // `null | undefined | missing` equivalence (see route handler line 273).
+    const body: Record<string, unknown> = { resumeContent: data.resumeContent };
+    if (data.targetJobId) body.targetJobId = data.targetJobId;
+    if (data.targetJobDescription) body.targetJobDescription = data.targetJobDescription;
+
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const csrf = readCsrfCookie();
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+
+    const res = await fetch(`${API_URL}/api/skills/resume-builder/ats-rubric/score`, {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok) {
+      return res.json() as Promise<AtsRubricResponse>;
+    }
+
+    let payload: Partial<AtsRubricError> = {};
+    try {
+      payload = (await res.json()) as Partial<AtsRubricError>;
+    } catch {
+      // Body wasn't JSON; fall through with empty payload — `code` will be
+      // undefined and toFriendlyError will use the generic 4xx/5xx branch.
+    }
+
+    const err: AtsRubricError = {
+      status: res.status,
+      code: payload.code,
+      message: payload.message,
+      limit_bytes: payload.limit_bytes,
+      received_bytes: payload.received_bytes,
+    };
+    throw err;
+  },
 
   // Career Gap Explainer
   explainCareerGap: (data: { gapStartDate: string; gapEndDate: string; activities?: string; targetRole?: string }) =>
