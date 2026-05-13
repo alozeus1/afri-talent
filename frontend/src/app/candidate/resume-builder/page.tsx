@@ -351,7 +351,7 @@ export default function ResumeBuilderPage() {
     setRubric(null);
     try {
       const result = await skills.scoreAtsRubric({
-        resumeContent: generated.sections as unknown as Record<string, unknown>,
+        resumeContent: { rawText: editedText || generated.rawText },
         targetJobDescription: rubricJobDescription.trim() || undefined,
       });
       setRubric(result);
