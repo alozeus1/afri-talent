@@ -1,19 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { profile, skills, billing, CandidateProfile, GeneratedResume, type BillingStatus } from "@/lib/api";
+import {
+  profile,
+  skills,
+  billing,
+  type CandidateProfile,
+  type GeneratedResume,
+  type BillingStatus,
+  type AtsRubricResponse,
+  type AtsRubricError,
+} from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ATSScoreDisplay } from "@/components/ui/ats-score-display";
-import { LoadingState } from "@/components/ui/loading-state";
 import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
-import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
 import { PremiumGate } from "@/components/ui/premium-gate";
-import { RESUME_IMPROVEMENT_TIPS, reviewResumeInput } from "@/lib/early-tester-content";
+import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
+import { reviewResumeInput } from "@/lib/early-tester-content";
+import { StepIndicator } from "@/components/resume-builder/step-indicator";
+import { BasicsStep, basicsStepValid } from "@/components/resume-builder/basics-step";
+import { ExperienceStep } from "@/components/resume-builder/experience-step";
+import { EducationStep, educationStepValid } from "@/components/resume-builder/education-step";
+import { SummaryStep } from "@/components/resume-builder/summary-step";
+import { TemplateStep } from "@/components/resume-builder/template-step";
+import { LivePreview } from "@/components/resume-builder/live-preview";
+import { RubricScorePanel } from "@/components/resume-builder/rubric-score-panel";
+import type { ResumePreviewData, TemplateId } from "@/components/resume-builder/types";
 
 interface WorkEntry {
   company: string;
@@ -45,6 +61,79 @@ interface FormState {
 const emptyWork: WorkEntry = { company: "", title: "", period: "", description: "" };
 const emptyEdu: EduEntry = { institution: "", degree: "", period: "" };
 
+const STEP_LABELS = ["Basics", "Experience", "Education", "Summary", "Template"] as const;
+const TOTAL_STEPS = STEP_LABELS.length;
+
+function formHasDraft(value: FormState): boolean {
+  return Boolean(
+    value.targetRole ||
+      value.location ||
+      value.summary ||
+      value.skills ||
+      value.certifications ||
+      value.workHistory.some((item) => item.company || item.title || item.description) ||
+      value.educationHistory.some((item) => item.institution || item.degree),
+  );
+}
+
+function fromProfile(candidateProfile: CandidateProfile): Partial<FormState> {
+  return {
+    location: candidateProfile.targetCountries?.[0] || "",
+    targetRole: candidateProfile.targetRoles?.[0] || "",
+    yearsExperience: String(candidateProfile.yearsExperience ?? 0),
+    summary: candidateProfile.bio || candidateProfile.headline || "",
+    skills: candidateProfile.skills.join(", "),
+    certifications: (candidateProfile.certifications || [])
+      .map((item) => item.name)
+      .filter(Boolean)
+      .join(", "),
+    workHistory: candidateProfile.workHistory?.length
+      ? candidateProfile.workHistory.map((item) => ({
+          company: item.company || "",
+          title: item.title || "",
+          period: item.period || "",
+          description: item.description || "",
+        }))
+      : [{ ...emptyWork }],
+    educationHistory: candidateProfile.educationHistory?.length
+      ? candidateProfile.educationHistory.map((item) => ({
+          institution: item.institution || "",
+          degree: item.degree || "",
+          period: item.period || "",
+        }))
+      : [{ ...emptyEdu }],
+  };
+}
+
+// Defers to toFriendlyError for the generic 4xx / 5xx cases. Only special-
+// cases the size-aware codes where we have `limit_bytes` to surface in the
+// description. Source of truth:
+//   backend/src/routes/skills/resume-builder.ts @ 3a07488.
+function rubricErrorToFriendly(err: AtsRubricError): FriendlyError {
+  const limitBytes = err.limit_bytes ?? 256 * 1024;
+  switch (err.code) {
+    case "RESUME_TOO_LARGE":
+    case "RESUME_FIELD_TOO_LARGE":
+      return {
+        title: "Resume is too large to score",
+        description: `Try removing image data or trimming long fields. The limit is ${Math.round(
+          limitBytes / 1024,
+        )} KB per field.`,
+        tone: "warning",
+      };
+    case "RESUME_NOT_SERIALIZABLE":
+      return {
+        title: "Couldn't process your resume",
+        description:
+          "Your resume contains a self-reference. Try regenerating it and re-running the score.",
+        tone: "error",
+      };
+    default:
+      // VALIDATION_FAILED / ATS_RUBRIC_INTERNAL_ERROR / unknown → generic mapping.
+      return toFriendlyError(err);
+  }
+}
+
 export default function ResumeBuilderPage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
@@ -63,6 +152,8 @@ export default function ResumeBuilderPage() {
     educationHistory: [{ ...emptyEdu }],
   });
 
+  const [step, setStep] = useState<number>(1);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateId>("classic");
   const [generated, setGenerated] = useState<GeneratedResume | null>(null);
   const [editedText, setEditedText] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -73,57 +164,102 @@ export default function ResumeBuilderPage() {
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
 
-  // ATS scan state
-  const [atsJobDescription, setAtsJobDescription] = useState("");
-  const [atsResult, setAtsResult] = useState<{
-    score: number;
-    missingKeywords: string[];
-    presentKeywords: string[];
-    suggestions: string[];
-    source: "ai" | "heuristic";
-  } | null>(null);
-  const [atsLoading, setAtsLoading] = useState(false);
-  const [atsError, setAtsError] = useState<FriendlyError | null>(null);
+  const [rubric, setRubric] = useState<AtsRubricResponse | null>(null);
+  const [rubricLoading, setRubricLoading] = useState(false);
+  const [rubricError, setRubricError] = useState<FriendlyError | null>(null);
+  const [rubricJobDescription, setRubricJobDescription] = useState("");
 
-  function formHasDraft(value: FormState): boolean {
-    return Boolean(
-      value.targetRole ||
-        value.location ||
-        value.summary ||
-        value.skills ||
-        value.certifications ||
-        value.workHistory.some((item) => item.company || item.title || item.description) ||
-        value.educationHistory.some((item) => item.institution || item.degree),
-    );
-  }
+  useEffect(() => {
+    if (!authLoading && !user) router.push("/login");
+  }, [authLoading, router, user]);
 
-  function fromProfile(candidateProfile: CandidateProfile): Partial<FormState> {
-    return {
-      location: candidateProfile.targetCountries?.[0] || "",
-      targetRole: candidateProfile.targetRoles?.[0] || "",
-      yearsExperience: String(candidateProfile.yearsExperience ?? 0),
-      summary: candidateProfile.bio || candidateProfile.headline || "",
-      skills: candidateProfile.skills.join(", "),
-      certifications: (candidateProfile.certifications || [])
-        .map((item) => item.name)
-        .filter(Boolean)
-        .join(", "),
-      workHistory: candidateProfile.workHistory?.length
-        ? candidateProfile.workHistory.map((item) => ({
-            company: item.company || "",
-            title: item.title || "",
-            period: item.period || "",
-            description: item.description || "",
-          }))
-        : [{ ...emptyWork }],
-      educationHistory: candidateProfile.educationHistory?.length
-        ? candidateProfile.educationHistory.map((item) => ({
-            institution: item.institution || "",
-            degree: item.degree || "",
-            period: item.period || "",
-          }))
-        : [{ ...emptyEdu }],
+  useEffect(() => {
+    if (!user || user.role !== "CANDIDATE") return;
+    billing
+      .status()
+      .then(setBillingStatus)
+      .catch(() => undefined);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    profile
+      .get()
+      .then((candidateProfile) => {
+        if (cancelled || !candidateProfile) return;
+        setSavedProfile(candidateProfile);
+        setForm((current) => {
+          if (formHasDraft(current)) return current;
+          setProfileNotice("Resume builder started from your saved profile.");
+          return { ...current, ...fromProfile(candidateProfile) };
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
     };
+  }, [user]);
+
+  const isProfessional = billingStatus?.plan === "PROFESSIONAL";
+
+  const skillsArray = useMemo(
+    () =>
+      form.skills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [form.skills],
+  );
+  const certificationsArray = useMemo(
+    () =>
+      form.certifications
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean),
+    [form.certifications],
+  );
+
+  const previewData: ResumePreviewData = useMemo(
+    () => ({
+      fullName: form.fullName,
+      email: form.email,
+      phone: form.phone,
+      location: form.location,
+      targetRole: form.targetRole,
+      yearsExperience: form.yearsExperience,
+      summary: form.summary,
+      skills: skillsArray,
+      certifications: certificationsArray,
+      workHistory: form.workHistory,
+      educationHistory: form.educationHistory,
+      generatedRawText: generated ? editedText || generated.rawText : undefined,
+      generatedSource: generated?.source,
+    }),
+    [form, skillsArray, certificationsArray, generated, editedText],
+  );
+
+  const educationValue = useMemo(
+    () => ({
+      educationHistory: form.educationHistory,
+      skills: form.skills,
+      certifications: form.certifications,
+    }),
+    [form.educationHistory, form.skills, form.certifications],
+  );
+
+  const canAdvance = (() => {
+    if (step === 1) return basicsStepValid(form);
+    if (step === 3) return educationStepValid(educationValue);
+    return true;
+  })();
+  const canGenerate = basicsStepValid(form) && educationStepValid(educationValue);
+
+  function goNext() {
+    if (canAdvance && step < TOTAL_STEPS) setStep(step + 1);
+  }
+  function goBack() {
+    if (step > 1) setStep(step - 1);
   }
 
   function applyProfileToForm(candidateProfile: CandidateProfile, overwrite = false) {
@@ -135,66 +271,20 @@ export default function ResumeBuilderPage() {
           if (overwrite) return true;
           const current = prev[key as keyof FormState];
           if (Array.isArray(current)) {
-            return current.length === 0 || current.every((item) => Object.values(item).every((field) => !field));
+            return (
+              current.length === 0 ||
+              current.every((item) => Object.values(item).every((field) => !field))
+            );
           }
           return !current && Boolean(value);
         }),
       ),
     }));
-    setProfileNotice(overwrite ? "Resume fields updated from your latest profile." : "Blank resume fields were prefilled from your profile.");
-  }
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/login");
-    }
-  }, [authLoading, router, user]);
-
-  useEffect(() => {
-    if (!user || user.role !== "CANDIDATE") return;
-    billing.status()
-      .then(setBillingStatus)
-      .catch(() => {
-        // no-op if billing endpoint fails
-      });
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    profile.get()
-      .then((candidateProfile) => {
-        if (cancelled || !candidateProfile) return;
-        setSavedProfile(candidateProfile);
-        setForm((current) => {
-          if (formHasDraft(current)) return current;
-          const profileForm = fromProfile(candidateProfile);
-          setProfileNotice("Resume builder started from your saved profile.");
-          return { ...current, ...profileForm };
-        });
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
-  if (authLoading || !user) return null;
-
-  function updateWork(index: number, field: keyof WorkEntry, value: string) {
-    setForm((prev) => {
-      const updated = [...prev.workHistory];
-      updated[index] = { ...updated[index], [field]: value };
-      return { ...prev, workHistory: updated };
-    });
-  }
-
-  function updateEdu(index: number, field: keyof EduEntry, value: string) {
-    setForm((prev) => {
-      const updated = [...prev.educationHistory];
-      updated[index] = { ...updated[index], [field]: value };
-      return { ...prev, educationHistory: updated };
-    });
+    setProfileNotice(
+      overwrite
+        ? "Resume fields updated from your latest profile."
+        : "Blank resume fields were prefilled from your profile.",
+    );
   }
 
   async function handleGenerate() {
@@ -219,12 +309,10 @@ export default function ResumeBuilderPage() {
         targetRole: form.targetRole,
         yearsExperience: Number(form.yearsExperience),
         summary: form.summary || undefined,
-        skills: form.skills.split(",").map((s) => s.trim()).filter(Boolean),
+        skills: skillsArray,
         workHistory: form.workHistory.filter((w) => w.company && w.title),
         educationHistory: form.educationHistory.filter((e) => e.institution && e.degree),
-        certifications: form.certifications
-          ? form.certifications.split(",").map((c) => c.trim()).filter(Boolean)
-          : undefined,
+        certifications: certificationsArray.length > 0 ? certificationsArray : undefined,
       });
       setGenerated(result.resume);
       setEditedText(result.resume.rawText);
@@ -256,25 +344,32 @@ export default function ResumeBuilderPage() {
     window.print();
   }
 
-  async function handleAtsScan() {
+  async function handleScoreRubric() {
     if (!generated) return;
-    setAtsLoading(true);
-    setAtsError(null);
-    setAtsResult(null);
+    setRubricLoading(true);
+    setRubricError(null);
+    setRubric(null);
     try {
-      const result = await skills.scanResumeAts({
-        resumeText: editedText || generated.rawText,
-        jobDescription: atsJobDescription.trim() || undefined,
+      const result = await skills.scoreAtsRubric({
+        resumeContent: generated.sections as unknown as Record<string, unknown>,
+        targetJobDescription: rubricJobDescription.trim() || undefined,
       });
-      setAtsResult(result);
+      setRubric(result);
     } catch (err) {
-      setAtsError(toFriendlyError(err));
+      // skills.scoreAtsRubric throws AtsRubricError shapes for non-2xx
+      // responses; fall back to toFriendlyError for anything else
+      // (network failure, unexpected shape, etc).
+      if (err && typeof err === "object" && "status" in err) {
+        setRubricError(rubricErrorToFriendly(err as AtsRubricError));
+      } else {
+        setRubricError(toFriendlyError(err));
+      }
     } finally {
-      setAtsLoading(false);
+      setRubricLoading(false);
     }
   }
 
-  const isProfessional = billingStatus?.plan === "PROFESSIONAL";
+  if (authLoading || !user) return null;
 
   if (!isProfessional && billingStatus) {
     return (
@@ -296,9 +391,9 @@ export default function ResumeBuilderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50 py-8 px-4 print:bg-white print:py-0 print:px-0">
+      <div className="mx-auto max-w-7xl space-y-6 print:max-w-none print:space-y-0">
+        <div className="flex flex-col gap-4 print:hidden sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">AI Resume Builder</h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -313,7 +408,7 @@ export default function ResumeBuilderPage() {
             role="alert"
             aria-live="assertive"
             data-testid="resume-builder-error"
-            className={`rounded-md border p-4 text-sm ${
+            className={`rounded-md border p-4 text-sm print:hidden ${
               error.tone === "error"
                 ? "bg-red-50 border-red-200 text-red-800"
                 : error.tone === "warning"
@@ -326,454 +421,189 @@ export default function ResumeBuilderPage() {
           </div>
         )}
 
-        {profileNotice && (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+        {profileNotice && !generated && (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 print:hidden">
             {profileNotice}
           </div>
         )}
 
-        {!generated ? (
-          <Card>
-            <CardHeader>
-              <h2 className="text-lg font-semibold">Your Information</h2>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-                <p className="font-semibold">Resume safety checklist</p>
-                <p className="mt-1">
-                  Keep every claim verifiable. AfriTalent can improve wording and structure, but it should not invent tools, employers, certifications, or results.
-                </p>
-              </div>
-              {savedProfile && (
-                <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-white p-4">
-                  <Button size="sm" variant="outline" onClick={() => applyProfileToForm(savedProfile, false)}>
-                    Update from profile
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      applyProfileToForm(savedProfile, true);
-                    }}
-                  >
-                    Start from profile
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setForm({
-                        fullName: user?.name || "",
-                        email: user?.email || "",
-                        phone: "",
-                        location: "",
-                        targetRole: "",
-                        yearsExperience: "0",
-                        summary: "",
-                        skills: "",
-                        certifications: "",
-                        workHistory: [{ ...emptyWork }],
-                        educationHistory: [{ ...emptyEdu }],
-                      });
-                      setProfileNotice("Started a blank resume draft.");
-                    }}
-                  >
-                    Start blank
-                  </Button>
-                </div>
-              )}
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-emerald-950">Premium template bundle</p>
-                    <p className="mt-1 text-sm text-emerald-800">
-                      Preview ATS-ready layouts and download templates included with your plan.
-                    </p>
-                  </div>
-                  <Link
-                    href="/candidate/resume-templates"
-                    className="inline-flex items-center justify-center rounded-md border border-zinc-200 bg-transparent px-3.5 py-2 text-sm font-medium text-zinc-900 shadow-sm transition-all duration-200 hover:bg-zinc-100"
-                  >
-                    Browse templates
-                  </Link>
-                </div>
-              </div>
-
-              <div className="grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
-                {reviewResumeInput(form).suggestions.slice(0, 4).map((item) => (
-                  <div key={item} className="rounded-lg bg-white p-3 text-xs text-gray-700">
-                    {item}
-                  </div>
-                ))}
-                {reviewResumeInput(form).suggestions.length === 0 && (
-                  RESUME_IMPROVEMENT_TIPS.slice(0, 4).map((item) => (
-                    <div key={item} className="rounded-lg bg-white p-3 text-xs text-gray-700">
-                      {item}
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Basic Info */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-                  <input
-                    type="text"
-                    value={form.fullName}
-                    onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Jane Doe"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="jane@example.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                  <input
-                    type="text"
-                    value={form.phone}
-                    onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="+234 800 000 0000"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                  <input
-                    type="text"
-                    value={form.location}
-                    onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Lagos, Nigeria"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Target Role *</label>
-                  <input
-                    type="text"
-                    value={form.targetRole}
-                    onChange={(e) => setForm((p) => ({ ...p, targetRole: e.target.value }))}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Senior Software Engineer"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Years of Experience *</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={50}
-                    value={form.yearsExperience}
-                    onChange={(e) => setForm((p) => ({ ...p, yearsExperience: e.target.value }))}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Skills * <span className="text-gray-400">(comma-separated)</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.skills}
-                  onChange={(e) => setForm((p) => ({ ...p, skills: e.target.value }))}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="React, TypeScript, Node.js, PostgreSQL"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Certifications <span className="text-gray-400">(comma-separated)</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.certifications}
-                  onChange={(e) => setForm((p) => ({ ...p, certifications: e.target.value }))}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="AWS Certified Developer, Google Cloud Professional"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Professional Summary</label>
-                <textarea
-                  value={form.summary}
-                  onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))}
-                  rows={3}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Optional — AfriTalent can draft this from your real experience if left blank"
-                />
-              </div>
-
-              {/* Work History */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium text-gray-700">Work History</label>
-                  <button
-                    type="button"
-                    onClick={() => setForm((p) => ({ ...p, workHistory: [...p.workHistory, { ...emptyWork }] }))}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    + Add Role
-                  </button>
-                </div>
-                {form.workHistory.map((w, i) => (
-                  <div key={i} className="border border-gray-200 rounded-md p-4 space-y-3 mb-3">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                      <input
-                        type="text"
-                        placeholder="Company"
-                        value={w.company}
-                        onChange={(e) => updateWork(i, "company", e.target.value)}
-                        className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Job Title"
-                        value={w.title}
-                        onChange={(e) => updateWork(i, "title", e.target.value)}
-                        className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <input
-                        type="text"
-                        placeholder="2022 - Present"
-                        value={w.period}
-                        onChange={(e) => updateWork(i, "period", e.target.value)}
-                        className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <textarea
-                      placeholder="Responsibilities and truthful achievements. Add metrics where available."
-                      value={w.description}
-                      onChange={(e) => updateWork(i, "description", e.target.value)}
-                      rows={2}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {/* Education */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium text-gray-700">Education</label>
-                  <button
-                    type="button"
-                    onClick={() => setForm((p) => ({ ...p, educationHistory: [...p.educationHistory, { ...emptyEdu }] }))}
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    + Add Education
-                  </button>
-                </div>
-                {form.educationHistory.map((e, i) => (
-                  <div key={i} className="grid grid-cols-1 gap-3 sm:grid-cols-3 mb-3">
-                    <input
-                      type="text"
-                      placeholder="Institution"
-                      value={e.institution}
-                      onChange={(ev) => updateEdu(i, "institution", ev.target.value)}
-                      className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Degree / Course"
-                      value={e.degree}
-                      onChange={(ev) => updateEdu(i, "degree", ev.target.value)}
-                      className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="2018 - 2022"
-                      value={e.period}
-                      onChange={(ev) => updateEdu(i, "period", ev.target.value)}
-                      className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <Button
-                onClick={handleGenerate}
-                disabled={loading || !form.fullName || !form.targetRole || !form.skills}
-                className="w-full"
-              >
-                {loading ? "Generating with Claude..." : "Generate Resume"}
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Badge variant={generated.source === "ai" ? "success" : "default"}>
-                  {generated.source === "ai" ? "AI Generated" : "Template"}
-                </Badge>
-                {saved && <Badge variant="success">Saved</Badge>}
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={() => { setGenerated(null); setSaved(false); setEditedText(""); }} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
-                  Edit Inputs
-                </Button>
-                <Button onClick={handlePrint} className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
-                  Export / Print
-                </Button>
-                <Button onClick={handleSave} disabled={saving || saved}>
-                  {saving ? "Saving..." : saved ? "Saved" : "Save Resume"}
-                </Button>
-              </div>
-            </div>
-
-            <Card>
-              <CardContent className="p-6 space-y-2">
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Preview{" "}
-                  <span className="normal-case font-normal text-gray-400">
-                    (editable — refine before saving)
-                  </span>
-                </label>
-                <textarea
-                  value={editedText}
-                  onChange={(e) => {
-                    setEditedText(e.target.value);
-                    setSaved(false);
-                  }}
-                  rows={24}
-                  data-testid="resume-preview-textarea"
-                  className="w-full rounded-md border border-gray-200 bg-white px-4 py-3 font-mono text-sm text-gray-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                  Review before saving. Remove any claim you cannot prove or explain in an interview. ATS-friendly does not mean guaranteed ATS approval.
-                </div>
-              </CardContent>
-            </Card>
-
-            {saved && (
-              <p className="text-sm text-green-600 text-center">
-                Resume saved. Job Matcher will now use this for similarity scoring.
-              </p>
-            )}
-
-            {/* ATS Scanner */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 print:grid-cols-1">
+          <div className="space-y-6 print:hidden">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold">ATS Score Check</h2>
-                    <p className="text-sm text-gray-500 mt-0.5">
-                      Optionally paste a job description for a targeted analysis
-                    </p>
-                  </div>
-                  <Badge variant="info">Premium</Badge>
-                </div>
+                <StepIndicator step={step} total={TOTAL_STEPS} labels={STEP_LABELS} />
               </CardHeader>
-              <CardContent className="space-y-4">
-                <textarea
-                  value={atsJobDescription}
-                  onChange={(e) => setAtsJobDescription(e.target.value)}
-                  rows={4}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  placeholder="Paste a job description here for a targeted keyword match (optional)"
-                />
-                <Button onClick={handleAtsScan} disabled={atsLoading} className="w-full">
-                  {atsLoading ? "Scanning..." : "Scan ATS Compatibility"}
-                </Button>
-
-                {atsError && (
-                  <div
-                    role="alert"
-                    aria-live="assertive"
-                    data-testid="ats-scan-error"
-                    className={`rounded-md border p-3 text-sm ${
-                      atsError.tone === "error"
-                        ? "bg-red-50 border-red-200 text-red-800"
-                        : atsError.tone === "warning"
-                          ? "bg-amber-50 border-amber-200 text-amber-900"
-                          : "bg-blue-50 border-blue-200 text-blue-900"
-                    }`}
-                  >
-                    <p className="font-medium">{atsError.title}</p>
-                    <p className="mt-0.5">{atsError.description}</p>
+              <CardContent className="space-y-6">
+                {!generated && savedProfile && step === 1 && (
+                  <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-white p-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => applyProfileToForm(savedProfile, false)}
+                    >
+                      Update from profile
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => applyProfileToForm(savedProfile, true)}
+                    >
+                      Start from profile
+                    </Button>
                   </div>
                 )}
 
-                {atsLoading && <LoadingState lines={4} />}
+                {!generated && step === 1 && (
+                  <BasicsStep
+                    value={form}
+                    onChange={(patch) => setForm((p) => ({ ...p, ...patch }))}
+                    isActive
+                  />
+                )}
+                {!generated && step === 2 && (
+                  <ExperienceStep
+                    value={form.workHistory}
+                    onChange={(workHistory) => setForm((p) => ({ ...p, workHistory }))}
+                    isActive
+                  />
+                )}
+                {!generated && step === 3 && (
+                  <EducationStep
+                    value={educationValue}
+                    onChange={(patch) => setForm((p) => ({ ...p, ...patch }))}
+                    isActive
+                  />
+                )}
+                {!generated && step === 4 && (
+                  <SummaryStep
+                    value={form.summary}
+                    onChange={(summary) => setForm((p) => ({ ...p, summary }))}
+                    isActive
+                  />
+                )}
+                {!generated && step === 5 && (
+                  <TemplateStep
+                    selected={selectedTemplate}
+                    onSelect={setSelectedTemplate}
+                    onGenerate={handleGenerate}
+                    generating={loading}
+                    canGenerate={canGenerate}
+                    isActive
+                  />
+                )}
 
-                {atsResult && !atsLoading && (
-                  <div className="space-y-4 pt-2">
-                    <div className="flex items-center gap-4">
-                      <ATSScoreDisplay score={atsResult.score} size="lg" />
-                      <div className="text-sm text-gray-500">
-                        {atsResult.source === "ai" ? "AI-powered analysis" : "Heuristic analysis"}
-                      </div>
+                {generated && (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={generated.source === "ai" ? "success" : "default"}>
+                        {generated.source === "ai" ? "AI Generated" : "Template"}
+                      </Badge>
+                      {saved && <Badge variant="success">Saved</Badge>}
                     </div>
-
-                    {atsResult.presentKeywords.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2">
-                          Keywords Found ({atsResult.presentKeywords.length})
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {atsResult.presentKeywords.map((kw) => (
-                            <span
-                              key={kw}
-                              className="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700"
-                            >
-                              {kw}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        onClick={() => {
+                          setGenerated(null);
+                          setSaved(false);
+                          setEditedText("");
+                          setRubric(null);
+                          setRubricError(null);
+                          setStep(1);
+                        }}
+                        variant="outline"
+                      >
+                        Edit Inputs
+                      </Button>
+                      <Button onClick={handlePrint} variant="outline">
+                        Export / Print
+                      </Button>
+                      <Button onClick={handleSave} disabled={saving || saved}>
+                        {saving ? "Saving..." : saved ? "Saved" : "Save Resume"}
+                      </Button>
+                    </div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      Preview text{" "}
+                      <span className="normal-case font-normal text-gray-400">
+                        (editable — refine before saving)
+                      </span>
+                    </label>
+                    <textarea
+                      value={editedText}
+                      onChange={(e) => {
+                        setEditedText(e.target.value);
+                        setSaved(false);
+                      }}
+                      rows={18}
+                      data-testid="resume-preview-textarea"
+                      className="w-full rounded-md border border-gray-200 bg-white px-4 py-3 font-mono text-sm text-gray-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {saved && (
+                      <p className="text-sm text-emerald-700">
+                        Resume saved. Job Matcher will now use this for similarity scoring.
+                      </p>
                     )}
+                  </div>
+                )}
 
-                    {atsResult.missingKeywords.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2">
-                          Missing Keywords ({atsResult.missingKeywords.length})
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {atsResult.missingKeywords.map((kw) => (
-                            <span
-                              key={kw}
-                              className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-600"
-                            >
-                              {kw}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                {atsResult.suggestions.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">
-                          Suggestions
-                        </p>
-                        <ol className="text-sm text-gray-700 space-y-1 list-decimal list-inside">
-                          {atsResult.suggestions.map((s, i) => (
-                            <li key={i}>{s}</li>
-                          ))}
-                        </ol>
-                      </div>
+                {!generated && (
+                  <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={goBack}
+                      disabled={step === 1}
+                      data-testid="resume-step-back"
+                    >
+                      Back
+                    </Button>
+                    {step < TOTAL_STEPS && (
+                      <Button
+                        onClick={goNext}
+                        disabled={!canAdvance}
+                        data-testid="resume-step-next"
+                      >
+                        Next
+                      </Button>
                     )}
                   </div>
                 )}
               </CardContent>
             </Card>
-            <EarlyTesterFeedback area="Resume review" />
+
+            {generated && (
+              <RubricScorePanel
+                rubric={rubric}
+                loading={rubricLoading}
+                error={rubricError}
+                jobDescription={rubricJobDescription}
+                onJobDescriptionChange={setRubricJobDescription}
+                onScore={handleScoreRubric}
+              />
+            )}
+
+            <EarlyTesterFeedback area="resume-builder" />
+
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 print:hidden">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold">Premium template bundle</p>
+                  <p className="mt-1">
+                    Preview ATS-ready layouts and download templates included with your plan.
+                  </p>
+                </div>
+                <Link
+                  href="/candidate/resume-templates"
+                  className="inline-flex items-center justify-center rounded-md border border-zinc-200 bg-transparent px-3.5 py-2 text-sm font-medium text-zinc-900 shadow-sm transition-all duration-200 hover:bg-zinc-100"
+                >
+                  Browse templates
+                </Link>
+              </div>
+            </div>
           </div>
-        )}
-        {!generated && <EarlyTesterFeedback area="Resume review" />}
+
+          <div className="lg:sticky lg:top-6 lg:self-start print:static print:col-span-2">
+            <LivePreview data={previewData} template={selectedTemplate} />
+          </div>
+        </div>
       </div>
     </div>
   );
