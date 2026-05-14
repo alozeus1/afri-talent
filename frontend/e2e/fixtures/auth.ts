@@ -1,4 +1,4 @@
-import { APIRequestContext } from "@playwright/test";
+import { APIRequestContext, Page, expect } from "@playwright/test";
 
 /** Shared test credentials — seeded by backend/prisma/seed.ts */
 export const TEST_CANDIDATE = {
@@ -59,6 +59,29 @@ export async function loginAs(
 
     throw new Error(`Login failed (${status}): ${body}`);
   }
+}
+
+/**
+ * Login via the browser page (form submit), so the auth_token cookie lands
+ * in the browser cookie jar — distinct from `loginAs`, which only populates
+ * the Playwright `APIRequestContext` cookies. Use this when subsequent
+ * `page.goto()` calls need to access authenticated routes.
+ *
+ * Mirrors the helper in `ui-agent3-browser-qa.spec.ts` so the pattern stays
+ * consistent across UI suites that need authenticated-page access.
+ */
+export async function loginViaUi(
+  page: Page,
+  creds: { email: string; password: string },
+): Promise<void> {
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await page.locator("#email").fill(creds.email);
+  await page.locator("#password").fill(creds.password);
+  const loginResponse = page.waitForResponse((response) =>
+    response.url().includes("/api/auth/login"),
+  );
+  await page.locator("form button[type='submit']").click();
+  expect((await loginResponse).ok()).toBeTruthy();
 }
 
 /** Register a fresh user and return their ID (for isolation tests). */
