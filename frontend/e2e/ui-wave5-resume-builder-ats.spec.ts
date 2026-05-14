@@ -20,7 +20,11 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { loginViaUi, TEST_CANDIDATE, TEST_CANDIDATE_PRO } from "./fixtures/auth";
+import { TEST_CANDIDATE_PRO } from "./fixtures/auth";
+import {
+  TEST_CANDIDATE_STORAGE,
+  TEST_CANDIDATE_PRO_STORAGE,
+} from "./global.setup";
 
 const RESUME_BUILDER_URL = "/candidate/resume-builder";
 const ATS_RUBRIC_URL_GLOB = "**/api/skills/resume-builder/ats-rubric/score";
@@ -50,9 +54,7 @@ async function fillStepsThroughSummary(page: Page) {
 test.describe.configure({ mode: "serial" });
 
 test.describe("Wave 5 — Resume Builder (multi-step UX + ATS rubric)", () => {
-  test.beforeEach(async ({ page }) => {
-    await loginViaUi(page, TEST_CANDIDATE_PRO);
-  });
+  test.use({ storageState: TEST_CANDIDATE_PRO_STORAGE });
 
   test("1. Step-flow happy path: fill steps 1..5 → generate → Saved badge appears", async ({ page }) => {
     await page.goto(RESUME_BUILDER_URL);
@@ -191,9 +193,7 @@ test.describe("Wave 5 — Resume Builder (multi-step UX + ATS rubric)", () => {
 });
 
 test.describe("Wave 5 — Resume Builder PremiumGate (FREE plan)", () => {
-  test.beforeEach(async ({ page }) => {
-    await loginViaUi(page, TEST_CANDIDATE);
-  });
+  test.use({ storageState: TEST_CANDIDATE_STORAGE });
 
   test("6. PremiumGate renders for FREE candidate; step indicator absent", async ({ page }) => {
     await page.goto(RESUME_BUILDER_URL);
