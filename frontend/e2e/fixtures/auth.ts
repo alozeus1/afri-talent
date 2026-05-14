@@ -6,6 +6,16 @@ export const TEST_CANDIDATE = {
   password: "Password123!",
 };
 
+/**
+ * PROFESSIONAL-plan candidate used by tests that need to pass the
+ * `requirePlan(SubscriptionPlan.PROFESSIONAL)` gate on resume-builder
+ * routes. Seeded by backend/prisma/seed.ts (Wave 5 PR #96).
+ */
+export const TEST_CANDIDATE_PRO = {
+  email: "candidate-pro@example.com",
+  password: "Password123!",
+};
+
 export const TEST_EMPLOYER = {
   email: "employer@example.com",
   password: "Password123!",
