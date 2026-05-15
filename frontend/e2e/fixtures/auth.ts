@@ -30,6 +30,15 @@ export const TEST_ADMIN = {
 export const API = process.env.API_BASE_URL ?? "http://localhost:4000";
 
 /**
+ * Persisted browser-state paths written by `global.setup.ts` and consumed by
+ * UI specs via `test.use({ storageState: ... })`. Defined here (not in
+ * `global.setup.ts`) so spec files don't have to import another test file —
+ * Playwright forbids one test file importing another.
+ */
+export const TEST_CANDIDATE_STORAGE = "frontend/e2e/.auth/candidate.json";
+export const TEST_CANDIDATE_PRO_STORAGE = "frontend/e2e/.auth/candidate-pro.json";
+
+/**
  * Login and return the Set-Cookie header string.
  * Playwright's APIRequestContext stores cookies automatically when
  * `storeCookies` is true (the default), so subsequent requests in the same

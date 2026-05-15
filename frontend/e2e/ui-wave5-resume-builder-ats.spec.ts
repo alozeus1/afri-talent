@@ -20,11 +20,11 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { TEST_CANDIDATE_PRO } from "./fixtures/auth";
 import {
+  TEST_CANDIDATE_PRO,
   TEST_CANDIDATE_STORAGE,
   TEST_CANDIDATE_PRO_STORAGE,
-} from "./global.setup";
+} from "./fixtures/auth";
 
 const RESUME_BUILDER_URL = "/candidate/resume-builder";
 const ATS_RUBRIC_URL_GLOB = "**/api/skills/resume-builder/ats-rubric/score";

@@ -16,10 +16,13 @@
  */
 
 import { test as setup } from "@playwright/test";
-import { loginViaUi, TEST_CANDIDATE, TEST_CANDIDATE_PRO } from "./fixtures/auth";
-
-export const TEST_CANDIDATE_STORAGE = "frontend/e2e/.auth/candidate.json";
-export const TEST_CANDIDATE_PRO_STORAGE = "frontend/e2e/.auth/candidate-pro.json";
+import {
+  loginViaUi,
+  TEST_CANDIDATE,
+  TEST_CANDIDATE_PRO,
+  TEST_CANDIDATE_STORAGE,
+  TEST_CANDIDATE_PRO_STORAGE,
+} from "./fixtures/auth";
 
 setup("authenticate FREE candidate", async ({ page }) => {
   await loginViaUi(page, TEST_CANDIDATE);
