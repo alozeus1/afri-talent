@@ -78,7 +78,10 @@ test.describe("Wave 5 — Resume Builder (multi-step UX + ATS rubric)", () => {
     await expect(page.getByPlaceholder("Jane Doe")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Save Resume" }).click();
-    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    // After save, "Saved" appears in two elements: the success Badge (span)
+    // and the Save Resume button (which retitles to "Saved" disabled). Scope
+    // the assertion to the Badge span so strict-mode doesn't reject the match.
+    await expect(page.locator("span").filter({ hasText: /^Saved$/ })).toBeVisible();
     await expect(
       page.getByText("Resume saved. Job Matcher will now use this for similarity scoring."),
     ).toBeVisible();
