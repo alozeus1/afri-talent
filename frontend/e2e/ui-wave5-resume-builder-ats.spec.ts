@@ -33,7 +33,10 @@ async function fillStepsThroughSummary(page: Page) {
   await page.getByPlaceholder("Jane Doe").fill("Ada Okonkwo");
   await page.getByPlaceholder("jane@example.com").fill(TEST_CANDIDATE_PRO.email);
   await page.getByPlaceholder("Senior Software Engineer").fill("Senior Backend Engineer");
-  await page.getByLabel("Years of Experience *").fill("6");
+  // `Field` in basics-step.tsx renders <label> + <input> as siblings with
+  // no htmlFor/id association, so page.getByLabel(...) doesn't match.
+  // The "Years of Experience" input is the only `type="number"` on step 1.
+  await page.locator('input[type="number"]').fill("6");
   await expect(page.getByTestId("resume-step-next")).toBeEnabled();
   await page.getByTestId("resume-step-next").click();
 
@@ -82,7 +85,7 @@ test.describe("Wave 5 — Resume Builder (multi-step UX + ATS rubric)", () => {
     await page.getByPlaceholder("Jane Doe").fill("Ada Okonkwo");
     await page.getByPlaceholder("jane@example.com").fill(TEST_CANDIDATE_PRO.email);
     await page.getByPlaceholder("Senior Software Engineer").fill("Senior Backend Engineer");
-    await page.getByLabel("Years of Experience *").fill("6");
+    await page.locator('input[type="number"]').fill("6");
     await page.getByTestId("resume-step-next").click();
     await page.getByTestId("resume-step-next").click();
 
