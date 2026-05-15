@@ -84,8 +84,15 @@ export async function loginViaUi(
   creds: { email: string; password: string },
 ): Promise<void> {
   await page.goto("/login", { waitUntil: "domcontentloaded" });
+  // Backend `validateHumanAuthSubmission` (backend/src/middleware/bot-protection.ts)
+  // rejects POST /api/auth/login when `botShield.startedAt` shows the form was
+  // completed in < FORM_MIN_COMPLETION_MS (1.2s). Two 1.3s pauses split across
+  // load/fill/submit keep the elapsed time safely above that floor — same
+  // pattern as the local helper in `ui-agent3-browser-qa.spec.ts:37-45`.
+  await page.waitForTimeout(1_300);
   await page.locator("#email").fill(creds.email);
   await page.locator("#password").fill(creds.password);
+  await page.waitForTimeout(1_300);
   const loginResponse = page.waitForResponse((response) =>
     response.url().includes("/api/auth/login"),
   );
