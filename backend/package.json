@@ -43,7 +43,7 @@
     "pino": "^10.3.0",
     "pino-http": "^11.0.0",
     "serverless-http": "^3.2.0",
-    "stripe": "^20.3.1",
+    "stripe": "^22.1.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "web-push": "^3.6.7",
