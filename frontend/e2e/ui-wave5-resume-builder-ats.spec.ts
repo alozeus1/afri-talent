@@ -209,8 +209,14 @@ test.describe("Wave 5 — Resume Builder PremiumGate (FREE plan)", () => {
   test("6. PremiumGate renders for FREE candidate; step indicator absent", async ({ page }) => {
     await page.goto(RESUME_BUILDER_URL);
 
-    await expect(page.getByText("AI Resume Builder & Templates")).toBeVisible();
-    await expect(page.getByText("Professional", { exact: false })).toBeVisible();
+    // PremiumGate (premium-gate.tsx:28-39) renders the feature name in both
+    // the <h3> heading and a <p> description, so bare text matches trigger
+    // strict-mode. Anchor the assertions to unique elements: the heading
+    // (single h3 containing both feature + required plan) and the upgrade CTA.
+    await expect(
+      page.getByRole("heading", { name: /AI Resume Builder & Templates requires Professional/ }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "View pricing" })).toBeVisible();
 
     await expect(page.getByTestId("resume-step-1")).toHaveCount(0);
     await expect(page.getByTestId("resume-step-5")).toHaveCount(0);
