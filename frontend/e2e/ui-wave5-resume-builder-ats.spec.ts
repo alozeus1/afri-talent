@@ -70,7 +70,12 @@ test.describe("Wave 5 — Resume Builder (multi-step UX + ATS rubric)", () => {
     await page.getByTestId("resume-generate-trigger").click();
 
     await expect(page.getByTestId("resume-preview-textarea")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId("resume-step-1")).toHaveCount(0);
+    // Post-generation the form inputs disappear (they're gated on `!generated`
+    // in page.tsx:437-493); the StepIndicator stays visible by design so the
+    // user keeps workflow context. Asserting the BasicsStep input is gone is
+    // the semantic "we left the step form" check — `resume-step-1` is still
+    // in the DOM because StepIndicator is rendered unconditionally.
+    await expect(page.getByPlaceholder("Jane Doe")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Save Resume" }).click();
     await expect(page.getByText("Saved", { exact: true })).toBeVisible();
