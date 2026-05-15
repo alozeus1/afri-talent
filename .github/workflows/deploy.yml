@@ -248,7 +248,7 @@ jobs:
           terraform_wrapper: false
 
       - name: Download Lambda artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: lambda-packages-${{ github.sha }}
           path: infra/terraform/accounts/dev-new/lambda-packages
