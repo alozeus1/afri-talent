@@ -65,6 +65,7 @@ module "aurora" {
   name_prefix              = var.name_prefix
   isolated_subnet_ids      = module.vpc.isolated_subnet_ids
   sg_aurora_id             = module.vpc.sg_aurora_id
+  engine_version           = var.aurora_engine_version
   min_acu                  = var.aurora_min_acu
   max_acu                  = var.aurora_max_acu
   seconds_until_auto_pause = var.aurora_seconds_until_auto_pause
@@ -108,6 +109,10 @@ module "backup_dr" {
   schedule_expression     = var.backup_daily_schedule_cron
   retention_days          = var.backup_retention_days
   cold_storage_after_days = var.backup_cold_storage_after_days
+
+  # The Backup module creates a narrowly-scoped IAM service role. Ensure the
+  # GitHub deploy guardrail exception is applied before Terraform creates it.
+  depends_on = [module.iam_oidc_github]
 }
 
 # ---------------------------------------------------------------------------

@@ -50,6 +50,8 @@ locals {
   ssm_parameter_arn_prefix = "arn:aws:ssm:${var.aws_region}:${var.aws_account_id}:parameter/${var.name_prefix_path}/*"
 
   ecs_resource_targets = compact(concat([var.ecs_cluster_arn], var.ecs_service_arns))
+
+  backup_service_role_arn = "arn:aws:iam::${var.aws_account_id}:role/${var.name_prefix}-backup-service-role"
 }
 
 ############################################
@@ -181,6 +183,25 @@ data "aws_iam_policy_document" "github_deploy" {
     resources = [local.ssm_parameter_arn_prefix]
   }
 
+  # ----- AWS Backup service role, scoped to the stack-local role only.
+  statement {
+    sid    = "BackupServiceRoleLifecycle"
+    effect = "Allow"
+    actions = [
+      "iam:AttachRolePolicy",
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:DetachRolePolicy",
+      "iam:GetRole",
+      "iam:ListAttachedRolePolicies",
+      "iam:PassRole",
+      "iam:TagRole",
+      "iam:UntagRole",
+      "iam:UpdateAssumeRolePolicy",
+    ]
+    resources = [local.backup_service_role_arn]
+  }
+
   # ----- S3: Terraform state bucket
   statement {
     sid    = "TerraformStateBucket"
@@ -269,7 +290,7 @@ data "aws_iam_policy_document" "iam_org_guardrail" {
       "iam:CreateLoginProfile",
       "iam:UpdateLoginProfile",
     ]
-    resources = ["*"]
+    not_resources = [local.backup_service_role_arn]
   }
 
   statement {
