@@ -111,6 +111,7 @@ resource "aws_ssm_parameter" "optional" {
 # ---------------------------------------------------------------------------
 
 resource "aws_ssm_parameter" "toggle" {
+  # checkov:skip=CKV2_AWS_34: Non-secret runtime toggle (e.g. BLOG_AUTOMATION_ENABLED). Value is plain "0"/"1"; SecureString would add no real security here and would block console operators from flipping the flag via the standard UI.
   for_each = local.toggle_param_names
 
   name        = each.value
