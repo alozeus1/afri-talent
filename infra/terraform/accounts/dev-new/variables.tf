@@ -83,6 +83,62 @@ variable "aurora_seconds_until_auto_pause" {
   default     = 1800
 }
 
+# ── Aurora backup / DR / deletion-protection (Wave 8 §9.3) ────────────────────
+
+variable "aurora_backup_retention_period" {
+  type        = number
+  description = "Aurora automated backup retention in days. Also defines the PITR window (spec: ≥ 14 days). Set to 30 in dev/staging/prod per launch master prompt §9.3."
+  default     = 30
+
+  validation {
+    condition     = var.aurora_backup_retention_period >= 14 && var.aurora_backup_retention_period <= 35
+    error_message = "aurora_backup_retention_period must be ≥ 14 (Wave 8 §9.3 spec) and ≤ 35 (Aurora limit)."
+  }
+}
+
+variable "aurora_deletion_protection" {
+  type        = bool
+  description = "Whether to enable Aurora deletion protection. Wave 8 §9.3 spec: ON. Set false only for ephemeral/throwaway stacks."
+  default     = true
+}
+
+variable "aurora_skip_final_snapshot" {
+  type        = bool
+  description = "Whether to skip the final Aurora snapshot when the cluster is destroyed. Wave 8 §9.3 spec: false (retain a final snapshot)."
+  default     = false
+}
+
+# ── Cross-region DR (Wave 8 §9.3) ─────────────────────────────────────────────
+
+variable "dr_region" {
+  type        = string
+  description = "AWS region for cross-region snapshot copies via AWS Backup. Spec default: us-west-2."
+  default     = "us-west-2"
+}
+
+variable "backup_daily_schedule_cron" {
+  type        = string
+  description = "Cron expression for the daily Backup plan rule. Default 06:00 UTC matches the Aurora preferred backup window."
+  default     = "cron(0 6 ? * * *)"
+}
+
+variable "backup_retention_days" {
+  type        = number
+  description = "Days to retain each AWS Backup recovery point (primary vault + DR copy). Spec: 30."
+  default     = 30
+
+  validation {
+    condition     = var.backup_retention_days >= 7 && var.backup_retention_days <= 365
+    error_message = "backup_retention_days must be between 7 and 365."
+  }
+}
+
+variable "backup_cold_storage_after_days" {
+  type        = number
+  description = "Days after which a recovery point transitions to cold storage. Set to 0 to disable cold storage (recommended for Aurora — cold-storage transitions require ≥ 90 days total retention)."
+  default     = 0
+}
+
 # ── ECS knobs ─────────────────────────────────────────────────────────────────
 
 variable "ecs_desired_count" {

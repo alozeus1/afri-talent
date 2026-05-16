@@ -68,6 +68,14 @@ module "aurora" {
   min_acu                  = var.aurora_min_acu
   max_acu                  = var.aurora_max_acu
   seconds_until_auto_pause = var.aurora_seconds_until_auto_pause
+
+  # Wave 8 §9.3 — backups, DR, deletion protection.
+  # backup_retention_period also defines the PITR window (spec: ≥ 14 days).
+  # AWS Backup (module.backup_dr) layers a 30-day daily snapshot retention plan
+  # with cross-region copy to us-west-2 on top of this.
+  backup_retention_period = var.aurora_backup_retention_period
+  deletion_protection     = var.aurora_deletion_protection
+  skip_final_snapshot     = var.aurora_skip_final_snapshot
   # Other vars use sensible defaults (engine_version 15.5, db_name afritalent, etc.)
 }
 
@@ -80,6 +88,26 @@ module "rds_proxy" {
   aurora_cluster_identifier = module.aurora.aurora_cluster_identifier
   master_user_secret_arn    = module.aurora.aurora_master_user_secret_arn
   secret_kms_key_arn        = module.aurora.aurora_kms_key_arn
+}
+
+# ── Backup + DR (Wave 8 §9.3) ────────────────────────────────────────────────
+# Daily AWS Backup snapshots of the Aurora cluster into a primary-region vault,
+# with every recovery point copied cross-region to var.dr_region (us-west-2).
+# Aurora's own backup_retention_period gives PITR ≥ 14 days; this module
+# layers a 30-day daily-snapshot retention on top for longer-window restores.
+module "backup_dr" {
+  source = "../../modules/backup-dr"
+  providers = {
+    aws.dr = aws.dr
+  }
+
+  name_prefix             = var.name_prefix
+  primary_region          = var.aws_region
+  dr_region               = var.dr_region
+  aurora_cluster_arn      = module.aurora.aurora_cluster_arn
+  schedule_expression     = var.backup_daily_schedule_cron
+  retention_days          = var.backup_retention_days
+  cold_storage_after_days = var.backup_cold_storage_after_days
 }
 
 # ---------------------------------------------------------------------------

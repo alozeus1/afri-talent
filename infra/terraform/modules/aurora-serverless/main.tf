@@ -124,8 +124,9 @@ resource "aws_rds_cluster" "aurora" {
   enabled_cloudwatch_logs_exports = ["postgresql"]
 
   # Dev-friendly defaults — PROD MUST OVERRIDE.
-  deletion_protection = var.deletion_protection
-  skip_final_snapshot = true # PROD: set to false (or remove override) for retained snapshots.
+  deletion_protection       = var.deletion_protection
+  skip_final_snapshot       = var.skip_final_snapshot
+  final_snapshot_identifier = var.skip_final_snapshot ? null : (var.final_snapshot_identifier != "" ? var.final_snapshot_identifier : "${local.cluster_identifier}-final")
 
   apply_immediately = true
 
