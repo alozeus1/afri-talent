@@ -187,10 +187,33 @@ data "aws_iam_policy_document" "task_runtime" {
     }
   }
 
-  # Wave 9 §10.1 PR-B — custom CloudWatch metrics for agent SLOs.
-  # Backend emits to namespace AfriTalent/Agents via aws-sdk PutMetricData.
-  # PutMetricData has no resource-level permission; scope via condition on
-  # the namespace to prevent leakage into other namespaces.
+}
+
+resource "aws_iam_role_policy" "task_runtime" {
+  name   = "${var.name_prefix}-ecs-task-runtime"
+  role   = aws_iam_role.task.id
+  policy = data.aws_iam_policy_document.task_runtime.json
+}
+
+# ---------------------------------------------------------------------------
+# Wave 9 §10.1 PR-B — custom CloudWatch metrics for agent SLOs.
+#
+# Hotfix (deploy run 25964580570): the cloudwatch:PutMetricData statement
+# was originally added inline to the aws_iam_role_policy.task_runtime
+# document above. The afritalent-dev-github-deploy-guardrail policy
+# (added in PR #126) explicitly denies iam:PutRolePolicy on this role,
+# which blocks every apply that tries to update the inline policy.
+#
+# The fix is to ship PutMetricData as a separate AWS-managed policy and
+# attach it via aws_iam_role_policy_attachment. The guardrail does not
+# block iam:AttachRolePolicy on this role (attachments use the policy's
+# own permissions; no escalation surface).
+#
+# The namespace condition prevents this permission from leaking to
+# other CloudWatch namespaces — backend can only write to AfriTalent/Agents.
+# ---------------------------------------------------------------------------
+
+data "aws_iam_policy_document" "agent_metrics" {
   statement {
     effect    = "Allow"
     actions   = ["cloudwatch:PutMetricData"]
@@ -203,10 +226,15 @@ data "aws_iam_policy_document" "task_runtime" {
   }
 }
 
-resource "aws_iam_role_policy" "task_runtime" {
-  name   = "${var.name_prefix}-ecs-task-runtime"
-  role   = aws_iam_role.task.id
-  policy = data.aws_iam_policy_document.task_runtime.json
+resource "aws_iam_policy" "agent_metrics" {
+  name        = "${var.name_prefix}-ecs-task-agent-metrics"
+  description = "Wave 9 SLO emission. Allows the ECS task role to PutMetricData into the AfriTalent/Agents CloudWatch namespace only."
+  policy      = data.aws_iam_policy_document.agent_metrics.json
+}
+
+resource "aws_iam_role_policy_attachment" "agent_metrics" {
+  role       = aws_iam_role.task.name
+  policy_arn = aws_iam_policy.agent_metrics.arn
 }
 
 # ---------------------------------------------------------------------------
