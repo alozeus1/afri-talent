@@ -63,6 +63,12 @@ variable "create_route53_zone" {
   default     = true
 }
 
+variable "status_page_cname" {
+  type        = string
+  description = "Wave 9 §10.2 — CNAME target for status.<domain_name>. Set to the provider-supplied hostname (e.g. afritalent.instatus.com or afritalent.statuspage.io) after creating the status-page account. Empty disables the DNS record. Full setup: docs/runbooks/status-page-setup.md."
+  default     = ""
+}
+
 # ── Aurora knobs ──────────────────────────────────────────────────────────────
 
 variable "aurora_min_acu" {

@@ -120,6 +120,16 @@ output "dashboard_url" {
   value       = module.observability.dashboard_url
 }
 
+output "slo_alerts_topic_arn" {
+  description = "SNS topic ARN that every SLO alarm publishes to. Subscribe PagerDuty/Opsgenie + extra email endpoints to this ARN."
+  value       = module.observability.slo_alerts_topic_arn
+}
+
+output "slo_alarm_names" {
+  description = "Names of the SLO alarms created by Wave 9 §10.1."
+  value       = module.observability.slo_alarm_names
+}
+
 # ── Backup + DR (Wave 8 §9.3) ────────────────────────────────────────────────
 
 output "backup_primary_vault_name" {

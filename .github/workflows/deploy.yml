@@ -229,6 +229,7 @@ jobs:
             --build-arg SENTRY_ORG="$SENTRY_ORG" \
             --build-arg SENTRY_PROJECT="$SENTRY_PROJECT" \
             --build-arg GIT_SHA="${{ steps.provenance.outputs.git_sha }}" \
+            --build-arg NEXT_PUBLIC_GIT_SHA="${{ steps.provenance.outputs.git_sha }}" \
             --build-arg APP_RELEASE="${{ steps.provenance.outputs.app_release }}" \
             --build-arg BUILD_TIMESTAMP="${{ steps.provenance.outputs.build_timestamp }}" \
             -t "$IMAGE:$SHA_TAG" \

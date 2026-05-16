@@ -392,6 +392,13 @@ module "observability" {
     module.lambda_functions.lambda_blog_automation_name,
   ]
   aurora_cluster_identifier = module.aurora.aurora_cluster_identifier
+
+  # Wave 9 §10.1 — SLO alarms publish to a dedicated SNS topic. alerts_email
+  # provides a fallback channel until PagerDuty/Opsgenie is wired post-merge
+  # (see modules/observability/alarms.tf for founder action).
+  alerts_email    = var.budget_alert_email
+  environment     = var.environment
+  ssm_path_prefix = var.ssm_path_prefix
 }
 
 module "budgets" {

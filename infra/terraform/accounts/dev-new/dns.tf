@@ -109,6 +109,24 @@ resource "aws_route53_record" "www" {
   }
 }
 
+# ── Wave 9 §10.2 — status.afri-talent.com (status page) ──────────────────────
+# Founder picks instatus.com or statuspage.io and creates the account; that
+# provider gives a CNAME target like `<your-page>.instatus.com` or
+# `<your-page>.statuspage.io`. Set var.status_page_cname to that value and
+# this CNAME record activates. While the variable is empty the slot is a
+# no-op — no DNS resource exists, no validation noise.
+#
+# Full setup procedure: docs/runbooks/status-page-setup.md.
+resource "aws_route53_record" "status_page" {
+  count = local.has_domain && var.status_page_cname != "" ? 1 : 0
+
+  zone_id = local.effective_zone_id
+  name    = "status.${var.domain_name}"
+  type    = "CNAME"
+  ttl     = 300
+  records = [var.status_page_cname]
+}
+
 # ── Helpers exposed via locals ───────────────────────────────────────────────
 locals {
   acm_certificate_arn  = local.has_domain ? aws_acm_certificate_validation.primary[0].certificate_arn : ""
