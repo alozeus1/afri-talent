@@ -5,6 +5,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { nanoid } from "nanoid";
 import { authenticate } from "../middleware/auth.js";
 import { Role } from "@prisma/client";
+import { bucketForScope } from "../lib/upload-buckets.js";
 
 const router = Router();
 
@@ -43,16 +44,19 @@ function getS3Client(): S3Client {
 //   2. Frontend PUTs the file directly to S3 (browser → S3, no server bandwidth)
 //   3. Frontend calls POST /api/profile/resumes with the s3Key to register the metadata
 router.post("/presign", authenticate, async (req: Request, res: Response) => {
-  if (!BUCKET) {
-    res.status(503).json({
-      error: "File uploads are not configured on this server",
-      code: "S3_NOT_CONFIGURED",
-    });
-    return;
-  }
-
   try {
     const data = presignSchema.parse(req.body);
+    // §2.11 — trust scopes target TRUST_S3_BUCKET when available; falls back
+    // to the main uploads bucket otherwise. Resume scope always uses BUCKET.
+    const targetBucket = bucketForScope(data.scope);
+    if (!targetBucket) {
+      res.status(503).json({
+        error: "File uploads are not configured on this server",
+        code: "S3_NOT_CONFIGURED",
+      });
+      return;
+    }
+
     const ext = ALLOWED_CONTENT_TYPES[data.contentType];
     const scopeRoleMap: Record<string, Role[]> = {
       resume: [Role.CANDIDATE],
@@ -75,7 +79,7 @@ router.post("/presign", authenticate, async (req: Request, res: Response) => {
     const s3Key = `${scopePrefix}/${nanoid()}.${ext}`;
 
     const command = new PutObjectCommand({
-      Bucket: BUCKET,
+      Bucket: targetBucket,
       Key: s3Key,
       ContentType: data.contentType,
       ContentLength: data.fileSizeBytes,

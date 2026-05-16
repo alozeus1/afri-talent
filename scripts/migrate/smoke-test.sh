@@ -98,6 +98,33 @@ if [[ -n "${SMOKE_EMAIL:-}" && -n "${SMOKE_PASSWORD:-}" ]]; then
     fi
   fi
 
+  # ── Build provenance check (§2.5) ─────────────────────────────────────────
+  # Verbose health requires admin role; only run when the smoke caller is an
+  # admin. SMOKE_TEST_BUILD_PROVENANCE=1 opts in.
+  if [[ -n "${TOKEN}" && "${SMOKE_TEST_BUILD_PROVENANCE:-0}" == "1" ]]; then
+    echo
+    echo "Build provenance:"
+    verbose_body=$(curl -fsS -m "${TIMEOUT}" \
+      -H "Authorization: Bearer ${TOKEN}" \
+      "${BASE_URL}/api/health?verbose=1" 2>/dev/null || echo "")
+    if [[ -z "${verbose_body}" ]]; then
+      bad "GET /api/health?verbose=1" "empty/failed response (admin token required)"
+    else
+      release=$(echo "${verbose_body}" | jq -r '.release // "missing"' 2>/dev/null || echo "JQERR")
+      commit=$(echo "${verbose_body}" | jq -r '.commitSha // "missing"' 2>/dev/null || echo "JQERR")
+      if [[ "${release}" == "local" || "${release}" == "missing" ]]; then
+        bad "verbose .release" "got '${release}' — Docker build did not pass APP_RELEASE"
+      else
+        ok "verbose .release = ${release}"
+      fi
+      if [[ "${commit}" == "unknown" || "${commit}" == "missing" ]]; then
+        bad "verbose .commitSha" "got '${commit}' — Docker build did not pass GIT_SHA"
+      else
+        ok "verbose .commitSha = ${commit:0:12}…"
+      fi
+    fi
+  fi
+
   if [[ -n "${TOKEN}" && "${SMOKE_TEST_ORCHESTRATOR:-0}" == "1" ]]; then
     echo
     echo "Orchestrator (MOCK_AI=1 expected server-side):"

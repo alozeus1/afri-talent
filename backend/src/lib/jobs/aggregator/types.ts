@@ -122,6 +122,10 @@ export interface AggregationDiagnostics {
   sourcesSucceeded: number;
   sourcesFailed: number;
   jobsFetched: number;
+  // §4.2 — count of incoming jobs the tri-key cascade folded into an existing
+  // row rather than creating a new one. Surfaced so ops can watch the dedup
+  // rate over time and alert if it falls off a cliff.
+  duplicatesRemoved: number;
   hadErrors: boolean;
   sourceDiagnostics: SourceFetchDiagnostics[];
 }

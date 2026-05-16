@@ -1,0 +1,71 @@
+# Copy to terraform.tfvars and fill in the placeholder values BEFORE first apply.
+# terraform.tfvars is gitignored — never commit it.
+#
+# This file documents the prod-tuned values. Variable defaults in variables.tf
+# are deliberately conservative; tfvars below pushes them to production levels.
+
+# ─── REQUIRED — founder fills before first apply ─────────────────────────────
+
+# Set to the new dedicated production account ID (created during cutover prep).
+aws_account_id = "REPLACE-WITH-PROD-ACCOUNT-ID"
+
+# State backend ARNs in the new account (bootstrap script creates these).
+tfstate_bucket_arn = "arn:aws:s3:::afritalent-REPLACE-WITH-PROD-ACCOUNT-ID-tfstate"
+tflock_table_arn   = "arn:aws:dynamodb:us-east-1:REPLACE-WITH-PROD-ACCOUNT-ID:table/afritalent-REPLACE-WITH-PROD-ACCOUNT-ID-tflocks"
+
+# ─── Environment identity ────────────────────────────────────────────────────
+
+aws_region      = "us-east-1"
+environment     = "prod"
+name_prefix     = "afritalent-prod"
+ssm_path_prefix = "afritalent/prod"
+owner_tag       = "platform"
+
+# ─── Production domain ───────────────────────────────────────────────────────
+
+# Public domain. The prod stack runs at afri-talent.com.
+# DNS is currently on DigitalOcean and must be migrated to AWS Route 53 as part
+# of the cutover — see docs/runbooks/iac-cutover.md §"DNS migration".
+domain_name = "afri-talent.com"
+
+# Set to false if the Route 53 zone is created by hand (e.g. via the AWS console
+# during cutover) and you don't want Terraform managing it from this stack.
+create_route53_zone = true
+
+# ─── Aurora — production sizing + DR (Wave 8 §9.3) ───────────────────────────
+
+aurora_min_acu                  = 1  # keep cluster warm (no auto-pause in prod)
+aurora_max_acu                  = 16
+aurora_seconds_until_auto_pause = 1800
+aurora_backup_retention_period  = 30
+aurora_deletion_protection      = true
+aurora_skip_final_snapshot      = false
+
+dr_region                      = "us-west-2"
+backup_daily_schedule_cron     = "cron(0 6 ? * * *)"
+backup_retention_days          = 30
+backup_cold_storage_after_days = 0
+
+# ─── ECS — HA-tuned ──────────────────────────────────────────────────────────
+
+ecs_desired_count       = 2
+ecs_fargate_base        = 2
+ecs_fargate_spot_weight = 2
+
+# ─── GitHub OIDC ─────────────────────────────────────────────────────────────
+
+github_owner         = "alozeus1"
+github_repo          = "afri-talent"
+create_oidc_provider = true
+
+# ─── Cost ────────────────────────────────────────────────────────────────────
+
+monthly_budget_usd = 750
+budget_alert_email = "alozeus1@gmail.com"
+
+# ─── Lambda zips (CI fills via -var=) ────────────────────────────────────────
+
+# webhook_stripe_zip_path      = "../../../../dist-lambda-webhook-stripe.zip"
+# webhook_flutterwave_zip_path = "../../../../dist-lambda-webhook-flutterwave.zip"
+# orchestrator_zip_path        = "../../../../dist-lambda-orchestrator-step.zip"
+# blog_automation_zip_path     = "../../../../dist-lambda-blog-automation.zip"

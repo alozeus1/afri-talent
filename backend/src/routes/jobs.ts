@@ -27,6 +27,10 @@ import {
 import { recordLatencyMetric, recordOpsEvent } from "../lib/ops/events.js";
 import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import logger from "../lib/logger.js";
+import { classifyJobField as classifyTaxonomyField } from "../lib/ai/skills/job-field-classifier.js";
+import { classifyApplyStrategy } from "../lib/jobs/apply-strategy.js";
+import { resolveEffectiveApplyStrategy } from "../lib/apply/caps.js";
+import { normalizeCompany, normalizeLocation } from "../lib/jobs/normalize.js";
 
 const router = Router();
 
@@ -348,9 +352,26 @@ router.get("/:slug", async (req: Request, res: Response) => {
       return;
     }
 
-    // Only show published, non-expired jobs to public
-    if (job.status !== JobStatus.PUBLISHED || job.isExpired) {
+    if (job.status !== JobStatus.PUBLISHED) {
       res.status(404).json({ error: "Job not found" });
+      return;
+    }
+
+    // §4.4 — JOB_EXPIRED_RESPONSE_MODE controls how expired listings respond:
+    //   "410"                  → HTTP 410 Gone (signals permanent removal to
+    //                            crawlers; aligned with Google for Jobs).
+    //   "200_WITH_NO_JSONLD"   → HTTP 200 with the payload but emitNoJsonLd=true
+    //                            so the frontend can render a notice instead of
+    //                            structured data. Default.
+    if (job.isExpired) {
+      const mode = (process.env.JOB_EXPIRED_RESPONSE_MODE || "200_WITH_NO_JSONLD").toUpperCase();
+      if (mode === "410") {
+        res.status(410).json({ error: "Job expired", code: "JOB_EXPIRED", slug: req.params.slug });
+        return;
+      }
+      const expiredPayload = { ...serializeJob(job), emitNoJsonLd: true };
+      res.setHeader("X-Cache", "MISS");
+      res.status(200).json(expiredPayload);
       return;
     }
 
@@ -429,6 +450,39 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
       jobRisk.level === TrustRiskLevel.HIGH ||
       jobRisk.level === TrustRiskLevel.CRITICAL;
     const publishedAt = requiresModeration ? null : new Date();
+
+    // §4.1 — classify under the controlled taxonomy (LLM-primary, keyword fallback).
+    const classification = await classifyTaxonomyField({
+      title: jobData.title,
+      description: jobData.description,
+      companyName: employer.companyName,
+      seniority: jobData.seniority,
+      tags: jobData.tags ?? [],
+    });
+
+    // §4.5 — store canonical company + location forms alongside the raw values.
+    const normalizedCompany = normalizeCompany(employer.companyName);
+    const normalizedLocation = normalizeLocation(jobData.location);
+
+    // §5.2 — employer-posted jobs default to ASSISTED_REDIRECT (the candidate
+    // applies through us → onboarding flow). The classifier still inspects
+    // the description so a "send your CV to careers@…" employer post routes
+    // to EMAIL_DRAFT correctly.
+    const applyDecision = classifyApplyStrategy({
+      jobSource: "EMPLOYER_POSTED",
+      description: jobData.description,
+      applicationUrl: jobData.applicationUrl ?? undefined,
+    });
+    // §5.9 — downgrade EMAIL_DRAFT to ASSISTED_REDIRECT when the employer's
+    // domain has opted out.
+    const applyEffective = await resolveEffectiveApplyStrategy(prisma, {
+      applyStrategy: applyDecision.strategy,
+      applyEmailDetected: applyDecision.applyEmailDetected,
+    });
+    const applyStrategy = applyEffective.effective;
+    const applyEmailDetected = applyEffective.downgradedFromEmailDraft
+      ? null
+      : applyDecision.applyEmailDetected ?? null;
     const intelligence = buildJobIntelligenceUpdate({
       title: jobData.title,
       description: jobData.description,
@@ -456,6 +510,7 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
     const job = await prisma.job.create({
       data: {
         ...jobData,
+        location: normalizedLocation.display || jobData.location,
         slug: generateSlug(jobData.title),
         tags: jobData.tags || [],
         status: requiresModeration ? JobStatus.PENDING_REVIEW : JobStatus.PUBLISHED,
@@ -465,7 +520,13 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
         riskLevel: jobRisk.level,
         trustFlags: jobRisk.flags,
         qualityCheckedAt: requiresModeration ? null : new Date(),
-        sourceName: employer.companyName,
+        sourceName: normalizedCompany || employer.companyName,
+        taxonomyField: classification.field,
+        taxonomyVersion: classification.version,
+        taxonomyConfidence: classification.confidence,
+        applyStrategy,
+        applyEmailDetected,
+        applyFormDomain: applyDecision.applyFormDomain ?? null,
         ...intelligence,
       },
     });

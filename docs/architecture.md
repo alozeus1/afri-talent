@@ -6,7 +6,7 @@
 - Backend: Express, TypeScript, Prisma.
 - Database: PostgreSQL.
 - Auth: custom JWT issued by the backend and stored in HttpOnly cookies, with
-  password login, Google OAuth, Apple OAuth, and role-aware UI/API checks.
+  password login, Google OAuth, GitHub OAuth, and role-aware UI/API checks.
 - AI services: backend AI skill/orchestration modules, including Mara product
   knowledge and candidate/application assistance.
 - Testing: Vitest/Supertest for backend, Jest for frontend units, Playwright for

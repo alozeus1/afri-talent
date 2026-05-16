@@ -1,8 +1,18 @@
-import { APIRequestContext } from "@playwright/test";
+import { APIRequestContext, Page, expect } from "@playwright/test";
 
 /** Shared test credentials — seeded by backend/prisma/seed.ts */
 export const TEST_CANDIDATE = {
   email: "candidate@example.com",
+  password: "Password123!",
+};
+
+/**
+ * PROFESSIONAL-plan candidate used by tests that need to pass the
+ * `requirePlan(SubscriptionPlan.PROFESSIONAL)` gate on resume-builder
+ * routes. Seeded by backend/prisma/seed.ts (Wave 5 PR #96).
+ */
+export const TEST_CANDIDATE_PRO = {
+  email: "candidate-pro@example.com",
   password: "Password123!",
 };
 
@@ -18,6 +28,15 @@ export const TEST_ADMIN = {
 
 /** Base URL for the backend API (matches playwright.config.ts baseURL) */
 export const API = process.env.API_BASE_URL ?? "http://localhost:4000";
+
+/**
+ * Persisted browser-state paths written by `global.setup.ts` and consumed by
+ * UI specs via `test.use({ storageState: ... })`. Defined here (not in
+ * `global.setup.ts`) so spec files don't have to import another test file —
+ * Playwright forbids one test file importing another.
+ */
+export const TEST_CANDIDATE_STORAGE = "frontend/e2e/.auth/candidate.json";
+export const TEST_CANDIDATE_PRO_STORAGE = "frontend/e2e/.auth/candidate-pro.json";
 
 /**
  * Login and return the Set-Cookie header string.
@@ -49,6 +68,36 @@ export async function loginAs(
 
     throw new Error(`Login failed (${status}): ${body}`);
   }
+}
+
+/**
+ * Login via the browser page (form submit), so the auth_token cookie lands
+ * in the browser cookie jar — distinct from `loginAs`, which only populates
+ * the Playwright `APIRequestContext` cookies. Use this when subsequent
+ * `page.goto()` calls need to access authenticated routes.
+ *
+ * Mirrors the helper in `ui-agent3-browser-qa.spec.ts` so the pattern stays
+ * consistent across UI suites that need authenticated-page access.
+ */
+export async function loginViaUi(
+  page: Page,
+  creds: { email: string; password: string },
+): Promise<void> {
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  // Backend `validateHumanAuthSubmission` (backend/src/middleware/bot-protection.ts)
+  // rejects POST /api/auth/login when `botShield.startedAt` shows the form was
+  // completed in < FORM_MIN_COMPLETION_MS (1.2s). Two 1.3s pauses split across
+  // load/fill/submit keep the elapsed time safely above that floor — same
+  // pattern as the local helper in `ui-agent3-browser-qa.spec.ts:37-45`.
+  await page.waitForTimeout(1_300);
+  await page.locator("#email").fill(creds.email);
+  await page.locator("#password").fill(creds.password);
+  await page.waitForTimeout(1_300);
+  const loginResponse = page.waitForResponse((response) =>
+    response.url().includes("/api/auth/login"),
+  );
+  await page.locator("form button[type='submit']").click();
+  expect((await loginResponse).ok()).toBeTruthy();
 }
 
 /** Register a fresh user and return their ID (for isolation tests). */

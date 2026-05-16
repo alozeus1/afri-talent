@@ -265,7 +265,7 @@ afri-tech/
 | `FRONTEND_URL` | Frontend origin for CORS |
 | `PORT` | Server port (default: 4000) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Enable Google OAuth |
-| `APPLE_CLIENT_ID` / `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` | Enable Apple OAuth |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | Enable GitHub OAuth |
 | `SES_FROM_EMAIL` | Sender used for email verification/reset emails |
 | `ENABLE_API_DOCS` | Set `true` to expose `/api/docs` in production |
 | `PHASE4_SOCIAL_ENABLED` | Enable social graph/profile endpoints (`/api/social/*`) |

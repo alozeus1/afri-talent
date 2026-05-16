@@ -34,3 +34,22 @@ provider "aws" {
     }
   }
 }
+
+# DR-region alias (Wave 8 §9.3). Hosts the cross-region AWS Backup vault that
+# receives copies of every Aurora recovery point produced by the primary plan.
+# Region driven by var.dr_region (default us-west-2 per spec).
+provider "aws" {
+  alias  = "dr"
+  region = var.dr_region
+
+  default_tags {
+    tags = {
+      Project     = "afritalent"
+      Environment = var.environment
+      Application = "afritalent-platform"
+      ManagedBy   = "terraform"
+      Owner       = var.owner_tag
+      CostCenter  = "engineering"
+    }
+  }
+}

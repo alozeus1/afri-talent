@@ -33,6 +33,11 @@ import {
 } from "./sources/company-careers.js";
 import type { BaseJobSource, JobQuery } from "./sources/base.js";
 import { classifyJobField, normalizeWorkplaceType } from "./taxonomy.js";
+import { classifyJobField as classifyTaxonomyField } from "../../ai/skills/job-field-classifier.js";
+import { classifyApplyStrategy } from "../apply-strategy.js";
+import { resolveEffectiveApplyStrategy } from "../../apply/caps.js";
+import { normalizeCompany, normalizeLocation } from "../normalize.js";
+import { buildDedupKeys, findDuplicate, type DedupMatch } from "../dedup.js";
 
 interface AggregatedJobGroup {
   canonical: AggregatedJob;
@@ -374,6 +379,10 @@ export class JobAggregator {
         sourcesSucceeded,
         sourcesFailed,
         jobsFetched,
+        // §4.2 — set by syncJobsToDatabase after the upsert pass; defaulted
+        // here so callers that only read the diagnostics object never see
+        // `undefined`.
+        duplicatesRemoved: 0,
         hadErrors,
         sourceDiagnostics,
       },
@@ -403,6 +412,10 @@ export class JobAggregator {
     let inserted = 0;
     let updated = 0;
     let skipped = 0;
+    // §4.2 — only K1 (cross-source title canonicalisation) and K3 (embedding
+    // cosine ≥ 0.92) count as actual dedups. K2 is the same source's re-scrape
+    // hitting the same fingerprint, which is normal traffic, not a duplicate.
+    let duplicatesRemoved = 0;
     const byRegion: Record<JobRegion, number> = {
       AFRICA: 0,
       EUROPE: 0,
@@ -416,9 +429,13 @@ export class JobAggregator {
       const job = group.canonical;
       try {
         const result = await this.upsertJob(job, group.variants);
-        if (result === "inserted") inserted++;
-        else if (result === "updated") updated++;
+        if (result.outcome === "inserted") inserted++;
+        else if (result.outcome === "updated") updated++;
         else skipped++;
+
+        if (result.dedupMatch && result.dedupMatch.matchedOn !== "K2") {
+          duplicatesRemoved += 1;
+        }
 
         byRegion[job.region]++;
         bySource[job.source] = (bySource[job.source] || 0) + 1;
@@ -427,6 +444,8 @@ export class JobAggregator {
         skipped++;
       }
     }
+
+    diagnostics.duplicatesRemoved = duplicatesRemoved;
 
     logger.info(
       { total: groupedJobs.length, inserted, updated, skipped },
@@ -538,21 +557,26 @@ export class JobAggregator {
     };
   }
 
-  private async upsertJob(job: AggregatedJob, variants: AggregatedJob[] = [job]): Promise<"inserted" | "updated" | "skipped"> {
+  private async upsertJob(
+    job: AggregatedJob,
+    variants: AggregatedJob[] = [job],
+  ): Promise<{ outcome: "inserted" | "updated" | "skipped"; dedupMatch?: DedupMatch }> {
     const fingerprint = buildSourceFingerprint(this.toJobDocument(job));
-    const existing = await this.prisma.job.findFirst({
-      where: {
-        jobSource: "AGGREGATED",
-        OR: [
-          { sourceId: job.externalId },
-          { sourceFingerprint: fingerprint },
-        ],
-      },
-      orderBy: [
-        { qualityScore: "desc" },
-        { publishedAt: "desc" },
-      ],
+
+    // §4.2 — tri-key cascade. K1 (norm company:title:city) → K2
+    // (sourceFingerprint) → K3 (embedding cosine ≥ 0.92).
+    const dedupMatch = await findDuplicate(this.prisma, {
+      title: job.title,
+      description: job.description,
+      company: job.company,
+      location: job.location,
+      sourceFingerprint: fingerprint,
+      sourceName: job.company,
     });
+
+    const existing = dedupMatch
+      ? await this.prisma.job.findUnique({ where: { id: dedupMatch.jobId } })
+      : null;
 
     // Generate slug
     const baseSlug = this.generateSlug(job.title, job.company);
@@ -565,17 +589,72 @@ export class JobAggregator {
       relatedJobs,
     );
 
+    // §4.1 — controlled taxonomy classification runs inline at ingest. Falls
+    // back to keyword path when LLM is unavailable, MOCK_AI=1, or confidence
+    // < 0.6. Legacy `jobField` stays alongside for back-compat until the
+    // consumer cutover (separate frontend PR).
+    const classification = await classifyTaxonomyField({
+      title: job.title,
+      description: job.description,
+      companyName: job.company,
+      seniority: job.seniority ?? undefined,
+      tags: job.skills,
+    });
+
+    // §4.5 — write normalised canonical forms for company + location so the
+    // dedup key (PR K) and search facets can match without re-running these.
+    const normalizedCompany = normalizeCompany(job.company);
+    const normalizedLocation = normalizeLocation(job.location, job.locationType);
+
+    // §4.2 — persist K1 alongside the row so future inserts can short-circuit
+    // to a text-index hit.
+    const dedupKeys = buildDedupKeys({
+      title: job.title,
+      description: job.description,
+      company: job.company,
+      location: job.location,
+      sourceFingerprint: fingerprint,
+      sourceName: job.company,
+    });
+
+    // §5.2 — apply pathway routing. Uses the vendor on `job.source`
+    // (GREENHOUSE/LEVER/...) — not the DB `jobSource: "AGGREGATED"` we write
+    // below — so the classifier can match per-vendor ATS partner flags.
+    const applyDecision = classifyApplyStrategy({
+      jobSource: job.source,
+      description: job.description,
+      sourceUrl: job.sourceUrl,
+      applicationUrl: job.applicationUrl,
+    });
+
+    // §5.9 — if the classifier picked EMAIL_DRAFT and the employer's domain
+    // is on the opt-out list, downgrade to ASSISTED_REDIRECT so the
+    // candidate sees the right CTA from the start.
+    const effective = await resolveEffectiveApplyStrategy(this.prisma, {
+      applyStrategy: applyDecision.strategy,
+      applyEmailDetected: applyDecision.applyEmailDetected,
+    });
+    const finalStrategy = effective.effective;
+    const finalApplyEmail = effective.downgradedFromEmailDraft ? null : applyDecision.applyEmailDetected ?? null;
+
     const jobData = {
       title: job.title,
       slug,
       description: job.description,
-      location: job.location,
+      location: normalizedLocation.display || job.location,
       type: job.jobType,
       jobField: job.jobField ?? classifyJobField({
         title: job.title,
         description: job.description,
         tags: job.skills,
       }),
+      taxonomyField: classification.field,
+      taxonomyVersion: classification.version,
+      taxonomyConfidence: classification.confidence,
+      dedupKeyV2: dedupKeys.k1,
+      applyStrategy: finalStrategy,
+      applyEmailDetected: finalApplyEmail,
+      applyFormDomain: applyDecision.applyFormDomain ?? null,
       workplaceType: job.workplaceType ?? normalizeWorkplaceType(job.locationType),
       seniority: job.seniority || "Mid-level",
       salaryMin: job.salary?.min,
@@ -590,7 +669,7 @@ export class JobAggregator {
       jobSource: "AGGREGATED" as const,
       sourceUrl: job.sourceUrl,
       sourceId: job.externalId,
-      sourceName: job.company,
+      sourceName: normalizedCompany || job.company,
       expiresAt: job.expiresAt || null,
       companyCareerSourceId: job.companyCareerSourceId ?? null,
       lastCheckedAt: new Date(),
@@ -606,13 +685,13 @@ export class JobAggregator {
         where: { id: existing.id },
         data: jobData,
       });
-      return "updated";
+      return { outcome: "updated", dedupMatch: dedupMatch ?? undefined };
     }
 
     await this.prisma.job.create({
       data: jobData,
     });
-    return "inserted";
+    return { outcome: "inserted" };
   }
 
   private generateSlug(title: string, company: string): string {

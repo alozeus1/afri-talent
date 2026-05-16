@@ -38,7 +38,6 @@ variable "optional_params" {
     "FLUTTERWAVE_PAYMENT_OPTIONS",
     "GITHUB_CLIENT_ID",
     "GITHUB_CLIENT_SECRET",
-    "APPLE_CLIENT_ID",
     "ADZUNA_APP_ID",
     "ADZUNA_API_KEY",
     "APIFY_TOKEN",
@@ -67,6 +66,19 @@ variable "blog_params" {
     "PEXELS_API_KEY",
     "BLOG_ADMIN_NOTIFICATION_EMAIL",
   ]
+}
+
+variable "toggle_params" {
+  description = <<EOT
+Map of plain String (non-secret) feature-flag parameters under '<name_prefix>/<KEY>'.
+Created with the supplied default value; subsequent value edits in the AWS console
+are preserved (lifecycle ignores 'value'). Use for runtime toggles like
+BLOG_AUTOMATION_ENABLED that the founder flips post-apply.
+EOT
+  type        = map(string)
+  default = {
+    BLOG_AUTOMATION_ENABLED = "0"
+  }
 }
 
 # --------------------------------------------------------------------------

@@ -22,6 +22,7 @@ locals {
   required_param_names = { for k in var.required_params : k => "${local.prefix_path}/${k}" }
   optional_param_names = { for k in var.optional_params : k => "${local.prefix_path}/${k}" }
   blog_param_names     = { for k in var.blog_params : k => "${local.prefix_path}/blog/${k}" }
+  toggle_param_names   = { for k, v in var.toggle_params : k => "${local.prefix_path}/${k}" }
 
   database_url_param_name = "${local.prefix_path}/DATABASE_URL"
 
@@ -95,6 +96,33 @@ resource "aws_ssm_parameter" "optional" {
   tags = merge(local.base_tags, {
     Name        = each.value
     SecretClass = "optional"
+  })
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Plain String toggle parameters (under /<prefix>/<KEY>).
+# Non-secret runtime flags; created with the supplied default. The lifecycle
+# ignore_changes block lets the founder flip values in the AWS console without
+# Terraform reverting them on the next apply.
+# ---------------------------------------------------------------------------
+
+resource "aws_ssm_parameter" "toggle" {
+  # checkov:skip=CKV2_AWS_34: Non-secret runtime toggle (e.g. BLOG_AUTOMATION_ENABLED). Value is plain "0"/"1"; SecureString would add no real security here and would block console operators from flipping the flag via the standard UI.
+  for_each = local.toggle_param_names
+
+  name        = each.value
+  description = "Runtime toggle: ${each.key}. Initial value managed by TF; subsequent edits preserved."
+  type        = "String"
+  value       = var.toggle_params[each.key]
+  tier        = "Standard"
+
+  tags = merge(local.base_tags, {
+    Name        = each.value
+    SecretClass = "toggle"
   })
 
   lifecycle {

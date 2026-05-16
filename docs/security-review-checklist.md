@@ -36,6 +36,17 @@ payments, AI, and infrastructure changes.
 - No `.env` or secret material is committed.
 - Logs do not include raw resumes, credentials, tokens, or verification files.
 - Secrets come from environment variables or Secrets Manager.
+- `CandidateResumeVersion.content`, `originalContent`, and `optimizedContent`
+  are PII-grade JSONB. Never log raw values; redact in serializers.
+
+## DSAR Scope (Wave 10)
+
+Candidate-facing JSONB fields that must be included in DSAR export / delete:
+
+- `CandidateResumeVersion.content`
+- `CandidateResumeVersion.originalContent` (added Wave 5 PR #1)
+- `CandidateResumeVersion.optimizedContent` (added Wave 5 PR #1)
+- `CandidateResumeVersion.plainText`, `summary`, `notes`, `keywords`
 
 ## Infrastructure
 

@@ -84,6 +84,23 @@ output "state_machine_orchestrator_arn" {
   value       = module.lambda_functions.state_machine_orchestrator_arn
 }
 
+# ── Blog automation (Wave 6 §7.3 γ1) ─────────────────────────────────────────
+
+output "blog_automation_lambda_name" {
+  description = "Name of the blog-automation Lambda."
+  value       = module.lambda_functions.lambda_blog_automation_name
+}
+
+output "blog_automation_lambda_arn" {
+  description = "ARN of the blog-automation Lambda."
+  value       = module.lambda_functions.lambda_blog_automation_arn
+}
+
+output "blog_automation_schedule_rule_arn" {
+  description = "ARN of the EventBridge weekly schedule rule that triggers the blog-automation Lambda."
+  value       = module.lambda_functions.blog_automation_schedule_rule_arn
+}
+
 # ── CI/IAM ───────────────────────────────────────────────────────────────────
 
 output "github_oidc_role_arn" {
@@ -103,7 +120,55 @@ output "dashboard_url" {
   value       = module.observability.dashboard_url
 }
 
+# ── Backup + DR (Wave 8 §9.3) ────────────────────────────────────────────────
+
+output "backup_primary_vault_name" {
+  description = "Primary-region AWS Backup vault holding daily Aurora recovery points."
+  value       = module.backup_dr.primary_vault_name
+}
+
+output "backup_dr_vault_name" {
+  description = "DR-region AWS Backup vault receiving cross-region recovery-point copies."
+  value       = module.backup_dr.dr_vault_name
+}
+
+output "backup_plan_arn" {
+  description = "AWS Backup plan ARN that drives daily Aurora snapshots + DR copies."
+  value       = module.backup_dr.plan_arn
+}
+
+output "dr_region" {
+  description = "Region holding the DR Backup vault (cross-region recovery-point copies land here)."
+  value       = var.dr_region
+}
+
 output "ssm_path_prefix" {
   description = "SSM parameter path prefix used by every secret (no leading/trailing slash)."
   value       = module.ssm_params.ssm_parameter_path_prefix
 }
+
+# ── Trust artefact bucket (Wave 1 §2.11) ─────────────────────────────────────
+# WAVE_1_TRUST_BUCKET_OUTPUTS — uncomment alongside the module block in main.tf.
+#
+# output "trust_bucket_name" {
+#   description = "Name of the separate trust artefact bucket. Set as SSM TRUST_S3_BUCKET."
+#   value       = module.s3_trust.bucket_name
+# }
+#
+# output "trust_bucket_iam_policy_arn" {
+#   description = "IAM policy ARN to attach to the ECS task role so backend tasks can write trust artefacts."
+#   value       = module.s3_trust.iam_policy_arn
+# }
+
+# ── ElastiCache Redis (Wave 1 §2.4) ──────────────────────────────────────────
+# WAVE_1_REDIS_OUTPUTS — uncomment alongside the module block in main.tf.
+#
+# output "redis_primary_endpoint" {
+#   description = "Primary endpoint hostname. Use to compose rediss:// REDIS_URL for SSM."
+#   value       = module.elasticache_redis.primary_endpoint_address
+# }
+#
+# output "redis_auth_secret_name" {
+#   description = "Secrets Manager name holding the Redis AUTH token. Read with aws secretsmanager get-secret-value."
+#   value       = module.elasticache_redis.auth_secret_name
+# }

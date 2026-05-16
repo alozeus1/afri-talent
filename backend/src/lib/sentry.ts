@@ -16,6 +16,9 @@ export function initSentry(): void {
     dsn,
     enabled: Boolean(dsn) && !isTest,
     environment: process.env.NODE_ENV || "development",
+    // §2.5 build provenance: tag releases so Sentry can correlate errors with
+    // deploys. APP_RELEASE is injected by the Docker build (see deploy.yml).
+    release: process.env.APP_RELEASE || undefined,
     integrations: (defaultIntegrations) => [...defaultIntegrations, nodeProfilingIntegration()],
     tracesSampleRate: isProduction ? 0.2 : 1.0,
     profilesSampleRate: isProduction ? 0.2 : 1.0,

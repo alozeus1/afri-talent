@@ -68,6 +68,14 @@ module "aurora" {
   min_acu                  = var.aurora_min_acu
   max_acu                  = var.aurora_max_acu
   seconds_until_auto_pause = var.aurora_seconds_until_auto_pause
+
+  # Wave 8 §9.3 — backups, DR, deletion protection.
+  # backup_retention_period also defines the PITR window (spec: ≥ 14 days).
+  # AWS Backup (module.backup_dr) layers a 30-day daily snapshot retention plan
+  # with cross-region copy to us-west-2 on top of this.
+  backup_retention_period = var.aurora_backup_retention_period
+  deletion_protection     = var.aurora_deletion_protection
+  skip_final_snapshot     = var.aurora_skip_final_snapshot
   # Other vars use sensible defaults (engine_version 15.5, db_name afritalent, etc.)
 }
 
@@ -81,6 +89,60 @@ module "rds_proxy" {
   master_user_secret_arn    = module.aurora.aurora_master_user_secret_arn
   secret_kms_key_arn        = module.aurora.aurora_kms_key_arn
 }
+
+# ── Backup + DR (Wave 8 §9.3) ────────────────────────────────────────────────
+# Daily AWS Backup snapshots of the Aurora cluster into a primary-region vault,
+# with every recovery point copied cross-region to var.dr_region (us-west-2).
+# Aurora's own backup_retention_period gives PITR ≥ 14 days; this module
+# layers a 30-day daily-snapshot retention on top for longer-window restores.
+module "backup_dr" {
+  source = "../../modules/backup-dr"
+  providers = {
+    aws.dr = aws.dr
+  }
+
+  name_prefix             = var.name_prefix
+  primary_region          = var.aws_region
+  dr_region               = var.dr_region
+  aurora_cluster_arn      = module.aurora.aurora_cluster_arn
+  schedule_expression     = var.backup_daily_schedule_cron
+  retention_days          = var.backup_retention_days
+  cold_storage_after_days = var.backup_cold_storage_after_days
+}
+
+# ---------------------------------------------------------------------------
+# ElastiCache Redis (Wave 1 §2.4) — UNCOMMENT TO ENABLE.
+#
+# The application ships with `REDIS_REQUIRED` defaulting to false, so the
+# backend works without Redis on day-1. To roll out:
+#
+#   1. Uncomment the `module "elasticache_redis"` block below + the matching
+#      output in outputs.tf (look for "WAVE_1_REDIS_OUTPUTS").
+#   2. `terraform plan` in this directory — review the new SG, KMS key,
+#      Secrets Manager entry, and replication group.
+#   3. `terraform apply` (~10 minutes for the cluster to come up).
+#   4. Compose REDIS_URL from the AUTH secret + primary endpoint and write
+#      to SSM. Full snippet in infra/terraform/modules/elasticache-redis/README.md.
+#   5. Verify reachable from a backend task:
+#        aws ecs execute-command --cluster afritalent-dev \
+#          --task <task-id> --container backend --interactive \
+#          --command "redis-cli -u $REDIS_URL --no-auth-warning ping"
+#   6. Add `REDIS_URL = "${local.ssm_arn_base}/REDIS_URL"` to backend_secrets.
+#   7. Once verified: set `REDIS_REQUIRED=true` in SSM and add to backend_env.
+#      ECS picks up env on next deployment; existing tasks finish out gracefully.
+#
+# module "elasticache_redis" {
+#   source = "../../modules/elasticache-redis"
+#
+#   name_prefix                = var.name_prefix
+#   vpc_id                     = module.vpc.vpc_id
+#   subnet_ids                 = module.vpc.private_subnet_ids
+#   ingress_security_group_ids = [module.vpc.sg_ecs_tasks_id]
+#   # node_type                = "cache.t4g.small"  # for prod uplift
+#   # num_cache_clusters       = 2                  # Multi-AZ + automatic failover
+#   tags                       = local.tags
+# }
+# ---------------------------------------------------------------------------
 
 module "ssm_params" {
   source = "../../modules/ssm-params"
@@ -105,10 +167,58 @@ module "ecr" {
 module "s3_uploads" {
   source = "../../modules/s3"
 
-  bucket_name     = "afritalent-${var.environment}-uploads-${var.aws_account_id}"
-  environment     = var.environment
-  allowed_origins = ["https://d2j3ahmgbbdup1.cloudfront.net", "https://afri-talent.com", "https://www.afri-talent.com"]
+  bucket_name = "afritalent-${var.environment}-uploads-${var.aws_account_id}"
+  environment = var.environment
+  # CORS origins derived from live CloudFront output (+ optional custom domain).
+  # See local.app_allowed_origins in locals.tf.
+  allowed_origins = local.app_allowed_origins
+
+  # §2.11 — the IAM policy now lists every prefix the bucket holds. Without
+  # `trust/candidates/` and `trust/employers/`, the backend's presigned
+  # uploads to those paths silently fail with AccessDenied. Remove the two
+  # trust entries here once the separate `s3_trust` bucket below is live and
+  # the backend's TRUST_S3_BUCKET env var is pointing at it.
+  prefix_acl = [
+    "resumes/",
+    "trust/candidates/",
+    "trust/employers/",
+  ]
 }
+
+# ---------------------------------------------------------------------------
+# Separate trust-artefact bucket (Wave 1 §2.11) — UNCOMMENT TO ENABLE.
+#
+# Recommended by the launch master prompt: keep candidate/employer KYC
+# artefacts in their own bucket so a leak in the resumes/exports bucket
+# can't reach trust artefacts and vice versa.
+#
+# Rollout:
+#   1. Uncomment the `module "s3_trust"` block + outputs in outputs.tf
+#      (look for WAVE_1_TRUST_BUCKET_OUTPUTS).
+#   2. `terraform apply` (creates bucket, KMS, IAM policy).
+#   3. Attach the new IAM policy to the ECS task role — add
+#      `${module.s3_trust.iam_policy_arn}` to the ecs-fargate `policy_arns`
+#      input alongside the existing `${module.s3_uploads.iam_policy_arn}`.
+#   4. Set the SSM `TRUST_S3_BUCKET` parameter to
+#      `${module.s3_trust.bucket_name}` and add it to the ecs_fargate
+#      `backend_secrets` map. The backend (files.ts) routes trust scopes
+#      there automatically when TRUST_S3_BUCKET is set.
+#   5. Once verified working, remove `trust/candidates/` and
+#      `trust/employers/` from the s3_uploads `prefix_acl` above and
+#      apply again.
+#   6. Optional: copy any existing trust/* objects from the uploads bucket
+#      to the trust bucket (aws s3 sync s3://uploads/trust s3://trust)
+#      before tightening the IAM.
+#
+# module "s3_trust" {
+#   source = "../../modules/s3"
+#
+#   bucket_name     = "afritalent-${var.environment}-trust-${var.aws_account_id}"
+#   environment     = var.environment
+#   allowed_origins = local.app_allowed_origins
+#   prefix_acl      = ["trust/candidates/", "trust/employers/"]
+# }
+# ---------------------------------------------------------------------------
 
 module "ecs_fargate" {
   source = "../../modules/ecs-fargate"
@@ -126,11 +236,8 @@ module "ecs_fargate" {
   desired_count             = var.ecs_desired_count
   fargate_base              = var.ecs_fargate_base
   fargate_spot_weight       = var.ecs_fargate_spot_weight
-  # Pass var.ssm_path_prefix directly (no leading slash). The ssm-params module's
-  # output has a leading slash which causes a double-slash in the IAM policy
-  # resource ARN (parameter//afritalent/dev/* vs the actual parameter/afritalent/dev/*).
-  ssm_path_prefix = var.ssm_path_prefix
-  ssm_kms_key_arn = module.ssm_params.ssm_kms_key_arn
+  ssm_path_prefix           = module.ssm_params.ssm_parameter_path_prefix
+  ssm_kms_key_arn           = module.ssm_params.ssm_kms_key_arn
 
   app_s3_bucket_arn = module.s3_uploads.bucket_arn
 
@@ -229,11 +336,33 @@ module "lambda_functions" {
   aws_account_id               = var.aws_account_id
   private_subnet_ids           = module.vpc.private_subnet_ids
   sg_lambda_id                 = module.vpc.sg_lambda_id
-  ssm_path_prefix              = var.ssm_path_prefix # no leading slash (see ecs_fargate note)
+  ssm_path_prefix              = module.ssm_params.ssm_parameter_path_prefix
   ssm_kms_key_arn              = module.ssm_params.ssm_kms_key_arn
   webhook_stripe_zip_path      = var.webhook_stripe_zip_path
   webhook_flutterwave_zip_path = var.webhook_flutterwave_zip_path
   orchestrator_zip_path        = var.orchestrator_zip_path
+  blog_automation_zip_path     = var.blog_automation_zip_path
+
+  # Wave 6 §7.3 γ1 — blog automation Lambda env. BLOG_AUTOMATION_ENABLED is
+  # sourced from the SSM toggle parameter so the founder can flip the gate by
+  # updating SSM and re-running `terraform apply` (the env var refreshes,
+  # next Lambda cold start picks it up). Defense-in-depth: the handler also
+  # treats unset/0/false as "no-op exit".
+  blog_automation_env = {
+    NODE_ENV                = "production"
+    AWS_REGION              = var.aws_region
+    BLOG_AUTOMATION_ENABLED = data.aws_ssm_parameter.blog_automation_enabled.value
+    FRONTEND_URL            = "https://d2j3ahmgbbdup1.cloudfront.net"
+  }
+
+  depends_on = [module.ssm_params]
+}
+
+# Read the BLOG_AUTOMATION_ENABLED SSM toggle so the blog-automation Lambda
+# env tracks SSM as the source of truth. Founder flips SSM then re-applies TF.
+data "aws_ssm_parameter" "blog_automation_enabled" {
+  name       = "/${var.ssm_path_prefix}/BLOG_AUTOMATION_ENABLED"
+  depends_on = [module.ssm_params]
 }
 
 # ── Security & Ops plane ─────────────────────────────────────────────────────
@@ -260,6 +389,7 @@ module "observability" {
     module.lambda_functions.lambda_webhook_stripe_name,
     module.lambda_functions.lambda_webhook_flutterwave_name,
     module.lambda_functions.lambda_orchestrator_name,
+    module.lambda_functions.lambda_blog_automation_name,
   ]
   aurora_cluster_identifier = module.aurora.aurora_cluster_identifier
 }
@@ -297,6 +427,7 @@ module "iam_oidc_github" {
     module.lambda_functions.lambda_webhook_stripe_arn,
     module.lambda_functions.lambda_webhook_flutterwave_arn,
     module.lambda_functions.lambda_orchestrator_arn,
+    module.lambda_functions.lambda_blog_automation_arn,
   ]
 
   tfstate_bucket_arn   = var.tfstate_bucket_arn

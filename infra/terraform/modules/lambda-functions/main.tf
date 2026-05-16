@@ -18,9 +18,10 @@ terraform {
 #
 
 locals {
-  use_placeholder_stripe       = length(trimspace(var.webhook_stripe_zip_path)) == 0
-  use_placeholder_flutterwave  = length(trimspace(var.webhook_flutterwave_zip_path)) == 0
-  use_placeholder_orchestrator = length(trimspace(var.orchestrator_zip_path)) == 0
+  use_placeholder_stripe          = length(trimspace(var.webhook_stripe_zip_path)) == 0
+  use_placeholder_flutterwave     = length(trimspace(var.webhook_flutterwave_zip_path)) == 0
+  use_placeholder_orchestrator    = length(trimspace(var.orchestrator_zip_path)) == 0
+  use_placeholder_blog_automation = length(trimspace(var.blog_automation_zip_path)) == 0
 
   use_cloudwatch_kms = length(trimspace(var.cloudwatch_kms_key_arn)) > 0
 
@@ -29,7 +30,9 @@ locals {
   webhook_stripe_name      = "${var.name_prefix}-webhook-stripe"
   webhook_flutterwave_name = "${var.name_prefix}-webhook-flutterwave"
   orchestrator_name        = "${var.name_prefix}-orchestrator-step"
+  blog_automation_name     = "${var.name_prefix}-blog-automation"
   state_machine_name       = "${var.name_prefix}-orchestrator"
+  blog_schedule_rule_name  = "${var.name_prefix}-blog-automation-weekly"
 }
 
 # ---------------------------------------------------------------------------
@@ -365,4 +368,119 @@ resource "aws_sfn_state_machine" "orchestrator" {
     include_execution_data = true
     level                  = "ALL"
   }
+}
+
+# ---------------------------------------------------------------------------
+# blog-automation (EventBridge weekly cron)
+# ---------------------------------------------------------------------------
+# Wave 6 §7.3 γ1. Scheduled blog pipeline runner — sources content, fact-checks,
+# drafts a post, persists Resource + AdminReview (PENDING). Human review at
+# /admin/blog before publication.
+#
+# Runtime defense: the handler reads BLOG_AUTOMATION_ENABLED from env (sourced
+# from SSM at cold start). If the SSM value is "0" the handler exits cleanly
+# without invoking the pipeline — TF stays applied, SSM flip is the toggle.
+
+resource "aws_iam_role" "blog_automation" {
+  name               = "${local.blog_automation_name}-role"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "blog_automation_vpc" {
+  role       = aws_iam_role.blog_automation.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+resource "aws_iam_role_policy" "blog_automation_common" {
+  name   = "${local.blog_automation_name}-common"
+  role   = aws_iam_role.blog_automation.id
+  policy = data.aws_iam_policy_document.lambda_common.json
+}
+
+# Bedrock for AI fallback — same pattern as orchestrator. Anthropic egress goes
+# via NAT instance (VPC config + private subnets + sg_lambda_id).
+data "aws_iam_policy_document" "blog_automation_bedrock" {
+  statement {
+    effect    = "Allow"
+    actions   = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "blog_automation_bedrock" {
+  name   = "${local.blog_automation_name}-bedrock"
+  role   = aws_iam_role.blog_automation.id
+  policy = data.aws_iam_policy_document.blog_automation_bedrock.json
+}
+
+# SES SendEmail for admin notification (BLOG_ADMIN_NOTIFICATION_EMAIL).
+data "aws_iam_policy_document" "blog_automation_ses" {
+  statement {
+    effect    = "Allow"
+    actions   = ["ses:SendEmail", "ses:SendRawEmail"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "blog_automation_ses" {
+  name   = "${local.blog_automation_name}-ses"
+  role   = aws_iam_role.blog_automation.id
+  policy = data.aws_iam_policy_document.blog_automation_ses.json
+}
+
+resource "aws_cloudwatch_log_group" "blog_automation" {
+  name              = "/aws/lambda/${local.blog_automation_name}"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = local.use_cloudwatch_kms ? var.cloudwatch_kms_key_arn : null
+}
+
+resource "aws_lambda_function" "blog_automation" {
+  function_name = local.blog_automation_name
+  role          = aws_iam_role.blog_automation.arn
+  runtime       = "nodejs20.x"
+  handler       = "dist/lambda/blog-automation.handler"
+  memory_size   = var.blog_automation_memory_mb
+  timeout       = var.blog_automation_timeout_sec
+
+  filename         = local.use_placeholder_blog_automation ? data.archive_file.placeholder.output_path : var.blog_automation_zip_path
+  source_code_hash = local.use_placeholder_blog_automation ? data.archive_file.placeholder.output_base64sha256 : filebase64sha256(var.blog_automation_zip_path)
+
+  vpc_config {
+    subnet_ids         = var.private_subnet_ids
+    security_group_ids = [var.sg_lambda_id]
+  }
+
+  environment {
+    variables = var.blog_automation_env
+  }
+
+  depends_on = [
+    aws_cloudwatch_log_group.blog_automation,
+    aws_iam_role_policy_attachment.blog_automation_vpc,
+    aws_iam_role_policy.blog_automation_common,
+    aws_iam_role_policy.blog_automation_bedrock,
+    aws_iam_role_policy.blog_automation_ses,
+  ]
+}
+
+# EventBridge weekly schedule. Cron is UTC. Default: Mondays 09:00 UTC.
+resource "aws_cloudwatch_event_rule" "blog_automation_weekly" {
+  name                = local.blog_schedule_rule_name
+  description         = "Weekly trigger for the blog-automation Lambda. Runtime SSM flag BLOG_AUTOMATION_ENABLED also gates execution."
+  schedule_expression = var.blog_automation_schedule_expression
+  state               = var.blog_automation_schedule_enabled ? "ENABLED" : "DISABLED"
+}
+
+resource "aws_cloudwatch_event_target" "blog_automation_weekly" {
+  rule      = aws_cloudwatch_event_rule.blog_automation_weekly.name
+  target_id = "blog-automation-lambda"
+  arn       = aws_lambda_function.blog_automation.arn
+}
+
+resource "aws_lambda_permission" "blog_automation_eventbridge" {
+  statement_id  = "AllowEventBridgeInvokeBlogAutomation"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.blog_automation.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.blog_automation_weekly.arn
 }

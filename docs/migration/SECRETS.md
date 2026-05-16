@@ -47,7 +47,8 @@
 |---|---|---|
 | `/afritalent/<env>/GOOGLE_CLIENT_ID` | Google Cloud Console → OAuth consent | SecureString |
 | `/afritalent/<env>/GOOGLE_CLIENT_SECRET` | Google Cloud Console | SecureString |
-| `/afritalent/<env>/APPLE_CLIENT_ID` | Apple Developer | SecureString |
+| `/afritalent/<env>/GITHUB_CLIENT_ID` | GitHub Developer Settings → OAuth Apps | SecureString |
+| `/afritalent/<env>/GITHUB_CLIENT_SECRET` | GitHub Developer Settings → OAuth Apps | SecureString |
 
 **Action item:** Add the new CloudFront domain to authorized redirect URIs in each provider's console BEFORE cutover.
 
