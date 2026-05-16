@@ -167,9 +167,11 @@ module "ecr" {
 module "s3_uploads" {
   source = "../../modules/s3"
 
-  bucket_name     = "afritalent-${var.environment}-uploads-${var.aws_account_id}"
-  environment     = var.environment
-  allowed_origins = ["https://d2j3ahmgbbdup1.cloudfront.net", "https://afri-talent.com", "https://www.afri-talent.com"]
+  bucket_name = "afritalent-${var.environment}-uploads-${var.aws_account_id}"
+  environment = var.environment
+  # CORS origins derived from live CloudFront output (+ optional custom domain).
+  # See local.app_allowed_origins in locals.tf.
+  allowed_origins = local.app_allowed_origins
 
   # §2.11 — the IAM policy now lists every prefix the bucket holds. Without
   # `trust/candidates/` and `trust/employers/`, the backend's presigned
@@ -213,7 +215,7 @@ module "s3_uploads" {
 #
 #   bucket_name     = "afritalent-${var.environment}-trust-${var.aws_account_id}"
 #   environment     = var.environment
-#   allowed_origins = ["https://d2j3ahmgbbdup1.cloudfront.net", "https://afri-talent.com", "https://www.afri-talent.com"]
+#   allowed_origins = local.app_allowed_origins
 #   prefix_acl      = ["trust/candidates/", "trust/employers/"]
 # }
 # ---------------------------------------------------------------------------
@@ -234,11 +236,8 @@ module "ecs_fargate" {
   desired_count             = var.ecs_desired_count
   fargate_base              = var.ecs_fargate_base
   fargate_spot_weight       = var.ecs_fargate_spot_weight
-  # Pass var.ssm_path_prefix directly (no leading slash). The ssm-params module's
-  # output has a leading slash which causes a double-slash in the IAM policy
-  # resource ARN (parameter//afritalent/dev/* vs the actual parameter/afritalent/dev/*).
-  ssm_path_prefix = var.ssm_path_prefix
-  ssm_kms_key_arn = module.ssm_params.ssm_kms_key_arn
+  ssm_path_prefix           = module.ssm_params.ssm_parameter_path_prefix
+  ssm_kms_key_arn           = module.ssm_params.ssm_kms_key_arn
 
   app_s3_bucket_arn = module.s3_uploads.bucket_arn
 
@@ -337,7 +336,7 @@ module "lambda_functions" {
   aws_account_id               = var.aws_account_id
   private_subnet_ids           = module.vpc.private_subnet_ids
   sg_lambda_id                 = module.vpc.sg_lambda_id
-  ssm_path_prefix              = var.ssm_path_prefix # no leading slash (see ecs_fargate note)
+  ssm_path_prefix              = module.ssm_params.ssm_parameter_path_prefix
   ssm_kms_key_arn              = module.ssm_params.ssm_kms_key_arn
   webhook_stripe_zip_path      = var.webhook_stripe_zip_path
   webhook_flutterwave_zip_path = var.webhook_flutterwave_zip_path
