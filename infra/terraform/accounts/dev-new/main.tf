@@ -360,7 +360,10 @@ module "lambda_functions" {
     FRONTEND_URL            = "https://d2j3ahmgbbdup1.cloudfront.net"
   }
 
-  depends_on = [module.ssm_params]
+  depends_on = [
+    module.ssm_params,
+    module.iam_oidc_github,
+  ]
 }
 
 # Read the BLOG_AUTOMATION_ENABLED SSM toggle so the blog-automation Lambda
@@ -429,10 +432,10 @@ module "iam_oidc_github" {
     module.ecs_fargate.ecs_service_backend_arn,
   ]
   lambda_function_arns = [
-    module.lambda_functions.lambda_webhook_stripe_arn,
-    module.lambda_functions.lambda_webhook_flutterwave_arn,
-    module.lambda_functions.lambda_orchestrator_arn,
-    module.lambda_functions.lambda_blog_automation_arn,
+    "arn:aws:lambda:${var.aws_region}:${var.aws_account_id}:function:${var.name_prefix}-webhook-stripe",
+    "arn:aws:lambda:${var.aws_region}:${var.aws_account_id}:function:${var.name_prefix}-webhook-flutterwave",
+    "arn:aws:lambda:${var.aws_region}:${var.aws_account_id}:function:${var.name_prefix}-orchestrator-step",
+    "arn:aws:lambda:${var.aws_region}:${var.aws_account_id}:function:${var.name_prefix}-blog-automation",
   ]
 
   tfstate_bucket_arn   = var.tfstate_bucket_arn
