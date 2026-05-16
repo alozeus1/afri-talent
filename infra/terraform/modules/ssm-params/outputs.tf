@@ -1,5 +1,10 @@
 output "ssm_parameter_path_prefix" {
-  description = "Leading slash path prefix all parameters live under (e.g., '/afritalent/dev')."
+  description = "Path prefix all parameters live under, WITHOUT leading slash (e.g., 'afritalent/dev'). Matches the input contract every other module in the stack uses to build ARNs ('parameter/<prefix>/*'). Use ssm_parameter_path with leading slash if you need the canonical SSM path form."
+  value       = var.name_prefix
+}
+
+output "ssm_parameter_path" {
+  description = "Path prefix WITH leading slash (e.g., '/afritalent/dev'). This is the form aws_ssm_parameter.name uses internally. Most callers want ssm_parameter_path_prefix above instead."
   value       = local.prefix_path
 }
 
