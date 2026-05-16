@@ -355,7 +355,6 @@ module "lambda_functions" {
   # treats unset/0/false as "no-op exit".
   blog_automation_env = {
     NODE_ENV                = "production"
-    AWS_REGION              = var.aws_region
     BLOG_AUTOMATION_ENABLED = data.aws_ssm_parameter.blog_automation_enabled.value
     FRONTEND_URL            = "https://d2j3ahmgbbdup1.cloudfront.net"
   }
