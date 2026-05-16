@@ -11,6 +11,7 @@
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { buildJobIntelligenceUpdate } from "../lib/jobs/discovery.js";
+import { emitStaleJobRemovalLatencySeconds } from "../lib/observability/metrics.js";
 
 const STALE_THRESHOLD_DAYS = parseInt(process.env.JOB_STALE_DAYS || "30", 10);
 const BATCH_SIZE = 100;
@@ -41,23 +42,46 @@ export async function runJobCleanupCycle(): Promise<void> {
   const staleCutoff = new Date();
   staleCutoff.setDate(staleCutoff.getDate() - STALE_THRESHOLD_DAYS);
 
+  const staleWhere = {
+    jobSource: "AGGREGATED" as const,
+    isExpired: false,
+    status: "PUBLISHED" as const,
+    OR: [
+      { staleAt: { lte: new Date() } },
+      { sourceLastSeenAt: { lte: staleCutoff } },
+      {
+        AND: [
+          { sourceLastSeenAt: null },
+          { updatedAt: { lte: staleCutoff } },
+        ],
+      },
+    ],
+    expiresAt: null,
+  };
+
+  // Wave 9 §10.1 SLO #6 — sample the latency of the rows about to be
+  // expired so the alarm has a Max statistic to evaluate. Cheaper than
+  // refactoring updateMany → per-row updates. Sample size capped to
+  // bound DB cost on large backlogs.
+  const stalenessSample = await prisma.job.findMany({
+    where: staleWhere,
+    select: { sourceLastSeenAt: true, updatedAt: true },
+    take: 500,
+  });
+  const cycleStartedAt = Date.now();
+  let maxLatencyMs = 0;
+  for (const row of stalenessSample) {
+    const seenAt = row.sourceLastSeenAt ?? row.updatedAt;
+    if (!seenAt) continue;
+    const latencyMs = cycleStartedAt - seenAt.getTime();
+    if (latencyMs > maxLatencyMs) maxLatencyMs = latencyMs;
+  }
+  if (stalenessSample.length > 0) {
+    void emitStaleJobRemovalLatencySeconds(maxLatencyMs / 1000);
+  }
+
   const staleExpired = await prisma.job.updateMany({
-    where: {
-      jobSource: "AGGREGATED",
-      isExpired: false,
-      status: "PUBLISHED",
-      OR: [
-        { staleAt: { lte: new Date() } },
-        { sourceLastSeenAt: { lte: staleCutoff } },
-        {
-          AND: [
-            { sourceLastSeenAt: null },
-            { updatedAt: { lte: staleCutoff } },
-          ],
-        },
-      ],
-      expiresAt: null,
-    },
+    where: staleWhere,
     data: {
       isExpired: true,
       status: "REJECTED",

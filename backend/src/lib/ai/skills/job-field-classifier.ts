@@ -1,12 +1,18 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import logger from "../../logger.js";
+import { emitClassifierEvaluation, emitClassifierCorrect } from "../../observability/metrics.js";
 import {
   JOB_TAXONOMY,
   TAXONOMY_VERSION,
   isTaxonomyField,
   type TaxonomyField,
 } from "../../jobs/taxonomy.js";
+
+// Wave 9 §10.1 SLO #5 — accuracy proxy threshold. Until a post-hoc
+// reviewer pipeline ships (Wave 10+), confidence ≥ this counts as
+// "correct" for the alarm's denominator/numerator ratio.
+const ACCURACY_PROXY_CONFIDENCE_THRESHOLD = 0.8;
 
 // §4.1 — LLM-classified job field.
 //
@@ -328,6 +334,17 @@ Description: ${(input.description ?? "").slice(0, 600)}`;
 }
 
 export async function classifyJobField(input: ClassifierInput): Promise<ClassificationResult> {
+  const result = await classifyJobFieldInner(input);
+  // Wave 9 §10.1 SLO #5 — every classification ticks the denominator;
+  // high-confidence outputs (proxy for "correct") tick the numerator.
+  void emitClassifierEvaluation();
+  if (result.confidence >= ACCURACY_PROXY_CONFIDENCE_THRESHOLD) {
+    void emitClassifierCorrect();
+  }
+  return result;
+}
+
+async function classifyJobFieldInner(input: ClassifierInput): Promise<ClassificationResult> {
   const llm = await classifyByLlm(input);
   if (llm) return llm;
 

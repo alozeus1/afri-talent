@@ -20,6 +20,7 @@ import {
 } from "../lib/apply/state-machine.js";
 import { dispatchApply } from "../lib/apply/dispatch.js";
 import { checkApplyCaps } from "../lib/apply/caps.js";
+import { emitApplyAgentSubmission, emitApplyAgentConfirmed } from "../lib/observability/metrics.js";
 import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import { requireAccountStanding } from "../middleware/account-standing.js";
 import { assessApplicationRisk } from "../lib/trust/risk.js";
@@ -755,6 +756,9 @@ router.post(
       // applyStrategy may still be null for pre-PR-O rows that haven't been
       // backfilled; the dispatcher's ?? "ASSISTED_REDIRECT" below keeps the
       // candidate moving.
+      // Wave 9 §10.1 SLO #4 — emit submission count BEFORE dispatch so even
+      // dispatcher exceptions/early returns are captured in the denominator.
+      void emitApplyAgentSubmission();
       const result = await dispatchApply({
         applicationId: submitting.id,
         applyStrategy: application.job.applyStrategy ?? "ASSISTED_REDIRECT",
@@ -766,6 +770,12 @@ router.post(
 
       if (result.ok) {
         const nextStatus = result.nextStatus ?? SubmissionStatus.SUBMITTED;
+        // Wave 9 §10.1 SLO #4 — count only the terminal SUBMITTED state as
+        // "confirmed". AWAITING_USER_CONFIRMATION is counted when the
+        // candidate later confirms via the clickout-confirm handler below.
+        if (nextStatus === SubmissionStatus.SUBMITTED) {
+          void emitApplyAgentConfirmed();
+        }
         const settled = await prisma.application.update({
           where: { id: submitting.id },
           data: {
@@ -910,6 +920,13 @@ async function settleClickoutResponse(
             },
       }),
     ]);
+
+    // Wave 9 §10.1 SLO #4 — async confirmation track. The original
+    // submission was counted when /submit dispatched; the confirmation
+    // counter only ticks on a candidate-confirmed clickout.
+    if (isConfirm) {
+      void emitApplyAgentConfirmed();
+    }
 
     recordOpsEvent({
       metricName: "apply_pathway_clickout_response",
