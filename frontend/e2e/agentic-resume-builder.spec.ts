@@ -9,13 +9,14 @@
  *
  * Requires:
  *   - Backend running on API_BASE_URL (http://localhost:4000)
- *   - Candidate seeded with a PROFESSIONAL subscription
+ *   - TEST_CANDIDATE_PRO seeded with a PROFESSIONAL subscription
+ *     (backend/prisma/seed.ts:99-172; candidate-pro@example.com)
  *   - OPENAI_API_KEY + ANTHROPIC_API_KEY set server-side
  *   - MOCK_AI unset (so real models run)
  */
 
 import { test, expect } from "@playwright/test";
-import { API, TEST_CANDIDATE, loginAs } from "./fixtures/auth";
+import { API, TEST_CANDIDATE_PRO, loginAs } from "./fixtures/auth";
 
 const AGENTIC_ENABLED = process.env.E2E_RUN_AGENTIC === "1";
 
@@ -25,11 +26,11 @@ test.describe("Agentic — Resume Builder", () => {
   test.skip(!AGENTIC_ENABLED, "Set E2E_RUN_AGENTIC=1 to run live-AI suites");
 
   test("generates a structured resume and passes basic quality gates", async ({ request }) => {
-    await loginAs(request, TEST_CANDIDATE);
+    await loginAs(request, TEST_CANDIDATE_PRO);
 
     const payload = {
       fullName: "Ada Okonkwo",
-      email: TEST_CANDIDATE.email,
+      email: TEST_CANDIDATE_PRO.email,
       phone: "+234 800 111 2233",
       location: "Lagos, Nigeria",
       targetRole: "Senior Product Engineer",
@@ -88,7 +89,7 @@ test.describe("Agentic — Resume Builder", () => {
   });
 
   test("save + fetch cycle returns the same resume content", async ({ request }) => {
-    await loginAs(request, TEST_CANDIDATE);
+    await loginAs(request, TEST_CANDIDATE_PRO);
 
     const saveRes = await request.post(`${API}/api/skills/resume-builder/save`, {
       data: {
@@ -105,7 +106,7 @@ test.describe("Agentic — Resume Builder", () => {
   });
 
   test("rejects invalid input with 400 and structured zod errors", async ({ request }) => {
-    await loginAs(request, TEST_CANDIDATE);
+    await loginAs(request, TEST_CANDIDATE_PRO);
     const res = await request.post(`${API}/api/skills/resume-builder/generate`, {
       data: { fullName: "", email: "not-an-email", targetRole: "" },
     });

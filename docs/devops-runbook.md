@@ -21,6 +21,43 @@ npm run dev
 
 Use `.env.example` files as templates. Do not commit real `.env` files.
 
+### Local Postgres + pgvector
+
+`backend/prisma/schema.prisma` uses the `vector` type from the pgvector
+extension. CI runs against `pgvector/pgvector:pg15`, so CI is unaffected,
+but `prisma migrate deploy` against a local Postgres without the extension
+fails on `20260512000000_enable_pgvector_extension`.
+
+Two ways to satisfy this locally:
+
+```bash
+# Option 1 — install pgvector into your existing local Postgres
+brew install pgvector
+# then in psql:
+#   CREATE EXTENSION IF NOT EXISTS vector;
+
+# Option 2 — use the same image CI uses, via docker
+docker run --rm -d --name afritalent-pg -p 5432:5432 \
+  -e POSTGRES_USER=afritalent -e POSTGRES_PASSWORD=afritalent_test \
+  -e POSTGRES_DB=afritalent_test \
+  pgvector/pgvector:pg15
+```
+
+### Stray `_prisma_migrations` rows
+
+If a local dev environment carries `_prisma_migrations` rows for the
+historical `20260429150000_add_learning_feedback` migration whose on-disk
+file no longer exists (the current file is `20260429120000_add_learning_feedback`),
+`prisma migrate deploy` ignores them but `prisma migrate status` warns.
+Clean up with:
+
+```bash
+psql "$DATABASE_URL" -c "DELETE FROM _prisma_migrations \
+  WHERE migration_name = '20260429150000_add_learning_feedback';"
+```
+
+CI is unaffected — the test DB is provisioned fresh per run.
+
 ## Test Commands
 
 ```bash
