@@ -82,3 +82,28 @@ variable "aurora_cluster_identifier" {
   description = "Aurora cluster identifier for dashboard widgets."
   default     = ""
 }
+
+# ── SLO alarms (Wave 9 §10.1) ────────────────────────────────────────────────
+
+variable "alerts_email" {
+  type        = string
+  description = "Email subscribed to the SLO alerts SNS topic as a fallback channel. Leave empty to disable email subscription (e.g. when PagerDuty is wired)."
+  default     = ""
+}
+
+variable "environment" {
+  type        = string
+  description = "Environment dimension applied to custom CloudWatch metrics (dev/staging/prod). Must match the value the backend emits via aws-sdk PutMetricData."
+  default     = "dev"
+
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "environment must be one of: dev, staging, prod."
+  }
+}
+
+variable "ssm_path_prefix" {
+  type        = string
+  description = "SSM parameter path prefix used by the (commented) PagerDuty subscription block. Without leading or trailing slash, e.g. 'afritalent/dev'."
+  default     = ""
+}
