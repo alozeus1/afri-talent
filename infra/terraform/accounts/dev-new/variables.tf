@@ -83,6 +83,12 @@ variable "aurora_seconds_until_auto_pause" {
   default     = 1800
 }
 
+variable "aurora_engine_version" {
+  type        = string
+  description = "Aurora PostgreSQL engine version for the existing dev cluster. Keep aligned with live AWS to avoid invalid downgrade attempts."
+  default     = "15.15"
+}
+
 # ── Aurora backup / DR / deletion-protection (Wave 8 §9.3) ────────────────────
 
 variable "aurora_backup_retention_period" {

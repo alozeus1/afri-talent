@@ -98,6 +98,10 @@ module "backup_dr" {
   schedule_expression     = var.backup_daily_schedule_cron
   retention_days          = var.backup_retention_days
   cold_storage_after_days = var.backup_cold_storage_after_days
+
+  # Keep Backup IAM role creation ordered after the deploy-role guardrail is
+  # updated with its narrow exception.
+  depends_on = [module.iam_oidc_github]
 }
 
 module "ssm_params" {
