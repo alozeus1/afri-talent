@@ -98,7 +98,7 @@ variable "deletion_protection" {
 }
 
 variable "backup_retention_period" {
-  description = "Days of automated backups to retain (1-35)."
+  description = "Days of automated backups to retain (1-35). Aurora PITR window equals this value, so callers needing PITR ≥ 14 days (Wave 8 §9.3) must set this ≥ 14."
   type        = number
   default     = 7
 
@@ -106,6 +106,18 @@ variable "backup_retention_period" {
     condition     = var.backup_retention_period >= 1 && var.backup_retention_period <= 35
     error_message = "backup_retention_period must be between 1 and 35."
   }
+}
+
+variable "skip_final_snapshot" {
+  description = "Whether to skip the final snapshot when the cluster is destroyed. PROD MUST OVERRIDE TO FALSE so a recovery snapshot is retained."
+  type        = bool
+  default     = true
+}
+
+variable "final_snapshot_identifier" {
+  description = "Identifier for the final snapshot taken when skip_final_snapshot is false. Required only when skip_final_snapshot = false."
+  type        = string
+  default     = ""
 }
 
 variable "preferred_backup_window" {

@@ -120,6 +120,28 @@ output "dashboard_url" {
   value       = module.observability.dashboard_url
 }
 
+# ── Backup + DR (Wave 8 §9.3) ────────────────────────────────────────────────
+
+output "backup_primary_vault_name" {
+  description = "Primary-region AWS Backup vault holding daily Aurora recovery points."
+  value       = module.backup_dr.primary_vault_name
+}
+
+output "backup_dr_vault_name" {
+  description = "DR-region AWS Backup vault receiving cross-region recovery-point copies."
+  value       = module.backup_dr.dr_vault_name
+}
+
+output "backup_plan_arn" {
+  description = "AWS Backup plan ARN that drives daily Aurora snapshots + DR copies."
+  value       = module.backup_dr.plan_arn
+}
+
+output "dr_region" {
+  description = "Region holding the DR Backup vault (cross-region recovery-point copies land here)."
+  value       = var.dr_region
+}
+
 output "ssm_path_prefix" {
   description = "SSM parameter path prefix used by every secret (no leading/trailing slash)."
   value       = module.ssm_params.ssm_parameter_path_prefix

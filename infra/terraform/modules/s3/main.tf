@@ -81,18 +81,25 @@ resource "aws_s3_bucket_cors_configuration" "uploads" {
   }
 }
 
-# Lifecycle — expire old non-current versions after 90 days
+# Lifecycle — Wave 8 §9.3:
+#   - noncurrent versions older than 90 days transition to Glacier (kept, not deleted)
+#   - abort incomplete multipart uploads after 7 days (cost hygiene)
+#
+# Previous behavior was to expire (delete) noncurrent versions at 90 days,
+# which loses recovery material. Master prompt §9.3 explicitly calls for a
+# transition rule so versions remain restorable indefinitely from Glacier.
 resource "aws_s3_bucket_lifecycle_configuration" "uploads" {
   bucket = aws_s3_bucket.uploads.id
 
   rule {
-    id     = "expire-old-versions"
+    id     = "archive-old-versions"
     status = "Enabled"
 
     filter {}
 
-    noncurrent_version_expiration {
+    noncurrent_version_transition {
       noncurrent_days = 90
+      storage_class   = "GLACIER"
     }
 
     abort_incomplete_multipart_upload {
