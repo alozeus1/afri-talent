@@ -1,4 +1,4 @@
-import { Job, JobListParams, JobListResponse, PublicStats } from "@/lib/api";
+import { Job, JobListParams, JobListResponse, PricingData, PublicStats, UserPricingData } from "@/lib/api";
 
 const SERVER_API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -88,6 +88,34 @@ export async function getJobsListServer(
         error instanceof Error
           ? error.message
           : "We couldn't refresh jobs right now. Check your connection and try again.",
+    };
+  }
+}
+
+export async function getPricingServer(
+  options: { region?: string; authCookie?: string } = {},
+): Promise<{ data: PricingData | null; error: string | null }> {
+  const { region, authCookie } = options;
+  try {
+    if (authCookie) {
+      const data = await fetchServerPublicApi<UserPricingData>("/api/pricing/me", {
+        timeoutMs: 4500,
+        headers: { Cookie: `auth_token=${authCookie}` },
+      });
+      return { data, error: null };
+    }
+    const query = region ? `?region=${encodeURIComponent(region)}` : "";
+    const data = await fetchServerPublicApi<PricingData>(`/api/pricing${query}`, {
+      timeoutMs: 4500,
+    });
+    return { data, error: null };
+  } catch (error) {
+    return {
+      data: null,
+      error:
+        error instanceof Error
+          ? error.message
+          : "We couldn't load pricing right now. Please try again in a moment.",
     };
   }
 }
