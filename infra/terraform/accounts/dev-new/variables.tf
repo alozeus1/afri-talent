@@ -157,6 +157,12 @@ variable "orchestrator_zip_path" {
   default     = ""
 }
 
+variable "blog_automation_zip_path" {
+  type        = string
+  description = "Path to the built blog-automation Lambda zip."
+  default     = ""
+}
+
 # ── Image tag ─────────────────────────────────────────────────────────────────
 
 variable "image_tag" {

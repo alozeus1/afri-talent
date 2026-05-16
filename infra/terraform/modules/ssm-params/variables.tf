@@ -68,6 +68,19 @@ variable "blog_params" {
   ]
 }
 
+variable "toggle_params" {
+  description = <<EOT
+Map of plain String (non-secret) feature-flag parameters under '<name_prefix>/<KEY>'.
+Created with the supplied default value; subsequent value edits in the AWS console
+are preserved (lifecycle ignores 'value'). Use for runtime toggles like
+BLOG_AUTOMATION_ENABLED that the founder flips post-apply.
+EOT
+  type        = map(string)
+  default = {
+    BLOG_AUTOMATION_ENABLED = "0"
+  }
+}
+
 # --------------------------------------------------------------------------
 # Inputs for the DATABASE_URL parameter shell. Value is intentionally NOT
 # constructed at plan time because the master password is sealed inside

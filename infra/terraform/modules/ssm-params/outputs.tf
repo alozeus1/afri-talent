@@ -33,6 +33,11 @@ output "blog_parameter_arns" {
   value       = { for k, p in aws_ssm_parameter.blog : k => p.arn }
 }
 
+output "toggle_parameter_arns" {
+  description = "Map of toggle parameter NAME -> ARN."
+  value       = { for k, p in aws_ssm_parameter.toggle : k => p.arn }
+}
+
 output "database_url_parameter_arn" {
   description = "ARN of the DATABASE_URL SSM parameter shell."
   value       = aws_ssm_parameter.database_url.arn
@@ -44,11 +49,12 @@ output "database_url_parameter_name" {
 }
 
 output "all_parameter_arns" {
-  description = "Combined map of every parameter NAME -> ARN that this module manages (required + optional + blog + DATABASE_URL)."
+  description = "Combined map of every parameter NAME -> ARN that this module manages (required + optional + blog + toggle + DATABASE_URL)."
   value = merge(
     { for k, p in aws_ssm_parameter.required : k => p.arn },
     { for k, p in aws_ssm_parameter.optional : k => p.arn },
     { for k, p in aws_ssm_parameter.blog : "blog/${k}" => p.arn },
+    { for k, p in aws_ssm_parameter.toggle : k => p.arn },
     { "DATABASE_URL" = aws_ssm_parameter.database_url.arn },
   )
 }

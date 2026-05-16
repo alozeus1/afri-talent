@@ -119,7 +119,7 @@ jobs:
         working-directory: backend
         run: |
           set -euo pipefail
-          for fn in webhook-stripe webhook-flutterwave orchestrator-step; do
+          for fn in webhook-stripe webhook-flutterwave orchestrator-step blog-automation; do
             echo "Packaging $fn"
             zip -qr "../dist-lambda-${fn}.zip" \
               "dist/lambda/${fn}.js" \
