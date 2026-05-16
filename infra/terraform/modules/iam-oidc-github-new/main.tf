@@ -51,7 +51,13 @@ locals {
 
   ecs_resource_targets = compact(concat([var.ecs_cluster_arn], var.ecs_service_arns))
 
-  backup_service_role_arn = "arn:aws:iam::${var.aws_account_id}:role/${var.name_prefix}-backup-service-role"
+  backup_service_role_arn  = "arn:aws:iam::${var.aws_account_id}:role/${var.name_prefix}-backup-service-role"
+  blog_automation_role_arn = "arn:aws:iam::${var.aws_account_id}:role/${var.name_prefix}-blog-automation-role"
+
+  iam_role_exception_arns = [
+    local.backup_service_role_arn,
+    local.blog_automation_role_arn,
+  ]
 }
 
 ############################################
@@ -183,23 +189,26 @@ data "aws_iam_policy_document" "github_deploy" {
     resources = [local.ssm_parameter_arn_prefix]
   }
 
-  # ----- AWS Backup service role, scoped to the stack-local role only.
+  # ----- Stack-local IAM roles required by managed service resources.
   statement {
-    sid    = "BackupServiceRoleLifecycle"
+    sid    = "ServiceRoleLifecycle"
     effect = "Allow"
     actions = [
       "iam:AttachRolePolicy",
       "iam:CreateRole",
       "iam:DeleteRole",
+      "iam:DeleteRolePolicy",
       "iam:DetachRolePolicy",
       "iam:GetRole",
       "iam:ListAttachedRolePolicies",
+      "iam:ListRolePolicies",
       "iam:PassRole",
+      "iam:PutRolePolicy",
       "iam:TagRole",
       "iam:UntagRole",
       "iam:UpdateAssumeRolePolicy",
     ]
-    resources = [local.backup_service_role_arn]
+    resources = local.iam_role_exception_arns
   }
 
   # ----- S3: Terraform state bucket
@@ -290,7 +299,7 @@ data "aws_iam_policy_document" "iam_org_guardrail" {
       "iam:CreateLoginProfile",
       "iam:UpdateLoginProfile",
     ]
-    not_resources = [local.backup_service_role_arn]
+    not_resources = local.iam_role_exception_arns
   }
 
   statement {
