@@ -90,6 +90,12 @@ variable "orchestrator_zip_path" {
   default     = ""
 }
 
+variable "blog_automation_zip_path" {
+  description = "Path to the built blog-automation Lambda zip. Empty => use placeholder."
+  type        = string
+  default     = ""
+}
+
 # ---- Function env vars ----
 
 variable "webhook_stripe_env" {
@@ -108,6 +114,12 @@ variable "orchestrator_env" {
   description = "Plain env vars for orchestrator-step."
   type        = map(string)
   default     = { NODE_ENV = "production", MOCK_AI = "0" }
+}
+
+variable "blog_automation_env" {
+  description = "Plain env vars for blog-automation. BLOG_AUTOMATION_ENABLED defaults to '0' — runtime toggle via SSM."
+  type        = map(string)
+  default     = { NODE_ENV = "production", BLOG_AUTOMATION_ENABLED = "0" }
 }
 
 # ---- Function URL CORS for webhooks ----
@@ -147,4 +159,33 @@ variable "orchestrator_timeout_sec" {
     condition     = var.orchestrator_timeout_sec > 0 && var.orchestrator_timeout_sec <= 900
     error_message = "orchestrator_timeout_sec must be 1..900."
   }
+}
+
+variable "blog_automation_memory_mb" {
+  description = "Memory for the blog-automation Lambda."
+  type        = number
+  default     = 1024
+}
+
+variable "blog_automation_timeout_sec" {
+  description = "Timeout (s) for the blog-automation Lambda. Max 900s (15 min)."
+  type        = number
+  default     = 900
+
+  validation {
+    condition     = var.blog_automation_timeout_sec > 0 && var.blog_automation_timeout_sec <= 900
+    error_message = "blog_automation_timeout_sec must be 1..900."
+  }
+}
+
+variable "blog_automation_schedule_expression" {
+  description = "EventBridge schedule expression for the blog-automation cron. Default: Mondays 09:00 UTC."
+  type        = string
+  default     = "cron(0 9 ? * MON *)"
+}
+
+variable "blog_automation_schedule_enabled" {
+  description = "Whether the EventBridge rule fires the blog-automation Lambda. Defense-in-depth: the runtime SSM flag BLOG_AUTOMATION_ENABLED also gates execution inside the Lambda."
+  type        = bool
+  default     = true
 }

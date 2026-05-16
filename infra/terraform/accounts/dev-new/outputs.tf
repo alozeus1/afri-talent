@@ -84,6 +84,23 @@ output "state_machine_orchestrator_arn" {
   value       = module.lambda_functions.state_machine_orchestrator_arn
 }
 
+# ── Blog automation (Wave 6 §7.3 γ1) ─────────────────────────────────────────
+
+output "blog_automation_lambda_name" {
+  description = "Name of the blog-automation Lambda."
+  value       = module.lambda_functions.lambda_blog_automation_name
+}
+
+output "blog_automation_lambda_arn" {
+  description = "ARN of the blog-automation Lambda."
+  value       = module.lambda_functions.lambda_blog_automation_arn
+}
+
+output "blog_automation_schedule_rule_arn" {
+  description = "ARN of the EventBridge weekly schedule rule that triggers the blog-automation Lambda."
+  value       = module.lambda_functions.blog_automation_schedule_rule_arn
+}
+
 # ── CI/IAM ───────────────────────────────────────────────────────────────────
 
 output "github_oidc_role_arn" {

@@ -314,6 +314,28 @@ module "lambda_functions" {
   webhook_stripe_zip_path      = var.webhook_stripe_zip_path
   webhook_flutterwave_zip_path = var.webhook_flutterwave_zip_path
   orchestrator_zip_path        = var.orchestrator_zip_path
+  blog_automation_zip_path     = var.blog_automation_zip_path
+
+  # Wave 6 §7.3 γ1 — blog automation Lambda env. BLOG_AUTOMATION_ENABLED is
+  # sourced from the SSM toggle parameter so the founder can flip the gate by
+  # updating SSM and re-running `terraform apply` (the env var refreshes,
+  # next Lambda cold start picks it up). Defense-in-depth: the handler also
+  # treats unset/0/false as "no-op exit".
+  blog_automation_env = {
+    NODE_ENV                = "production"
+    AWS_REGION              = var.aws_region
+    BLOG_AUTOMATION_ENABLED = data.aws_ssm_parameter.blog_automation_enabled.value
+    FRONTEND_URL            = "https://d2j3ahmgbbdup1.cloudfront.net"
+  }
+
+  depends_on = [module.ssm_params]
+}
+
+# Read the BLOG_AUTOMATION_ENABLED SSM toggle so the blog-automation Lambda
+# env tracks SSM as the source of truth. Founder flips SSM then re-applies TF.
+data "aws_ssm_parameter" "blog_automation_enabled" {
+  name       = "/${var.ssm_path_prefix}/BLOG_AUTOMATION_ENABLED"
+  depends_on = [module.ssm_params]
 }
 
 # ── Security & Ops plane ─────────────────────────────────────────────────────
@@ -340,6 +362,7 @@ module "observability" {
     module.lambda_functions.lambda_webhook_stripe_name,
     module.lambda_functions.lambda_webhook_flutterwave_name,
     module.lambda_functions.lambda_orchestrator_name,
+    module.lambda_functions.lambda_blog_automation_name,
   ]
   aurora_cluster_identifier = module.aurora.aurora_cluster_identifier
 }
@@ -377,6 +400,7 @@ module "iam_oidc_github" {
     module.lambda_functions.lambda_webhook_stripe_arn,
     module.lambda_functions.lambda_webhook_flutterwave_arn,
     module.lambda_functions.lambda_orchestrator_arn,
+    module.lambda_functions.lambda_blog_automation_arn,
   ]
 
   tfstate_bucket_arn   = var.tfstate_bucket_arn
