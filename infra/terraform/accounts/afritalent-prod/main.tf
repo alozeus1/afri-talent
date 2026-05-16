@@ -267,7 +267,6 @@ module "lambda_functions" {
 
   blog_automation_env = {
     NODE_ENV                = "production"
-    AWS_REGION              = var.aws_region
     BLOG_AUTOMATION_ENABLED = data.aws_ssm_parameter.blog_automation_enabled.value
     FRONTEND_URL            = local.frontend_url
   }
