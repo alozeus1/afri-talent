@@ -1,0 +1,148 @@
+# ── User-facing endpoints ─────────────────────────────────────────────────────
+
+output "cloudfront_domain_name" {
+  description = "CloudFront distribution domain (e.g. d12345.cloudfront.net). Public entry point pre-DNS-cutover."
+  value       = module.cloudfront_waf.cloudfront_domain_name
+}
+
+output "alb_dns_name" {
+  description = "Internal ALB DNS name. Use for direct testing before DNS cutover."
+  value       = module.alb_fargate.alb_dns_name
+}
+
+output "primary_url" {
+  description = "Resolved primary URL — custom domain if configured, otherwise CloudFront default domain."
+  value       = local.has_domain ? "https://${var.domain_name}" : "https://${module.cloudfront_waf.cloudfront_domain_name}"
+}
+
+# ── DNS ──────────────────────────────────────────────────────────────────────
+
+output "route53_zone_id" {
+  description = "Route 53 hosted zone ID for var.domain_name (empty if not created)."
+  value       = local.route53_zone_id
+}
+
+output "route53_name_servers" {
+  description = "Name servers to set at the domain registrar to delegate DNS to this zone. **Cutover-critical**: at DigitalOcean (or wherever afri-talent.com is registered), update NS records to these four values to delegate DNS to Route 53."
+  value       = local.route53_name_servers
+}
+
+output "acm_certificate_arn" {
+  description = "ACM certificate ARN used by both CloudFront and the ALB HTTPS listener."
+  value       = local.acm_certificate_arn
+}
+
+# ── Webhook URLs (config back into Stripe / Flutterwave dashboards) ──────────
+
+output "webhook_stripe_url" {
+  description = "Lambda Function URL for Stripe webhooks. Configure this in the Stripe dashboard as the webhook endpoint (replaces the dev URL at cutover)."
+  value       = module.lambda_functions.lambda_webhook_stripe_url
+}
+
+output "webhook_flutterwave_url" {
+  description = "Lambda Function URL for Flutterwave webhooks. Configure in the Flutterwave dashboard at cutover."
+  value       = module.lambda_functions.lambda_webhook_flutterwave_url
+}
+
+# ── Data plane ───────────────────────────────────────────────────────────────
+
+output "aurora_cluster_endpoint" {
+  description = "Aurora writer endpoint. Apps should connect via the proxy below, not this directly."
+  value       = module.aurora.aurora_cluster_endpoint
+}
+
+output "rds_proxy_endpoint" {
+  description = "RDS Proxy endpoint. Use this in DATABASE_URL."
+  value       = module.rds_proxy.rds_proxy_endpoint
+}
+
+output "aurora_master_user_secret_arn" {
+  description = "Secrets Manager ARN holding auto-rotated Aurora master credentials."
+  value       = module.aurora.aurora_master_user_secret_arn
+  sensitive   = true
+}
+
+# ── Compute plane ────────────────────────────────────────────────────────────
+
+output "ecs_cluster_name" {
+  description = "ECS cluster name."
+  value       = module.ecs_fargate.ecs_cluster_name
+}
+
+output "ecr_repo_url_frontend" {
+  description = "Frontend ECR repository URL (push images here)."
+  value       = module.ecr.ecr_repo_url_frontend
+}
+
+output "ecr_repo_url_backend" {
+  description = "Backend ECR repository URL (push images here)."
+  value       = module.ecr.ecr_repo_url_backend
+}
+
+output "state_machine_orchestrator_arn" {
+  description = "Step Functions state machine ARN — invoke for orchestrator runs."
+  value       = module.lambda_functions.state_machine_orchestrator_arn
+}
+
+# ── Blog automation (Wave 6 §7.3 γ1) ─────────────────────────────────────────
+
+output "blog_automation_lambda_name" {
+  description = "Name of the blog-automation Lambda."
+  value       = module.lambda_functions.lambda_blog_automation_name
+}
+
+output "blog_automation_lambda_arn" {
+  description = "ARN of the blog-automation Lambda."
+  value       = module.lambda_functions.lambda_blog_automation_arn
+}
+
+output "blog_automation_schedule_rule_arn" {
+  description = "ARN of the EventBridge weekly schedule rule that triggers the blog-automation Lambda."
+  value       = module.lambda_functions.blog_automation_schedule_rule_arn
+}
+
+# ── CI/IAM ───────────────────────────────────────────────────────────────────
+
+output "github_oidc_role_arn" {
+  description = "GitHub Actions OIDC deploy role ARN. Set as vars.AWS_DEPLOY_ROLE_ARN (or vars.OIDC_ROLE_NAME) in the GitHub repo settings when ready to switch the deploy workflow to the new account."
+  value       = module.iam_oidc_github.oidc_role_arn
+}
+
+output "github_oidc_role_name" {
+  description = "GitHub Actions OIDC deploy role NAME (used by deploy.yml as vars.OIDC_ROLE_NAME)."
+  value       = module.iam_oidc_github.oidc_role_name
+}
+
+# ── Observability ────────────────────────────────────────────────────────────
+
+output "dashboard_url" {
+  description = "CloudWatch dashboard URL for stack-wide visibility."
+  value       = module.observability.dashboard_url
+}
+
+# ── Backup + DR (Wave 8 §9.3) ────────────────────────────────────────────────
+
+output "backup_primary_vault_name" {
+  description = "Primary-region AWS Backup vault holding daily Aurora recovery points."
+  value       = module.backup_dr.primary_vault_name
+}
+
+output "backup_dr_vault_name" {
+  description = "DR-region AWS Backup vault receiving cross-region recovery-point copies."
+  value       = module.backup_dr.dr_vault_name
+}
+
+output "backup_plan_arn" {
+  description = "AWS Backup plan ARN that drives daily Aurora snapshots + DR copies."
+  value       = module.backup_dr.plan_arn
+}
+
+output "dr_region" {
+  description = "Region holding the DR Backup vault (cross-region recovery-point copies land here)."
+  value       = var.dr_region
+}
+
+output "ssm_path_prefix" {
+  description = "SSM parameter path prefix used by every secret (no leading/trailing slash)."
+  value       = module.ssm_params.ssm_parameter_path_prefix
+}
