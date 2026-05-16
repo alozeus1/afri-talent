@@ -186,6 +186,21 @@ data "aws_iam_policy_document" "task_runtime" {
       ]
     }
   }
+
+  # Wave 9 §10.1 PR-B — custom CloudWatch metrics for agent SLOs.
+  # Backend emits to namespace AfriTalent/Agents via aws-sdk PutMetricData.
+  # PutMetricData has no resource-level permission; scope via condition on
+  # the namespace to prevent leakage into other namespaces.
+  statement {
+    effect    = "Allow"
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = ["AfriTalent/Agents"]
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "task_runtime" {
