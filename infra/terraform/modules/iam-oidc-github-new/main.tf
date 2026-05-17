@@ -53,11 +53,17 @@ locals {
 
   backup_service_role_arn  = "arn:aws:iam::${var.aws_account_id}:role/${var.name_prefix}-backup-service-role"
   blog_automation_role_arn = "arn:aws:iam::${var.aws_account_id}:role/${var.name_prefix}-blog-automation-role"
+  ecs_task_role_arn        = "arn:aws:iam::${var.aws_account_id}:role/${var.name_prefix}-ecs-task"
+  agent_metrics_policy_arn = "arn:aws:iam::${var.aws_account_id}:policy/${var.name_prefix}-ecs-task-agent-metrics"
 
-  iam_role_exception_arns = [
+  service_role_lifecycle_arns = [
     local.backup_service_role_arn,
     local.blog_automation_role_arn,
   ]
+
+  iam_guardrail_role_exception_arns = concat(local.service_role_lifecycle_arns, [
+    local.ecs_task_role_arn,
+  ])
 }
 
 ############################################
@@ -208,7 +214,34 @@ data "aws_iam_policy_document" "github_deploy" {
       "iam:UntagRole",
       "iam:UpdateAssumeRolePolicy",
     ]
-    resources = local.iam_role_exception_arns
+    resources = local.service_role_lifecycle_arns
+  }
+
+  # ----- Exact ECS task-role attachment needed for Wave 9 agent metrics.
+  statement {
+    sid    = "EcsTaskAgentMetricsPolicyAttachment"
+    effect = "Allow"
+    actions = [
+      "iam:AttachRolePolicy",
+      "iam:DetachRolePolicy",
+    ]
+    resources = [local.ecs_task_role_arn]
+
+    condition {
+      test     = "ArnEquals"
+      variable = "iam:PolicyARN"
+      values   = [local.agent_metrics_policy_arn]
+    }
+  }
+
+  statement {
+    sid    = "EcsTaskAgentMetricsPolicyRead"
+    effect = "Allow"
+    actions = [
+      "iam:GetRole",
+      "iam:ListAttachedRolePolicies",
+    ]
+    resources = [local.ecs_task_role_arn]
   }
 
   # ----- S3: Terraform state bucket
@@ -299,7 +332,7 @@ data "aws_iam_policy_document" "iam_org_guardrail" {
       "iam:CreateLoginProfile",
       "iam:UpdateLoginProfile",
     ]
-    not_resources = local.iam_role_exception_arns
+    not_resources = local.iam_guardrail_role_exception_arns
   }
 
   statement {
