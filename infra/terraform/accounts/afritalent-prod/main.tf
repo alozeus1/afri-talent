@@ -250,6 +250,13 @@ module "ecs_fargate" {
   }
 }
 
+resource "aws_iam_role_policy_attachment" "ecs_task_agent_metrics" {
+  role       = module.ecs_fargate.task_role_name
+  policy_arn = module.ecs_fargate.agent_metrics_policy_arn
+
+  depends_on = [module.iam_oidc_github]
+}
+
 module "lambda_functions" {
   source = "../../modules/lambda-functions"
 

@@ -38,6 +38,16 @@ output "task_role_arn" {
   value       = aws_iam_role.task.arn
 }
 
+output "task_role_name" {
+  description = "ECS task role name (runtime permissions)."
+  value       = aws_iam_role.task.name
+}
+
+output "agent_metrics_policy_arn" {
+  description = "Managed policy ARN allowing ECS tasks to publish Wave 9 agent metrics."
+  value       = aws_iam_policy.agent_metrics.arn
+}
+
 output "frontend_task_definition_family" {
   description = "Frontend task definition family — used by CI to register new revisions."
   value       = aws_ecs_task_definition.frontend.family

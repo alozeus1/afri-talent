@@ -232,11 +232,6 @@ resource "aws_iam_policy" "agent_metrics" {
   policy      = data.aws_iam_policy_document.agent_metrics.json
 }
 
-resource "aws_iam_role_policy_attachment" "agent_metrics" {
-  role       = aws_iam_role.task.name
-  policy_arn = aws_iam_policy.agent_metrics.arn
-}
-
 # ---------------------------------------------------------------------------
 # Task definitions
 # ---------------------------------------------------------------------------
