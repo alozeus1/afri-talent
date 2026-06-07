@@ -256,7 +256,7 @@ export default function AdminTrustPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <p className="font-semibold">We couldn't load trust operations</p>
+          <p className="font-semibold">We couldn&apos;t load trust operations</p>
           <p className="mt-1">{error ?? "Try again in a moment."}</p>
           <Button size="sm" className="mt-4" onClick={loadAll}>Retry</Button>
         </div>
