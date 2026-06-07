@@ -1,6 +1,6 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: May 10, 2026 (cross-account migration complete; OLD App Runner stack destroyed)
+Last updated: May 17, 2026 (Wave 9 agent metrics promotion complete)
 
 > [!IMPORTANT]
 > **Architecture changed on 2026-05-10.** The shared environment has moved off
@@ -8,6 +8,90 @@ Last updated: May 10, 2026 (cross-account migration complete; OLD App Runner sta
 > Serverless v2 + Lambda + CloudFront/WAF in the new AWS account `108188564905`.
 > Anything below that references `*.awsapprunner.com`, `afritalent-staging-*`
 > AWS resources, or the old account ID is historical and no longer live.
+
+## Update on May 17, 2026: Wave 9 agent metrics promotion complete
+
+Promoted Wave 9 agent metrics/SLO work through the restored `develop` buffer
+and into `main`. The initial promotion exposed IAM guardrail sequencing gaps in
+the main deploy workflow, so two follow-up hotfixes were merged before the
+apply completed:
+
+- PR #131: allowed the GitHub deploy role to attach/detach the exact
+  `afritalent-dev-ecs-task-agent-metrics` managed policy on the exact
+  `afritalent-dev-ecs-task` role.
+- PR #133: moved the agent metrics policy attachment to the account layer and
+  made it depend on `module.iam_oidc_github` so the guardrail policy update
+  applies before Terraform attempts `iam:AttachRolePolicy`.
+
+Promotion/deploy sequence:
+
+- PR #130 promoted PR #129 to `main`, but deploy run `25980614859` failed at
+  `Terraform Apply (dev-new)` on `iam:AttachRolePolicy`.
+- PR #132 promoted PR #131 to `main`, but deploy run `25980923639` hit the same
+  guardrail denial because the attachment raced the guardrail update.
+- PR #134 promoted PR #133 to `main`; deploy run `25981178399` completed
+  successfully.
+
+Final successful deploy:
+
+- **Workflow run**: `25981178399`
+- **Commit**: `a98d09055b7cc906c69d34737c87ac29c5d3c57b`
+- **Terraform Apply (dev-new)**: success, completed `2026-05-17T04:29:56Z`
+- **Smoke Test**: success, completed `2026-05-17T04:30:07Z`
+
+Operational note: GitHub auto-deleted `develop` after each `develop -> main`
+promotion PR because it was the PR head branch. After the final promotion,
+`develop` was restored from `main` and both branches pointed at
+`a98d09055b7cc906c69d34737c87ac29c5d3c57b`. GitHub reported
+`develop` as unprotected after restoration; reattach branch protection in repo
+settings if this buffer should be protected.
+
+## Update on May 16, 2026: Wave 6/8 AWS activation complete
+
+Merged `develop` into `main` to activate the previously merged Wave 6 and Wave
+8 Terraform/Lambda work. The main deploy workflow required four follow-up
+hotfix PRs before the apply completed:
+
+- PR #125: pinned the live Aurora engine version to `15.15` and allowed the
+  GitHub deploy role to create the exact AWS Backup service role.
+- PR #126: extended the deploy-role guardrail for the blog automation IAM role.
+- PR #127: ordered Lambda creation after IAM guardrail updates by using
+  deterministic Lambda ARNs.
+- PR #128: removed reserved `AWS_REGION` from the blog automation Lambda
+  environment.
+
+Final successful deploy:
+
+- **Workflow run**: `25954427791`
+- **Terraform apply job**: `76298678534`
+- **Apply completed**: `2026-05-16T06:07:18Z`
+- **Apply summary**: `Apply complete! Resources: 7 added, 1 changed, 4 destroyed.`
+
+Live resources now active in account `108188564905`:
+
+- **Aurora**: cluster `afritalent-dev-aurora`; Terraform changed
+  `deletion_protection` from `false` to `true` and backup retention from 7 to
+  30 days during the activation sequence.
+- **AWS Backup primary vault**: `afritalent-dev-backup-vault` in `us-east-1`.
+- **AWS Backup DR vault**: `afritalent-dev-backup-vault-dr` in `us-west-2`.
+- **Blog automation Lambda**:
+  `arn:aws:lambda:us-east-1:108188564905:function:afritalent-dev-blog-automation`.
+- **Blog automation schedule**:
+  `arn:aws:events:us-east-1:108188564905:rule/afritalent-dev-blog-automation-weekly`.
+
+Verification note: local AWS CLI credentials in the handoff session resolved to
+the old account `260820061731`, and assuming
+`arn:aws:iam::108188564905:role/afritalent-dev-github-deploy` failed with
+`AccessDenied`. The resource evidence above comes from GitHub Actions Terraform
+apply logs and outputs, not a direct local AWS console/CLI read.
+
+Open post-activation items:
+
+- Set Stripe test credentials as GitHub repository **Secrets** once real test
+  values are available: `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. They
+  were not set during activation because secret values were not provided.
+- Verify live `RegionalPrice` rows for `AFRICA`, `EUROPE`, and `ROW` once a
+  valid database access path for account `108188564905` is available.
 
 ## Update on May 10, 2026: Cross-account migration complete
 
