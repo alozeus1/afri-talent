@@ -308,12 +308,25 @@ export default function CandidateTrustPage() {
     );
   }
 
-  if (loading || !dashboard) {
+  if (loading) {
     return (
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex justify-center py-24">
           <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
         </div>
+      </div>
+    );
+  }
+
+  if (!dashboard) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <TrustStatusBanner
+          tone="danger"
+          title="We couldn't load your trust profile"
+          body={pageError ?? "Try again in a moment."}
+          actions={<Button size="sm" onClick={loadDashboard}>Retry</Button>}
+        />
       </div>
     );
   }

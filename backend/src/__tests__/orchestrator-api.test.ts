@@ -94,10 +94,23 @@ describe("POST /api/orchestrator/run — request validation (400)", () => {
     expect(res.body.details.fieldErrors.resume_text).toBeDefined();
   });
 
-  // Note: testing resume_text > 30 000 chars via HTTP is not feasible here
-  // because the general 10kb body-size guard fires first (Express returns 500
-  // before Zod validation runs). The Zod max-length constraint is covered by
-  // the pure unit tests in orchestrator-validators.test.ts instead.
+  it("accepts orchestrator payloads larger than the global 10 KB body limit", async () => {
+    const token = makeCandidateToken();
+    const res = await request(app)
+      .post("/api/orchestrator/run")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        run_type: "resume_review",
+        resume_text: "A".repeat(12_000),
+        limits: { token_budget_total: 15_000 },
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("ok");
+  });
+
+  // Note: resume_text > 30 000 chars is covered by the pure unit tests in
+  // orchestrator-validators.test.ts. HTTP tests verify the route-scoped parser
+  // accepts realistic orchestrator bodies over the app-wide 10 KB default.
 
   it("returns 400 when job_match is sent without jobs array", async () => {
     const token = makeCandidateToken();

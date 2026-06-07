@@ -23,6 +23,16 @@ vi.mock("../lib/ai/persistence.js", () => ({
 
 import request from "supertest";
 import app from "../app.js";
+import { signToken } from "../lib/jwt.js";
+import { Role } from "@prisma/client";
+
+function makeCandidateToken(): string {
+  return signToken({
+    userId: "csrf-candidate-uid",
+    email: "candidate@test.com",
+    role: Role.CANDIDATE,
+  });
+}
 
 describe("CSRF middleware (§2.3)", () => {
   it("POST without token AND without test-bypass header → 403 CSRF_INVALID", async () => {
@@ -57,6 +67,18 @@ describe("CSRF middleware (§2.3)", () => {
       .get("/api/jobs")
       .set("x-csrf-test-bypass", "enforce");
     expect(res.status).not.toBe(403);
+  });
+
+  it("POST /api/orchestrator/run remains CSRF-gated for cookie-authenticated users", async () => {
+    const token = makeCandidateToken();
+    const res = await request(app)
+      .post("/api/orchestrator/run")
+      .set("Cookie", [`auth_token=${encodeURIComponent(token)}`])
+      .set("x-csrf-test-bypass", "enforce")
+      .send({ run_type: "resume_review", resume_text: "A".repeat(100) });
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("CSRF_INVALID");
   });
 
   it("GET /api/auth/me returns a csrfToken value", async () => {
