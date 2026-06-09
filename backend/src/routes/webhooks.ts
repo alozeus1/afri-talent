@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { Router, Request, Response } from "express";
 import { BillingDiscrepancyType, BillingEventOutcome, BillingProvider, Prisma, SubscriptionPlan, SubscriptionStatus } from "@prisma/client";
 import { getStripe, getPlanFromPriceId, isStripeConfigured } from "../lib/stripe.js";
@@ -148,13 +149,55 @@ async function activateFlutterwaveSubscription(input: {
   });
 }
 
+// Constant-time comparison of the verif-hash header against the configured
+// secret. Both sides are SHA-256 digested first so inputs of different
+// lengths can be compared without leaking length information.
+function isValidFlutterwaveSignature(signature: unknown, secretHash: string): boolean {
+  if (typeof signature !== "string" || signature.length === 0) {
+    return false;
+  }
+  const a = createHash("sha256").update(signature).digest();
+  const b = createHash("sha256").update(secretHash).digest();
+  return timingSafeEqual(a, b);
+}
+
 // POST /api/webhooks/flutterwave
+// SECURITY: fail closed. If FLUTTERWAVE_SECRET_HASH is not configured, every
+// request is rejected (503) — we never process an unauthenticated webhook.
+// See config/env.ts for the matching startup fail-fast in production/staging.
 router.post("/flutterwave", async (req: Request, res: Response) => {
   const startedAt = Date.now();
   const secretHash = getFlutterwaveSecretHash();
-  const signature = req.headers["verif-hash"];
 
-  if (secretHash && signature !== secretHash) {
+  if (!secretHash) {
+    console.error("[webhook] FLUTTERWAVE_SECRET_HASH not set — rejecting Flutterwave webhook");
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "critical",
+      durationMs: Date.now() - startedAt,
+      details: {
+        provider: "flutterwave",
+        reason: "webhook_secret_missing",
+      },
+    });
+    res.status(503).json({ error: "Flutterwave webhook is not configured" });
+    return;
+  }
+
+  if (!isValidFlutterwaveSignature(req.headers["verif-hash"], secretHash)) {
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "warning",
+      durationMs: Date.now() - startedAt,
+      details: {
+        provider: "flutterwave",
+        reason: "invalid_signature",
+      },
+    });
     res.status(401).json({ error: "Invalid Flutterwave signature" });
     return;
   }
