@@ -290,6 +290,45 @@ destroyed. The new live environment is on ECS Fargate + Aurora in account
 
 ---
 
+## Update on June 9, 2026: Main deployment and DATABASE_URL recovery
+
+PR #155 (`develop` -> `main`) was merged at commit `0cdcc16` after CI,
+Security, Terraform, and Deploy PR checks passed. The post-merge `main` deploy
+workflow run `27236806275` completed successfully, including image pushes,
+Lambda packaging, and `terraform apply` for `infra/terraform/accounts/dev-new/`.
+The built-in smoke test skipped because `PROD_DOMAIN` is not configured.
+
+Immediately after the workflow, manual CloudFront checks returned `503/504`
+because the backend ECS task was exiting during `npx prisma migrate deploy` with
+Prisma `P1000` database authentication failures. The ECS task definition still
+referenced SSM `/afritalent/dev/DATABASE_URL`, but that parameter had not been
+updated since May 8 while Aurora/RDS Proxy used the current AWS-managed master
+secret.
+
+Recovery performed:
+
+- Recomputed `/afritalent/dev/DATABASE_URL` from the current Aurora
+  `MasterUserSecret` and the RDS Proxy endpoint without printing the secret.
+- Wrote the corrected SecureString as SSM parameter version 4.
+- Forced a new deployment of ECS service `afritalent-dev-backend`.
+
+Post-recovery validation:
+
+- `https://d2j3ahmgbbdup1.cloudfront.net/api/health` returned `200`.
+- `https://d2j3ahmgbbdup1.cloudfront.net/en` returned `200`.
+- ECS services `afritalent-dev-backend` and `afritalent-dev-frontend` both
+  reached `COMPLETED` rollout state with desired `1`, running `1`, pending `0`.
+
+Follow-up:
+
+- Automate `DATABASE_URL` SSM sync from the RDS managed secret, or migrate the
+  backend to consume the RDS managed secret directly, so any future RDS secret
+  rotation or task restart cannot strand the app on a stale database password.
+- Configure `PROD_DOMAIN` or update the smoke-test target logic so the deploy
+  workflow verifies the CloudFront endpoint after `terraform apply`.
+
+---
+
 ## Update on May 10, 2026: Temporary staging DB public access revoked (HISTORICAL)
 
 The temporary database exposure for GitHub Actions migration work has been
