@@ -190,7 +190,12 @@ export default function CandidateTrustPage() {
       setOtpExpiresAt(result.expiresAt);
       setPageSuccess("Verification code created. Enter it below to complete phone verification.");
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : "Failed to request verification code.");
+      const msg = error instanceof Error ? error.message : String(error);
+      setPageError(
+        msg === "sms_provider_unconfigured" || msg.includes("SMS_DISABLED")
+          ? "Phone verification is not available in this environment. Contact support."
+          : msg || "Failed to request verification code.",
+      );
     } finally {
       setRequestingOtp(false);
     }
@@ -239,8 +244,11 @@ export default function CandidateTrustPage() {
       await loadDashboard();
       setPageSuccess("Verification evidence submitted for review.");
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       setPageError(
-        error instanceof Error ? error.message : "Failed to submit candidate verification evidence.",
+        msg.includes("S3_NOT_CONFIGURED") || msg.includes("not configured on this server")
+          ? "Document upload is not available in this environment. Contact your administrator."
+          : msg || "Failed to submit candidate verification evidence.",
       );
     } finally {
       setSubmittingArtifact(false);
@@ -281,8 +289,11 @@ export default function CandidateTrustPage() {
           : "Skill evidence submitted for trust review.",
       );
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       setPageError(
-        error instanceof Error ? error.message : "Failed to submit skill verification evidence.",
+        msg.includes("S3_NOT_CONFIGURED") || msg.includes("not configured on this server")
+          ? "Document upload is not available in this environment. Contact your administrator."
+          : msg || "Failed to submit skill verification evidence.",
       );
     } finally {
       setSubmittingSkill(false);
@@ -297,12 +308,25 @@ export default function CandidateTrustPage() {
     );
   }
 
-  if (loading || !dashboard) {
+  if (loading) {
     return (
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex justify-center py-24">
           <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
         </div>
+      </div>
+    );
+  }
+
+  if (!dashboard) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <TrustStatusBanner
+          tone="danger"
+          title="We couldn't load your trust profile"
+          body={pageError ?? "Try again in a moment."}
+          actions={<Button size="sm" onClick={loadDashboard}>Retry</Button>}
+        />
       </div>
     );
   }

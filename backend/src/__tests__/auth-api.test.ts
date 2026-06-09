@@ -13,6 +13,7 @@ vi.mock("../lib/prisma.js", () => ({
         user: {
             findUnique: vi.fn(),
             create: vi.fn(),
+            update: vi.fn(),
         },
         employer: {
             create: vi.fn(),
@@ -180,10 +181,12 @@ describe("Auth API", () => {
         it("returns an anonymous session payload without token", async () => {
             const res = await request(app).get("/api/auth/me");
             expect(res.status).toBe(200);
-            expect(res.body).toEqual({
+            expect(res.body).toMatchObject({
                 authenticated: false,
                 user: null,
             });
+            // §2.3 — anonymous /me now also seeds a CSRF token.
+            expect(typeof res.body.csrfToken).toBe("string");
         });
 
         it("returns 404 if user no longer exists", async () => {

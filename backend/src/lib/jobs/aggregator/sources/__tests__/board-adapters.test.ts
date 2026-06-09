@@ -51,6 +51,7 @@ describe("Job board adapter normalization", () => {
 
   it("imports non-technical roles that match the broader keyword set", async () => {
     const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
+    const recentDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -60,7 +61,7 @@ describe("Job board adapter normalization", () => {
             title: "Accountant",
             content:
               "<p>Partner with engineering, product, and developer teams on month-end close.</p>",
-            updated_at: "2026-04-08T00:00:00.000Z",
+            updated_at: recentDate,
             absolute_url: "https://boards.greenhouse.io/acme/jobs/202",
             location: { name: "Remote - USA" },
             metadata: [{ name: "Employment Type", value: "Full-time" }],

@@ -26,6 +26,7 @@ function buildDiagnostics(sourceDiagnostics: SourceFetchDiagnostics[], hadErrors
     sourcesSucceeded: sourceDiagnostics.length - sourcesFailed,
     sourcesFailed,
     jobsFetched: sourceDiagnostics.reduce((sum, entry) => sum + entry.jobsFetched, 0),
+    duplicatesRemoved: 0,
     hadErrors,
     sourceDiagnostics,
   };

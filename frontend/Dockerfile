@@ -25,11 +25,17 @@ ARG NEXT_PUBLIC_BACKEND_URL
 ARG NEXT_PUBLIC_SENTRY_DSN
 ARG SENTRY_ORG
 ARG SENTRY_PROJECT
+# Wave 9 §10.2 — release tagging. GIT_SHA / NEXT_PUBLIC_GIT_SHA flow into
+# the Sentry init configs so frontend release-health groups events by SHA.
+ARG GIT_SHA
+ARG NEXT_PUBLIC_GIT_SHA
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
 ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 ENV SENTRY_ORG=$SENTRY_ORG
 ENV SENTRY_PROJECT=$SENTRY_PROJECT
+ENV GIT_SHA=$GIT_SHA
+ENV NEXT_PUBLIC_GIT_SHA=$NEXT_PUBLIC_GIT_SHA
 
 # Disable telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -45,6 +51,15 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# §2.5 build provenance — injected by deploy.yml. Available to the Node
+# runtime (server.js) and to any /api route that wants to surface it.
+ARG GIT_SHA="unknown"
+ARG APP_RELEASE="local"
+ARG BUILD_TIMESTAMP=""
+ENV GIT_SHA=$GIT_SHA \
+    APP_RELEASE=$APP_RELEASE \
+    BUILD_TIMESTAMP=$BUILD_TIMESTAMP
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs

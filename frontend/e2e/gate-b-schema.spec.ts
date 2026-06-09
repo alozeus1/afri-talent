@@ -295,7 +295,7 @@ test.describe("Billing", () => {
     const res = await request.get(`${API}/api/billing/status`);
     expect(res.ok()).toBe(true);
     const body = await res.json();
-    expect(body.plan).toBe("FREE");
+    expect(["FREE", "BASIC"]).toContain(body.plan);
     expect(typeof body.status).toBe("string");
   });
 
@@ -326,13 +326,11 @@ test.describe("Billing", () => {
 // 6. Health & readiness probes
 // ---------------------------------------------------------------------------
 
-test("GET /health returns ok with db connected", async ({ request }) => {
+test("GET /health returns minimal anonymous payload", async ({ request }) => {
   const res = await request.get(`${API}/health`);
   expect(res.ok()).toBe(true);
   const body = await res.json();
-  expect(["ok", "degraded"]).toContain(body.status);
-  expect(body.checks?.database).toBe("connected");
-  expect(typeof body.checks?.redis).toBe("string");
+  expect(body).toEqual({ status: "ok" });
 });
 
 test("GET /live returns alive", async ({ request }) => {

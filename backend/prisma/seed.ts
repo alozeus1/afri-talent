@@ -92,6 +92,21 @@ async function main() {
     },
   });
 
+  // Wave 5 PR #4 — TEST_CANDIDATE_PRO Playwright fixture for the resume
+  // builder + ATS rubric happy paths that require requirePlan(PROFESSIONAL).
+  // Kept distinct from candidate@example.com (FREE) so the PremiumGate path
+  // and the PROFESSIONAL paths each have a hermetic, deterministic fixture.
+  const candidateProUser = await prisma.user.create({
+    data: {
+      email: "candidate-pro@example.com",
+      password: passwordHash,
+      role: Role.CANDIDATE,
+      name: "Candidate Pro",
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
   // ── Employer profile ───────────────────────────────────
 
   const employer = await prisma.employer.create({
@@ -142,6 +157,16 @@ async function main() {
     data: {
       userId: employerUser.id,
       plan: SubscriptionPlan.EMPLOYER_FREE,
+      status: SubscriptionStatus.ACTIVE,
+    },
+  });
+
+  // Wave 5 PR #4 — PROFESSIONAL plan for TEST_CANDIDATE_PRO. See user
+  // creation above for context on why this fixture is distinct.
+  await prisma.subscription.create({
+    data: {
+      userId: candidateProUser.id,
+      plan: SubscriptionPlan.PROFESSIONAL,
       status: SubscriptionStatus.ACTIVE,
     },
   });

@@ -40,17 +40,28 @@ export default defineConfig({
   projects: [
     {
       name: "api",
-      testMatch: /(gate-.*|phase1-foundation-smoke|phase2-.*api.*|phase2-.*security.*|skills-ai-features)\.spec\.ts$/,
+      testMatch: /(gate-.*|phase1-foundation-smoke|phase2-.*api.*|phase2-.*security.*|skills-ai-features|agentic-.*)\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"], baseURL: API_URL },
+    },
+    // Setup project: logs in test users once per CI run and persists
+    // their authenticated browser state to `frontend/e2e/.auth/*.json`.
+    // Spec files consume the state via `test.use({ storageState: ... })`
+    // to skip per-test login (avoids /api/auth/login rate-limit).
+    {
+      name: "setup",
+      testMatch: /global\.setup\.ts$/,
+      use: { ...devices["Desktop Chrome"], baseURL: APP_URL },
     },
     {
       name: "desktop-web",
       testMatch: /ui-.*\.spec\.ts$/,
+      dependencies: ["setup"],
       use: { ...devices["Desktop Chrome"], baseURL: APP_URL },
     },
     {
       name: "mobile-web",
       testMatch: /ui-.*\.spec\.ts$/,
+      dependencies: ["setup"],
       use: { ...devices["iPhone 13"], baseURL: APP_URL },
     },
   ],

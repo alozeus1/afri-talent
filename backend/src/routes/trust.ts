@@ -31,8 +31,63 @@ import {
 } from "../lib/trust/service.js";
 import { assessContentRisk, riskLevelForScore } from "../lib/trust/risk.js";
 import { createUserNotification } from "../lib/notifications.js";
+import { isSmsConfigured, sendSms } from "../lib/sms/africasTalking.js";
 
 const router = Router();
+
+function hostnameFromUrl(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    return new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function wordsFromCompanyName(name: string) {
+  return name
+    .toLowerCase()
+    .replace(/\b(ltd|limited|inc|llc|plc|gmbh|technologies|technology|company|co)\b/g, " ")
+    .split(/[^a-z0-9]+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length >= 3);
+}
+
+function buildEmployerVerificationAgentReview(
+  employer: { companyName: string; website: string | null; user?: { email: string } | null },
+  artifact: { type: VerificationArtifactType; externalUrl: string | null; fileKey: string | null; fileName: string | null },
+) {
+  const websiteDomain = hostnameFromUrl(employer.website);
+  const evidenceDomain = hostnameFromUrl(artifact.externalUrl);
+  const emailDomain = employer.user?.email.split("@")[1]?.toLowerCase() ?? null;
+  const companyWords = wordsFromCompanyName(employer.companyName);
+  const domainText = [websiteDomain, evidenceDomain, emailDomain].filter(Boolean).join(" ");
+  const matchedCompanyWords = companyWords.filter((word) => domainText.includes(word));
+  const findings = [
+    websiteDomain ? `Company website domain detected: ${websiteDomain}.` : "No company website domain is on file.",
+    emailDomain ? `Employer account email domain detected: ${emailDomain}.` : "No employer email domain was available for comparison.",
+    evidenceDomain ? `Submitted evidence URL domain detected: ${evidenceDomain}.` : "Submitted evidence is a file upload, so public URL checks require admin review.",
+    matchedCompanyWords.length > 0
+      ? `Company-name signal matched in domain evidence: ${matchedCompanyWords.join(", ")}.`
+      : "No strong company-name token was found in the submitted domain evidence.",
+  ];
+  const flags = [
+    !websiteDomain ? "missing_company_website" : null,
+    websiteDomain && emailDomain && websiteDomain !== emailDomain ? "website_email_domain_mismatch" : null,
+    artifact.type === VerificationArtifactType.DOMAIN_OWNERSHIP && !evidenceDomain && !artifact.fileKey
+      ? "missing_domain_evidence"
+      : null,
+    matchedCompanyWords.length === 0 ? "company_name_not_reflected_in_domain" : null,
+  ].filter(Boolean);
+
+  return {
+    status: flags.length === 0 ? "LOW_RISK_REVIEW" : "ADMIN_REVIEW_REQUIRED",
+    recommendation: flags.length === 0 ? "Approve if the uploaded document is legible." : "Admin should verify evidence before approval.",
+    findings,
+    flags,
+    checkedAt: new Date().toISOString(),
+  };
+}
 
 const phoneNumberSchema = z
   .string()
@@ -145,6 +200,11 @@ function generateOtp(): string {
   return crypto.randomInt(100000, 1000000).toString();
 }
 
+function maskPhone(phoneNumber: string): string {
+  if (phoneNumber.length <= 5) return "***";
+  return `${phoneNumber.slice(0, 3)}***${phoneNumber.slice(-2)}`;
+}
+
 function mapArtifact(artifact: {
   id: string;
   type: VerificationArtifactType;
@@ -234,20 +294,39 @@ function mapPartnerMarker(marker: {
   };
 }
 
-async function deliverPhoneOtp(phoneNumber: string, code: string): Promise<{ previewCode?: string }> {
-  // TODO: Check if Twilio/AWS SNS environment variables exist
-  const hasSmsProvider = !!process.env.TWILIO_ACCOUNT_SID || !!process.env.AWS_SNS_TOPIC_ARN;
+async function deliverPhoneOtp(phoneNumber: string, code: string, userId: string): Promise<{ previewCode?: string }> {
+  const smsConfigured = isSmsConfigured();
 
-  if (process.env.NODE_ENV === "production" && !hasSmsProvider) {
+  if ((process.env.NODE_ENV === "production" || process.env.NODE_ENV === "staging") && !smsConfigured) {
     logger.warn(
-      { phoneNumber },
-      "Phone verification requested without an SMS provider configured. Integrate Twilio or a local SMS gateway before production rollout.",
+      { phoneNumber: maskPhone(phoneNumber), userId: userId.slice(0, 8) },
+      "Phone verification requested without SMS provider configured.",
     );
     throw new Error("SMS_DISABLED");
   }
 
-  logger.info({ phoneNumber, code }, "Phone verification OTP generated");
-  return { previewCode: code };
+  const result = await sendSms({
+    to: phoneNumber,
+    userId,
+    template: "candidate_phone_verification",
+    message: `Your AfriTalent verification code is ${code}. It expires in 10 minutes.`,
+    metadata: { purpose: "candidate_phone_verification" },
+  });
+
+  logger.info(
+    {
+      phoneNumber: maskPhone(phoneNumber),
+      userId: userId.slice(0, 8),
+      status: result.status,
+      configured: smsConfigured,
+    },
+    "Phone verification OTP delivery handled",
+  );
+
+  const allowPreview =
+    !smsConfigured &&
+    (process.env.NODE_ENV !== "production" || process.env.TEST_SMS_OTP_PREVIEW === "1");
+  return allowPreview ? { previewCode: code } : {};
 }
 
 function validationFailure(res: Response, error: z.ZodError) {
@@ -381,7 +460,7 @@ router.post(
       const data = employerArtifactSchema.parse(req.body);
       const employer = await prisma.employer.findUnique({
         where: { userId: req.user!.userId },
-        include: { trustProfile: true },
+        include: { trustProfile: true, user: { select: { email: true } } },
       });
 
       if (!employer) {
@@ -422,6 +501,29 @@ router.post(
         reasonCode: "artifact_submitted",
         notes: "Employer submitted verification evidence for review.",
       });
+
+      const agentReview = buildEmployerVerificationAgentReview(employer, artifact);
+      await Promise.all([
+        prisma.verificationArtifact.update({
+          where: { id: artifact.id },
+          data: {
+            metadata: {
+              ...((artifact.metadata && typeof artifact.metadata === "object" && !Array.isArray(artifact.metadata)
+                ? artifact.metadata
+                : {}) as Record<string, unknown>),
+              automatedReview: agentReview,
+            } as Prisma.InputJsonValue,
+          },
+        }),
+        addTrustCaseAction({
+          caseId: trustCase.id,
+          actorId: null,
+          actionType: "NOTE",
+          reasonCode: "automated_verification_review",
+          notes: `Automated verification workflow completed: ${agentReview.recommendation}`,
+          metadata: agentReview as Prisma.InputJsonValue,
+        }),
+      ]);
 
       const trustProfile = await refreshEmployerTrustProfile(employer.id);
       res.status(201).json({
@@ -557,6 +659,26 @@ router.post(
       const trustProfile = await ensureCandidateTrustProfile(req.user!.userId);
       const code = generateOtp();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      const cooldownSeconds = 60;
+      const existingChallenge = await prisma.phoneVerificationChallenge.findFirst({
+        where: {
+          candidateTrustProfileId: trustProfile.id,
+          phoneNumber: data.phoneNumber,
+          status: "PENDING",
+          createdAt: { gt: new Date(Date.now() - cooldownSeconds * 1000) },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (existingChallenge) {
+        res.status(429).json({
+          error: "otp_resend_cooldown",
+          message: `Please wait ${cooldownSeconds} seconds before requesting another code.`,
+          retryAfterSeconds: cooldownSeconds,
+          maskedPhone: maskPhone(data.phoneNumber),
+        });
+        return;
+      }
 
       await prisma.phoneVerificationChallenge.updateMany({
         where: {
@@ -578,15 +700,20 @@ router.post(
       });
 
       try {
-        const delivery = await deliverPhoneOtp(data.phoneNumber, code);
+        const delivery = await deliverPhoneOtp(data.phoneNumber, code, req.user!.userId);
         res.status(201).json({
-          message: "Verification code created.",
+          message: "Verification code sent. It expires in 10 minutes.",
           expiresAt,
+          maskedPhone: maskPhone(data.phoneNumber),
           ...(delivery.previewCode ? { previewCode: delivery.previewCode } : {}),
         });
       } catch (err: any) {
         if (err.message === "SMS_DISABLED") {
-          res.status(503).json({ error: "Phone verification is currently disabled in this environment because no SMS provider is configured." });
+          res.status(503).json({
+            error: "sms_provider_unconfigured",
+            message: "Phone verification is being configured for this environment. Try again later or use other trust signals for now.",
+            maskedPhone: maskPhone(data.phoneNumber),
+          });
           return;
         }
         throw err;
@@ -1269,6 +1396,11 @@ router.get("/messaging-guidance", authenticate, async (_req: Request, res: Respo
       "Never pay application, processing, equipment, or training fees.",
       "Be cautious if someone asks to move immediately to WhatsApp, Telegram, or private email.",
       "Report impersonation, fake jobs, salary bait, or pressure tactics right away.",
+      "Confirm that the company domain, recruiter email, and application link match before sharing documents.",
+      "Do not share passport scans, bank details, tax IDs, or national identity numbers until the employer is verified and the request is necessary.",
+      "Watch for urgency language like same-day payment demands, guaranteed visa claims, or interviews that skip normal screening.",
+      "Keep all offer letters, interview details, and compensation promises inside AfriTalent messages whenever possible.",
+      "Use the report button if a recruiter changes the role, salary, or location after you apply.",
       "Premium employers can only see verified-candidate filters when backed by real trust checks.",
     ],
     rulePreview: {

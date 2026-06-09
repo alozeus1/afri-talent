@@ -67,7 +67,7 @@ export const EMPLOYER_PLANS = [
     description: "Try hiring on AfriTalent",
     popular: false,
     features: [
-      { label: "Job postings", included: "limited", limit: "1/month" },
+      { label: "Unlimited job postings", included: "yes" },
       { label: "Applicant management", included: "yes" },
       { label: "Company profile", included: "yes" },
       { label: "Candidate search", included: "no" },
@@ -84,7 +84,7 @@ export const EMPLOYER_PLANS = [
     description: "Scale your hiring",
     popular: false,
     features: [
-      { label: "Job postings", included: "limited", limit: "5/month" },
+      { label: "Unlimited job postings", included: "yes" },
       { label: "Applicant management", included: "yes" },
       { label: "Company profile", included: "yes" },
       { label: "Candidate search", included: "yes" },
@@ -133,7 +133,7 @@ export const CANDIDATE_COMPARISON_ROWS = [
 ];
 
 export const EMPLOYER_COMPARISON_ROWS = [
-  { feature: "Job postings per month", values: { "Employer Free": "1", "Employer Basic": "5", "Employer Premium": "Unlimited" } },
+  { feature: "Job postings per month", values: { "Employer Free": "Unlimited", "Employer Basic": "Unlimited", "Employer Premium": "Unlimited" } },
   { feature: "Applicant management", values: { "Employer Free": true, "Employer Basic": true, "Employer Premium": true } },
   { feature: "Company profile", values: { "Employer Free": true, "Employer Basic": true, "Employer Premium": true } },
   { feature: "Verified badge", values: { "Employer Free": false, "Employer Basic": false, "Employer Premium": true } },

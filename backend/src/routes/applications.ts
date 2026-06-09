@@ -2,7 +2,25 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize, requireVerifiedEmail } from "../middleware/auth.js";
-import { ApplicationStatus, JobStatus, Role, TrustEntityType, TrustRiskLevel } from "@prisma/client";
+import {
+  ApplicationStatus,
+  JobStatus,
+  Role,
+  SubmissionProofKind,
+  SubmissionStatus,
+  SubscriptionPlan,
+  SubscriptionStatus,
+  TrustEntityType,
+  TrustRiskLevel,
+} from "@prisma/client";
+import {
+  REQUIRED_ACKNOWLEDGEMENTS,
+  gateSubmit,
+  validateAcknowledgements,
+} from "../lib/apply/state-machine.js";
+import { dispatchApply } from "../lib/apply/dispatch.js";
+import { checkApplyCaps } from "../lib/apply/caps.js";
+import { emitApplyAgentSubmission, emitApplyAgentConfirmed } from "../lib/observability/metrics.js";
 import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import { requireAccountStanding } from "../middleware/account-standing.js";
 import { assessApplicationRisk } from "../lib/trust/risk.js";
@@ -338,6 +356,32 @@ router.get("/job/:jobId", authenticate, authorize(Role.EMPLOYER), async (req: Re
       orderBy: { createdAt: "desc" },
     });
 
+    const subscription = await prisma.subscription.findUnique({
+      where: { userId: req.user!.userId },
+      select: { plan: true, status: true },
+    }).catch(() => null);
+    const canViewFullCandidates =
+      subscription?.status === SubscriptionStatus.ACTIVE &&
+      (subscription.plan === SubscriptionPlan.EMPLOYER_BASIC || subscription.plan === SubscriptionPlan.EMPLOYER_PREMIUM);
+
+    if (!canViewFullCandidates) {
+      res.json(
+        applications.map((application, index) => ({
+          ...application,
+          cvUrl: null,
+          coverLetter: null,
+          candidate: {
+            id: application.candidate.id,
+            name: `Candidate ${index + 1}`,
+            email: "Upgrade to unlock candidate contact details",
+          },
+          locked: true,
+          upgradeRequired: true,
+        })),
+      );
+      return;
+    }
+
     res.json(applications);
   } catch (error) {
     console.error("Job applications error:", error);
@@ -468,5 +512,457 @@ router.get("/:id", authenticate, async (req: Request, res: Response) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §5.7 — apply pathway consent gate (Draft → Preview → Submit).
+//
+// Three new endpoints replace the single confirm:true flag with an explicit
+// state machine. Each track (PR Q/R/S/T) plugs into the dispatcher in
+// lib/apply/dispatch.ts — this PR ships the gate + the ASSISTED_REDIRECT
+// branch, the rest stub-fail to FAILED with a forward-pointer.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const draftSchema = z.object({
+  jobId: z.string().uuid(),
+  cvUrl: z.string().url().refine(validateCvUrl).optional(),
+  coverLetter: z.string().optional(),
+});
+
+const submitSchema = z.object({
+  acknowledgements: z.array(z.string()).min(REQUIRED_ACKNOWLEDGEMENTS.length),
+});
+
+// POST /api/applications/draft — create the Application in DRAFTING and
+// surface the rendered content for the candidate's preview screen.
+router.post(
+  "/draft",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  requireAccountStanding(),
+  requireVerifiedEmail({ roles: [Role.CANDIDATE] }),
+  async (req: Request, res: Response) => {
+    try {
+      const data = draftSchema.parse(req.body);
+
+      const job = await prisma.job.findUnique({ where: { id: data.jobId } });
+      if (!job || job.status !== JobStatus.PUBLISHED || job.isExpired) {
+        res.status(404).json({ error: "Job not found or not available" });
+        return;
+      }
+
+      const existing = await prisma.application.findFirst({
+        where: { jobId: data.jobId, candidateId: req.user!.userId },
+      });
+      if (existing) {
+        // Re-open the existing draft so the candidate can preview/submit it
+        // instead of creating a sibling row that would violate the
+        // (jobId, candidateId) unique constraint.
+        if (existing.submissionStatus === SubmissionStatus.SUBMITTED) {
+          res.status(409).json({
+            error: "Already submitted",
+            code: "ALREADY_SUBMITTED",
+            applicationId: existing.id,
+          });
+          return;
+        }
+        res.status(200).json({
+          applicationId: existing.id,
+          submissionStatus: existing.submissionStatus,
+          preview: {
+            jobId: existing.jobId,
+            cvUrl: data.cvUrl ?? existing.cvUrl,
+            coverLetter: data.coverLetter ?? existing.coverLetter,
+            applyStrategy: job.applyStrategy,
+            applyFormDomain: job.applyFormDomain,
+            applyEmailDetected: job.applyEmailDetected,
+            requiredAcknowledgements: REQUIRED_ACKNOWLEDGEMENTS,
+          },
+          reused: true,
+        });
+        return;
+      }
+
+      // §5.9 — per-candidate apply caps. Only enforced on NEW drafts;
+      // re-opening an existing draft is the same candidate's own row and
+      // shouldn't be capped (the caller hit `existing` above).
+      const capDecision = await checkApplyCaps(prisma, req.user!.userId, data.jobId);
+      if (!capDecision.ok) {
+        res.status(429).json({
+          error:
+            capDecision.code === "PER_JOB_CAP"
+              ? "You have already applied to this role recently."
+              : "You have reached the per-employer apply cap for the last 30 days.",
+          code:
+            capDecision.code === "PER_JOB_CAP" ? "APPLY_CAP_PER_JOB" : "APPLY_CAP_PER_EMPLOYER",
+          nextAllowedAt: capDecision.nextAllowedAt,
+        });
+        return;
+      }
+
+      const application = await prisma.application.create({
+        data: {
+          jobId: data.jobId,
+          candidateId: req.user!.userId,
+          cvUrl: data.cvUrl,
+          coverLetter: data.coverLetter,
+          status: ApplicationStatus.PENDING,
+          submissionStatus: SubmissionStatus.DRAFTING,
+        },
+      });
+
+      recordOpsEvent({
+        metricName: "apply_pathway_draft",
+        category: "applications",
+        outcome: "success",
+        severity: "info",
+        details: { applicationId: application.id, applyStrategy: job.applyStrategy ?? "unset" },
+      });
+
+      res.status(201).json({
+        applicationId: application.id,
+        submissionStatus: application.submissionStatus,
+        preview: {
+          jobId: job.id,
+          cvUrl: application.cvUrl,
+          coverLetter: application.coverLetter,
+          applyStrategy: job.applyStrategy,
+          applyFormDomain: job.applyFormDomain,
+          applyEmailDetected: job.applyEmailDetected,
+          requiredAcknowledgements: REQUIRED_ACKNOWLEDGEMENTS,
+        },
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid draft payload", details: error.issues });
+        return;
+      }
+      console.error("Draft error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// GET /api/applications/:id/preview — read-only view of the draft so the
+// candidate's preview screen can refresh without a POST.
+router.get(
+  "/:id/preview",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  async (req: Request, res: Response) => {
+    try {
+      const application = await prisma.application.findUnique({
+        where: { id: req.params.id },
+        include: { job: { select: { id: true, applyStrategy: true, applyFormDomain: true, applyEmailDetected: true, title: true, sourceName: true } } },
+      });
+      if (!application || application.candidateId !== req.user!.userId) {
+        res.status(404).json({ error: "Application not found" });
+        return;
+      }
+      res.json({
+        applicationId: application.id,
+        submissionStatus: application.submissionStatus,
+        submittedAt: application.submittedAt,
+        submissionAttempts: application.submissionAttempts,
+        lastSubmissionError: application.lastSubmissionError,
+        preview: {
+          jobId: application.job.id,
+          jobTitle: application.job.title,
+          company: application.job.sourceName,
+          cvUrl: application.cvUrl,
+          coverLetter: application.coverLetter,
+          applyStrategy: application.job.applyStrategy,
+          applyFormDomain: application.job.applyFormDomain,
+          applyEmailDetected: application.job.applyEmailDetected,
+          requiredAcknowledgements: REQUIRED_ACKNOWLEDGEMENTS,
+        },
+      });
+    } catch (error) {
+      console.error("Preview error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// POST /api/applications/:id/submit — commit: validate ack, move state,
+// dispatch to the per-track handler, settle.
+router.post(
+  "/:id/submit",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  async (req: Request, res: Response) => {
+    const startedAt = Date.now();
+    try {
+      const parsed = submitSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid submit payload", details: parsed.error.issues });
+        return;
+      }
+      const ack = validateAcknowledgements(parsed.data.acknowledgements);
+      if (!ack.ok) {
+        res.status(400).json({
+          error: "Acknowledgements required",
+          code: "ACKNOWLEDGEMENTS_REQUIRED",
+          missing: ack.missing,
+          required: REQUIRED_ACKNOWLEDGEMENTS,
+        });
+        return;
+      }
+
+      const application = await prisma.application.findUnique({
+        where: { id: req.params.id },
+        include: {
+          job: {
+            select: {
+              id: true,
+              applyStrategy: true,
+              applyEmailDetected: true,
+              applyFormDomain: true,
+              sourceUrl: true,
+              applicationUrl: true,
+            },
+          },
+        },
+      });
+      if (!application) {
+        res.status(404).json({ error: "Application not found" });
+        return;
+      }
+      if (application.candidateId !== req.user!.userId) {
+        res.status(403).json({ error: "Not authorised for this application" });
+        return;
+      }
+
+      const gate = gateSubmit(application.submissionStatus);
+      if (!gate.ok) {
+        res.status(409).json({
+          error: "Cannot submit in current state",
+          code: gate.reason,
+          submissionStatus: application.submissionStatus,
+        });
+        return;
+      }
+
+      // Move to SUBMITTING + bump attempts. The dispatcher runs INSIDE this
+      // state so concurrent submits short-circuit on the gateSubmit check.
+      const submitting = await prisma.application.update({
+        where: { id: application.id },
+        data: {
+          submissionStatus: SubmissionStatus.SUBMITTING,
+          submissionAttempts: { increment: 1 },
+          lastSubmissionError: null,
+        },
+      });
+
+      // applyStrategy may still be null for pre-PR-O rows that haven't been
+      // backfilled; the dispatcher's ?? "ASSISTED_REDIRECT" below keeps the
+      // candidate moving.
+      // Wave 9 §10.1 SLO #4 — emit submission count BEFORE dispatch so even
+      // dispatcher exceptions/early returns are captured in the denominator.
+      void emitApplyAgentSubmission();
+      const result = await dispatchApply({
+        applicationId: submitting.id,
+        applyStrategy: application.job.applyStrategy ?? "ASSISTED_REDIRECT",
+        applyEmailDetected: application.job.applyEmailDetected,
+        applyFormDomain: application.job.applyFormDomain,
+        sourceUrl: application.job.sourceUrl,
+        applicationUrl: application.job.applicationUrl,
+      });
+
+      if (result.ok) {
+        const nextStatus = result.nextStatus ?? SubmissionStatus.SUBMITTED;
+        // Wave 9 §10.1 SLO #4 — count only the terminal SUBMITTED state as
+        // "confirmed". AWAITING_USER_CONFIRMATION is counted when the
+        // candidate later confirms via the clickout-confirm handler below.
+        if (nextStatus === SubmissionStatus.SUBMITTED) {
+          void emitApplyAgentConfirmed();
+        }
+        const settled = await prisma.application.update({
+          where: { id: submitting.id },
+          data: {
+            submissionStatus: nextStatus,
+            // submittedAt is only stamped on the terminal SUBMITTED state;
+            // tracks that park in AWAITING_USER_CONFIRMATION (Track D §5.6)
+            // get it on clickout-confirm.
+            submittedAt: nextStatus === SubmissionStatus.SUBMITTED ? new Date() : null,
+            submissionProofKind: result.proofKind,
+            submissionProofRef: result.proofRef,
+            submissionProvider: result.provider ?? null,
+            submissionProviderApplicationId: result.providerApplicationId ?? null,
+            lastSubmissionError: null,
+          },
+        });
+        // §5.6 — Track D records each click-out so the 24h-nudge worker has
+        // something to read.
+        if (result.createApplyAttempt) {
+          await prisma.applyAttempt.create({
+            data: {
+              applicationId: settled.id,
+              sourceUrl: application.job.sourceUrl,
+              applicationUrl: application.job.applicationUrl,
+            },
+          });
+        }
+        recordOpsEvent({
+          metricName: "apply_pathway_submit",
+          category: "applications",
+          outcome: "success",
+          severity: "info",
+          durationMs: Date.now() - startedAt,
+          details: {
+            applicationId: settled.id,
+            applyStrategy: application.job.applyStrategy,
+            proofKind: result.proofKind,
+            nextStatus,
+          },
+        });
+        res.status(200).json({
+          applicationId: settled.id,
+          submissionStatus: settled.submissionStatus,
+          submittedAt: settled.submittedAt,
+          submissionProofKind: settled.submissionProofKind,
+          awaitingClickoutConfirmation: nextStatus === SubmissionStatus.AWAITING_USER_CONFIRMATION,
+        });
+        return;
+      }
+
+      const failed = await prisma.application.update({
+        where: { id: submitting.id },
+        data: {
+          submissionStatus: SubmissionStatus.FAILED,
+          lastSubmissionError: result.error,
+        },
+      });
+      recordOpsEvent({
+        metricName: "apply_pathway_submit",
+        category: "applications",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: { applicationId: failed.id, error: result.error, applyStrategy: application.job.applyStrategy ?? "unset" },
+      });
+      res.status(202).json({
+        applicationId: failed.id,
+        submissionStatus: failed.submissionStatus,
+        lastSubmissionError: failed.lastSubmissionError,
+      });
+    } catch (error) {
+      console.error("Submit error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §5.6 — Track D click-out telemetry (assisted redirect).
+//
+// After a successful /submit against an ASSISTED_REDIRECT job, the Application
+// is parked in AWAITING_USER_CONFIRMATION. The candidate's frontend opens the
+// apply URL in a new tab; when they return, two buttons appear:
+//   "Yes, I applied" → POST /api/applications/:id/clickout-confirm → SUBMITTED
+//   "No, I didn't"   → POST /api/applications/:id/clickout-deny    → FAILED
+// The apply-clickout-nudge worker handles the 24h reminder + 7-day timeout.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function settleClickoutResponse(
+  req: Request,
+  res: Response,
+  outcome: "CONFIRMED_COMPLETED" | "DENIED_COMPLETED",
+) {
+  try {
+    const application = await prisma.application.findUnique({
+      where: { id: req.params.id },
+      include: { applyAttempts: { where: { candidateResponse: "PENDING" }, orderBy: { createdAt: "desc" }, take: 1 } },
+    });
+    if (!application) {
+      res.status(404).json({ error: "Application not found" });
+      return;
+    }
+    if (application.candidateId !== req.user!.userId) {
+      res.status(403).json({ error: "Not authorised for this application" });
+      return;
+    }
+    if (application.submissionStatus !== SubmissionStatus.AWAITING_USER_CONFIRMATION) {
+      res.status(409).json({
+        error: "Application is not awaiting clickout confirmation",
+        code: "NOT_AWAITING_CONFIRMATION",
+        submissionStatus: application.submissionStatus,
+      });
+      return;
+    }
+    const attempt = application.applyAttempts[0];
+    if (!attempt) {
+      res.status(409).json({ error: "No pending click-out to confirm", code: "NO_PENDING_ATTEMPT" });
+      return;
+    }
+
+    const now = new Date();
+    const isConfirm = outcome === "CONFIRMED_COMPLETED";
+
+    await prisma.$transaction([
+      prisma.applyAttempt.update({
+        where: { id: attempt.id },
+        data: { candidateResponse: outcome, respondedAt: now },
+      }),
+      prisma.application.update({
+        where: { id: application.id },
+        data: isConfirm
+          ? {
+              submissionStatus: SubmissionStatus.SUBMITTED,
+              submittedAt: now,
+              // Upgrade the proof reference with the confirmation timestamp
+              // so a later audit can see when the candidate signed off.
+              submissionProofRef: `${application.submissionProofRef ?? ""}|confirmed:${now.toISOString()}`,
+              lastSubmissionError: null,
+            }
+          : {
+              submissionStatus: SubmissionStatus.FAILED,
+              lastSubmissionError: "Candidate denied completion of the external application",
+            },
+      }),
+    ]);
+
+    // Wave 9 §10.1 SLO #4 — async confirmation track. The original
+    // submission was counted when /submit dispatched; the confirmation
+    // counter only ticks on a candidate-confirmed clickout.
+    if (isConfirm) {
+      void emitApplyAgentConfirmed();
+    }
+
+    recordOpsEvent({
+      metricName: "apply_pathway_clickout_response",
+      category: "applications",
+      outcome: isConfirm ? "success" : "failure",
+      severity: "info",
+      details: { applicationId: application.id, response: outcome },
+    });
+
+    res.status(200).json({
+      applicationId: application.id,
+      submissionStatus: isConfirm ? SubmissionStatus.SUBMITTED : SubmissionStatus.FAILED,
+      respondedAt: now,
+    });
+  } catch (error) {
+    console.error("Clickout response error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+router.post(
+  "/:id/clickout-confirm",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  async (req: Request, res: Response) => {
+    await settleClickoutResponse(req, res, "CONFIRMED_COMPLETED");
+  },
+);
+
+router.post(
+  "/:id/clickout-deny",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  async (req: Request, res: Response) => {
+    await settleClickoutResponse(req, res, "DENIED_COMPLETED");
+  },
+);
 
 export default router;

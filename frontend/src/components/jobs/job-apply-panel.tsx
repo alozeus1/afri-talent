@@ -31,6 +31,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [emailVerifyNeeded, setEmailVerifyNeeded] = useState(false);
   const [quickApplyOpen, setQuickApplyOpen] = useState(false);
   const isOnPlatformApply = job.discovery?.deliveryModel === "ON_PLATFORM" || job.jobSource === "EMPLOYER_POSTED";
   const externalApplyUrl = job.applicationUrl || job.sourceUrl || null;
@@ -60,8 +61,28 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
         return;
       }
 
+      setApplying(true);
+      try {
+        await applications.apply({ jobId: job.id });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("EMAIL_VERIFICATION_REQUIRED") || message.toLowerCase().includes("verify your email")) {
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("verifyReturnTo", window.location.href);
+          }
+          setEmailVerifyNeeded(true);
+          setApplying(false);
+          return;
+        }
+        if (!message.toLowerCase().includes("already applied")) {
+          setApplyError(message || "Failed to record this application");
+          setApplying(false);
+          return;
+        }
+      }
       window.open(externalApplyUrl, "_blank", "noopener,noreferrer");
       setApplied(true);
+      setApplying(false);
       return;
     }
 
@@ -72,7 +93,15 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
       await applications.apply({ jobId: job.id });
       setApplied(true);
     } catch (error) {
-      setApplyError(error instanceof Error ? error.message : "Failed to apply");
+      const message = error instanceof Error ? error.message : "Failed to apply";
+      if (message.includes("EMAIL_VERIFICATION_REQUIRED") || message.toLowerCase().includes("verify your email")) {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("verifyReturnTo", window.location.href);
+        }
+        setEmailVerifyNeeded(true);
+      } else {
+        setApplyError(message);
+      }
     } finally {
       setApplying(false);
     }
@@ -123,6 +152,15 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
             </div>
           ) : (
             <>
+              {emailVerifyNeeded && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  <p className="font-semibold mb-1">Verify your email to apply</p>
+                  <p className="mb-3">We sent a verification link to your email address. Open it, then come back here to apply.</p>
+                  <Link href="/candidate" className="text-emerald-700 underline font-medium">
+                    Go to dashboard to resend
+                  </Link>
+                </div>
+              )}
               {applyError && (
                 <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
                   {applyError}

@@ -1,15 +1,21 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import pinoHttpModule from "pino-http";
 const pinoHttp = pinoHttpModule as unknown as typeof import("pino-http").default;
+import { Role } from "@prisma/client";
 import prisma from "./lib/prisma.js";
 import logger from "./lib/logger.js";
-import { initSentry, setupExpressErrorHandler } from "./lib/sentry.js";
-import { redisHealthStatus } from "./lib/redis.js";
+import { initSentry, setupExpressErrorHandler, captureMessage } from "./lib/sentry.js";
+import { redisHealthStatus, isRedisRequired } from "./lib/redis.js";
 import { buildDegradedState } from "./lib/platform/health.js";
 import { isAnyBillingProviderConfigured } from "./lib/billing/index.js";
+import { optionalAuth } from "./middleware/auth.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
+import { csrfProtection, csrfErrorHandler } from "./middleware/csrf.js";
+import { adminTotpGate } from "./middleware/admin-totp-gate.js";
+import { validateAllowedOriginRegex } from "./lib/cors-validation.js";
 import {
   securityHeaders,
   generalLimiter,
@@ -75,8 +81,10 @@ import adminAuditRoutes from "./routes/admin-audit.js";
 import adminAlertsRoutes from "./routes/admin-alerts.js";
 import adminBulkRoutes from "./routes/admin-bulk.js";
 import adminBlogRoutes from "./routes/admin-blog.js";
+import adminTotpRoutes from "./routes/admin-totp.js";
 // AI Skills routes (premium, additive)
 import skillsResumeBuilderRoutes from "./routes/skills/resume-builder.js";
+import skillsResumeTemplateRoutes from "./routes/skills/resume-templates.js";
 import skillsJobMatcherRoutes from "./routes/skills/job-matcher.js";
 import skillsApplicationWriterRoutes from "./routes/skills/application-writer.js";
 import skillsCareerAdvisorRoutes from "./routes/skills/career-advisor.js";
@@ -91,15 +99,24 @@ const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 const isTest = process.env.NODE_ENV === "test";
 const docsEnabled = process.env.ENABLE_API_DOCS === "true" || !isProduction;
+// §2.5 build provenance — values injected via Docker --build-arg in deploy.yml.
+// APP_RELEASE/GIT_SHA/BUILD_TIMESTAMP are the canonical names; legacy fallbacks
+// (RELEASE_VERSION, GITHUB_SHA, etc.) are preserved for older deploy paths.
 const serviceMetadata = {
   service: "afritalent-backend",
   environment: process.env.APP_ENV || process.env.NODE_ENV || "development",
-  release: process.env.RELEASE_VERSION || process.env.IMAGE_TAG || "local",
+  release:
+    process.env.APP_RELEASE
+    || process.env.RELEASE_VERSION
+    || process.env.IMAGE_TAG
+    || "local",
   commitSha:
-    process.env.GITHUB_SHA
+    process.env.GIT_SHA
+    || process.env.GITHUB_SHA
     || process.env.VERCEL_GIT_COMMIT_SHA
     || process.env.RENDER_GIT_COMMIT
     || "unknown",
+  buildTimestamp: process.env.BUILD_TIMESTAMP || null,
 };
 
 // Request ID middleware (must be first)
@@ -118,7 +135,12 @@ if (isProduction) {
   app.set("trust proxy", 1);
 }
 
-// Security: CORS configuration
+// §2.7 — CORS lockdown.
+//
+// `ALLOWED_ORIGIN_REGEX` is validated at module load (lib/cors-validation):
+// the process refuses to start if the regex matches the empty string or is
+// one of the canonical "match-everything" shortcuts. A permissive deploy is
+// treated as misconfiguration, not a runtime warning.
 const allowedOrigins = [
   process.env.FRONTEND_URL || "http://localhost:3000",
   "http://localhost:3000",
@@ -129,12 +151,14 @@ const allowedOrigins = [
   "http://127.0.0.1:3100",
 ];
 const allowedOriginRegex = process.env.ALLOWED_ORIGIN_REGEX
-  ? new RegExp(process.env.ALLOWED_ORIGIN_REGEX)
+  ? validateAllowedOriginRegex(process.env.ALLOWED_ORIGIN_REGEX)
   : null;
 
 const isAllowedOrigin = (origin?: string | null) => {
   if (!origin) {
-    // Non-browser callers such as App Runner health checks won't send Origin.
+    // Non-browser callers such as health probes and server-to-server clients
+    // do not send Origin. CORS is a browser boundary, so only explicit browser
+    // origins are allowlisted below.
     return true;
   }
   if (allowedOrigins.includes(origin)) {
@@ -159,7 +183,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token", "x-csrf-test-bypass"],
   maxAge: 86400,
 }));
 
@@ -171,6 +195,50 @@ app.use(generalLimiter);
 app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoutes);
 app.use("/api/ats/webhooks", express.raw({ type: "application/json" }), atsWebhookRoutes);
 
+// §2.8 — CSP report endpoint. Browsers POST violation reports here when a
+// page running our Helmet CSP triggers a directive. Reports forward to
+// Sentry as warnings so we see drift before users hit broken UI. Body is
+// JSON but the canonical Content-Type is `application/csp-report`; both
+// shapes are accepted. The route is exempt from CSRF (browsers send these
+// without any token) and uses its own small body limit so a flood cannot
+// overwhelm log infrastructure.
+app.post(
+  "/api/csp-report",
+  express.json({ type: ["application/csp-report", "application/json"], limit: "20kb" }),
+  (req, res) => {
+    const body = req.body as { "csp-report"?: Record<string, unknown> } & Record<string, unknown>;
+    const report = body?.["csp-report"] || body || {};
+    const violated = (report as Record<string, unknown>)["violated-directive"] || "unknown";
+    captureMessage(`CSP violation: ${String(violated)}`, "warning");
+    logger.warn({ cspReport: report }, "[csp-report] violation received");
+    res.status(204).end();
+  },
+);
+
+// Wave 5 PR #2 — ATS rubric scoring accepts resume content payloads bounded
+// by the Zod 256 KB per-field cap (originalContent + optimizedContent) plus
+// envelope overhead. Mount a path-scoped body parser BEFORE the global
+// 10 KB parser so the larger limit applies on this route only. Layered cap:
+//   Express body-parser (1 MB, here)
+//   → Zod resumeContentSchema 256 KB per-field cap (PR #1)
+//   → Route-level envelope check 768 KB (PR #2)
+//   → Per-user AI quotas + skillsLimiter rate limit (existing)
+// Mirrors the existing Stripe webhook (line 195) + CSP report (line 205)
+// pattern: path-scoped parser registered before the global one.
+app.use(
+  "/api/skills/resume-builder/ats-rubric",
+  express.json({ limit: "1mb" })
+);
+
+// Orchestrator requests need a larger body limit (resume + raw job texts can be ~200 KB combined).
+// Register only the path-scoped JSON parser before the global 10 KB parser so
+// large orchestrator bodies are accepted, then mount the protected route after
+// request sanitization + CSRF below.
+app.use(
+  "/api/orchestrator",
+  express.json({ limit: "250kb" })
+);
+
 // Body parsing with size limits (all other routes)
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
@@ -178,10 +246,40 @@ app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 // Security: Request sanitization
 app.use(sanitizeRequest);
 
-// Health check endpoint (for load balancers, k8s probes)
-const healthHandler = async (_req: express.Request, res: express.Response) => {
+// Cookie parser — required by the CSRF middleware below (reads req.cookies).
+app.use(cookieParser());
+
+// §2.3 — CSRF protection (double-submit cookie). Must run AFTER cookie/body
+// parsing (already done above) but BEFORE the route handlers so it can gate
+// mutations. Webhooks, health probes, OAuth start/callback, and auth entry
+// points are exempt — see middleware/csrf.ts `skipCsrfProtection`.
+app.use(csrfProtection);
+
+app.use("/api/orchestrator", orchestratorLimiter, orchestratorRoutes);
+
+// Health check endpoint (for load balancers, k8s probes).
+//
+// §2.6 info-leak fix: anonymous callers get the minimal `{status: "ok"}`
+// payload only. Admin callers get the rich payload (release, commitSha,
+// db/redis/billing checks) by passing `?verbose=1`.
+function wantsVerbose(req: express.Request): boolean {
+  return req.query.verbose === "1" || req.query.verbose === "true";
+}
+
+const healthHandler = async (req: express.Request, res: express.Response) => {
+  const verbose = wantsVerbose(req);
+
+  if (verbose && (!req.user || req.user.role !== Role.ADMIN)) {
+    res.status(403).json({ error: "Admin role required for verbose health" });
+    return;
+  }
+
   // Skip DB check in test environment — no DB required to run tests
   if (isTest) {
+    if (!verbose) {
+      res.json({ status: "ok" });
+      return;
+    }
     res.json({
       status: "ok",
       ...serviceMetadata,
@@ -199,6 +297,10 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
 
   try {
     await prisma.$queryRaw`SELECT 1`;
+    if (!verbose) {
+      res.json({ status: "ok" });
+      return;
+    }
     const redis = await redisHealthStatus();
     const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
     const degraded = buildDegradedState({ redis, billing });
@@ -215,6 +317,10 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
       timestamp: new Date().toISOString(),
     });
   } catch {
+    if (!verbose) {
+      res.status(500).json({ status: "error" });
+      return;
+    }
     const redis = await redisHealthStatus();
     const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
     res.status(500).json({
@@ -232,8 +338,8 @@ const healthHandler = async (_req: express.Request, res: express.Response) => {
   }
 };
 
-app.get("/health", healthHandler);
-app.get("/api/health", healthHandler);
+app.get("/health", optionalAuth, healthHandler);
+app.get("/api/health", optionalAuth, healthHandler);
 
 // Readiness check (for k8s readiness probes)
 const readyHandler = async (_req: express.Request, res: express.Response) => {
@@ -256,6 +362,24 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
     await prisma.$queryRaw`SELECT 1`;
     const redis = await redisHealthStatus();
     const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
+
+    // §2.4 — when REDIS_REQUIRED=true, a non-connected Redis means not-ready.
+    if (isRedisRequired() && redis !== "connected") {
+      res.status(503).json({
+        status: "not_ready",
+        ...serviceMetadata,
+        checks: {
+          database: "ok",
+          redis,
+          billing,
+        },
+        degraded: true,
+        reason: "redis_required_but_unavailable",
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
     res.json({
       status: "ready",
       ...serviceMetadata,
@@ -308,6 +432,9 @@ app.use("/api/auth/phone", phoneVerificationRoutes);
 app.use("/api/jobs", jobsRoutes);
 app.use("/api/applications", applicationsRoutes);
 app.use("/api/resources", resourcesRoutes);
+// §2.10 — admin TOTP gate. Skips /api/admin/totp/* (admins enrol there).
+// Test-mode bypass via `x-admin-totp-test-bypass: enforce` header.
+app.use("/api/admin", adminTotpGate);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/audit-logs", adminAuditRoutes);
 app.use("/api/admin/alerts", adminAlertsRoutes);
@@ -353,11 +480,13 @@ app.use("/api/university-partners", universityPartnersRoutes);
 app.use("/api/employer/ai", employerAiRoutes);
 app.use("/api/trust", trustRoutes);
 app.use("/api/admin/trust", adminTrustRoutes);
+app.use("/api/admin/totp", adminTotpRoutes);
 app.use("/api/admin/rag", adminRagRoutes);
 app.use("/api/admin/blog", adminBlogRoutes);
 app.use("/api/bots", botsRoutes);
 // AI Skills (premium gated — require PROFESSIONAL plan + per-user rate limit)
 app.use("/api/skills/resume-builder", skillsLimiter, skillsResumeBuilderRoutes);
+app.use("/api/skills/resume-templates", skillsLimiter, skillsResumeTemplateRoutes);
 app.use("/api/skills/job-matcher", skillsLimiter, skillsJobMatcherRoutes);
 app.use("/api/skills/application-writer", skillsLimiter, skillsApplicationWriterRoutes);
 app.use("/api/skills/career-advisor", skillsLimiter, skillsCareerAdvisorRoutes);
@@ -401,13 +530,9 @@ app.get("/api/docs", async (_req, res) => {
   res.type("html").send(html);
 });
 
-// Orchestrator route needs a larger body limit (resume + raw job texts can be ~200 KB combined)
-app.use(
-  "/api/orchestrator",
-  express.json({ limit: "250kb" }),
-  orchestratorLimiter,
-  orchestratorRoutes
-);
+// CSRF error handler — converts invalidCsrfTokenError into a 403 JSON
+// response. Must run before the Sentry/global error handlers.
+app.use(csrfErrorHandler);
 
 // Sentry error handler (must be before any other error middleware and after all controllers)
 setupExpressErrorHandler(app);

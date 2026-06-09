@@ -24,6 +24,10 @@ import {
   pushAtsCandidateStageUpdate,
   verifyAtsWebhookSignature,
 } from "./providers.js";
+import { classifyJobField as classifyTaxonomyField } from "../ai/skills/job-field-classifier.js";
+import { classifyApplyStrategy } from "../jobs/apply-strategy.js";
+import { resolveEffectiveApplyStrategy } from "../apply/caps.js";
+import { normalizeLocation } from "../jobs/normalize.js";
 
 type ATSConnectionRecord = Prisma.ATSConnectionGetPayload<{
   include: {
@@ -621,16 +625,52 @@ async function importJobsFromConnection(params: {
       rawData: job.rawData ?? null,
     };
 
+    // §4.1 — controlled-taxonomy classification at ingest, same path as the
+    // aggregator and employer flows.
+    const classification = await classifyTaxonomyField({
+      title: job.title,
+      description: job.description ?? undefined,
+      seniority: job.seniority ?? undefined,
+      tags: job.tags ?? [],
+    });
+
+    // §4.5 — canonical location form. Company normalisation is handled at the
+    // employer record, not per imported job.
+    const normalizedLocation = normalizeLocation(job.location || "Remote");
+
+    // §5.2 — ATS-imported jobs route to the matching ATS_API_* track when
+    // the per-vendor partner flag is on, else fall back to OPERATOR_HANDOFF /
+    // ASSISTED_REDIRECT. params.provider is the ATSProvider enum
+    // (GREENHOUSE/LEVER/ASHBY/WORKABLE/…) — same shape the classifier reads.
+    const applyDecision = classifyApplyStrategy({
+      jobSource: params.provider,
+      description: job.description ?? undefined,
+      sourceUrl: job.sourceUrl ?? undefined,
+    });
+    // §5.9 — downgrade EMAIL_DRAFT to ASSISTED_REDIRECT for opted-out domains.
+    const atsApplyEffective = await resolveEffectiveApplyStrategy(prisma, {
+      applyStrategy: applyDecision.strategy,
+      applyEmailDetected: applyDecision.applyEmailDetected,
+    });
+
     const data = {
       title: job.title,
       description: job.description || "Imported from ATS",
-      location: job.location || "Remote",
+      location: normalizedLocation.display || job.location || "Remote",
       type: job.type || "FULL_TIME",
       seniority: job.seniority || "Mid-level",
       salaryMin: job.salaryMin,
       salaryMax: job.salaryMax,
       currency: job.currency,
       tags: job.tags,
+      taxonomyField: classification.field,
+      taxonomyVersion: classification.version,
+      taxonomyConfidence: classification.confidence,
+      applyStrategy: atsApplyEffective.effective,
+      applyEmailDetected: atsApplyEffective.downgradedFromEmailDraft
+        ? null
+        : applyDecision.applyEmailDetected ?? null,
+      applyFormDomain: applyDecision.applyFormDomain ?? null,
       status: JobStatus.PUBLISHED,
       publishedAt: job.postedAt || new Date(),
       visaSponsorship: job.visaSponsorship,

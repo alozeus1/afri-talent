@@ -37,6 +37,15 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+# §2.5 build provenance — injected by deploy.yml. Surfaced in /api/health
+# (verbose admin view) and as the Sentry release tag.
+ARG GIT_SHA="unknown"
+ARG APP_RELEASE="local"
+ARG BUILD_TIMESTAMP=""
+ENV GIT_SHA=$GIT_SHA \
+    APP_RELEASE=$APP_RELEASE \
+    BUILD_TIMESTAMP=$BUILD_TIMESTAMP
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 --ingroup nodejs expressjs

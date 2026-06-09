@@ -1,8 +1,419 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: April 30, 2026 (Lighthouse quality pass)
+Last updated: June 7, 2026 (cost anomaly remediation expanded)
+
+> [!IMPORTANT]
+> **Architecture changed on 2026-05-10.** The shared environment has moved off
+> App Runner (in old AWS account `260820061731`) and onto ECS Fargate + Aurora
+> Serverless v2 + Lambda + CloudFront/WAF in the new AWS account `108188564905`.
+> Anything below that references `*.awsapprunner.com`, `afritalent-staging-*`
+> AWS resources, or the old account ID is historical and no longer live.
+
+## Update on June 7, 2026: Cost anomaly investigation
+
+Initial read-only local investigation used AWS credentials for old/shared
+account `260820061731`. Follow-up investigation confirmed local AWS profile
+`afritalent` resolves to live account `108188564905` and should be used for
+future live-account AWS checks from this machine.
+
+Live account `108188564905` Cost Anomaly Detection confirmed the relevant
+anomaly:
+
+- Largest anomaly: Amazon VPC, May 8-May 28, total actual/impact `$183.12`,
+  rooted in `USE1-VpcEndpoint-Hours`.
+- Before remediation, June 1-June 7 showed `$56.88` for `5,688` VPC
+  endpoint-hours, roughly `$9/day`.
+- Root cause is the Terraform VPC module creating 12 interface VPC endpoints
+  across 3 private subnets/AZs (`ecr.api`, `ecr.dkr`, `logs`, `ssm`,
+  `ssmmessages`, `ec2messages`, `secretsmanager`, `sts`, `kms`, `sqs`,
+  `states`, `events`). At about `$0.01` per endpoint-AZ-hour, this creates an
+  expected baseline of about `$8.64/day` before data processing.
+- Other live-account anomalies: RDS May 8-May 11 `$15.56` (RDS Proxy ASv2 plus
+  Aurora Serverless v2 I/O-Optimized ACU before the June 7 Standard-storage
+  switch), ECS May 8-May 15 `$12.80`, ELB May 8-May 16 `$4.52`, KMS
+  May 8-May 19 `$1.98`, CloudWatch May 13-May 16 `$1.90`.
+- Account-level June spend as of June 7 is `$112.421` with Cost Explorer
+  forecast `$489.282`.
+
+Budget guardrail issue found during investigation: the Terraform budget
+`afritalent-dev-monthly-cost` reported `$0` because its CostFilters value was
+literally `user:Project${var.project_tag_value}`. The Terraform filter was fixed
+and applied on June 7, 2026; live AWS now shows `user:Project$afritalent`.
+Cost Explorer tag filtering for `Project=afritalent` previously returned `$0`,
+so still verify that the `Project` cost-allocation tag is active in AWS Billing.
+
+Operational side finding: ECS service `afritalent-dev-backend` has desired
+count `1` but running count `0`; service events show task startup failures from
+May 16. This is not the primary cost anomaly, but it affects live environment
+health.
+
+Remediation applied on June 7, 2026:
+
+- Terraform now supports configurable interface endpoints in
+  `infra/terraform/modules/vpc`.
+- `infra/terraform/accounts/dev-new/main.tf` sets `interface_endpoints = []`,
+  keeping free S3/DynamoDB gateway endpoints and routing private subnet AWS API
+  egress through the already-running `t4g.nano` NAT instance.
+- `infra/terraform/modules/budgets/main.tf` fixes the malformed budget filter
+  so it renders `user:Project$afritalent`.
+- Validation passed: `terraform fmt`, `terraform validate`, and a targeted plan.
+- Full plan includes unrelated NAT/ECS/Lambda drift and should not be applied
+  for the cost fix.
+- Targeted apply result: `0 added, 1 changed, 12 destroyed`.
+- Post-apply verification found only the free S3 and DynamoDB Gateway endpoints
+  for `afritalent-dev-vpce-*`; no paid Interface endpoints remain.
+- NAT fallback remains available: `afritalent-dev-nat-instance` is running as
+  `t4g.nano`.
+- Follow-up cost controls also applied on June 7:
+  - Aurora `afritalent-dev-aurora` switched in place from I/O-Optimized
+    (`aurora-iopt1`) to Standard (`aurora`). Live RDS now reports the cluster
+    `available`; `StorageType` is `null` in `describe-db-clusters`, which is
+    the API shape observed for Standard.
+  - ECS service capacity-provider strategies changed to `FARGATE` base `0` and
+    `FARGATE_SPOT` weight `4`, preserving current task definitions.
+  - `afritalent-dev-frontend` stabilized with task definition revision `16`
+    running on `FARGATE_SPOT`.
+  - `afritalent-dev-backend` kept task definition revision `18` but remains on
+    its pre-existing unhealthy deployment path (`desired=1`, `running=0`,
+    `pending=1` after the strategy update).
+- CloudFront primary URL still responds and redirects `/` to `/en`.
+- Estimated monthly effect: VPC endpoint baseline drops by about `$260/month`.
+  Aurora Standard and Fargate Spot should reduce the remaining run rate further,
+  but the exact billing effect will show in Cost Explorer after the next 24-48
+  hours.
+
+Applied command, after explicit human approval:
+
+```bash
+cd infra/terraform/accounts/dev-new
+AWS_PROFILE=afritalent terraform apply \
+  -auto-approve \
+  -input=false \
+  -target='module.vpc.aws_vpc_endpoint.interface' \
+  -target='module.budgets.aws_budgets_budget.monthly'
+```
+
+Follow-up commands, after explicit human approval:
+
+```bash
+cd infra/terraform/accounts/dev-new
+AWS_PROFILE=afritalent terraform apply \
+  -auto-approve \
+  -input=false \
+  -target='module.aurora.aws_rds_cluster.aurora'
+
+AWS_PROFILE=afritalent aws ecs update-service \
+  --region us-east-1 \
+  --cluster afritalent-dev \
+  --service afritalent-dev-frontend \
+  --capacity-provider-strategy \
+    capacityProvider=FARGATE,weight=1,base=0 \
+    capacityProvider=FARGATE_SPOT,weight=4 \
+  --force-new-deployment
+
+AWS_PROFILE=afritalent aws ecs update-service \
+  --region us-east-1 \
+  --cluster afritalent-dev \
+  --service afritalent-dev-backend \
+  --capacity-provider-strategy \
+    capacityProvider=FARGATE,weight=1,base=0 \
+    capacityProvider=FARGATE_SPOT,weight=4 \
+  --force-new-deployment
+```
+
+For old account `260820061731`, AWS Cost Anomaly Detection returned no anomaly
+events for May 1 through June 7, 2026. Cost Explorer did show a May spend
+cluster that matches the May 10 cross-account migration and teardown window:
+
+- AfriTalent-tagged May costs were led by ElastiCache (~$29.93), EC2-Other/NAT
+  Gateway (~$11.04), RDS (~$9.52), App Runner (~$3.51), CloudWatch Synthetics
+  and monitors (~$3.32), and KMS (~$0.64).
+- Daily old-stack spend dropped after May 10. No active AfriTalent App Runner
+  services, ElastiCache caches, RDS instances, NAT gateways, or Synthetics
+  canaries were found in old account `us-east-1` during this check.
+- Remaining old-account AfriTalent items are the manual RDS snapshot
+  `afritalent-staging-pre-migration-20260510-1902`, a pending-deletion staging
+  Secrets Manager secret, a historical Synthetics Lambda log group with no
+  retention policy, and old Terraform state/lock resources.
+
+Full investigation note:
+`docs/ops/2026-06-07-cost-anomaly-investigation.md`.
+
+Cleanup candidates requiring explicit human approval:
+
+- Delete the old manual RDS snapshot after the retained safety window is no
+  longer needed.
+- Delete or set retention on the historical Synthetics Lambda log group.
+- Decide whether to archive/remove old-account Terraform state and lock
+  resources.
+- For live-account cost work, use `AWS_PROFILE=afritalent`; avoid falling back
+  to old/shared account `260820061731`.
+
+## Update on May 17, 2026: Wave 9 agent metrics promotion complete
+
+Promoted Wave 9 agent metrics/SLO work through the restored `develop` buffer
+and into `main`. The initial promotion exposed IAM guardrail sequencing gaps in
+the main deploy workflow, so two follow-up hotfixes were merged before the
+apply completed:
+
+- PR #131: allowed the GitHub deploy role to attach/detach the exact
+  `afritalent-dev-ecs-task-agent-metrics` managed policy on the exact
+  `afritalent-dev-ecs-task` role.
+- PR #133: moved the agent metrics policy attachment to the account layer and
+  made it depend on `module.iam_oidc_github` so the guardrail policy update
+  applies before Terraform attempts `iam:AttachRolePolicy`.
+
+Promotion/deploy sequence:
+
+- PR #130 promoted PR #129 to `main`, but deploy run `25980614859` failed at
+  `Terraform Apply (dev-new)` on `iam:AttachRolePolicy`.
+- PR #132 promoted PR #131 to `main`, but deploy run `25980923639` hit the same
+  guardrail denial because the attachment raced the guardrail update.
+- PR #134 promoted PR #133 to `main`; deploy run `25981178399` completed
+  successfully.
+
+Final successful deploy:
+
+- **Workflow run**: `25981178399`
+- **Commit**: `a98d09055b7cc906c69d34737c87ac29c5d3c57b`
+- **Terraform Apply (dev-new)**: success, completed `2026-05-17T04:29:56Z`
+- **Smoke Test**: success, completed `2026-05-17T04:30:07Z`
+
+Operational note: GitHub auto-deleted `develop` after each `develop -> main`
+promotion PR because it was the PR head branch. After the final promotion,
+`develop` was restored from `main` and both branches pointed at
+`a98d09055b7cc906c69d34737c87ac29c5d3c57b`. GitHub reported
+`develop` as unprotected after restoration; reattach branch protection in repo
+settings if this buffer should be protected.
+
+## Update on May 16, 2026: Wave 6/8 AWS activation complete
+
+Merged `develop` into `main` to activate the previously merged Wave 6 and Wave
+8 Terraform/Lambda work. The main deploy workflow required four follow-up
+hotfix PRs before the apply completed:
+
+- PR #125: pinned the live Aurora engine version to `15.15` and allowed the
+  GitHub deploy role to create the exact AWS Backup service role.
+- PR #126: extended the deploy-role guardrail for the blog automation IAM role.
+- PR #127: ordered Lambda creation after IAM guardrail updates by using
+  deterministic Lambda ARNs.
+- PR #128: removed reserved `AWS_REGION` from the blog automation Lambda
+  environment.
+
+Final successful deploy:
+
+- **Workflow run**: `25954427791`
+- **Terraform apply job**: `76298678534`
+- **Apply completed**: `2026-05-16T06:07:18Z`
+- **Apply summary**: `Apply complete! Resources: 7 added, 1 changed, 4 destroyed.`
+
+Live resources now active in account `108188564905`:
+
+- **Aurora**: cluster `afritalent-dev-aurora`; Terraform changed
+  `deletion_protection` from `false` to `true` and backup retention from 7 to
+  30 days during the activation sequence.
+- **AWS Backup primary vault**: `afritalent-dev-backup-vault` in `us-east-1`.
+- **AWS Backup DR vault**: `afritalent-dev-backup-vault-dr` in `us-west-2`.
+- **Blog automation Lambda**:
+  `arn:aws:lambda:us-east-1:108188564905:function:afritalent-dev-blog-automation`.
+- **Blog automation schedule**:
+  `arn:aws:events:us-east-1:108188564905:rule/afritalent-dev-blog-automation-weekly`.
+
+Verification note: local AWS CLI credentials in the handoff session resolved to
+the old account `260820061731`, and assuming
+`arn:aws:iam::108188564905:role/afritalent-dev-github-deploy` failed with
+`AccessDenied`. The resource evidence above comes from GitHub Actions Terraform
+apply logs and outputs, not a direct local AWS console/CLI read.
+
+Open post-activation items:
+
+- Set Stripe test credentials as GitHub repository **Secrets** once real test
+  values are available: `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. They
+  were not set during activation because secret values were not provided.
+- Verify live `RegionalPrice` rows for `AFRICA`, `EUROPE`, and `ROW` once a
+  valid database access path for account `108188564905` is available.
+
+## Update on May 10, 2026: Cross-account migration complete
+
+The old staging stack on App Runner in account `260820061731` has been
+destroyed. The new live environment is on ECS Fargate + Aurora in account
+`108188564905`.
+
+### New environment (LIVE)
+
+- **AWS account**: `108188564905`
+- **Region**: `us-east-1`
+- **Primary URL** (CloudFront): `https://d2j3ahmgbbdup1.cloudfront.net`
+- **ALB DNS** (direct, for debugging): `afritalent-dev-alb-25816556.us-east-1.elb.amazonaws.com`
+- **Aurora cluster endpoint**: `afritalent-dev-aurora.cluster-c3mldqa7xfbn.us-east-1.rds.amazonaws.com`
+- **RDS Proxy endpoint** (use this in DATABASE_URL): `afritalent-dev-rds-proxy.proxy-c3mldqa7xfbn.us-east-1.rds.amazonaws.com`
+- **ECS cluster**: `afritalent-dev`
+- **ECS services**: `afritalent-dev-backend`, `afritalent-dev-frontend`
+- **ECR**: `108188564905.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-{backend,frontend}`
+- **GitHub OIDC role**: `arn:aws:iam::108188564905:role/afritalent-dev-github-deploy` (has AdministratorAccess for now — scope down before prod)
+- **Terraform state**: `s3://afritalent-108188564905-tfstate/dev-new/terraform.tfstate` + lock table `afritalent-108188564905-tflocks`
+- **CloudWatch dashboard**: see `terraform output dashboard_url`
+- **Lambda Function URLs** (webhooks): see `terraform output webhook_stripe_url`, `webhook_flutterwave_url`
+- **Step Functions state machine** (orchestrator): see `terraform output state_machine_orchestrator_arn`
+
+### CI/CD
+
+- **Deploy workflow**: `.github/workflows/deploy.yml` (`Deploy (new account, ECS Fargate + Lambda)`). Triggers on push to `main`. Builds + pushes images, packages Lambda zips, runs `terraform apply` against `infra/terraform/accounts/dev-new/`.
+- **Terraform validate/checkov**: `.github/workflows/terraform.yml`. Runs on PRs.
+- **Required GitHub repo variables**: `AWS_ACCOUNT_ID=108188564905`, `AWS_REGION=us-east-1`, `OIDC_ROLE_NAME=afritalent-dev-github-deploy`, `FRONTEND_API_URL=https://d2j3ahmgbbdup1.cloudfront.net`.
+- **Removed (2026-05-10)**: `.github/workflows/deploy-apprunner.yml` (old account), `migrate-data.yml`, `restore-and-migrate.yml` (one-shot migration helpers). Stale repo variables removed: `AWS_ROLE_ARN`, `ECR_REGISTRY`, `TF_STATE_BUCKET`.
+
+### What was migrated
+
+- 7 candidate accounts, 3 employer accounts, 2,427 jobs, 44 notifications, 1 saved search.
+- Method: cross-account RDS snapshot share (CMK-encrypted), restored as a temp RDS in the new VPC, `pg_dump | psql` into Aurora via a one-off Fargate task. The PG 17.6 → 15.5 mismatch was bridged by filtering `SET transaction_timeout` out of the dump prologue.
+- Verified post-migration: `https://d2j3ahmgbbdup1.cloudfront.net/api/public/stats` matches old env exactly (7/3/2427). Password and Google OAuth login both work.
+
+### Safety net retained
+
+- **RDS snapshot in old account**: `afritalent-staging-pre-migration-20260510-1902` (50 GB). Recommend keeping until 2026-06-10 then deleting:
+  ```
+  aws rds delete-db-snapshot --db-snapshot-identifier afritalent-staging-pre-migration-20260510-1902 --region us-east-1
+  ```
+
+### Old account state (post-destroy)
+
+- Old account `260820061731` no longer hosts AfriTalent. The shared account still contains unrelated student/demo workloads — do not run wholesale cleanup against it.
+- KMS keys for staging-uploads, staging-blog-ssm, and the migration-share CMK are all in `PendingDeletion` (auto-completes 2026-05-17 to 2026-05-24).
+- Secrets Manager `afritalent-staging/app-secrets` is in its default 7-day retention window.
+
+### Application changes shipped during the migration
+
+- `feat(billing): unlimited job postings on every employer tier` — `EMPLOYER_FREE` and `EMPLOYER_BASIC` `jobPostsPerMonth` set to `null` (unlimited). Pricing UI cards now show "Unlimited job postings" across all 3 employer tiers. Paid tiers differentiate via talent search, analytics, ATS, API, branded career page, priority support.
+- `fix(test): unflake board-adapter accountant test` — replaced a hardcoded mock date with a relative date to stop the time-bomb regression.
+- `fix(ci): pass NEXT_PUBLIC_API_URL into frontend Docker build` — frontend was falling back to `localhost:4000`; now baked in at build time.
+
+---
+
+## Update on June 9, 2026: Main deployment and DATABASE_URL recovery
+
+PR #155 (`develop` -> `main`) was merged at commit `0cdcc16` after CI,
+Security, Terraform, and Deploy PR checks passed. The post-merge `main` deploy
+workflow run `27236806275` completed successfully, including image pushes,
+Lambda packaging, and `terraform apply` for `infra/terraform/accounts/dev-new/`.
+The built-in smoke test skipped because `PROD_DOMAIN` is not configured.
+
+Immediately after the workflow, manual CloudFront checks returned `503/504`
+because the backend ECS task was exiting during `npx prisma migrate deploy` with
+Prisma `P1000` database authentication failures. The ECS task definition still
+referenced SSM `/afritalent/dev/DATABASE_URL`, but that parameter had not been
+updated since May 8 while Aurora/RDS Proxy used the current AWS-managed master
+secret.
+
+Recovery performed:
+
+- Recomputed `/afritalent/dev/DATABASE_URL` from the current Aurora
+  `MasterUserSecret` and the RDS Proxy endpoint without printing the secret.
+- Wrote the corrected SecureString as SSM parameter version 4.
+- Forced a new deployment of ECS service `afritalent-dev-backend`.
+
+Post-recovery validation:
+
+- `https://d2j3ahmgbbdup1.cloudfront.net/api/health` returned `200`.
+- `https://d2j3ahmgbbdup1.cloudfront.net/en` returned `200`.
+- ECS services `afritalent-dev-backend` and `afritalent-dev-frontend` both
+  reached `COMPLETED` rollout state with desired `1`, running `1`, pending `0`.
+
+Follow-up:
+
+- Automate `DATABASE_URL` SSM sync from the RDS managed secret, or migrate the
+  backend to consume the RDS managed secret directly, so any future RDS secret
+  rotation or task restart cannot strand the app on a stale database password.
+- Configure `PROD_DOMAIN` or update the smoke-test target logic so the deploy
+  workflow verifies the CloudFront endpoint after `terraform apply`.
+
+---
+
+## Update on May 10, 2026: Temporary staging DB public access revoked (HISTORICAL)
+
+The temporary database exposure for GitHub Actions migration work has been
+closed.
+
+- DB instance: `afritalent-staging-postgres`
+- RDS state after revert: `available`, `PubliclyAccessible=false`
+- RDS security group: `sg-0dff34cf73e8ad1b2`
+- Public inbound `tcp/5432` from `0.0.0.0/0` is no longer present
+- Remaining inbound PostgreSQL source is the internal security group
+  `sg-0dc650cf0e705b5f3`
+- GitHub repository secret `OLD_DATABASE_URL` was deleted from
+  `alozeus1/afri-talent`
+
+## Update on May 10, 2026: Temporary public staging DB access for GitHub Actions
+
+Temporary access was opened so GitHub Actions can connect to the old staging
+RDS PostgreSQL instance during migration work.
+
+- AWS account verified before change: `260820061731`
+- DB instance: `afritalent-staging-postgres`
+- DB endpoint:
+  `afritalent-staging-postgres.cm3aieqwylul.us-east-1.rds.amazonaws.com`
+- RDS state after change: `available`, `PubliclyAccessible=true`
+- RDS security group: `sg-0dff34cf73e8ad1b2`
+- Temporary inbound rule: `sgr-0d8f684cb2458a0ea`
+  - `tcp/5432` from `0.0.0.0/0`
+  - description: `Temporary GitHub Actions staging DB access - revoke after migration`
+- GitHub repository secret set: `OLD_DATABASE_URL` in `alozeus1/afri-talent`
+  at `2026-05-10T18:32:28Z`
+
+Revoke the temporary public database ingress rule when the migration is done:
+
+```bash
+aws ec2 revoke-security-group-ingress \
+  --group-id sg-0dff34cf73e8ad1b2 \
+  --security-group-rule-ids sgr-0d8f684cb2458a0ea \
+  --region us-east-1
+```
+
+## Update on May 1, 2026: Deploy workflow repaired after Mara product knowledge build failure
+
+GitHub Actions run `25219626472` failed in `Deploy Shared Environment (App Runner)`
+while building the backend Docker image from commit `919b4b2`. The backend
+TypeScript build could not resolve `src/lib/ai/product-knowledge.ts`, which was
+referenced by `chat-context.ts` but had not been included in the pushed commit.
+
+- Fix pushed: `cd2b79c` (`fix(api): include Mara product knowledge module`)
+- Local validation before push:
+  - `cd backend && npm run build`
+  - `cd backend && npm test -- src/lib/ai/product-knowledge.test.ts`
+- Replacement deploy run `25222079661` completed successfully on `develop`.
+- The replacement run passed image builds, Terraform, App Runner backend/frontend
+  deployment waits, and post-deploy backend/frontend health checks.
+- Follow-up fix: `ff00434` (`fix(api): satisfy job matcher lint`) removed an
+  unnecessary regex escape in `backend/src/workers/job-matcher.ts` after CI run
+  `25222844111` exposed the lint error on the runbook-only push.
+- Final validation on `ff00434`:
+  - CI run `25225690693` completed successfully, including backend/frontend
+    lint, typecheck, builds, backend tests, frontend unit tests, Playwright E2E,
+    and Lighthouse mobile performance.
+  - Deploy run `25225690659` completed successfully, including backend/frontend
+    image builds, App Runner deployment waits, and post-deploy backend/frontend
+    health checks.
+- Remaining workflow annotations are Node.js 20 deprecation warnings for GitHub
+  Actions dependencies; they did not block deployment.
 
 ## Update on April 30, 2026: Lighthouse quality pass on public landing page
+
+Follow-up performance patch:
+
+- Commit `6a906be` (`perf(frontend): trim landing page critical load`) was
+  pushed to `develop` after the live audit showed Performance `75`,
+  Accessibility `100`, Best Practices `100`, SEO `100`.
+- Changes:
+  - removed the unused Geist font preload from the root layout
+  - switched landing page art from JPEG/Next optimizer paths to right-sized
+    static WebP files
+  - removed the unused first-viewport decorative hero image asset from the page
+    path, so Lighthouse no longer treats it as the LCP element
+- Local desktop Lighthouse on `/en` after this patch reached
+  Performance `100`, Accessibility `100`, Best Practices `100`, SEO `100`.
+- After the App Runner deploy completes, rerun live Lighthouse on
+  `https://3mwn2b4e5t.us-east-1.awsapprunner.com/en` and archive the fresh
+  report in `lighthouse-reports/`.
 
 Commit `2168210` (`fix(frontend): improve lighthouse quality scores`) was
 pushed to `develop` after reviewing the April 30 Lighthouse report for
@@ -701,3 +1112,13 @@ The `random_password.db` resource was aligned to the existing state specifically
 ## Maintenance Rule
 
 Whenever live infrastructure, deploy status, recovery steps, or critical environment assumptions change, update this file in the same work session.
+
+## Trust Queue Coverage
+
+**URL:** `/admin/trust`
+**Runbook:** `docs/ops/trust-review-runbook.md`
+
+At launch, the bootstrap admin account must monitor the trust queue daily.
+Verification submissions that sit `PENDING` more than 48 hours degrade
+the user experience — verified users get higher-quality job matches and
+skip job moderation queues.

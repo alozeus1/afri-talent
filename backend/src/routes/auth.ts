@@ -1,10 +1,11 @@
 import { Router, Request, Response } from "express";
-import bcrypt from "bcrypt";
+import { hashPassword, comparePassword, isHashBelowCurrentCost } from "../lib/password.js";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { signToken, getTokenExpiresIn } from "../lib/jwt.js";
 import { authenticate, optionalAuth } from "../middleware/auth.js";
 import { authLimiter, registerLimiter } from "../middleware/security.js";
+import { issueCsrfToken } from "../middleware/csrf.js";
 import { validateHumanAuthSubmission } from "../middleware/bot-protection.js";
 import { blockToken } from "../lib/redis.js";
 import { Role } from "@prisma/client";
@@ -144,7 +145,9 @@ router.post("/register", registerLimiter, validateHumanAuthSubmission, async (re
       return;
     }
 
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+    // §2.10 — bcrypt cost 12 (was 10). hashPassword centralises the cost
+    // factor so future bumps live in one file.
+    const hashedPassword = await hashPassword(data.password);
 
     const user = await prisma.user.create({
       data: {
@@ -269,6 +272,9 @@ router.post("/login", authLimiter, validateHumanAuthSubmission, async (req: Requ
       where: { email: data.email },
       include: {
         employer: true,
+        adminRole: {
+          select: { id: true },
+        },
         oauthAccounts: {
           select: { provider: true },
         },
@@ -310,7 +316,20 @@ router.post("/login", authLimiter, validateHumanAuthSubmission, async (req: Requ
       return;
     }
 
-    const validPassword = await bcrypt.compare(data.password, user.password || "");
+    const validPassword = await comparePassword(data.password, user.password || "");
+    // §2.10 transparent rehash — if the stored hash is below the current cost
+    // factor, upgrade it now. Best-effort; failures don't block the login.
+    if (validPassword && user.password && isHashBelowCurrentCost(user.password)) {
+      try {
+        const rehashed = await hashPassword(data.password);
+        await prisma.user.update({ where: { id: user.id }, data: { password: rehashed } });
+      } catch (rehashError) {
+        logger.warn(
+          { err: rehashError, userId: user.id },
+          "[auth] bcrypt rehash on login failed (non-fatal)",
+        );
+      }
+    }
 
     if (!validPassword) {
       recordOpsEvent({
@@ -325,6 +344,19 @@ router.post("/login", authLimiter, validateHumanAuthSubmission, async (req: Requ
       });
       res.status(401).json({ error: "Invalid email or password" });
       return;
+    }
+
+    // §2.10 — admins created after the migration do not get the SQL backfill.
+    // Start their enrolment grace window on first successful password login.
+    if (
+      (user.role === Role.ADMIN || user.adminRole != null)
+      && !user.totpEnrolledAt
+      && !user.totpGraceUntil
+    ) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { totpGraceUntil: new Date(Date.now() + COOKIE_MAX_AGE_MS) },
+      });
     }
 
     const token = signToken({
@@ -410,10 +442,16 @@ router.post("/logout", authenticate, async (req: Request, res: Response) => {
 // GET /api/auth/me
 router.get("/me", optionalAuth, async (req: Request, res: Response) => {
   try {
+    // §2.3 — issue (or refresh) a CSRF token on every /me call. SPAs hit /me
+    // on app load and after login, so this is the canonical place to seed the
+    // cookie that subsequent mutating requests will echo as X-CSRF-Token.
+    const csrfToken = issueCsrfToken(req, res);
+
     if (!req.user) {
       res.json({
         authenticated: false,
         user: null,
+        csrfToken,
       });
       return;
     }
@@ -439,6 +477,7 @@ router.get("/me", optionalAuth, async (req: Request, res: Response) => {
         avatarUrl: user.avatarUrl,
         employer: user.employer,
       },
+      csrfToken,
     });
   } catch (error) {
     console.error("Me error:", error);

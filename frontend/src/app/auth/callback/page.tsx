@@ -8,25 +8,40 @@ import { trackEvent } from "@/lib/analytics";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-type OAuthProvider = "google" | "apple";
+type OAuthProvider = "google" | "github";
 
-function readStoredOAuthState(): { state: string | null; provider: OAuthProvider | null } {
-  if (typeof window === "undefined") {
-    return { state: null, provider: null };
-  }
-
-  const state = sessionStorage.getItem("oauth_state");
+// §2.2 — state for Google + GitHub is held in an HttpOnly cookie set by the
+// backend; only the chosen provider is echoed via sessionStorage so this
+// page can route to the right backend endpoint.
+function readStoredOAuthProvider(): OAuthProvider | null {
+  if (typeof window === "undefined") return null;
   const provider = sessionStorage.getItem("oauth_provider");
-  return {
-    state,
-    provider: provider === "google" || provider === "apple" ? provider : null,
-  };
+  return provider === "google" || provider === "github"
+    ? (provider as OAuthProvider)
+    : null;
 }
 
-function clearStoredOAuthState() {
+function clearStoredOAuthSession() {
   if (typeof window === "undefined") return;
   sessionStorage.removeItem("oauth_state");
   sessionStorage.removeItem("oauth_provider");
+}
+
+function describeOAuthError(codeOrMessage: string): string {
+  const normalized = codeOrMessage.toUpperCase();
+  if (normalized.includes("OAUTH_CALLBACK_MISMATCH") || normalized.includes("REDIRECT_URI")) {
+    return "Google sign-in is almost configured, but this callback URL is not registered for the current environment. Ask an admin to add this app URL in Google Cloud OAuth settings.";
+  }
+  if (normalized.includes("OAUTH_MISSING_CONFIG") || normalized.includes("NOT CONFIGURED")) {
+    return "Google sign-in is not configured for this environment yet. You can continue with email and password.";
+  }
+  if (normalized.includes("ACCESS_DENIED") || normalized.includes("USER_CANCEL")) {
+    return "Sign-in was cancelled. You can try again or continue with email and password.";
+  }
+  if (normalized.includes("OAUTH_PROVIDER_UNAVAILABLE")) {
+    return "The OAuth provider is temporarily unavailable. Try again later or continue with email and password.";
+  }
+  return codeOrMessage || "Authentication failed. Try again or continue with email and password.";
 }
 
 function OAuthCallbackInner() {
@@ -38,15 +53,11 @@ function OAuthCallbackInner() {
     const errorParam = searchParams.get("error");
     const providerParam = searchParams.get("provider");
     const stateParam = searchParams.get("state");
-    const idToken = searchParams.get("id_token");
-    const encodedUser = searchParams.get("user");
-    const { state: storedState, provider: storedProvider } = readStoredOAuthState();
+    const storedProvider = readStoredOAuthProvider();
     const provider: OAuthProvider =
-      providerParam === "apple" || providerParam === "google"
-        ? providerParam
-        : idToken
-          ? "apple"
-          : (storedProvider || "google");
+      providerParam === "google" || providerParam === "github"
+        ? (providerParam as OAuthProvider)
+        : (storedProvider || "google");
 
     if (errorParam) {
       trackEvent("oauth_error", {
@@ -54,28 +65,28 @@ function OAuthCallbackInner() {
         stage: "provider_redirect",
         error: errorParam,
       });
-      setError(`OAuth was cancelled or failed: ${errorParam}`);
-      clearStoredOAuthState();
+      setError(describeOAuthError(errorParam));
+      clearStoredOAuthSession();
       return;
     }
 
-    if (!code && provider === "google") {
+    if (!code) {
       trackEvent("oauth_error", {
         provider,
         stage: "missing_code",
       });
-      setError("No authorization code received");
-      clearStoredOAuthState();
+      setError("No authorization code was received from the provider. Try signing in again.");
+      clearStoredOAuthSession();
       return;
     }
 
-    if (stateParam && storedState && stateParam !== storedState) {
+    if ((provider === "google" || provider === "github") && !stateParam) {
       trackEvent("oauth_error", {
         provider,
-        stage: "state_validation",
+        stage: "missing_state",
       });
-      setError("Authentication state mismatch. Please try signing in again.");
-      clearStoredOAuthState();
+      setError("The provider did not return a state value. Please try signing in again.");
+      clearStoredOAuthSession();
       return;
     }
 
@@ -84,32 +95,17 @@ function OAuthCallbackInner() {
         trackEvent("oauth_callback_received", {
           provider,
           has_code: Boolean(code),
-          has_id_token: Boolean(idToken),
         });
 
-        const redirectUri =
-          provider === "apple"
-            ? `${window.location.origin}/auth/apple/callback`
-            : `${window.location.origin}/auth/callback`;
+        const redirectUri = `${window.location.origin}/auth/callback`;
 
-        const endpoint =
-          provider === "apple"
-            ? `${API_URL}/api/auth/oauth/apple/callback`
-            : `${API_URL}/api/auth/oauth/google/callback`;
+        const endpointByProvider: Record<OAuthProvider, string> = {
+          google: `${API_URL}/api/auth/oauth/google/callback`,
+          github: `${API_URL}/api/auth/oauth/github/callback`,
+        };
+        const endpoint = endpointByProvider[provider];
 
-        let parsedAppleUser: { name?: string; email?: string } | undefined;
-        if (encodedUser) {
-          try {
-            parsedAppleUser = JSON.parse(encodedUser) as { name?: string; email?: string };
-          } catch {
-            parsedAppleUser = undefined;
-          }
-        }
-
-        const payload =
-          provider === "apple"
-            ? { code, idToken, user: parsedAppleUser }
-            : { code, redirectUri };
+        const payload = { code, state: stateParam, redirectUri };
 
         const res = await fetch(endpoint, {
           method: "POST",
@@ -120,7 +116,7 @@ function OAuthCallbackInner() {
 
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.error || "OAuth failed");
+          throw new Error(data.code || data.message || data.error || "OAuth failed");
         }
 
         trackEvent(data.isNewUser ? "oauth_signup" : "oauth_login", {
@@ -130,7 +126,7 @@ function OAuthCallbackInner() {
           provider,
           is_new_user: Boolean(data.isNewUser),
         });
-        clearStoredOAuthState();
+        clearStoredOAuthSession();
 
         // Redirect based on role
         const role = data.user?.role;
@@ -146,8 +142,8 @@ function OAuthCallbackInner() {
           provider,
           stage: "exchange",
         });
-        setError(err instanceof Error ? err.message : "Authentication failed");
-        clearStoredOAuthState();
+        setError(describeOAuthError(err instanceof Error ? err.message : "Authentication failed"));
+        clearStoredOAuthSession();
       }
     };
 

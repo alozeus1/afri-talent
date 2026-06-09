@@ -34,6 +34,19 @@ if (REDIS_URL) {
 }
 
 /**
+ * §2.4 — when `REDIS_REQUIRED=true`, treat Redis unavailability as a hard
+ * failure (token rejection / readiness 503) rather than the legacy fail-open
+ * behaviour. Defaults to false so existing deployments are unaffected until
+ * the founder flips the flag in SSM post-ElastiCache provisioning.
+ *
+ * Read at call-time so tests can flip the env var per case without reloading
+ * the module.
+ */
+export function isRedisRequired(): boolean {
+  return process.env.REDIS_REQUIRED === "true";
+}
+
+/**
  * Add a JWT to the blocklist until it naturally expires.
  * No-op if Redis is unavailable (graceful degradation).
  */
@@ -48,15 +61,35 @@ export async function blockToken(token: string, ttlSeconds: number): Promise<voi
 
 /**
  * Check if a JWT has been blocklisted.
- * Returns false if Redis is unavailable (fail-open).
+ *
+ * §2.4 — behaviour depends on `REDIS_REQUIRED`:
+ *  - `REDIS_REQUIRED=true` and Redis unavailable/erroring → returns `true`
+ *    (fail-closed: callers treat the token as revoked and reject the request).
+ *  - Otherwise → returns `false` (fail-open: legacy behaviour, preserves
+ *    availability when Redis is genuinely optional).
  */
 export async function isTokenBlocked(token: string): Promise<boolean> {
-  if (!client || !available) return false;
+  if (!client || !available) {
+    if (isRedisRequired()) {
+      logger.warn(
+        "[redis] fail-closed: rejecting token because Redis is unavailable and REDIS_REQUIRED=true",
+      );
+      return true;
+    }
+    return false;
+  }
   try {
     const result = await client.get(`${BLOCKLIST_PREFIX}${token}`);
     return result !== null;
-  } catch {
-    return false; // fail-open on Redis error
+  } catch (err) {
+    if (isRedisRequired()) {
+      logger.warn(
+        { err: (err as Error).message },
+        "[redis] fail-closed: rejecting token because Redis query failed and REDIS_REQUIRED=true",
+      );
+      return true;
+    }
+    return false;
   }
 }
 

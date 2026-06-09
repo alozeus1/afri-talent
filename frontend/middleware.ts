@@ -3,6 +3,12 @@ import { DEFAULT_LOCALE, isSupportedLocale, normalizeLocale } from "@/lib/i18n/c
 
 const LOCALE_COOKIE = "afritalent-locale";
 
+// Wave 6 §7.2 — legacy/SEO onboarding entry points collapse to /register so
+// the funnel is unambiguous and external/inbound links keep working. Strict
+// 301 (not next.config redirects() — those return 308) so search engines and
+// older clients treat the move as permanent in the canonical sense.
+const REGISTER_ALIASES = new Set(["/signup", "/sign-up", "/join", "/get-started"]);
+
 function shouldLocalize(pathname: string): boolean {
   if (pathname === "/") return true;
   return (
@@ -25,6 +31,12 @@ export function middleware(req: NextRequest) {
     pathname.includes(".")
   ) {
     return NextResponse.next();
+  }
+
+  if (REGISTER_ALIASES.has(pathname)) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/register";
+    return NextResponse.redirect(url, 301);
   }
 
   const firstSegment = pathname.split("/").filter(Boolean)[0];

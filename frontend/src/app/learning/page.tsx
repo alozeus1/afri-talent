@@ -185,7 +185,9 @@ export default function LearningPage() {
   const [error, setError] = useState<string | null>(null);
   const [usingFallbackContent, setUsingFallbackContent] = useState(false);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
+  const [lessonProgress, setLessonProgress] = useState<Record<string, "IN_PROGRESS" | "COMPLETED">>({});
   const [selectedLesson, setSelectedLesson] = useState<EarlyLearningLesson | null>(null);
+  const [activeLessonStep, setActiveLessonStep] = useState(0);
 
   // Filters
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -229,8 +231,25 @@ export default function LearningPage() {
 
           if (user.role === "CANDIDATE") {
             try {
-              const status = await billing.status();
+              const [status, persistedProgress] = await Promise.all([
+                billing.status(),
+                learning.progress().catch(() => ({ progress: [] })),
+              ]);
               setBillingStatus(status);
+              const completed = new Set<string>();
+              const progressMap: Record<string, "IN_PROGRESS" | "COMPLETED"> = {};
+              persistedProgress.progress.forEach((item) => {
+                if (item.status === "COMPLETED") {
+                  completed.add(item.resourceId);
+                  progressMap[item.resourceId] = "COMPLETED";
+                } else if (item.status === "IN_PROGRESS") {
+                  progressMap[item.resourceId] = "IN_PROGRESS";
+                }
+              });
+              if (completed.size > 0) {
+                setCompletedLessons((prev) => new Set([...prev, ...completed]));
+              }
+              setLessonProgress(progressMap);
             } catch {
               setBillingStatus(null);
             }
@@ -288,10 +307,32 @@ export default function LearningPage() {
     setPage(1);
   };
 
+  const persistLessonProgress = async (
+    lessonId: string,
+    status: "IN_PROGRESS" | "COMPLETED" | "NOT_STARTED",
+    lastStepIndex = activeLessonStep,
+  ) => {
+    if (user?.role !== "CANDIDATE") return;
+    try {
+      await learning.updateProgress(lessonId, { status, lastStepIndex });
+    } catch (err) {
+      console.error("Failed to save learning progress:", err);
+    }
+  };
+
+  const setLessonStep = (lessonId: string, step: number) => {
+    setActiveLessonStep(step);
+    if (!completedLessons.has(lessonId)) {
+      setLessonProgress((prev) => ({ ...prev, [lessonId]: "IN_PROGRESS" }));
+      void persistLessonProgress(lessonId, "IN_PROGRESS", step);
+    }
+  };
+
   const toggleCompleted = (lessonId: string) => {
+    const willComplete = !completedLessons.has(lessonId);
     setCompletedLessons((prev) => {
       const next = new Set(prev);
-      if (next.has(lessonId)) {
+      if (!willComplete) {
         next.delete(lessonId);
       } else {
         next.add(lessonId);
@@ -300,6 +341,21 @@ export default function LearningPage() {
       window.localStorage.setItem("afritalent_learning_completed_lessons", JSON.stringify([...next]));
       return next;
     });
+    setLessonProgress((prev) => ({
+      ...prev,
+      [lessonId]: willComplete ? "COMPLETED" : "IN_PROGRESS",
+    }));
+    void persistLessonProgress(lessonId, willComplete ? "COMPLETED" : "IN_PROGRESS", activeLessonStep);
+  };
+
+  const openLesson = (lesson: EarlyLearningLesson) => {
+    setSelectedLesson(lesson);
+    setActiveLessonStep(0);
+    if (!completedLessons.has(lesson.id)) {
+      setLessonProgress((prev) => ({ ...prev, [lesson.id]: "IN_PROGRESS" }));
+      void persistLessonProgress(lesson.id, "IN_PROGRESS", 0);
+    }
+    trackEvent("lesson_started", { lesson_id: lesson.id, category: lesson.category });
   };
 
   const displayedCourses = query.trim() && !usingFallbackContent
@@ -467,7 +523,7 @@ export default function LearningPage() {
                       <span className="text-xs text-gray-500">{course.durationHours}h</span>
                     )}
                     {isEarlyLesson(course) ? (
-                      <Button size="sm" onClick={() => setSelectedLesson(course)}>{t("learning.startLesson")}</Button>
+                      <Button size="sm" onClick={() => openLesson(course)}>{t("learning.startLesson")}</Button>
                     ) : (
                       <a href={course.url} target="_blank" rel="noopener noreferrer">
                         <Button size="sm">{t("learning.viewCourse")}</Button>
@@ -633,13 +689,16 @@ export default function LearningPage() {
                       <div className="flex gap-2">
                         {isEarlyLesson(course) ? (
                           <>
-                            {completedLessons.has(course.id) && <Badge variant="success">Complete</Badge>}
+                            {completedLessons.has(course.id) ? (
+                              <Badge variant="success">Complete</Badge>
+                            ) : lessonProgress[course.id] === "IN_PROGRESS" ? (
+                              <Badge variant="info">In progress</Badge>
+                            ) : null}
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => {
-                                setSelectedLesson(course);
-                                trackEvent("lesson_started", { lesson_id: course.id, category: course.category });
+                                openLesson(course);
                               }}
                             >
                               Start
@@ -723,9 +782,51 @@ export default function LearningPage() {
 
               <section>
                 <h3 className="font-semibold text-gray-900">{t("learning.stepByStep")}</h3>
-                <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-gray-700">
-                  {selectedLesson.steps.map((step) => <li key={step}>{step}</li>)}
-                </ol>
+                <div className="mt-3 space-y-3">
+                  <div className="rounded-xl border border-gray-200 bg-white p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Step {activeLessonStep + 1} of {selectedLesson.steps.length}
+                      </p>
+                      <Badge variant={completedLessons.has(selectedLesson.id) ? "success" : "info"}>
+                        {completedLessons.has(selectedLesson.id) ? "Complete" : "In progress"}
+                      </Badge>
+                    </div>
+                    <p className="text-sm leading-6 text-gray-700">{selectedLesson.steps[activeLessonStep]}</p>
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={activeLessonStep === 0}
+                        onClick={() => setLessonStep(selectedLesson.id, Math.max(0, activeLessonStep - 1))}
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex gap-1">
+                        {selectedLesson.steps.map((step, index) => (
+                          <button
+                            key={step}
+                            type="button"
+                            aria-label={`Go to lesson step ${index + 1}`}
+                            onClick={() => setLessonStep(selectedLesson.id, index)}
+                            className={`h-2.5 w-2.5 rounded-full ${index === activeLessonStep ? "bg-emerald-600" : "bg-gray-300"}`}
+                          />
+                        ))}
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={activeLessonStep === selectedLesson.steps.length - 1}
+                        onClick={() =>
+                          setLessonStep(selectedLesson.id, Math.min(selectedLesson.steps.length - 1, activeLessonStep + 1))
+                        }
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </section>
 
               <section>
@@ -748,9 +849,16 @@ export default function LearningPage() {
 
               <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-gray-500">
-                  {t("learning.completionNote")}
+                  Progress is saved to your AfriTalent account and synced across devices.
                 </p>
-                <Button onClick={() => toggleCompleted(selectedLesson.id)}>
+                <Button
+                  onClick={() => {
+                    toggleCompleted(selectedLesson.id);
+                    if (!completedLessons.has(selectedLesson.id)) {
+                      setActiveLessonStep(selectedLesson.steps.length - 1);
+                    }
+                  }}
+                >
                   {completedLessons.has(selectedLesson.id) ? t("learning.markIncomplete") : t("learning.markComplete")}
                 </Button>
               </div>

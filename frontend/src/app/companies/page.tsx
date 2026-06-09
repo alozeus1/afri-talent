@@ -19,6 +19,10 @@ interface Company {
   size: string | null;
   hiresFromAfrica: boolean;
   verified: boolean;
+  profileType?: "COMPANY" | "EMPLOYER";
+  jobCount?: number;
+  logoUrl?: string | null;
+  brandColor?: string | null;
   ratingAggregate: {
     averageOverall: number;
     reviewCount: number;
@@ -35,40 +39,11 @@ interface CompanyListResponse {
   };
 }
 
-const DEMO_COMPANIES: Company[] = [
-  {
-    id: "demo-1",
-    companyName: "Sample fintech employer profile",
-    industry: "Financial Services",
-    headquarters: "Lagos, Nigeria",
-    website: null,
-    size: "501-1000",
-    hiresFromAfrica: false,
-    verified: false,
-    ratingAggregate: null
-  },
-  {
-    id: "demo-2",
-    companyName: "Sample distributed engineering network",
-    industry: "Technology",
-    headquarters: "Remote-first",
-    website: null,
-    size: "1000+",
-    hiresFromAfrica: false,
-    verified: false,
-    ratingAggregate: null
-  },
-  {
-    id: "demo-3",
-    companyName: "Sample global payments company",
-    industry: "Financial Services",
-    headquarters: "Global",
-    website: null,
-    size: "501-1000",
-    hiresFromAfrica: false,
-    verified: false,
-    ratingAggregate: null
-  }
+const candidateActions = [
+  { label: "Browse verified job listings", href: "/jobs" },
+  { label: "Search remote roles", href: "/jobs?remote=true" },
+  { label: "Use visa-friendly filters", href: "/jobs?visaSponsorship=true" },
+  { label: "Set alert preferences", href: "/candidate/preferences" },
 ];
 
 function StarRating({ rating }: { rating: number }) {
@@ -208,56 +183,22 @@ export default function CompaniesPage() {
               </div>
 
               {!search && (
-                <div>
-                  <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">{t("companies.sampleStructure")}</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {t("companies.sampleDesc")}
-                      </p>
-                    </div>
-                    <Badge variant="warning">{t("companies.demoContent")}</Badge>
-                  </div>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    {DEMO_COMPANIES.map((company) => (
-                        <Card key={company.id} className="h-full interactive-card transition-all duration-200">
-                          <CardContent className="p-6">
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-gray-900 text-lg truncate">
-                                  {company.companyName}
-                                </h3>
-                                {company.industry && (
-                                  <p className="text-sm text-gray-600">{company.industry}</p>
-                                )}
-                              </div>
-                              <Badge variant="warning" className="ml-2 shrink-0">Demo</Badge>
-                            </div>
-
-                            {company.headquarters && (
-                              <p className="text-sm text-gray-500 mb-3">
-                                📍 {company.headquarters}
-                              </p>
-                            )}
-
-                            {company.ratingAggregate && company.ratingAggregate.reviewCount > 0 && (
-                              <div className="mb-3">
-                                <StarRating rating={company.ratingAggregate.averageOverall} />
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {company.ratingAggregate.reviewCount} review
-                                  {company.ratingAggregate.reviewCount !== 1 ? "s" : ""}
-                                </p>
-                              </div>
-                            )}
-
-                            <div className="flex flex-wrap gap-2 mt-auto pt-4">
-                              <Badge variant="default">Verification pending</Badge>
-                              <Badge variant="info">Pilot profile format</Badge>
-                            </div>
-                          </CardContent>
-                        </Card>
-                    ))}
-                  </div>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  {candidateActions.map((action) => (
+                    <Link key={action.href} href={action.href}>
+                      <Card className="h-full interactive-card transition-all duration-200">
+                        <CardContent className="p-5">
+                          <Badge variant="info">Available now</Badge>
+                          <h3 className="mt-4 text-base font-semibold text-gray-900 dark:text-gray-100">
+                            {action.label}
+                          </h3>
+                          <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
+                            Use candidate-side tools while verified employer profiles are onboarded.
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
                 </div>
               )}
             </div>
@@ -269,12 +210,30 @@ export default function CompaniesPage() {
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 text-lg truncate">
-                            {company.companyName}
-                          </h3>
-                          {company.industry && (
-                            <p className="text-sm text-gray-600">{company.industry}</p>
-                          )}
+                          <div className="flex items-center gap-3">
+                            {company.logoUrl ? (
+                              <img
+                                src={company.logoUrl}
+                                alt={`${company.companyName} logo`}
+                                className="h-10 w-10 rounded-lg border border-gray-200 object-contain"
+                              />
+                            ) : (
+                              <span
+                                className="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-semibold text-white"
+                                style={{ backgroundColor: company.brandColor || "#0f766e" }}
+                              >
+                                {company.companyName.slice(0, 1).toUpperCase()}
+                              </span>
+                            )}
+                            <div className="min-w-0">
+                              <h3 className="truncate text-lg font-semibold text-gray-900">
+                                {company.companyName}
+                              </h3>
+                              {company.industry && (
+                                <p className="text-sm text-gray-600">{company.industry}</p>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         {company.verified && (
                           <Badge variant="info" className="ml-2 shrink-0">Verified</Badge>
@@ -300,6 +259,12 @@ export default function CompaniesPage() {
                       <div className="flex flex-wrap gap-2 mt-auto">
                         {company.hiresFromAfrica && (
                           <Badge variant="success">Hires from Africa</Badge>
+                        )}
+                        {company.profileType === "EMPLOYER" && (
+                          <Badge variant="info">Registered employer</Badge>
+                        )}
+                        {(company.jobCount ?? 0) > 0 && (
+                          <Badge>{company.jobCount} open role{company.jobCount === 1 ? "" : "s"}</Badge>
                         )}
                       </div>
                     </CardContent>

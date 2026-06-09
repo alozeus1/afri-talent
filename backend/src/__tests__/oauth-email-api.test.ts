@@ -62,23 +62,90 @@ describe("OAuth + Email Verification API", () => {
   it("lists enabled OAuth providers", async () => {
     const previousGoogle = process.env.GOOGLE_CLIENT_ID;
     const previousGoogleSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const previousApple = process.env.APPLE_CLIENT_ID;
+    const previousGithub = process.env.GITHUB_CLIENT_ID;
+    const previousGithubSecret = process.env.GITHUB_CLIENT_SECRET;
     process.env.GOOGLE_CLIENT_ID = "google-client-id";
     process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
-    process.env.APPLE_CLIENT_ID = "apple-client-id";
+    process.env.GITHUB_CLIENT_ID = "github-client-id";
+    process.env.GITHUB_CLIENT_SECRET = "github-client-secret";
 
     const res = await request(app).get("/api/auth/oauth/providers");
     expect(res.status).toBe(200);
     expect(res.body.providers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ provider: "google", clientId: "google-client-id", enabled: true }),
-        expect.objectContaining({ provider: "apple", enabled: true }),
+        expect.objectContaining({ provider: "github", clientId: "github-client-id", enabled: true }),
       ]),
     );
 
     process.env.GOOGLE_CLIENT_ID = previousGoogle;
     process.env.GOOGLE_CLIENT_SECRET = previousGoogleSecret;
-    process.env.APPLE_CLIENT_ID = previousApple;
+    process.env.GITHUB_CLIENT_ID = previousGithub;
+    process.env.GITHUB_CLIENT_SECRET = previousGithubSecret;
+  });
+
+  it("hides GitHub provider when GITHUB_CLIENT_SECRET is missing", async () => {
+    const previousId = process.env.GITHUB_CLIENT_ID;
+    const previousSecret = process.env.GITHUB_CLIENT_SECRET;
+    process.env.GITHUB_CLIENT_ID = "id-only";
+    delete process.env.GITHUB_CLIENT_SECRET;
+
+    const res = await request(app).get("/api/auth/oauth/providers");
+    expect(res.status).toBe(200);
+    expect(res.body.providers).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ provider: "github" })]),
+    );
+
+    process.env.GITHUB_CLIENT_ID = previousId;
+    if (previousSecret !== undefined) process.env.GITHUB_CLIENT_SECRET = previousSecret;
+  });
+
+  it("returns 503 when GitHub OAuth is not configured", async () => {
+    const previousId = process.env.GITHUB_CLIENT_ID;
+    const previousSecret = process.env.GITHUB_CLIENT_SECRET;
+    delete process.env.GITHUB_CLIENT_ID;
+    delete process.env.GITHUB_CLIENT_SECRET;
+
+    // §2.2: the callback now requires a valid state cookie before it reaches
+    // the missing-config branch. Generate a matching pair so the state gate
+    // passes and the test exercises the OAUTH_MISSING_CONFIG path.
+    const { generateOAuthState, OAUTH_STATE_COOKIE } = await import("../lib/oauth-state.js");
+    const { state, cookieValue } = generateOAuthState("github");
+
+    const res = await request(app)
+      .post("/api/auth/oauth/github/callback")
+      .set("Cookie", `${OAUTH_STATE_COOKIE}=${cookieValue}`)
+      .send({ code: "abc", state, redirectUri: "https://example.com/auth/callback" });
+
+    expect(res.status).toBe(503);
+    expect(res.body.code).toBe("OAUTH_MISSING_CONFIG");
+
+    if (previousId !== undefined) process.env.GITHUB_CLIENT_ID = previousId;
+    if (previousSecret !== undefined) process.env.GITHUB_CLIENT_SECRET = previousSecret;
+  });
+
+  it("exposes safe OAuth diagnostics without secrets", async () => {
+    const previousFrontend = process.env.FRONTEND_URL;
+    const previousGoogle = process.env.GOOGLE_CLIENT_ID;
+    const previousGoogleSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    process.env.FRONTEND_URL = "https://staging.example.com";
+    process.env.GOOGLE_CLIENT_ID = "google-client-id";
+    process.env.GOOGLE_CLIENT_SECRET = "google-client-secret";
+
+    const res = await request(app).get("/api/auth/oauth/diagnostics");
+
+    expect(res.status).toBe(200);
+    expect(res.body.providers.google.configured).toBe(true);
+    expect(res.body.providers.google.clientSecretConfigured).toBe(true);
+    expect(res.body.providers.google.requiredCallbackUrls).toContain("https://staging.example.com/auth/callback");
+    expect(res.body.providers.google.requiredCallbackUrls).toContain("http://localhost:3000/auth/callback");
+    expect(res.body.secretsExposed).toBe(false);
+    expect(JSON.stringify(res.body)).not.toContain("google-client-secret");
+
+    process.env.FRONTEND_URL = previousFrontend;
+    process.env.GOOGLE_CLIENT_ID = previousGoogle;
+    process.env.GOOGLE_CLIENT_SECRET = previousGoogleSecret;
   });
 
   it("returns provider-mismatch when password login is attempted for OAuth-only account", async () => {

@@ -13,6 +13,7 @@
 import { randomUUID } from "crypto";
 import { z } from "zod/v4";
 import logger from "../../logger.js";
+import { emitMatchAgentDurationMs } from "../../observability/metrics.js";
 import {
   ResumeParserAgent,
   JobParserAgent,
@@ -435,12 +436,16 @@ export async function runOrchestrator(input: OrchestratorInput): Promise<Orchest
       break;
     }
 
+    const matchStartedAt = Date.now();
     try {
       budget.assertAvailable(800, `MatchScorerAgent:${jobInput.job_id}`);
       const result = await MatchScorerAgent(resumeJson, jobJson, candidate_profile);
       budget.consume(result.token_estimate);
       const match = validateOrThrow(MatchSchemaValidator, result.data, `MatchScorerAgent:${jobInput.job_id}`);
       rankedJobs.push({ job_id: jobInput.job_id, job_json: jobJson, match });
+      // Wave 9 §10.1 SLO #3 — Match Agent end-to-end p95 ≤ 6s.
+      // Emit only on success; failures are tracked by the surrounding logs.
+      void emitMatchAgentDurationMs(Date.now() - matchStartedAt);
       agentLog({
         run_id, user_id,
         agent: "MatchScorerAgent",

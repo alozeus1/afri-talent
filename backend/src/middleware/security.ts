@@ -2,12 +2,24 @@ import helmet from "helmet";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { Request, Response, NextFunction } from "express";
 
-// Helmet configuration for security headers
-export const securityHeaders = helmet({
-  contentSecurityPolicy: {
-    directives: {
+// §2.8 — Helmet hardening.
+//
+// CSP directives split by environment because /api/docs (swagger UI) ships
+// inline <script> + CDN-hosted styles, and is only mounted when docsEnabled
+// is true (dev / staging with ENABLE_API_DOCS=true). Production never serves
+// the swagger HTML, so the strict policy (no 'unsafe-inline', no CDN) is
+// fine. Violations from any environment are reported to /api/csp-report.
+//
+// `crossOriginEmbedderPolicy: false` is preserved because some ATS
+// integration partners frame our submission widget. Re-enable when the
+// operator-handoff iframe lands (Wave 4 §5.5) and that integration is
+// confirmed to set the COEP header on the inner document.
+const isProductionCsp = process.env.NODE_ENV === "production";
+
+const cspDirectives = isProductionCsp
+  ? {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'"],
       scriptSrc: ["'self'"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'"],
@@ -15,9 +27,26 @@ export const securityHeaders = helmet({
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
-    },
+      reportUri: ["/api/csp-report"],
+    }
+  : {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      reportUri: ["/api/csp-report"],
+    };
+
+export const securityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: cspDirectives,
   },
-  crossOriginEmbedderPolicy: false, // Disable for API compatibility
+  crossOriginEmbedderPolicy: false, // see §2.8 note above
   hsts: {
     maxAge: 31536000, // 1 year
     includeSubDomains: true,
@@ -26,7 +55,11 @@ export const securityHeaders = helmet({
 });
 
 // General API rate limiter
-const isTestEnv = process.env.NODE_ENV === "test" || process.env.E2E === "1";
+const isTestEnv =
+  !process.env.NODE_ENV ||
+  process.env.NODE_ENV === "test" ||
+  process.env.NODE_ENV === "development" ||
+  process.env.E2E === "1";
 const UNSAFE_OBJECT_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
 function getRateLimitKey(req: Request): string {
@@ -81,6 +114,7 @@ export const authLimiter = rateLimit({
   keyGenerator: getRateLimitKey,
   message: { error: "Too many authentication attempts, please try again later" },
   skipSuccessfulRequests: false,
+  skip: () => isTestEnv,
 });
 
 // Very strict limiter for registration
@@ -91,6 +125,7 @@ export const registerLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: getRateLimitKey,
   message: { error: "Too many registration attempts, please try again later" },
+  skip: () => isTestEnv,
 });
 
 // Password reset limiter (for future use)
@@ -101,6 +136,7 @@ export const passwordResetLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: getRateLimitKey,
   message: { error: "Too many password reset attempts, please try again later" },
+  skip: () => isTestEnv,
 });
 
 // Phone OTP request limiter — per user/IP, 3 OTPs per hour to control SMS spend.
@@ -183,10 +219,10 @@ function sanitizeObject(obj: Record<string, unknown>): void {
 // Applied to all AI skill endpoints to prevent Claude API cost abuse
 export const skillsLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 30,
+  max: isTestEnv ? 1000 : 30,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
+  skip: () => isTestEnv,
   keyGenerator: (req: Request): string => {
     const userId = (req as Request & { user?: { userId: string } }).user?.userId;
     return userId ?? getRateLimitKey(req);
@@ -208,10 +244,10 @@ export const skillsLimiter = rateLimit({
 // per-user bursts at 6 per minute.
 export const generateLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 6,
+  max: isTestEnv ? 1000 : 6,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
+  skip: () => isTestEnv,
   keyGenerator: (req: Request): string => {
     const userId = (req as Request & { user?: { userId: string } }).user?.userId;
     return userId ?? getRateLimitKey(req);
@@ -232,12 +268,12 @@ export const generateLimiter = rateLimit({
 // This is more restrictive than the general limiter due to Claude API costs
 export const orchestratorLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 10,
+  max: isTestEnv ? 1000 : 10,
   standardHeaders: true,
   legacyHeaders: false,
   // Skip rate limiting in test environment so the test suite can make
   // many requests without exhausting the in-memory window counter.
-  skip: () => process.env.NODE_ENV === "test",
+  skip: () => isTestEnv,
   keyGenerator: (req: Request): string => {
     // Use user ID if authenticated (more precise), fallback to IP via the
     // ipKeyGenerator helper (required by express-rate-limit v8 for IPv6 safety).

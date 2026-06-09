@@ -22,28 +22,16 @@ test.describe('UI/UX Quick Wins Verification', () => {
     // But the link existence and focusability is the core fix.
   });
 
-  test('Companies page empty state shows featured companies', async ({ page }) => {
-    await page.route('**/api/companies*', async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          companies: [],
-          pagination: { page: 1, limit: 12, total: 0, totalPages: 1 }
-        })
-      });
-    });
-
+  test('Companies page no-result state is honest and actionable', async ({ page }) => {
     await page.goto('/companies', { waitUntil: 'domcontentloaded' });
 
-    const heading = page.locator('h2', { hasText: 'Directory is being updated' });
-    const sampleHeading = page.locator('h3', { hasText: 'Sample Employer Profile Structure' });
+    await expect(page.getByText('Verified profiles, reviews, and hiring outcomes will appear only after real verification.')).toBeVisible();
+    await page.getByPlaceholder('Search companies by name or industry...').fill('zzzz-no-company-match-verified-directory');
 
-    await expect(heading).toBeVisible();
-    await expect(sampleHeading).toBeVisible();
+    await expect(page.getByText('0 companies found')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('h2', { hasText: 'No companies found' })).toBeVisible();
 
-    await expect(page.locator('text=Sample fintech employer profile')).toBeVisible();
-    await expect(page.locator('text=Sample distributed engineering network')).toBeVisible();
-    await expect(page.locator('text=Sample global payments company')).toBeVisible();
+    await expect(page.locator("text=We couldn't find any companies matching your search")).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Clear current search query to view all companies' })).toBeVisible();
   });
 });

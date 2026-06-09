@@ -70,24 +70,36 @@ resource "aws_s3_bucket_cors_configuration" "uploads" {
   cors_rule {
     allowed_origins = var.allowed_origins
     allowed_methods = ["PUT"]
-    allowed_headers = ["Content-Type", "Content-Length"]
+    allowed_headers = [
+      "Content-Type",
+      "Content-Length",
+      "x-amz-server-side-encryption",
+      "x-amz-server-side-encryption-aws-kms-key-id",
+    ]
     expose_headers  = ["ETag"]
     max_age_seconds = 300
   }
 }
 
-# Lifecycle — expire old non-current versions after 90 days
+# Lifecycle — Wave 8 §9.3:
+#   - noncurrent versions older than 90 days transition to Glacier (kept, not deleted)
+#   - abort incomplete multipart uploads after 7 days (cost hygiene)
+#
+# Previous behavior was to expire (delete) noncurrent versions at 90 days,
+# which loses recovery material. Master prompt §9.3 explicitly calls for a
+# transition rule so versions remain restorable indefinitely from Glacier.
 resource "aws_s3_bucket_lifecycle_configuration" "uploads" {
   bucket = aws_s3_bucket.uploads.id
 
   rule {
-    id     = "expire-old-versions"
+    id     = "archive-old-versions"
     status = "Enabled"
 
     filter {}
 
-    noncurrent_version_expiration {
+    noncurrent_version_transition {
       noncurrent_days = 90
+      storage_class   = "GLACIER"
     }
 
     abort_incomplete_multipart_upload {
@@ -96,10 +108,18 @@ resource "aws_s3_bucket_lifecycle_configuration" "uploads" {
   }
 }
 
-# IAM policy — ECS task role can Put + Get objects in resumes/ prefix
+# §2.11 — IAM policy parameterised by `prefix_acl`. The previous policy hard-
+# coded `resumes/*` only, which silently broke uploads under any other prefix
+# (e.g. trust/candidates/) with AccessDenied at runtime. Now the caller
+# enumerates every prefix it intends to store under.
+locals {
+  put_get_resources = [for p in var.prefix_acl : "${aws_s3_bucket.uploads.arn}/${p}*"]
+  list_prefixes     = [for p in var.prefix_acl : "${p}*"]
+}
+
 resource "aws_iam_policy" "uploads_access" {
   name        = "${var.bucket_name}-access"
-  description = "Allow ECS backend to Put and Get resume objects"
+  description = "Allow ECS backend to Put/Get/Delete under ${join(", ", var.prefix_acl)}"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -111,7 +131,7 @@ resource "aws_iam_policy" "uploads_access" {
           "s3:GetObject",
           "s3:DeleteObject"
         ]
-        Resource = "${aws_s3_bucket.uploads.arn}/resumes/*"
+        Resource = local.put_get_resources
       },
       {
         Effect   = "Allow"
@@ -119,7 +139,7 @@ resource "aws_iam_policy" "uploads_access" {
         Resource = aws_s3_bucket.uploads.arn
         Condition = {
           StringLike = {
-            "s3:prefix" = ["resumes/*"]
+            "s3:prefix" = local.list_prefixes
           }
         }
       },

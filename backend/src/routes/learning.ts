@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { LearningFeedbackStatus, Role } from "@prisma/client";
+import { LearningFeedbackStatus, LearningProgressStatus, Role } from "@prisma/client";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize, optionalAuth } from "../middleware/auth.js";
 import { z } from "zod";
@@ -19,6 +19,11 @@ const submitFeedbackSchema = z.object({
 const moderateFeedbackSchema = z.object({
   action: z.enum(["approve", "reject"]),
   moderationNotes: z.string().trim().max(1000).optional(),
+});
+
+const updateProgressSchema = z.object({
+  status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED"]),
+  lastStepIndex: z.number().int().min(0).max(100).optional(),
 });
 
 function formatFeedbackRecord(
@@ -202,6 +207,59 @@ router.put("/feedback/:id/moderate", authenticate, authorize(Role.ADMIN), async 
       return;
     }
     console.error("Moderate learning feedback error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/learning/progress — authenticated candidates. Return persisted course progress.
+router.get("/progress", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response) => {
+  try {
+    const progress = await prisma.learningProgress.findMany({
+      where: { userId: req.user!.userId },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    res.json({ progress });
+  } catch (error) {
+    console.error("List learning progress error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /api/learning/:id/progress — authenticated candidates. Upsert course progress.
+router.put("/:id/progress", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response) => {
+  try {
+    const data = updateProgressSchema.parse(req.body);
+    const completedAt = data.status === LearningProgressStatus.COMPLETED ? new Date() : null;
+
+    const progress = await prisma.learningProgress.upsert({
+      where: {
+        userId_resourceId: {
+          userId: req.user!.userId,
+          resourceId: req.params.id,
+        },
+      },
+      create: {
+        userId: req.user!.userId,
+        resourceId: req.params.id,
+        status: data.status,
+        lastStepIndex: data.lastStepIndex ?? 0,
+        completedAt,
+      },
+      update: {
+        status: data.status,
+        ...(data.lastStepIndex !== undefined && { lastStepIndex: data.lastStepIndex }),
+        completedAt,
+      },
+    });
+
+    res.json({ progress });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: "Validation failed", details: error.issues });
+      return;
+    }
+    console.error("Update learning progress error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });

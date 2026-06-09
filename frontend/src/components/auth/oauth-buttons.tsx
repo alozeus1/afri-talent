@@ -23,12 +23,11 @@ function trackOAuthEvent(action: string, provider: string) {
   });
 }
 
-function createOAuthState(provider: "google" | "apple"): string {
-  const randomPart = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  const state = `${provider}:${randomPart}`;
-  sessionStorage.setItem("oauth_state", state);
+// §2.2 — provider state is issued by the backend (HttpOnly cookie + signed
+// JWT). Frontend just remembers which provider the user picked so
+// /auth/callback can route the code to the right backend endpoint.
+function rememberProvider(provider: "google" | "github"): void {
   sessionStorage.setItem("oauth_provider", provider);
-  return state;
 }
 
 export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
@@ -58,61 +57,56 @@ export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
       });
   }, [mode]);
 
-  const handleGoogleLogin = useCallback(async () => {
-    const google = providers.find((p) => p.provider === "google");
-    if (!google) {
+  const startProviderFlow = useCallback(
+    async (provider: "google" | "github") => {
+      setLoading(provider);
+      trackOAuthEvent("oauth_start", provider);
+      try {
+        const res = await fetch(`${API_URL}/api/auth/oauth/${provider}/start`, {
+          method: "GET",
+          credentials: "include",
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to start ${provider} OAuth (${res.status})`);
+        }
+        const data = (await res.json()) as { authorizeUrl?: string };
+        if (!data.authorizeUrl) {
+          throw new Error(`Missing authorizeUrl from ${provider} OAuth start`);
+        }
+        rememberProvider(provider);
+        window.location.href = data.authorizeUrl;
+      } catch (err) {
+        setLoading(null);
+        onErrorRef.current?.(
+          err instanceof Error
+            ? err.message
+            : `Could not start ${provider === "google" ? "Google" : "GitHub"} sign-in.`,
+        );
+      }
+    },
+    [],
+  );
+
+  const handleGoogleLogin = useCallback(() => {
+    if (!providers.find((p) => p.provider === "google")) {
       onErrorRef.current?.("Google sign in is not available right now.");
       return;
     }
+    void startProviderFlow("google");
+  }, [providers, startProviderFlow]);
 
-    setLoading("google");
-    trackOAuthEvent("oauth_start", "google");
-
-    const redirectUri = `${window.location.origin}/auth/callback`;
-    const state = createOAuthState("google");
-    const params = new URLSearchParams({
-      client_id: google.clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: "openid email profile",
-      access_type: "offline",
-      prompt: "select_account",
-      state,
-    });
-
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-  }, [providers]);
-
-  const handleAppleLogin = useCallback(async () => {
-    const apple = providers.find((p) => p.provider === "apple");
-    if (!apple) {
-      onErrorRef.current?.("Apple sign in is not available right now.");
+  const handleGithubLogin = useCallback(() => {
+    if (!providers.find((p) => p.provider === "github")) {
+      onErrorRef.current?.("GitHub sign in is not available right now.");
       return;
     }
-
-    setLoading("apple");
-    trackOAuthEvent("oauth_start", "apple");
-
-    const redirectUri = `${window.location.origin}/auth/apple/callback`;
-    const state = createOAuthState("apple");
-    const nonce = Math.random().toString(36).slice(2);
-    const params = new URLSearchParams({
-      client_id: apple.clientId,
-      redirect_uri: redirectUri,
-      response_type: "code id_token",
-      scope: "name email",
-      response_mode: "form_post",
-      state,
-      nonce,
-    });
-
-    window.location.href = `https://appleid.apple.com/auth/authorize?${params}`;
-  }, [providers]);
+    void startProviderFlow("github");
+  }, [providers, startProviderFlow]);
 
   const googleEnabled = providers.some((p) => p.provider === "google");
-  const appleEnabled = providers.some((p) => p.provider === "apple");
+  const githubEnabled = providers.some((p) => p.provider === "github");
 
-  if (!googleEnabled && !appleEnabled) return null;
+  if (!googleEnabled && !githubEnabled) return null;
 
   return (
     <div className="mt-6">
@@ -147,23 +141,24 @@ export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
           </button>
         )}
 
-        {appleEnabled && (
+        {githubEnabled && (
           <button
             type="button"
-            onClick={handleAppleLogin}
+            onClick={handleGithubLogin}
             disabled={loading !== null}
-            className="w-full flex items-center justify-center gap-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-black px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 disabled:opacity-50 transition-colors"
+            className="w-full flex items-center justify-center gap-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-900 dark:bg-gray-100 px-4 py-2.5 text-sm font-medium text-white dark:text-gray-900 shadow-sm hover:bg-black dark:hover:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 disabled:opacity-50 transition-colors"
           >
-            {loading === "apple" ? (
+            {loading === "github" ? (
               <div className="w-5 h-5 border-2 border-gray-500 border-t-white rounded-full animate-spin" />
             ) : (
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.55v-2.07c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.27-5.24-5.66 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.07 0 4.4-2.69 5.36-5.25 5.64.41.35.78 1.04.78 2.11v3.13c0 .3.21.65.79.55A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z" />
               </svg>
             )}
-            {mode === "login" ? "Sign in with Apple" : "Sign up with Apple"}
+            {mode === "login" ? "Sign in with GitHub" : "Sign up with GitHub"}
           </button>
         )}
+
       </div>
     </div>
   );

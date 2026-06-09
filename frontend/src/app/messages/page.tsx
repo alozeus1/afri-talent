@@ -77,8 +77,8 @@ export default function MessagesPage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-blue-900">{guidance.headline}</h2>
-                <ul className="mt-3 space-y-2 text-sm text-blue-900">
-                  {guidance.tips.slice(0, 3).map((tip) => (
+                <ul className="mt-3 grid gap-2 text-sm text-blue-900 md:grid-cols-2">
+                  {guidance.tips.slice(0, 8).map((tip) => (
                     <li key={tip}>• {tip}</li>
                   ))}
                 </ul>

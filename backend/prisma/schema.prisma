@@ -42,6 +42,67 @@ enum ApplicationStatus {
   ACCEPTED
 }
 
+// §5.1 — apply pathway routing. One value per submission track. The
+// classifier in backend/src/lib/jobs/apply-strategy.ts (PR O) picks one of
+// these at ingest; the per-application submission worker (PR Q–T) dispatches
+// on it.
+enum ApplyStrategy {
+  ATS_API_GREENHOUSE
+  ATS_API_LEVER
+  ATS_API_ASHBY
+  ATS_API_WORKABLE
+  EMAIL_DRAFT
+  OPERATOR_HANDOFF
+  ASSISTED_REDIRECT
+}
+
+// §5.1 — Draft → Preview → Submit lifecycle for an Application.
+//   NOT_SUBMITTED              fresh record; track not yet started.
+//   DRAFTING                   tailored content ready for candidate preview.
+//   AWAITING_USER_CONFIRMATION drafted, candidate has not yet clicked Submit.
+//   SUBMITTING                 worker is dispatching against the track.
+//   SUBMITTED                  proof received; final state.
+//   FAILED                     unrecoverable; lastSubmissionError populated.
+enum SubmissionStatus {
+  NOT_SUBMITTED
+  DRAFTING
+  AWAITING_USER_CONFIRMATION
+  SUBMITTING
+  SUBMITTED
+  FAILED
+}
+
+// §5.1 — what kind of artefact proves a submission actually happened. Each
+// track lands a different kind:
+//   ATS_API           → ATS_ID (provider_application_id)
+//   EMAIL_DRAFT       → EMAIL_MESSAGE_ID (SES MessageId)
+//   OPERATOR_HANDOFF  → SCREENCAST_URL (S3 PUT URL)
+//   ASSISTED_REDIRECT → CLICKOUT_TIMESTAMP
+enum SubmissionProofKind {
+  ATS_ID
+  EMAIL_MESSAGE_ID
+  SCREENCAST_URL
+  CLICKOUT_TIMESTAMP
+}
+
+// §5.6 — Track D (assisted-redirect) telemetry. PENDING is the initial
+// state on click-out; the candidate's confirm/deny endpoints move it to
+// CONFIRMED_COMPLETED / DENIED_COMPLETED; the apply-clickout-nudge worker
+// sets NO_RESPONSE_TIMEOUT after 7 days of silence.
+enum CandidateApplyResponse {
+  PENDING
+  CONFIRMED_COMPLETED
+  DENIED_COMPLETED
+  NO_RESPONSE_TIMEOUT
+}
+
+// §5.9 — provenance of an EmployerApplyOptOut row.
+enum EmployerOptOutSource {
+  EMAIL  // arrived via the SES inbound rule (wired up in PR Q)
+  ADMIN  // created manually by an admin
+  API    // programmatic add for partner integrations
+}
+
 enum ReviewStatus {
   PENDING
   REVIEWED
@@ -129,6 +190,12 @@ enum SubscriptionPlan {
   EMPLOYER_FREE
   EMPLOYER_BASIC
   EMPLOYER_PREMIUM
+}
+
+enum LearningProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
 }
 
 enum ATSProvider {
@@ -489,7 +556,7 @@ enum BulkOperationStatus {
 
 enum OAuthProvider {
   GOOGLE
-  APPLE
+  GITHUB
 }
 
 model OAuthAccount {
@@ -631,10 +698,11 @@ model PlanEntitlement {
   videoMockInterviews   Int? // monthly seat quota
   pipelineExports       Boolean          @default(false)
   brandedCareerPage     Boolean          @default(false)
-  advancedFunnelMetrics Boolean          @default(false)
-  customFeatures        Json? // extensible
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  advancedFunnelMetrics   Boolean          @default(false)
+  templateDownloadsPerMonth Int?             // null = unlimited
+  customFeatures          Json? // extensible
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
 }
 
 model UserBillingProfile {
@@ -709,6 +777,10 @@ model User {
   deletedAt                DateTime?
   phoneNumber              String?                  @db.VarChar(30)
   phoneVerifiedAt          DateTime?
+  // §2.10 admin TOTP MFA
+  totpSecretEncrypted      String?
+  totpEnrolledAt           DateTime?
+  totpGraceUntil           DateTime?
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 
@@ -782,6 +854,7 @@ model User {
   adminRole                     AdminRole?
   userPhoneOtps                 UserPhoneOtp[]
   smsDeliveryLogs               SmsDeliveryLog[]
+  learningProgress              LearningProgress[]
 
   @@index([role])
   @@index([createdAt])
@@ -794,6 +867,9 @@ model Employer {
   website     String?
   location    String
   bio         String?
+  logoUrl     String?  @db.VarChar(500)
+  brandColor  String?  @db.VarChar(7)
+  accentColor String?  @db.VarChar(7)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -870,6 +946,21 @@ model Job {
   location    String
   type        String
   jobField    String?   @db.VarChar(80)
+  // §4.1 — controlled taxonomy fields. `jobField` is the legacy free-text
+  // tag; `taxonomyField` is the new controlled-vocabulary value (one of
+  // the strings in src/lib/jobs/taxonomy.ts JOB_TAXONOMY). Reads/filters
+  // should prefer `taxonomyField` once backfill completes.
+  taxonomyField      String? @db.VarChar(40)
+  taxonomyVersion    Int?
+  taxonomyConfidence Float?
+  // §5.1 — apply pathway routing. Computed at ingest by
+  // backend/src/lib/jobs/apply-strategy.ts (PR O). The strategy is the
+  // single source of truth the per-application submission tracks (PR Q–T)
+  // dispatch on. applyEmailDetected/applyFormDomain carry the parsed
+  // artefacts the EMAIL_DRAFT and OPERATOR_HANDOFF tracks need.
+  applyStrategy       ApplyStrategy?
+  applyEmailDetected  String?
+  applyFormDomain     String?
   workplaceType String? @db.VarChar(32)
   seniority   String
   salaryMin   Int?
@@ -892,6 +983,9 @@ model Job {
   applicationUrl             String?
   companyCareerSourceId      String?
   sourceFingerprint          String?               @db.VarChar(80)
+  // §4.2 — tri-key dedup K1 (`normCompany:normTitle:normCity`). Persisted
+  // for O(1) lookup on insert; populated by the ingest write-path.
+  dedupKeyV2                 String?               @db.VarChar(255)
   sourceLineage              Json?
   sourceFirstSeenAt          DateTime?
   sourceLastSeenAt           DateTime?
@@ -905,6 +999,9 @@ model Job {
   // Job expiry tracking
   expiresAt        DateTime? // when the listing expires (from source or heuristic)
   lastCheckedAt    DateTime? // last time we verified the listing is still live
+  // §4.4 — incremented by the stale-check worker on each failed re-fetch;
+  // reset to 0 on a successful one. Flips isExpired=true after 3 strikes.
+  staleCheckFailures Int            @default(0)
   isExpired        Boolean        @default(false)
   riskScore        Int            @default(0)
   riskLevel        TrustRiskLevel @default(LOW)
@@ -935,12 +1032,15 @@ model Job {
   @@index([location])
   @@index([type])
   @@index([jobField])
+  @@index([taxonomyField])
   @@index([workplaceType])
   @@index([seniority])
   @@index([visaSponsorship])
   @@index([jobSource])
   @@index([sourceId])
   @@index([sourceFingerprint])
+  @@index([dedupKeyV2])
+  @@index([applyStrategy])
   @@index([companyCareerSourceId])
   @@index([isExpired, status])
   @@index([expiresAt])
@@ -987,6 +1087,19 @@ model Application {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
+  // §5.1 — Draft → Preview → Submit state machine. submissionStatus tracks
+  // the apply-pathway lifecycle separately from the employer-facing `status`
+  // (which is REVIEWING/SHORTLISTED/etc.). The submission proof fields land
+  // when the chosen track records evidence of a real submission.
+  submissionStatus                SubmissionStatus     @default(NOT_SUBMITTED)
+  submissionProvider              String?
+  submissionProviderApplicationId String?
+  submissionProofKind             SubmissionProofKind?
+  submissionProofRef              String?
+  submittedAt                     DateTime?
+  submissionAttempts              Int                  @default(0)
+  lastSubmissionError             String?
+
   jobId String
   job   Job    @relation(fields: [jobId], references: [id])
 
@@ -1000,6 +1113,7 @@ model Application {
   trustCases          TrustCase[]
   atsLink             ATSApplicationLink?
   candidateAgentTasks CandidateAgentTask[]
+  applyAttempts       ApplyAttempt[]
 
   @@unique([jobId, candidateId])
   @@index([jobId])
@@ -1007,6 +1121,47 @@ model Application {
   @@index([status])
   @@index([createdAt(sort: Desc)])
   @@index([riskLevel, riskScore])
+  // §5.1 — admin queue + per-track worker scans.
+  @@index([submissionStatus])
+  @@index([submittedAt(sort: Desc)])
+}
+
+// §5.9 — employer opt-out from the EMAIL_DRAFT track. The apply-strategy
+// classifier downgrades EMAIL_DRAFT → ASSISTED_REDIRECT for jobs whose
+// detected apply-email domain matches an unexpired row. Default 12-month
+// window per master prompt §5.9.
+model EmployerApplyOptOut {
+  id         String               @id @default(uuid())
+  domain     String               @unique @db.VarChar(255)
+  optedOutAt DateTime             @default(now())
+  expiresAt  DateTime
+  source     EmployerOptOutSource
+  reason     String?
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+
+  @@index([expiresAt])
+}
+
+// §5.6 — one row per click-out attempt. The 24h-nudge worker reads PENDING
+// rows + sends the candidate a "did you complete the application?" prompt;
+// rows still PENDING after 7 days transition to NO_RESPONSE_TIMEOUT and
+// move the parent Application to FAILED.
+model ApplyAttempt {
+  id                String                 @id @default(uuid())
+  applicationId     String
+  application       Application            @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  clickedAt         DateTime               @default(now())
+  sourceUrl         String?
+  applicationUrl    String?
+  nudgeSentAt       DateTime?
+  candidateResponse CandidateApplyResponse @default(PENDING)
+  respondedAt       DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@index([applicationId, createdAt(sort: Desc)])
+  @@index([candidateResponse, clickedAt])
 }
 
 // ──────────────── AI Skills Models ────────────────
@@ -1425,6 +1580,14 @@ model CandidateResumeVersion {
   plainText          String                     @db.Text
   keywords           String[]
   score              Int?
+  // Wave 5 PR #1: ATS rubric tailoring fields. `originalContent` holds the
+  // unedited resume snapshot; `optimizedContent` holds the rubric-tailored
+  // resume; `atsScore` / `matchScore` are the 0–100 outputs of the ATS rubric
+  // scoring service (Wave 5 PR #2).
+  originalContent    Json?
+  optimizedContent   Json?
+  atsScore           Int?
+  matchScore         Int?
   notes              String[]
   isPrimary          Boolean                    @default(false)
   createdAt          DateTime                   @default(now())
@@ -1436,6 +1599,7 @@ model CandidateResumeVersion {
   @@index([userId, isPrimary, updatedAt(sort: Desc)])
   @@index([jobId, createdAt(sort: Desc)])
   @@index([status, updatedAt(sort: Desc)])
+  @@index([jobId, atsScore(sort: Desc)])
 }
 
 model CandidateAgentTask {
@@ -2593,6 +2757,22 @@ model LearningResource {
   @@index([featured])
 }
 
+model LearningProgress {
+  id            String                 @id @default(uuid())
+  userId        String
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resourceId    String                 @db.VarChar(160)
+  status        LearningProgressStatus @default(NOT_STARTED)
+  lastStepIndex Int                    @default(0)
+  completedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@unique([userId, resourceId])
+  @@index([userId, status])
+  @@index([resourceId])
+}
+
 model LearningFeedback {
   id               String                 @id @default(uuid())
   areaSlug         String                 @db.VarChar(120)
@@ -3036,4 +3216,51 @@ model SmsDeliveryLog {
   @@index([phoneNumber, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
   @@index([template, createdAt(sort: Desc)])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resume Template Catalog (Premium digital bundles)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ResumeTemplate {
+  id            String   @id @default(uuid())
+  name          String   @db.VarChar(120)
+  description   String   @db.Text
+  thumbnailUrl  String   @db.VarChar(500)
+  tags          String[] @default([])
+  bestFor       String[] @default([]) // e.g. "entry", "senior", "tech", "creative", "healthcare"
+  minPlan       SubscriptionPlan @default(PROFESSIONAL)
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  files         TemplateFile[]
+  downloads     TemplateDownload[]
+}
+
+model TemplateFile {
+  id            String   @id @default(uuid())
+  templateId    String
+  template      ResumeTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  format        String   @db.VarChar(20) // "HTML", "PDF", "DOCX", "GOOGLE_DOCS", "CANVA"
+  s3Key         String?  @db.VarChar(500) // null for external links
+  externalUrl   String?  @db.VarChar(500) // for Canva/Google Docs links
+  fileSizeBytes Int?
+  createdAt     DateTime @default(now())
+}
+
+model TemplateDownload {
+  id            String   @id @default(uuid())
+  userId        String
+  templateId    String
+  template      ResumeTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  format        String   @db.VarChar(20)
+  source        String   @db.VarChar(40) // "gallery", "resume_builder", "ats_recommendation"
+  downloadedAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([templateId])
+  @@index([userId, downloadedAt(sort: Desc)])
 }

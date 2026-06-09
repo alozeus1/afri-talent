@@ -38,7 +38,7 @@ export async function uploadVerificationFile(
   });
 
   if (!response.ok) {
-    throw new Error("Failed to upload the verification file.");
+    throw new Error(`Failed to upload the verification file. S3 returned ${response.status}.`);
   }
 
   return {

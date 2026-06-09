@@ -29,7 +29,7 @@ export function Footer() {
       <div className="page-frame py-14">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
-            <Link href="/" className="mb-5 flex items-center space-x-3">
+            <Link href="/" prefetch={false} className="mb-5 flex items-center space-x-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-500 bg-emerald-600 shadow-sm">
                 <span className="font-display text-lg font-bold text-white">A</span>
               </div>
@@ -47,42 +47,42 @@ export function Footer() {
             <h3 className="font-semibold text-lg mb-4">For Candidates</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/jobs" className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/jobs" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Browse Jobs
                 </Link>
               </li>
               <li>
-                <Link href="/companies" className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/companies" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Company Reviews
                 </Link>
               </li>
               <li>
-                <Link href="/salaries" className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/salaries" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Salary Comparison
                 </Link>
               </li>
               <li>
-                <Link href="/interviews" className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/interviews" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Interview Prep
                 </Link>
               </li>
               <li>
-                <Link href="/immigration" className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/immigration" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Visa Tracker
                 </Link>
               </li>
               <li>
-                <Link href="/learning" className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/learning" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Learning Hub
                 </Link>
               </li>
               <li>
-                <Link href="/resources" className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/resources" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Career Resources
                 </Link>
               </li>
               <li>
-                <Link href="/billing" className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/billing" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Pricing
                 </Link>
               </li>
@@ -93,17 +93,17 @@ export function Footer() {
             <h3 className="font-semibold text-lg mb-4">For Employers</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/register?role=employer" className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/register?role=employer" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Post a Job
                 </Link>
               </li>
               <li>
-                <Link href="/employer/talent" className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/employer/talent" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Browse Talent
                 </Link>
               </li>
               <li>
-                <Link href="/resources" className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/hiring-resources" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Hiring Resources
                 </Link>
               </li>
@@ -131,10 +131,10 @@ export function Footer() {
 
           {/* Legal nav */}
           <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-zinc-600 dark:text-zinc-400">
-            <Link href="/privacy-policy" className="hover:text-zinc-950 dark:hover:text-white transition-colors">Privacy Policy</Link>
-            <Link href="/terms-of-service" className="hover:text-zinc-950 dark:hover:text-white transition-colors">Terms of Service</Link>
-            <Link href="/cookies-policy" className="hover:text-zinc-950 dark:hover:text-white transition-colors">Cookies Policy</Link>
-            <Link href="/accessibility" className="hover:text-zinc-950 dark:hover:text-white transition-colors">Accessibility</Link>
+            <Link href="/privacy-policy" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Privacy Policy</Link>
+            <Link href="/terms-of-service" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Terms of Service</Link>
+            <Link href="/cookies-policy" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Cookies Policy</Link>
+            <Link href="/accessibility" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Accessibility</Link>
           </nav>
 
           <p className="whitespace-nowrap text-sm text-zinc-600 dark:text-zinc-400">

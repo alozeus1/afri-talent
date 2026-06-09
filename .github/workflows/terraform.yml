@@ -149,3 +149,124 @@ jobs:
         with:
           name: terraform-plan
           path: infra/terraform/tfplan.txt
+
+  # ---------------------------------------------------------------------------
+  # New-account migration target: validate + plan against accounts/dev-new.
+  # Runs on PRs only; uses the new-account OIDC role when configured.
+  # ---------------------------------------------------------------------------
+  validate-dev-new:
+    name: Terraform Validate (dev-new)
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    needs: [changes]
+    if: needs.changes.outputs.infra_changed == 'true'
+    defaults:
+      run:
+        working-directory: infra/terraform/accounts/dev-new
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Skip if dev-new not yet wired
+        id: probe
+        shell: bash
+        run: |
+          if [ ! -f main.tf ] && [ ! -f versions.tf ]; then
+            echo "dev-new account stack not present; skipping."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Terraform
+        if: steps.probe.outputs.present == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform fmt (recursive, repo-wide)
+        if: steps.probe.outputs.present == 'true'
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init (no backend)
+        if: steps.probe.outputs.present == 'true'
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        if: steps.probe.outputs.present == 'true'
+        run: terraform validate
+
+  plan-dev-new:
+    name: Terraform Plan (dev-new)
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    needs: [changes, validate-dev-new, checkov]
+    if: github.event_name == 'pull_request' && needs.changes.outputs.infra_changed == 'true' && vars.AWS_ACCOUNT_ID != '' && github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      OIDC_ROLE_NAME: ${{ vars.OIDC_ROLE_NAME || 'afritalent-dev-github-deploy' }}
+    defaults:
+      run:
+        working-directory: infra/terraform/accounts/dev-new
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Skip if dev-new not yet wired
+        id: probe
+        shell: bash
+        run: |
+          if [ ! -f main.tf ] && [ ! -f versions.tf ]; then
+            echo "dev-new account stack not present; skipping."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Terraform
+        if: steps.probe.outputs.present == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials (new account, OIDC)
+        if: steps.probe.outputs.present == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ env.OIDC_ROLE_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform init
+        if: steps.probe.outputs.present == 'true'
+        env:
+          TF_BACKEND_BUCKET: afritalent-${{ vars.AWS_ACCOUNT_ID }}-tfstate
+          TF_BACKEND_LOCK_TABLE: afritalent-${{ vars.AWS_ACCOUNT_ID }}-tflocks
+        run: |
+          terraform init \
+            -backend-config="bucket=${TF_BACKEND_BUCKET}" \
+            -backend-config="dynamodb_table=${TF_BACKEND_LOCK_TABLE}" \
+            -backend-config="key=dev-new/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="encrypt=true" \
+            -input=false
+
+      - name: Terraform plan (read-only)
+        if: steps.probe.outputs.present == 'true'
+        run: |
+          terraform plan \
+            -input=false \
+            -no-color \
+            -lock=false \
+            -out=tfplan-dev-new
+
+      - name: Export plan text
+        if: steps.probe.outputs.present == 'true'
+        run: terraform show -no-color tfplan-dev-new > tfplan-dev-new.txt
+
+      - name: Upload plan artifact
+        if: steps.probe.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-dev-new
+          path: infra/terraform/accounts/dev-new/tfplan-dev-new.txt

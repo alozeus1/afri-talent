@@ -1,5 +1,22 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
+const CSRF_COOKIE_NAME = "afri_csrf";
+
+// §2.3 — read the CSRF token written by /api/auth/me. The cookie is not
+// HttpOnly on purpose; document.cookie can see it from same-origin JS.
+function readCsrfCookie(): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie.match(
+    new RegExp(`(?:^|;\\s*)${CSRF_COOKIE_NAME}=([^;]*)`),
+  );
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
+function isMutating(method: string | undefined): boolean {
+  const m = (method || "GET").toUpperCase();
+  return m !== "GET" && m !== "HEAD" && m !== "OPTIONS";
+}
+
 interface FetchOptions extends RequestInit {
   token?: string;
 }
@@ -28,6 +45,15 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
 
+  // §2.3 — attach CSRF token on mutating requests (the backend skips this for
+  // exempt routes; sending it always is harmless but tighten to non-GET only).
+  if (isMutating(fetchOptions.method)) {
+    const csrf = readCsrfCookie();
+    if (csrf) {
+      (headers as Record<string, string>)["X-CSRF-Token"] = csrf;
+    }
+  }
+
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...fetchOptions,
     headers,
@@ -50,6 +76,14 @@ async function fetchMultipartAPI<T>(endpoint: string, options: Omit<FetchOptions
 
   if (token) {
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+  }
+
+  // §2.3 — same CSRF rule for multipart uploads.
+  if (isMutating(fetchOptions.method)) {
+    const csrf = readCsrfCookie();
+    if (csrf) {
+      (headers as Record<string, string>)["X-CSRF-Token"] = csrf;
+    }
   }
 
   const response = await fetch(`${API_URL}${endpoint}`, {
@@ -133,7 +167,7 @@ export const jobs = {
     fetchAPI<Job>(`/api/jobs/${slug}`),
 
   create: (data: CreateJobData, token?: string) =>
-    fetchAPI<Job>("/api/jobs", {
+    fetchAPI<Job & { pendingReason: string | null }>("/api/jobs", {
       method: "POST",
       body: JSON.stringify(data),
       token,
@@ -647,7 +681,15 @@ export const employerAnalytics = {
       body: JSON.stringify(data),
     }),
   getBranding: () => fetchAPI<EmployerBranding>("/api/employer/branding"),
-  updateBranding: (data: { companyName?: string; website?: string; location?: string; bio?: string }) =>
+  updateBranding: (data: {
+    companyName?: string;
+    website?: string;
+    location?: string;
+    bio?: string;
+    logoUrl?: string;
+    brandColor?: string;
+    accentColor?: string;
+  }) =>
     fetchAPI<EmployerBranding>("/api/employer/branding", {
       method: "PUT",
       body: JSON.stringify(data),
@@ -1426,6 +1468,7 @@ export interface CreateJobData {
   currency?: string;
   salaryPeriod?: string;
   tags?: string[];
+  applicationUrl?: string;
 }
 
 export interface Application {
@@ -1451,6 +1494,8 @@ export interface Application {
     name: string;
     email: string;
   };
+  locked?: boolean;
+  upgradeRequired?: boolean;
 }
 
 export interface Resource {
@@ -2392,6 +2437,11 @@ export interface EmployerBranding {
   website: string | null;
   location: string;
   bio: string | null;
+  logoUrl: string | null;
+  brandColor: string | null;
+  accentColor: string | null;
+  premiumBrandingEnabled: boolean;
+  subscriptionPlan: BillingStatus["plan"];
 }
 
 export type EmployerOnboardingStep =
@@ -2553,6 +2603,14 @@ export const notifications = {
   },
   unreadCount: () => fetchAPI<{ count: number }>("/api/notifications/unread-count"),
   markRead: (id: string) => fetchAPI<{ notification: NotificationItem }>(`/api/notifications/${id}/read`, { method: "PUT" }),
+  feedback: (
+    id: string,
+    feedback: "RELEVANT" | "NOT_RELEVANT" | "TOO_MANY" | "WRONG_ROLE" | "WRONG_LOCATION",
+  ) =>
+    fetchAPI<{ notification: NotificationItem }>(`/api/notifications/${id}/feedback`, {
+      method: "PUT",
+      body: JSON.stringify({ feedback }),
+    }),
   markAllRead: () => fetchAPI<{ updated: number }>("/api/notifications/read-all", { method: "PUT" }),
 };
 
@@ -2750,6 +2808,15 @@ export const learning = {
   },
   categories: () => fetchAPI<string[]>("/api/learning/categories"),
   recommended: () => fetchAPI<LearningResourceItem[]>("/api/learning/recommended"),
+  progress: () => fetchAPI<{ progress: LearningProgressItem[] }>("/api/learning/progress"),
+  updateProgress: (
+    id: string,
+    data: { status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED"; lastStepIndex?: number },
+  ) =>
+    fetchAPI<{ progress: LearningProgressItem }>(`/api/learning/${id}/progress`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   get: (id: string) => fetchAPI<LearningResourceItem>(`/api/learning/${id}`),
   feedback: {
     submit: (data: LearningFeedbackSubmitInput) =>
@@ -3182,6 +3249,17 @@ export interface LearningListResponse {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
+export interface LearningProgressItem {
+  id: string;
+  userId: string;
+  resourceId: string;
+  status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+  lastStepIndex: number;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface LearningFeedbackSubmitInput {
   areaSlug: string;
   lessonTitle?: string;
@@ -3339,6 +3417,44 @@ export interface GeneratedResume {
   source: "ai" | "template";
 }
 
+// ── Resume builder rubric types ──────────────────────────────────────────────
+// Mirror of backend/src/lib/resume/rubric-schema.ts (verified verbatim against
+// commit 630696a). The `criteria` array is intentionally extensible — adding
+// `seniority_signals` / `ats_compatibility_format` to the backend rubric
+// requires zero frontend changes, since the UI iterates the array.
+export type ResumeContent = Record<string, unknown>;
+
+export interface RubricCriterion {
+  key: string;
+  label: string;
+  score: number;     // 0..100 integer
+  weight: number;    // 0..100 integer; sums to 100 across criteria
+  notes: string[];
+  present?: string[];
+  missing?: string[];
+}
+
+export interface AtsRubricResponse {
+  resumeVersionId: string | null;
+  atsScore: number;
+  matchScore: number | null;
+  criteria: RubricCriterion[];
+  suggestions: string[];
+  optimizedContent: ResumeContent | null;
+  source: "ai" | "template";
+}
+
+// Thrown by `skills.scoreAtsRubric` on non-2xx so callers can read the
+// distinctive backend code (RESUME_TOO_LARGE / RESUME_FIELD_TOO_LARGE / etc.)
+// and the size hints the route surfaces with 413/400 responses.
+export interface AtsRubricError {
+  status: number;
+  code?: string;
+  message?: string;
+  limit_bytes?: number;
+  received_bytes?: number;
+}
+
 export interface JobMatch {
   jobId: string;
   title: string;
@@ -3493,6 +3609,56 @@ export const skills = {
       body: JSON.stringify(data),
     }),
 
+  // Wave 5 — ATS rubric scoring. Uses direct fetch (not fetchAPI) so the error
+  // body's `code` / `limit_bytes` / `received_bytes` fields survive the
+  // throw; fetchAPI flattens those into a single Error message and we lose
+  // the distinctive error codes from PR #92.
+  // Source of truth: backend/src/lib/resume/rubric-schema.ts @ 630696a,
+  //                  backend/src/routes/skills/resume-builder.ts @ 3a07488.
+  scoreAtsRubric: async (data: {
+    resumeContent: ResumeContent;
+    targetJobId?: string;
+    targetJobDescription?: string;
+  }): Promise<AtsRubricResponse> => {
+    // Omit undefined keys to match the backend's
+    // `null | undefined | missing` equivalence (see route handler line 273).
+    const body: Record<string, unknown> = { resumeContent: data.resumeContent };
+    if (data.targetJobId) body.targetJobId = data.targetJobId;
+    if (data.targetJobDescription) body.targetJobDescription = data.targetJobDescription;
+
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const csrf = readCsrfCookie();
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+
+    const res = await fetch(`${API_URL}/api/skills/resume-builder/ats-rubric/score`, {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok) {
+      return res.json() as Promise<AtsRubricResponse>;
+    }
+
+    let payload: Partial<AtsRubricError> = {};
+    try {
+      payload = (await res.json()) as Partial<AtsRubricError>;
+    } catch {
+      // Body wasn't JSON; fall through with empty payload — `code` will be
+      // undefined and toFriendlyError will use the generic 4xx/5xx branch.
+    }
+
+    const err: AtsRubricError = {
+      status: res.status,
+      code: payload.code,
+      message: payload.message,
+      limit_bytes: payload.limit_bytes,
+      received_bytes: payload.received_bytes,
+    };
+    throw err;
+  },
+
   // Career Gap Explainer
   explainCareerGap: (data: { gapStartDate: string; gapEndDate: string; activities?: string; targetRole?: string }) =>
     fetchAPI<{ explanation: string; framing: string; talkingPoints: string[]; source: "ai" | "template" }>("/api/career-gap/explain", {
@@ -3506,4 +3672,55 @@ export const skills = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+};
+
+// ── Resume Templates ──────────────────────────────────────────────────────────
+
+export type SubscriptionPlan =
+  | "FREE"
+  | "BASIC"
+  | "PROFESSIONAL"
+  | "EMPLOYER_FREE"
+  | "EMPLOYER_BASIC"
+  | "EMPLOYER_PREMIUM";
+
+export interface ResumeTemplate {
+  id: string;
+  name: string;
+  description: string;
+  thumbnailUrl: string;
+  tags: string[];
+  bestFor: string[];
+  minPlan: SubscriptionPlan;
+  sortOrder: number;
+  files: Array<{
+    id: string;
+    format: string;
+    s3Key: string | null;
+    externalUrl: string | null;
+    fileSizeBytes: number | null;
+  }>;
+  isLocked: boolean;
+  totalDownloads: number;
+}
+
+export interface TemplateListResponse {
+  templates: ResumeTemplate[];
+  userPlan: SubscriptionPlan;
+  userDownloadsThisMonth: number;
+  quota: number | null;
+  canDownload: boolean;
+}
+
+export interface TemplateDownloadResponse {
+  downloadUrl: string;
+  expiresAt: string | null;
+}
+
+export const templates = {
+  list: () => fetchAPI<TemplateListResponse>("/api/skills/resume-templates"),
+  download: (id: string, format: string) =>
+    fetchAPI<TemplateDownloadResponse>(`/api/skills/resume-templates/${id}/download?format=${encodeURIComponent(format)}`),
+  fill: (id: string) =>
+    fetchAPI<TemplateDownloadResponse>(`/api/skills/resume-templates/${id}/fill`, { method: "POST" }),
 };

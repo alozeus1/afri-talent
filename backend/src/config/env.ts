@@ -26,6 +26,10 @@ export function validateRuntimeEnv(): void {
   requireEnv("FRONTEND_URL");
 
   if (nodeEnv === "production" || nodeEnv === "staging") {
+    // §2.1 startup self-test: fail fast on missing critical production env.
+    // JWT_SECRET also throws at module load in jwt.ts; this list catches the
+    // rest of the production essentials so a misconfigured deploy never serves
+    // traffic.
     requireEnv("JWT_SECRET");
 
     // If Flutterwave payments are enabled, the webhook signature secret is
@@ -34,5 +38,7 @@ export function validateRuntimeEnv(): void {
     if (process.env.FLUTTERWAVE_SECRET_KEY?.trim()) {
       requireEnv("FLUTTERWAVE_SECRET_HASH");
     }
+    requireEnv("ANTHROPIC_API_KEY");
+    requireEnv("SENTRY_DSN");
   }
 }

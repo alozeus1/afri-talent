@@ -1,0 +1,62 @@
+{
+  "afritalent_employer_premium": {
+    "name": "AfriTalent Employer Premium",
+    "prices": {
+      "usd": {
+        "yearly": "price_1TJmIeIVndXzaBq6O8qd2V27",
+        "monthly": "price_1TJmIdIVndXzaBq6QPFKFwSI",
+        "discount_yearly": "price_1TJmIaIVndXzaBq6FVcQtwFV",
+        "discount_monthly": "price_1TJmIZIVndXzaBq6fqYtIgE7"
+      },
+      "eur": {
+        "yearly": "price_1TJmIcIVndXzaBq6rEaA4Kjm",
+        "monthly": "price_1TJmIbIVndXzaBq6dWDK66P8"
+      }
+    }
+  },
+  "afritalent_employer_basic": {
+    "name": "AfriTalent Employer Basic",
+    "prices": {
+      "usd": {
+        "yearly": "price_1TJmIPIVndXzaBq6PVcP65gg",
+        "monthly": "price_1TJmIOIVndXzaBq66VbAF1Ri",
+        "discount_yearly": "price_1TJmILIVndXzaBq6cFFXkR0J",
+        "discount_monthly": "price_1TJmIKIVndXzaBq6zszokqoy"
+      },
+      "eur": {
+        "yearly": "price_1TJmINIVndXzaBq6vSNXgEN6",
+        "monthly": "price_1TJmIMIVndXzaBq6WpAvsKoK"
+      }
+    }
+  },
+  "afritalent_professional": {
+    "name": "AfriTalent Professional",
+    "prices": {
+      "usd": {
+        "yearly": "price_1TJmIZIVndXzaBq6FpV54E7o",
+        "monthly": "price_1TJmIXIVndXzaBq6Rj5oyRai",
+        "discount_yearly": "price_1TJmI3IVndXzaBq6aBiKSL2E",
+        "discount_monthly": "price_1TJmI2IVndXzaBq6sBL5YZni"
+      },
+      "eur": {
+        "yearly": "price_1TJmI5IVndXzaBq6jvXoJveq",
+        "monthly": "price_1TJmI4IVndXzaBq6Uncr7417"
+      }
+    }
+  },
+  "afritalent_basic": {
+    "name": "AfriTalent Basic",
+    "prices": {
+      "usd": {
+        "yearly": "price_1TJmIJIVndXzaBq6jNqLUYMr",
+        "monthly": "price_1TJmIIIVndXzaBq6pRSPhlmH",
+        "discount_yearly": "price_1TJmHzIVndXzaBq6clpeEsa9",
+        "discount_monthly": "price_1TJmHyIVndXzaBq6zL81AHtU"
+      },
+      "eur": {
+        "yearly": "price_1TJmI1IVndXzaBq6QdI2PKH1",
+        "monthly": "price_1TJmI0IVndXzaBq63NLldsi1"
+      }
+    }
+  }
+}

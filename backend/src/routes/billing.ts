@@ -243,6 +243,7 @@ router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Reque
         amountMinor: regionalPrice?.amount ?? null,
         reasonCode: "flutterwave_checkout",
         metadata: {
+          plan,
           interval,
           provider: BillingProvider.FLUTTERWAVE,
           checkoutUrl: session.link,
@@ -408,28 +409,54 @@ router.post("/verify-checkout", authenticate, requireVerifiedEmail(), async (req
       return;
     }
 
-    const verified = await verifyFlutterwaveTransaction(payload.transactionId);
-    const checkoutEvent = payload.txRef
-      ? await prisma.billingEventAudit.findFirst({
-          where: {
-            eventId: payload.txRef,
-            userId: req.user!.userId,
-          },
-          orderBy: { createdAt: "desc" },
-        })
-      : null;
+    if (!payload.txRef) {
+      res.status(400).json({ error: "txRef is required for Flutterwave verification" });
+      return;
+    }
 
-    const metadata = (checkoutEvent?.metadata ?? {}) as Record<string, unknown>;
-    const plan = (metadata.plan as SubscriptionPlan | undefined) ?? SubscriptionPlan.BASIC;
+    const verified = await verifyFlutterwaveTransaction(payload.transactionId);
+    const checkoutEvent = await prisma.billingEventAudit.findFirst({
+      where: {
+        eventId: payload.txRef,
+        userId: req.user!.userId,
+        source: "FLUTTERWAVE_CHECKOUT",
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!checkoutEvent) {
+      res.status(404).json({ error: "Flutterwave checkout reference was not found for this user" });
+      return;
+    }
+
+    const metadata = (checkoutEvent.metadata ?? {}) as Record<string, unknown>;
+    const plan = (checkoutEvent.plan as SubscriptionPlan | null)
+      ?? (metadata.plan as SubscriptionPlan | undefined);
+
+    if (!plan) {
+      res.status(409).json({ error: "Flutterwave checkout reference is missing plan metadata" });
+      return;
+    }
+
     const currentSubscription = await prisma.subscription.findUnique({
       where: { userId: req.user!.userId },
     });
 
     if (
       verified.status.toLowerCase() !== "successful"
-      || (payload.txRef && verified.tx_ref !== payload.txRef)
+      || verified.tx_ref !== payload.txRef
     ) {
       res.status(409).json({ error: "Flutterwave transaction has not completed successfully yet" });
+      return;
+    }
+
+    if (checkoutEvent.amountMinor !== null && Math.round(verified.amount * 100) !== checkoutEvent.amountMinor) {
+      res.status(409).json({ error: "Flutterwave transaction amount does not match checkout reference" });
+      return;
+    }
+
+    if (checkoutEvent.currency && verified.currency.toUpperCase() !== checkoutEvent.currency.toUpperCase()) {
+      res.status(409).json({ error: "Flutterwave transaction currency does not match checkout reference" });
       return;
     }
 
