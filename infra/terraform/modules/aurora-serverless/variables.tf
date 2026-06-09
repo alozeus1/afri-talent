@@ -91,6 +91,17 @@ variable "seconds_until_auto_pause" {
   }
 }
 
+variable "storage_type" {
+  description = "Aurora storage configuration. aurora is Standard; aurora-iopt1 is I/O-Optimized."
+  type        = string
+  default     = "aurora-iopt1"
+
+  validation {
+    condition     = contains(["aurora", "aurora-iopt1"], var.storage_type)
+    error_message = "storage_type must be either aurora or aurora-iopt1."
+  }
+}
+
 variable "deletion_protection" {
   description = "Whether to enable deletion protection on the cluster. PROD MUST OVERRIDE TO TRUE."
   type        = bool

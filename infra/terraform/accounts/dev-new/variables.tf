@@ -89,6 +89,17 @@ variable "aurora_seconds_until_auto_pause" {
   default     = 1800
 }
 
+variable "aurora_storage_type" {
+  type        = string
+  description = "Aurora storage configuration. Use aurora for build-phase Standard storage; aurora-iopt1 is I/O-Optimized."
+  default     = "aurora"
+
+  validation {
+    condition     = contains(["aurora", "aurora-iopt1"], var.aurora_storage_type)
+    error_message = "aurora_storage_type must be either aurora or aurora-iopt1."
+  }
+}
+
 variable "aurora_engine_version" {
   type        = string
   description = "Aurora PostgreSQL engine version for the existing dev cluster. Keep aligned with live AWS to avoid invalid downgrade attempts."
@@ -162,7 +173,7 @@ variable "ecs_desired_count" {
 variable "ecs_fargate_base" {
   type        = number
   description = "Base on-demand task count before Fargate Spot kicks in."
-  default     = 1
+  default     = 0
 }
 
 variable "ecs_fargate_spot_weight" {

@@ -103,10 +103,11 @@ resource "aws_rds_cluster" "aurora" {
   manage_master_user_password   = true
   master_user_secret_kms_key_id = aws_kms_key.aurora.arn
 
-  # Storage: encrypted with our CMK; I/O-Optimized for I/O-heavy workloads.
+  # Storage: encrypted with our CMK. Build-phase dev can use Aurora Standard;
+  # production or I/O-heavy environments can use I/O-Optimized.
   storage_encrypted = true
   kms_key_id        = aws_kms_key.aurora.arn
-  storage_type      = "aurora-iopt1"
+  storage_type      = var.storage_type
 
   db_subnet_group_name            = aws_db_subnet_group.aurora.name
   vpc_security_group_ids          = [var.sg_aurora_id]

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
-import { TrustEntityType } from "@prisma/client";
+import { Role, TrustEntityType } from "@prisma/client";
 import prisma from "../lib/prisma.js";
 import { authenticate } from "../middleware/auth.js";
 import { newMessageEmail } from "../lib/email.js";
@@ -224,8 +224,90 @@ router.post("/threads", authenticate, requireAccountStanding(), async (req: Requ
       return;
     }
 
+    let resolvedParticipantId = data.participantId;
+    let resolvedJobId = data.jobId || null;
+    let resolvedApplicationId = data.applicationId || null;
+
+    if (data.applicationId) {
+      const application = await prisma.application.findUnique({
+        where: { id: data.applicationId },
+        select: {
+          id: true,
+          candidateId: true,
+          jobId: true,
+          job: {
+            select: {
+              employer: { select: { userId: true } },
+            },
+          },
+        },
+      });
+
+      if (!application) {
+        res.status(404).json({ error: "Application not found" });
+        return;
+      }
+
+      if (data.jobId && data.jobId !== application.jobId) {
+        res.status(400).json({ error: "jobId does not match application" });
+        return;
+      }
+
+      const employerUserId = application.job.employer?.userId;
+      const expectedParticipantId = userId === application.candidateId
+        ? employerUserId
+        : userId === employerUserId
+          ? application.candidateId
+          : null;
+
+      if (req.user!.role !== Role.ADMIN && !expectedParticipantId) {
+        res.status(403).json({ error: "You are not authorized to message about this application" });
+        return;
+      }
+
+      const applicationParticipantIds = [application.candidateId, employerUserId].filter(Boolean);
+      if (expectedParticipantId && data.participantId !== expectedParticipantId) {
+        res.status(403).json({ error: "Participant does not match this application" });
+        return;
+      }
+
+      if (!expectedParticipantId && !applicationParticipantIds.includes(data.participantId)) {
+        res.status(403).json({ error: "Participant does not match this application" });
+        return;
+      }
+
+      resolvedParticipantId = expectedParticipantId ?? data.participantId;
+      resolvedJobId = application.jobId;
+      resolvedApplicationId = application.id;
+    } else if (data.jobId) {
+      const job = await prisma.job.findUnique({
+        where: { id: data.jobId },
+        select: { employer: { select: { userId: true } } },
+      });
+
+      if (!job) {
+        res.status(404).json({ error: "Job not found" });
+        return;
+      }
+
+      const isEmployerOwner = Boolean(job.employer?.userId && job.employer.userId === userId);
+      const isAdmin = req.user!.role === Role.ADMIN;
+      if (!isEmployerOwner && !isAdmin) {
+        res.status(403).json({ error: "Only the owning employer can start a job-scoped thread without an application" });
+        return;
+      }
+    } else {
+      res.status(400).json({ error: "applicationId or jobId is required" });
+      return;
+    }
+
+    if (resolvedParticipantId === userId) {
+      res.status(400).json({ error: "Cannot create a thread with yourself" });
+      return;
+    }
+
     const otherUser = await prisma.user.findUnique({
-      where: { id: data.participantId },
+      where: { id: resolvedParticipantId },
       select: { id: true, name: true, email: true },
     });
 
@@ -240,9 +322,9 @@ router.post("/threads", authenticate, requireAccountStanding(), async (req: Requ
     });
 
     // Check for existing thread between same participants on same application
-    if (data.applicationId) {
+    if (resolvedApplicationId) {
       const existing = await prisma.messageThread.findUnique({
-        where: { applicationId: data.applicationId },
+        where: { applicationId: resolvedApplicationId },
         include: { participants: true },
       });
       if (existing) {
@@ -256,10 +338,10 @@ router.post("/threads", authenticate, requireAccountStanding(), async (req: Requ
 
     const thread = await prisma.messageThread.create({
       data: {
-        jobId: data.jobId || null,
-        applicationId: data.applicationId || null,
+        jobId: resolvedJobId,
+        applicationId: resolvedApplicationId,
         participants: {
-          create: [{ userId }, { userId: data.participantId }],
+          create: [{ userId }, { userId: resolvedParticipantId }],
         },
         messages: {
           create: {

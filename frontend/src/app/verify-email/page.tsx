@@ -20,16 +20,14 @@ function VerifyEmailInner() {
     const verify = async () => {
       try {
         const data = await emailVerification.verify(token);
-        if (data.message) {
-          setStatus("success");
-          setMessage(data.message || "Email verified successfully!");
-          if (typeof window !== "undefined") {
-            const returnTo = sessionStorage.getItem("verifyReturnTo");
-            if (returnTo) {
-              sessionStorage.removeItem("verifyReturnTo");
-              setReturnToUrl(returnTo);
-              setTimeout(() => { window.location.href = returnTo; }, 1800);
-            }
+        setStatus("success");
+        setMessage(data.message || "Email verified successfully!");
+        if (typeof window !== "undefined") {
+          const returnTo = sessionStorage.getItem("verifyReturnTo");
+          if (returnTo) {
+            sessionStorage.removeItem("verifyReturnTo");
+            setReturnToUrl(returnTo);
+            setTimeout(() => { window.location.href = returnTo; }, 1800);
           }
         }
       } catch (verificationError) {

@@ -1,6 +1,6 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: May 10, 2026 (cross-account migration complete; OLD App Runner stack destroyed)
+Last updated: June 7, 2026 (cost anomaly remediation expanded)
 
 > [!IMPORTANT]
 > **Architecture changed on 2026-05-10.** The shared environment has moved off
@@ -8,6 +8,230 @@ Last updated: May 10, 2026 (cross-account migration complete; OLD App Runner sta
 > Serverless v2 + Lambda + CloudFront/WAF in the new AWS account `108188564905`.
 > Anything below that references `*.awsapprunner.com`, `afritalent-staging-*`
 > AWS resources, or the old account ID is historical and no longer live.
+
+## Update on June 7, 2026: Cost anomaly investigation
+
+Initial read-only local investigation used AWS credentials for old/shared
+account `260820061731`. Follow-up investigation confirmed local AWS profile
+`afritalent` resolves to live account `108188564905` and should be used for
+future live-account AWS checks from this machine.
+
+Live account `108188564905` Cost Anomaly Detection confirmed the relevant
+anomaly:
+
+- Largest anomaly: Amazon VPC, May 8-May 28, total actual/impact `$183.12`,
+  rooted in `USE1-VpcEndpoint-Hours`.
+- Before remediation, June 1-June 7 showed `$56.88` for `5,688` VPC
+  endpoint-hours, roughly `$9/day`.
+- Root cause is the Terraform VPC module creating 12 interface VPC endpoints
+  across 3 private subnets/AZs (`ecr.api`, `ecr.dkr`, `logs`, `ssm`,
+  `ssmmessages`, `ec2messages`, `secretsmanager`, `sts`, `kms`, `sqs`,
+  `states`, `events`). At about `$0.01` per endpoint-AZ-hour, this creates an
+  expected baseline of about `$8.64/day` before data processing.
+- Other live-account anomalies: RDS May 8-May 11 `$15.56` (RDS Proxy ASv2 plus
+  Aurora Serverless v2 I/O-Optimized ACU before the June 7 Standard-storage
+  switch), ECS May 8-May 15 `$12.80`, ELB May 8-May 16 `$4.52`, KMS
+  May 8-May 19 `$1.98`, CloudWatch May 13-May 16 `$1.90`.
+- Account-level June spend as of June 7 is `$112.421` with Cost Explorer
+  forecast `$489.282`.
+
+Budget guardrail issue found during investigation: the Terraform budget
+`afritalent-dev-monthly-cost` reported `$0` because its CostFilters value was
+literally `user:Project${var.project_tag_value}`. The Terraform filter was fixed
+and applied on June 7, 2026; live AWS now shows `user:Project$afritalent`.
+Cost Explorer tag filtering for `Project=afritalent` previously returned `$0`,
+so still verify that the `Project` cost-allocation tag is active in AWS Billing.
+
+Operational side finding: ECS service `afritalent-dev-backend` has desired
+count `1` but running count `0`; service events show task startup failures from
+May 16. This is not the primary cost anomaly, but it affects live environment
+health.
+
+Remediation applied on June 7, 2026:
+
+- Terraform now supports configurable interface endpoints in
+  `infra/terraform/modules/vpc`.
+- `infra/terraform/accounts/dev-new/main.tf` sets `interface_endpoints = []`,
+  keeping free S3/DynamoDB gateway endpoints and routing private subnet AWS API
+  egress through the already-running `t4g.nano` NAT instance.
+- `infra/terraform/modules/budgets/main.tf` fixes the malformed budget filter
+  so it renders `user:Project$afritalent`.
+- Validation passed: `terraform fmt`, `terraform validate`, and a targeted plan.
+- Full plan includes unrelated NAT/ECS/Lambda drift and should not be applied
+  for the cost fix.
+- Targeted apply result: `0 added, 1 changed, 12 destroyed`.
+- Post-apply verification found only the free S3 and DynamoDB Gateway endpoints
+  for `afritalent-dev-vpce-*`; no paid Interface endpoints remain.
+- NAT fallback remains available: `afritalent-dev-nat-instance` is running as
+  `t4g.nano`.
+- Follow-up cost controls also applied on June 7:
+  - Aurora `afritalent-dev-aurora` switched in place from I/O-Optimized
+    (`aurora-iopt1`) to Standard (`aurora`). Live RDS now reports the cluster
+    `available`; `StorageType` is `null` in `describe-db-clusters`, which is
+    the API shape observed for Standard.
+  - ECS service capacity-provider strategies changed to `FARGATE` base `0` and
+    `FARGATE_SPOT` weight `4`, preserving current task definitions.
+  - `afritalent-dev-frontend` stabilized with task definition revision `16`
+    running on `FARGATE_SPOT`.
+  - `afritalent-dev-backend` kept task definition revision `18` but remains on
+    its pre-existing unhealthy deployment path (`desired=1`, `running=0`,
+    `pending=1` after the strategy update).
+- CloudFront primary URL still responds and redirects `/` to `/en`.
+- Estimated monthly effect: VPC endpoint baseline drops by about `$260/month`.
+  Aurora Standard and Fargate Spot should reduce the remaining run rate further,
+  but the exact billing effect will show in Cost Explorer after the next 24-48
+  hours.
+
+Applied command, after explicit human approval:
+
+```bash
+cd infra/terraform/accounts/dev-new
+AWS_PROFILE=afritalent terraform apply \
+  -auto-approve \
+  -input=false \
+  -target='module.vpc.aws_vpc_endpoint.interface' \
+  -target='module.budgets.aws_budgets_budget.monthly'
+```
+
+Follow-up commands, after explicit human approval:
+
+```bash
+cd infra/terraform/accounts/dev-new
+AWS_PROFILE=afritalent terraform apply \
+  -auto-approve \
+  -input=false \
+  -target='module.aurora.aws_rds_cluster.aurora'
+
+AWS_PROFILE=afritalent aws ecs update-service \
+  --region us-east-1 \
+  --cluster afritalent-dev \
+  --service afritalent-dev-frontend \
+  --capacity-provider-strategy \
+    capacityProvider=FARGATE,weight=1,base=0 \
+    capacityProvider=FARGATE_SPOT,weight=4 \
+  --force-new-deployment
+
+AWS_PROFILE=afritalent aws ecs update-service \
+  --region us-east-1 \
+  --cluster afritalent-dev \
+  --service afritalent-dev-backend \
+  --capacity-provider-strategy \
+    capacityProvider=FARGATE,weight=1,base=0 \
+    capacityProvider=FARGATE_SPOT,weight=4 \
+  --force-new-deployment
+```
+
+For old account `260820061731`, AWS Cost Anomaly Detection returned no anomaly
+events for May 1 through June 7, 2026. Cost Explorer did show a May spend
+cluster that matches the May 10 cross-account migration and teardown window:
+
+- AfriTalent-tagged May costs were led by ElastiCache (~$29.93), EC2-Other/NAT
+  Gateway (~$11.04), RDS (~$9.52), App Runner (~$3.51), CloudWatch Synthetics
+  and monitors (~$3.32), and KMS (~$0.64).
+- Daily old-stack spend dropped after May 10. No active AfriTalent App Runner
+  services, ElastiCache caches, RDS instances, NAT gateways, or Synthetics
+  canaries were found in old account `us-east-1` during this check.
+- Remaining old-account AfriTalent items are the manual RDS snapshot
+  `afritalent-staging-pre-migration-20260510-1902`, a pending-deletion staging
+  Secrets Manager secret, a historical Synthetics Lambda log group with no
+  retention policy, and old Terraform state/lock resources.
+
+Full investigation note:
+`docs/ops/2026-06-07-cost-anomaly-investigation.md`.
+
+Cleanup candidates requiring explicit human approval:
+
+- Delete the old manual RDS snapshot after the retained safety window is no
+  longer needed.
+- Delete or set retention on the historical Synthetics Lambda log group.
+- Decide whether to archive/remove old-account Terraform state and lock
+  resources.
+- For live-account cost work, use `AWS_PROFILE=afritalent`; avoid falling back
+  to old/shared account `260820061731`.
+
+## Update on May 17, 2026: Wave 9 agent metrics promotion complete
+
+Promoted Wave 9 agent metrics/SLO work through the restored `develop` buffer
+and into `main`. The initial promotion exposed IAM guardrail sequencing gaps in
+the main deploy workflow, so two follow-up hotfixes were merged before the
+apply completed:
+
+- PR #131: allowed the GitHub deploy role to attach/detach the exact
+  `afritalent-dev-ecs-task-agent-metrics` managed policy on the exact
+  `afritalent-dev-ecs-task` role.
+- PR #133: moved the agent metrics policy attachment to the account layer and
+  made it depend on `module.iam_oidc_github` so the guardrail policy update
+  applies before Terraform attempts `iam:AttachRolePolicy`.
+
+Promotion/deploy sequence:
+
+- PR #130 promoted PR #129 to `main`, but deploy run `25980614859` failed at
+  `Terraform Apply (dev-new)` on `iam:AttachRolePolicy`.
+- PR #132 promoted PR #131 to `main`, but deploy run `25980923639` hit the same
+  guardrail denial because the attachment raced the guardrail update.
+- PR #134 promoted PR #133 to `main`; deploy run `25981178399` completed
+  successfully.
+
+Final successful deploy:
+
+- **Workflow run**: `25981178399`
+- **Commit**: `a98d09055b7cc906c69d34737c87ac29c5d3c57b`
+- **Terraform Apply (dev-new)**: success, completed `2026-05-17T04:29:56Z`
+- **Smoke Test**: success, completed `2026-05-17T04:30:07Z`
+
+Operational note: GitHub auto-deleted `develop` after each `develop -> main`
+promotion PR because it was the PR head branch. After the final promotion,
+`develop` was restored from `main` and both branches pointed at
+`a98d09055b7cc906c69d34737c87ac29c5d3c57b`. GitHub reported
+`develop` as unprotected after restoration; reattach branch protection in repo
+settings if this buffer should be protected.
+
+## Update on May 16, 2026: Wave 6/8 AWS activation complete
+
+Merged `develop` into `main` to activate the previously merged Wave 6 and Wave
+8 Terraform/Lambda work. The main deploy workflow required four follow-up
+hotfix PRs before the apply completed:
+
+- PR #125: pinned the live Aurora engine version to `15.15` and allowed the
+  GitHub deploy role to create the exact AWS Backup service role.
+- PR #126: extended the deploy-role guardrail for the blog automation IAM role.
+- PR #127: ordered Lambda creation after IAM guardrail updates by using
+  deterministic Lambda ARNs.
+- PR #128: removed reserved `AWS_REGION` from the blog automation Lambda
+  environment.
+
+Final successful deploy:
+
+- **Workflow run**: `25954427791`
+- **Terraform apply job**: `76298678534`
+- **Apply completed**: `2026-05-16T06:07:18Z`
+- **Apply summary**: `Apply complete! Resources: 7 added, 1 changed, 4 destroyed.`
+
+Live resources now active in account `108188564905`:
+
+- **Aurora**: cluster `afritalent-dev-aurora`; Terraform changed
+  `deletion_protection` from `false` to `true` and backup retention from 7 to
+  30 days during the activation sequence.
+- **AWS Backup primary vault**: `afritalent-dev-backup-vault` in `us-east-1`.
+- **AWS Backup DR vault**: `afritalent-dev-backup-vault-dr` in `us-west-2`.
+- **Blog automation Lambda**:
+  `arn:aws:lambda:us-east-1:108188564905:function:afritalent-dev-blog-automation`.
+- **Blog automation schedule**:
+  `arn:aws:events:us-east-1:108188564905:rule/afritalent-dev-blog-automation-weekly`.
+
+Verification note: local AWS CLI credentials in the handoff session resolved to
+the old account `260820061731`, and assuming
+`arn:aws:iam::108188564905:role/afritalent-dev-github-deploy` failed with
+`AccessDenied`. The resource evidence above comes from GitHub Actions Terraform
+apply logs and outputs, not a direct local AWS console/CLI read.
+
+Open post-activation items:
+
+- Set Stripe test credentials as GitHub repository **Secrets** once real test
+  values are available: `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. They
+  were not set during activation because secret values were not provided.
+- Verify live `RegionalPrice` rows for `AFRICA`, `EUROPE`, and `ROW` once a
+  valid database access path for account `108188564905` is available.
 
 ## Update on May 10, 2026: Cross-account migration complete
 

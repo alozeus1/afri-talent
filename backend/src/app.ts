@@ -230,6 +230,15 @@ app.use(
   express.json({ limit: "1mb" })
 );
 
+// Orchestrator requests need a larger body limit (resume + raw job texts can be ~200 KB combined).
+// Register only the path-scoped JSON parser before the global 10 KB parser so
+// large orchestrator bodies are accepted, then mount the protected route after
+// request sanitization + CSRF below.
+app.use(
+  "/api/orchestrator",
+  express.json({ limit: "250kb" })
+);
+
 // Body parsing with size limits (all other routes)
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
@@ -245,6 +254,8 @@ app.use(cookieParser());
 // mutations. Webhooks, health probes, OAuth start/callback, and auth entry
 // points are exempt — see middleware/csrf.ts `skipCsrfProtection`.
 app.use(csrfProtection);
+
+app.use("/api/orchestrator", orchestratorLimiter, orchestratorRoutes);
 
 // Health check endpoint (for load balancers, k8s probes).
 //
@@ -518,14 +529,6 @@ app.get("/api/docs", async (_req, res) => {
 </body></html>`;
   res.type("html").send(html);
 });
-
-// Orchestrator route needs a larger body limit (resume + raw job texts can be ~200 KB combined)
-app.use(
-  "/api/orchestrator",
-  express.json({ limit: "250kb" }),
-  orchestratorLimiter,
-  orchestratorRoutes
-);
 
 // CSRF error handler — converts invalidCsrfTokenError into a 403 JSON
 // response. Must run before the Sentry/global error handlers.

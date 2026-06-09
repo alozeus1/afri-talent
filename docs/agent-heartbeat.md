@@ -109,18 +109,15 @@ secrets, or run destructive database commands.
 | deps-watcher | External-Deps Watcher | spawned, first poll sent |
 
 ### Wave status
-- Wave 5 (Resume builder UX + ATS rubric): **PR #1 merged**, 3 PRs remaining
-  - PR #1 (BE): resume version schema — MERGED 2026-05-12 as commit `5d82fdc1f46a082ff930ecffc38516f3fc845680`
-  - PR #2 (BE): ATS rubric scoring service — BE unblocked, claiming now
-  - PR #3 (FE): resume builder UX + live preview — blocked by #2
-  - PR #4 (QA): vitest + Playwright coverage — blocked by #3 (BE-half can start when #2 merges)
-  - Branch: `release/launch-wave-5-resume-builder-ats`
-  - PR #1 (BE): resume version schema
-  - PR #2 (BE): ATS rubric scoring service (blocked by #1)
-  - PR #3 (FE): resume builder UX + live preview (blocked by #2)
-  - PR #4 (QA): vitest + Playwright coverage (blocked by #3)
+- Wave 5 (Resume builder UX + ATS rubric): **PRs #1 + #2 merged**, 2 PRs in flight
+  - PR #1 (BE) resume version schema — MERGED 2026-05-12 as `5d82fdc`
+  - PR #2 (BE) ATS rubric scoring service + 1 MB path-scoped body-parser + 5 error codes — MERGED 2026-05-13 as `9e48a31`
+  - PR #3 (FE) in-place upgrade of `/candidate/resume-builder/` — **in progress** (FE self-claimed)
+  - PR #4 (QA) BE-half vitest at `backend/src/__tests__/ats-rubric.test.ts` (Playwright half waits for PR #3) — **in progress** (QA self-claimed)
+- Orchestration docs PR #91 also MERGED 2026-05-13 (spec + plan + heartbeat + security-checklist + watch-log now on develop)
 - Waves 6–12: pending
 - PR Q / S / T (Wave 4 blocked): awaiting external dependency (see `docs/agent-watch-log.md`)
+- Wave 10 carry-ins recorded: 2 PII-redaction follow-ups (Prisma err tightening + Zod issue.input redactor) deferred from PR #92 security review
 
 ### Safety contract (Mode A code-only)
 - No teammate or Wave Lead pushes to main, applies terraform, mutates SSM/KMS/IAM, rotates secrets, or merges PRs.
@@ -128,4 +125,4 @@ secrets, or run destructive database commands.
 - Founder reviews and merges every PR.
 
 ### Last update
-2026-05-12 — team spawned (7 teammates); Wave 5 branch + 5 tasks seeded; deps-watcher first poll complete (9 sub-items, all not-started); BE shipped PR #90 (resume version schema, extending CandidateResumeVersion at backend/prisma/schema.prisma:1562) with 256 KB resumeContentSchema size cap (commit e7fddbf folded in after security pre-read); security signed off; code-reviewer approved; FOUNDER MERGED PR #90 as merge commit 5d82fdc1f46a082ff930ecffc38516f3fc845680, post-merge workflows all green (CI/Security/Terraform/Deploy). BE now unblocked on Task #2 (ATS rubric service). Locked contract: new endpoint POST /api/skills/resume-builder/ats-rubric/score, no templateId persistence, 256 KB per-field cap propagates. PR #2 hard-blocks queued (5-item canonical list from CR + security). Founder approved option 2 for orchestration docs: thin doc PR off develop being opened next.
+2026-05-13 — PR #92 (BE ATS rubric scoring service) MERGED as `9e48a31`. Orchestration docs PR #91 MERGED as `df817ca`. Wave 5 branch fast-forwarded to develop's HEAD. FE self-claimed Task #3 (in-place upgrade of /candidate/resume-builder/); QA self-claimed Task #4 (BE-half vitest, Playwright waits for PR #3). BE parked for rest of Wave 5; next active wave is Wave 7 (Billing E2E). Locked PR #3 terms: in-place upgrade (not /tools/), consumes existing POST /ats-rubric/score (5 error codes available), 256 KB cap surfaces as inline 400, no templateId persisted. CR + Security reset for PR #3 review (light-touch — UI-only, no read endpoint).

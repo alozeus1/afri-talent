@@ -190,7 +190,7 @@ router.post("/flutterwave", async (req: Request, res: Response) => {
       const txRef = verified.tx_ref;
       const checkoutEvent = txRef
         ? await prisma.billingEventAudit.findFirst({
-            where: { eventId: txRef },
+            where: { eventId: txRef, source: "FLUTTERWAVE_CHECKOUT" },
             orderBy: { createdAt: "desc" },
           })
         : null;
@@ -221,12 +221,71 @@ router.post("/flutterwave", async (req: Request, res: Response) => {
       }
 
       if (verified.status.toLowerCase() === "successful") {
-        const plan = (checkoutMetadata.plan as SubscriptionPlan | undefined)
-          ?? (await prisma.subscription.findUnique({
-            where: { userId: user.id },
-            select: { plan: true },
-          }))?.plan
-          ?? SubscriptionPlan.BASIC;
+        if (!checkoutEvent?.userId || verified.tx_ref !== txRef) {
+          await recordBillingEvent({
+            source: "FLUTTERWAVE_WEBHOOK",
+            eventId: txRef ?? String(data.id),
+            eventType: event,
+            outcome: BillingEventOutcome.FAILED,
+            reasonCode: "checkout_reference_not_found",
+            message: "Successful Flutterwave webhook did not match a stored checkout reference",
+            rawPayload: payload as Prisma.InputJsonValue,
+            processedAt: new Date(),
+          }).catch(() => undefined);
+          res.status(202).json({ received: true, ignored: true });
+          return;
+        }
+
+        const plan = (checkoutEvent.plan as SubscriptionPlan | null)
+          ?? (checkoutMetadata.plan as SubscriptionPlan | undefined);
+
+        if (!plan) {
+          await recordBillingEvent({
+            userId: checkoutEvent.userId,
+            source: "FLUTTERWAVE_WEBHOOK",
+            eventId: txRef,
+            eventType: event,
+            outcome: BillingEventOutcome.FAILED,
+            reasonCode: "checkout_plan_missing",
+            message: "Stored Flutterwave checkout reference is missing plan metadata",
+            rawPayload: payload as Prisma.InputJsonValue,
+            processedAt: new Date(),
+          }).catch(() => undefined);
+          res.status(202).json({ received: true, ignored: true });
+          return;
+        }
+
+        if (checkoutEvent.amountMinor !== null && Math.round(verified.amount * 100) !== checkoutEvent.amountMinor) {
+          await recordBillingEvent({
+            userId: checkoutEvent.userId,
+            source: "FLUTTERWAVE_WEBHOOK",
+            eventId: txRef,
+            eventType: event,
+            outcome: BillingEventOutcome.FAILED,
+            reasonCode: "checkout_amount_mismatch",
+            message: "Verified Flutterwave amount does not match checkout reference",
+            rawPayload: payload as Prisma.InputJsonValue,
+            processedAt: new Date(),
+          }).catch(() => undefined);
+          res.status(202).json({ received: true, ignored: true });
+          return;
+        }
+
+        if (checkoutEvent.currency && verified.currency.toUpperCase() !== checkoutEvent.currency.toUpperCase()) {
+          await recordBillingEvent({
+            userId: checkoutEvent.userId,
+            source: "FLUTTERWAVE_WEBHOOK",
+            eventId: txRef,
+            eventType: event,
+            outcome: BillingEventOutcome.FAILED,
+            reasonCode: "checkout_currency_mismatch",
+            message: "Verified Flutterwave currency does not match checkout reference",
+            rawPayload: payload as Prisma.InputJsonValue,
+            processedAt: new Date(),
+          }).catch(() => undefined);
+          res.status(202).json({ received: true, ignored: true });
+          return;
+        }
 
         const card = (verified.card ?? {}) as Record<string, unknown>;
         await activateFlutterwaveSubscription({

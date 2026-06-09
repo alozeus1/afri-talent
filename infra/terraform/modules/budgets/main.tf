@@ -27,7 +27,7 @@ resource "aws_budgets_budget" "monthly" {
   # the budget tracks all account spend (still useful as a safety net).
   cost_filter {
     name   = "TagKeyValue"
-    values = ["user:Project$${var.project_tag_value}"]
+    values = [format("user:Project$%s", var.project_tag_value)]
   }
 
   # 50% — actual spend
