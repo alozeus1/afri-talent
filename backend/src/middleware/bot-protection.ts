@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import { isTrustedInternalFetch } from "./security.js";
 
 const FORM_MIN_COMPLETION_MS = 1200;
 const FORM_MAX_COMPLETION_MS = 2 * 60 * 60 * 1000;
@@ -15,8 +16,10 @@ function getClientKey(req: Request): string {
   return ipKeyGenerator(req.ip ?? req.socket?.remoteAddress ?? "anonymous");
 }
 
+// Secret-gated: see isTrustedInternalFetch in security.ts. The previous
+// static marker ("server-public-api") was spoofable by any client.
 function isInternalFetch(req: Request): boolean {
-  return req.header("x-afritalent-internal-fetch") === "server-public-api";
+  return isTrustedInternalFetch(req);
 }
 
 function isObviousAutomation(req: Request): boolean {
