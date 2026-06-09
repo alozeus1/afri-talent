@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { Router, Request, Response } from "express";
 import { BillingDiscrepancyType, BillingEventOutcome, BillingProvider, Prisma, SubscriptionPlan, SubscriptionStatus } from "@prisma/client";
 import { getStripe, getPlanFromPriceId, isStripeConfigured } from "../lib/stripe.js";
@@ -17,8 +18,6 @@ import {
 
 const router = Router();
 
-// Processed event IDs for idempotency (resets on restart; use Redis for production)
-const processedEvents = new Set<string>();
 const WEBHOOK_IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 function parseRawJsonBody(req: Request): Record<string, unknown> | null {
@@ -41,32 +40,32 @@ function parseRawJsonBody(req: Request): Record<string, unknown> | null {
   return null;
 }
 
-async function reserveEventId(eventId: string): Promise<boolean> {
+async function reserveEventId(provider: BillingProvider, eventId: string): Promise<boolean> {
+  const key = `${provider}:${eventId}`;
+
+  try {
+    await prisma.billingWebhookIdempotencyKey.create({
+      data: {
+        key,
+        provider,
+        eventId,
+        expiresAt: new Date(Date.now() + WEBHOOK_IDEMPOTENCY_TTL_SECONDS * 1000),
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return false;
+    }
+    throw error;
+  }
+
   if (redisClient) {
-    try {
-      const result = await redisClient.set(
-        `idempotency:stripe:${eventId}`,
-        new Date().toISOString(),
-        "EX",
-        WEBHOOK_IDEMPOTENCY_TTL_SECONDS,
-        "NX",
-      );
-      return result === "OK";
-    } catch {
-      // Fall back to in-memory duplicate protection.
-    }
-  }
-
-  if (processedEvents.has(eventId)) {
-    return false;
-  }
-
-  processedEvents.add(eventId);
-  if (processedEvents.size > 10000) {
-    const first = processedEvents.values().next().value;
-    if (first) {
-      processedEvents.delete(first);
-    }
+    await redisClient.set(
+      `idempotency:${key}`,
+      new Date().toISOString(),
+      "EX",
+      WEBHOOK_IDEMPOTENCY_TTL_SECONDS,
+    ).catch(() => undefined);
   }
 
   return true;
@@ -148,13 +147,55 @@ async function activateFlutterwaveSubscription(input: {
   });
 }
 
+// Constant-time comparison of the verif-hash header against the configured
+// secret. Both sides are SHA-256 digested first so inputs of different
+// lengths can be compared without leaking length information.
+function isValidFlutterwaveSignature(signature: unknown, secretHash: string): boolean {
+  if (typeof signature !== "string" || signature.length === 0) {
+    return false;
+  }
+  const a = createHash("sha256").update(signature).digest();
+  const b = createHash("sha256").update(secretHash).digest();
+  return timingSafeEqual(a, b);
+}
+
 // POST /api/webhooks/flutterwave
+// SECURITY: fail closed. If FLUTTERWAVE_SECRET_HASH is not configured, every
+// request is rejected (503) — we never process an unauthenticated webhook.
+// See config/env.ts for the matching startup fail-fast in production/staging.
 router.post("/flutterwave", async (req: Request, res: Response) => {
   const startedAt = Date.now();
   const secretHash = getFlutterwaveSecretHash();
-  const signature = req.headers["verif-hash"];
 
-  if (secretHash && signature !== secretHash) {
+  if (!secretHash) {
+    console.error("[webhook] FLUTTERWAVE_SECRET_HASH not set — rejecting Flutterwave webhook");
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "critical",
+      durationMs: Date.now() - startedAt,
+      details: {
+        provider: "flutterwave",
+        reason: "webhook_secret_missing",
+      },
+    });
+    res.status(503).json({ error: "Flutterwave webhook is not configured" });
+    return;
+  }
+
+  if (!isValidFlutterwaveSignature(req.headers["verif-hash"], secretHash)) {
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "warning",
+      durationMs: Date.now() - startedAt,
+      details: {
+        provider: "flutterwave",
+        reason: "invalid_signature",
+      },
+    });
     res.status(401).json({ error: "Invalid Flutterwave signature" });
     return;
   }
@@ -178,7 +219,7 @@ router.post("/flutterwave", async (req: Request, res: Response) => {
     return;
   }
 
-  const reserved = await reserveEventId(`flutterwave:${rawEventId}`);
+  const reserved = await reserveEventId(BillingProvider.FLUTTERWAVE, rawEventId);
   if (!reserved) {
     res.json({ received: true, duplicate: true });
     return;
@@ -442,7 +483,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
   }
 
   // Idempotency guard
-  const reserved = await reserveEventId(event.id);
+  const reserved = await reserveEventId(BillingProvider.STRIPE, event.id);
   if (!reserved) {
     await recordBillingEvent({
       source: "STRIPE_WEBHOOK",

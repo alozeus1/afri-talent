@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
-import { Role, SubscriptionPlan } from "@prisma/client";
+import { Prisma, Role, SubscriptionPlan } from "@prisma/client";
 import { signToken } from "../lib/jwt.js";
 
 const {
@@ -63,6 +63,9 @@ const {
     billingEventAudit: {
       create: vi.fn(),
       count: vi.fn(),
+    },
+    billingWebhookIdempotencyKey: {
+      create: vi.fn(),
     },
     billingDiscrepancy: {
       findFirst: vi.fn(),
@@ -315,6 +318,7 @@ describe("Phase 1/2 quality integration suite", () => {
     });
     prismaMock.billingEventAudit.create.mockResolvedValue({ id: "billing-event-1" });
     prismaMock.billingEventAudit.count.mockResolvedValue(0);
+    prismaMock.billingWebhookIdempotencyKey.create.mockResolvedValue({ id: "idempotency-1" });
     prismaMock.billingDiscrepancy.findFirst.mockResolvedValue(null);
     prismaMock.billingDiscrepancy.create.mockResolvedValue({ id: "billing-discrepancy-1" });
     prismaMock.billingDiscrepancy.update.mockResolvedValue({ id: "billing-discrepancy-1" });
@@ -562,6 +566,51 @@ describe("Phase 1/2 quality integration suite", () => {
       }),
     );
     expect(createUserNotificationMock).toHaveBeenCalled();
+  });
+
+  it("treats duplicate Stripe webhook reservations as already processed", async () => {
+    isStripeConfiguredMock.mockReturnValue(true);
+
+    prismaMock.billingWebhookIdempotencyKey.create.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed on idempotency key", {
+        code: "P2002",
+        clientVersion: "test",
+        meta: { target: ["key"] },
+      }),
+    );
+    stripeApiMock.webhooks.constructEvent.mockReturnValueOnce({
+      id: "evt_checkout_duplicate_1",
+      type: "checkout.session.completed",
+      created: 1_714_000_000,
+      data: {
+        object: {
+          customer: "cus_123",
+          subscription: "sub_123",
+          metadata: {
+            userId: "candidate-1",
+            plan: "BASIC",
+          },
+        },
+      },
+    });
+
+    const res = await request(app)
+      .post("/api/webhooks/stripe")
+      .set("stripe-signature", "valid-signature")
+      .set("Content-Type", "application/json")
+      .send({ test: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ received: true, duplicate: true });
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.billingEventAudit.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          eventId: "evt_checkout_duplicate_1",
+          reasonCode: "duplicate_webhook_event",
+        }),
+      }),
+    );
   });
 
   it("accepts analytics events for ingestion contracts", async () => {

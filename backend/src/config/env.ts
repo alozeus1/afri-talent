@@ -31,7 +31,21 @@ export function validateRuntimeEnv(): void {
     // rest of the production essentials so a misconfigured deploy never serves
     // traffic.
     requireEnv("JWT_SECRET");
+
+    // If Flutterwave payments are enabled, the webhook signature secret is
+    // mandatory — without it the webhook endpoint cannot authenticate
+    // requests and rejects everything (fail closed). Fail the deploy instead.
+    if (process.env.FLUTTERWAVE_SECRET_KEY?.trim()) {
+      requireEnv("FLUTTERWAVE_SECRET_HASH");
+    }
     requireEnv("ANTHROPIC_API_KEY");
     requireEnv("SENTRY_DSN");
+
+    // If Flutterwave payments are enabled, the webhook signature secret is
+    // mandatory — without it the webhook endpoint cannot authenticate
+    // requests and rejects everything (fail closed). Fail the deploy instead.
+    if (process.env.FLUTTERWAVE_SECRET_KEY?.trim()) {
+      requireEnv("FLUTTERWAVE_SECRET_HASH");
+    }
   }
 }
