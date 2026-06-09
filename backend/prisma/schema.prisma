@@ -2145,6 +2145,18 @@ model BillingEventAudit {
   @@index([stripeRefundId])
 }
 
+model BillingWebhookIdempotencyKey {
+  id         String          @id @default(uuid())
+  key        String          @unique @db.VarChar(320)
+  provider   BillingProvider
+  eventId    String          @db.VarChar(255)
+  reservedAt DateTime        @default(now())
+  expiresAt  DateTime?
+
+  @@index([provider, reservedAt(sort: Desc)])
+  @@index([expiresAt])
+}
+
 model BillingReconciliationRun {
   id                     String                      @id @default(uuid())
   status                 BillingReconciliationStatus @default(SUCCESS)

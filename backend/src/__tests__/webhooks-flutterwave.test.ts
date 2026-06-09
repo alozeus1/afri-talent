@@ -8,6 +8,7 @@ vi.mock("../lib/prisma.js", () => ({
         subscription: { upsert: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
         userBillingProfile: { upsert: vi.fn() },
         billingEventAudit: { findFirst: vi.fn() },
+        billingWebhookIdempotencyKey: { create: vi.fn().mockResolvedValue({ id: "idempotency-1" }) },
         $queryRaw: vi.fn().mockResolvedValue([]),
         $disconnect: vi.fn().mockResolvedValue(undefined),
     },
