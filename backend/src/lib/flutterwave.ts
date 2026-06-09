@@ -2,7 +2,6 @@ import { SubscriptionPlan } from "@prisma/client";
 
 const FLUTTERWAVE_SECRET_KEY = process.env.FLUTTERWAVE_SECRET_KEY?.trim() || "";
 const FLUTTERWAVE_PUBLIC_KEY = process.env.FLUTTERWAVE_PUBLIC_KEY?.trim() || "";
-const FLUTTERWAVE_SECRET_HASH = process.env.FLUTTERWAVE_SECRET_HASH?.trim() || "";
 const FLUTTERWAVE_PAYMENT_OPTIONS = process.env.FLUTTERWAVE_PAYMENT_OPTIONS?.trim() || "card,banktransfer,ussd";
 
 export interface FlutterwaveCheckoutInput {
@@ -55,8 +54,11 @@ export function isFlutterwaveConfigured(): boolean {
   return FLUTTERWAVE_SECRET_KEY.length > 0 && FLUTTERWAVE_PUBLIC_KEY.length > 0;
 }
 
+// Read at call time (not module load) so startup validation and tests observe
+// the current environment. The webhook handler rejects all requests when this
+// is unset — see routes/webhooks.ts and config/env.ts.
 export function getFlutterwaveSecretHash(): string {
-  return FLUTTERWAVE_SECRET_HASH;
+  return process.env.FLUTTERWAVE_SECRET_HASH?.trim() || "";
 }
 
 export function getFlutterwavePublicKey(): string {
