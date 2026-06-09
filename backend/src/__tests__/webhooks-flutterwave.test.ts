@@ -111,8 +111,10 @@ describe("validateRuntimeEnv — Flutterwave webhook secret fail-fast", () => {
         process.env.DATABASE_URL = "postgres://test";
         process.env.FRONTEND_URL = "https://example.com";
         process.env.JWT_SECRET = "x".repeat(32);
-        process.env.ANTHROPIC_API_KEY = "anthropic-test-key";
-        process.env.SENTRY_DSN = "https://public@example.com/1";
+        // Other production-critical vars validateRuntimeEnv() requires, so these
+        // tests isolate the Flutterwave secret behavior rather than tripping on them.
+        process.env.ANTHROPIC_API_KEY = "sk-ant-test";
+        process.env.SENTRY_DSN = "https://test@sentry.example.com/1";
     }
 
     it("throws in production when Flutterwave is enabled but FLUTTERWAVE_SECRET_HASH is unset", () => {
