@@ -10,23 +10,6 @@ terraform {
 
 locals {
   name = var.name_prefix
-
-  # Interface VPC endpoints (PrivateLink) needed for AWS service access from
-  # private subnets without a NAT Gateway.
-  interface_endpoints = [
-    "ecr.api",
-    "ecr.dkr",
-    "logs",
-    "ssm",
-    "ssmmessages",
-    "ec2messages",
-    "secretsmanager",
-    "sts",
-    "kms",
-    "sqs",
-    "states",
-    "events",
-  ]
 }
 
 # ---------------------------------------------------------------------------
@@ -390,7 +373,7 @@ resource "aws_vpc_endpoint" "dynamodb" {
 
 # Interface endpoints — across all 3 private subnets, private DNS enabled.
 resource "aws_vpc_endpoint" "interface" {
-  for_each = toset(local.interface_endpoints)
+  for_each = toset(var.interface_endpoints)
 
   vpc_id              = aws_vpc.this.id
   service_name        = "com.amazonaws.${var.aws_region}.${each.value}"

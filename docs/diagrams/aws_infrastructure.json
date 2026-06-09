@@ -1,0 +1,258 @@
+{
+  "metadata": {
+    "account_id": "108188564905",
+    "region": "us-east-1",
+    "environment": "dev",
+    "project": "afritalent",
+    "discovered_at": "2026-05-12",
+    "source": "Terraform stack at infra/terraform/accounts/dev-new/ (not live AWS API — local creds point to old account 260820061731)"
+  },
+  "networking": {
+    "vpc": {
+      "id": "afritalent-dev-vpc",
+      "name": "afritalent-dev-vpc",
+      "cidr": "10.30.0.0/16"
+    },
+    "subnets": {
+      "public": [
+        { "id": "afritalent-dev-public-us-east-1a", "name": "afritalent-dev-public-us-east-1a", "cidr": "10.30.0.0/24", "az": "us-east-1a" },
+        { "id": "afritalent-dev-public-us-east-1b", "name": "afritalent-dev-public-us-east-1b", "cidr": "10.30.1.0/24", "az": "us-east-1b" },
+        { "id": "afritalent-dev-public-us-east-1c", "name": "afritalent-dev-public-us-east-1c", "cidr": "10.30.2.0/24", "az": "us-east-1c" }
+      ],
+      "private": [
+        { "id": "afritalent-dev-private-us-east-1a", "name": "afritalent-dev-private-us-east-1a", "cidr": "10.30.10.0/24", "az": "us-east-1a" },
+        { "id": "afritalent-dev-private-us-east-1b", "name": "afritalent-dev-private-us-east-1b", "cidr": "10.30.11.0/24", "az": "us-east-1b" },
+        { "id": "afritalent-dev-private-us-east-1c", "name": "afritalent-dev-private-us-east-1c", "cidr": "10.30.12.0/24", "az": "us-east-1c" }
+      ],
+      "isolated": [
+        { "id": "afritalent-dev-isolated-us-east-1a", "name": "afritalent-dev-isolated-us-east-1a", "cidr": "10.30.20.0/24", "az": "us-east-1a" },
+        { "id": "afritalent-dev-isolated-us-east-1b", "name": "afritalent-dev-isolated-us-east-1b", "cidr": "10.30.21.0/24", "az": "us-east-1b" },
+        { "id": "afritalent-dev-isolated-us-east-1c", "name": "afritalent-dev-isolated-us-east-1c", "cidr": "10.30.22.0/24", "az": "us-east-1c" }
+      ]
+    },
+    "internet_gateway": { "id": "afritalent-dev-igw" },
+    "nat_instances": [
+      {
+        "id": "afritalent-dev-nat",
+        "instance_type": "t4g.nano",
+        "subnet": "public-us-east-1a",
+        "purpose": "Egress to SaaS APIs (Anthropic, OpenAI, Stripe, Flutterwave, Apify, Greenhouse, etc.) from private subnets — AWS services use VPC endpoints instead."
+      }
+    ],
+    "vpc_endpoints": [
+      { "type": "Gateway", "service": "s3", "attached_route_tables": ["private (x3)", "isolated (x3)"] },
+      { "type": "Gateway", "service": "dynamodb", "attached_route_tables": ["private (x3)", "isolated (x3)"] },
+      { "type": "Interface", "service": "ecr.api" },
+      { "type": "Interface", "service": "ecr.dkr" },
+      { "type": "Interface", "service": "logs" },
+      { "type": "Interface", "service": "ssm" },
+      { "type": "Interface", "service": "ssmmessages" },
+      { "type": "Interface", "service": "ec2messages" },
+      { "type": "Interface", "service": "secretsmanager" },
+      { "type": "Interface", "service": "sts" },
+      { "type": "Interface", "service": "kms" },
+      { "type": "Interface", "service": "sqs" },
+      { "type": "Interface", "service": "states" },
+      { "type": "Interface", "service": "events" }
+    ]
+  },
+  "edge": {
+    "cloudfront": {
+      "name": "afritalent-dev-cdn",
+      "dns_name": "d2j3ahmgbbdup1.cloudfront.net",
+      "origin": "afritalent-dev-alb-25816556.us-east-1.elb.amazonaws.com",
+      "price_class": "PriceClass_200",
+      "tls_policy": "TLSv1.2_2021",
+      "domain_aliases": []
+    },
+    "waf": {
+      "web_acl": {
+        "name": "afritalent-dev-waf",
+        "scope": "CLOUDFRONT",
+        "rate_limit_per_5min": 2000
+      }
+    }
+  },
+  "load_balancers": {
+    "public": {
+      "name": "afritalent-dev-alb",
+      "type": "application",
+      "scheme": "internet-facing",
+      "dns_name": "afritalent-dev-alb-25816556.us-east-1.elb.amazonaws.com",
+      "listeners": [
+        { "port": 80, "protocol": "HTTP", "rules": "Path /api/* -> backend TG; default -> frontend TG" }
+      ],
+      "target_groups": [
+        { "name": "afritalent-dev-tg-frontend", "port": 3000, "protocol": "HTTP", "target_type": "ip" },
+        { "name": "afritalent-dev-tg-backend", "port": 3001, "protocol": "HTTP", "target_type": "ip" }
+      ]
+    }
+  },
+  "compute": {
+    "ecs_cluster": { "name": "afritalent-dev", "capacity_providers": ["FARGATE", "FARGATE_SPOT"] },
+    "ecs_services": [
+      {
+        "name": "afritalent-dev-frontend",
+        "launch_type": "FARGATE (base 1) + FARGATE_SPOT (weight 4)",
+        "desired_count": 1,
+        "container": "Next.js 16 frontend",
+        "container_port": 3000,
+        "image": "<account>.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-frontend"
+      },
+      {
+        "name": "afritalent-dev-backend",
+        "launch_type": "FARGATE (base 1) + FARGATE_SPOT (weight 4)",
+        "desired_count": 1,
+        "container": "Express 5 backend (Node 20)",
+        "container_port": 3001,
+        "image": "<account>.dkr.ecr.us-east-1.amazonaws.com/afritalent-dev-backend"
+      }
+    ],
+    "lambda_functions": [
+      {
+        "name": "afritalent-dev-webhook-stripe",
+        "runtime": "nodejs20.x",
+        "handler": "dist/lambda/webhook-stripe.handler",
+        "function_url": { "auth_type": "NONE", "purpose": "Stripe webhook ingress; signature verified in code" },
+        "vpc": "private subnets",
+        "destinations": ["RDS Proxy -> Aurora"]
+      },
+      {
+        "name": "afritalent-dev-webhook-flutterwave",
+        "runtime": "nodejs20.x",
+        "handler": "dist/lambda/webhook-flutterwave.handler",
+        "function_url": { "auth_type": "NONE", "purpose": "Flutterwave webhook ingress; signature verified in code" },
+        "vpc": "private subnets",
+        "destinations": ["RDS Proxy -> Aurora"]
+      },
+      {
+        "name": "afritalent-dev-orchestrator-step",
+        "runtime": "nodejs20.x",
+        "handler": "dist/lambda/orchestrator-step.handler",
+        "function_url": null,
+        "invoked_by": "Step Functions",
+        "purpose": "AI multi-agent orchestrator task worker"
+      }
+    ]
+  },
+  "orchestration": {
+    "step_functions": [
+      {
+        "name": "afritalent-dev-orchestrator",
+        "type": "STANDARD",
+        "definition_source": "backend/infra/state-machines/orchestrator.asl.json",
+        "tasks": ["afritalent-dev-orchestrator-step Lambda"]
+      }
+    ]
+  },
+  "databases": {
+    "aurora_clusters": [
+      {
+        "cluster_identifier": "afritalent-dev-aurora",
+        "engine": "aurora-postgresql",
+        "engine_version": "15.5",
+        "database_name": "afritalent",
+        "deployment": "Serverless v2",
+        "min_acu": 0,
+        "max_acu": 4,
+        "seconds_until_auto_pause": 1800,
+        "subnets": "isolated (no internet)",
+        "fronted_by": "RDS Proxy"
+      }
+    ],
+    "rds_proxy": {
+      "name": "afritalent-dev-rds-proxy",
+      "endpoint": "afritalent-dev-rds-proxy.proxy-c3mldqa7xfbn.us-east-1.rds.amazonaws.com",
+      "engine": "POSTGRESQL",
+      "auth_secret": "Aurora master user secret (Secrets Manager)",
+      "subnets": "private"
+    }
+  },
+  "storage": {
+    "s3_buckets": [
+      {
+        "name": "afritalent-dev-uploads-108188564905",
+        "purpose": "Resumes, profile photos, blog images, exports, trust artefacts (KYC)",
+        "prefixes": ["resumes/", "trust/candidates/", "trust/employers/"],
+        "cors_origins": ["https://d2j3ahmgbbdup1.cloudfront.net", "https://afri-talent.com", "https://www.afri-talent.com"]
+      }
+    ],
+    "ecr_repositories": [
+      { "name": "afritalent-dev-frontend", "encryption": "AES256" },
+      { "name": "afritalent-dev-backend", "encryption": "AES256" }
+    ]
+  },
+  "security": {
+    "secrets_manager": [
+      { "name": "Aurora master user secret", "managed_by": "Aurora module" }
+    ],
+    "ssm_parameter_store": {
+      "path_prefix": "/afritalent/dev/",
+      "encryption": "KMS (SSM key)",
+      "purpose": "DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY, OPENAI_API_KEY, Stripe/Flutterwave keys, OAuth client secrets, job-board API tokens, SES/S3 config"
+    },
+    "kms_keys": [
+      { "alias": "alias/afritalent-dev-ssm", "purpose": "SSM SecureString" },
+      { "alias": "alias/afritalent-dev-aurora", "purpose": "Aurora storage + master secret" }
+    ],
+    "iam_oidc_providers": [
+      { "provider": "token.actions.githubusercontent.com", "purpose": "GitHub Actions deploys (alozeus1/afri-talent)" }
+    ],
+    "security_baseline": {
+      "config": "AWS Config service-linked role created",
+      "guardduty": "expected (security-baseline module)",
+      "cloudtrail": "expected (security-baseline module)"
+    }
+  },
+  "messaging": {
+    "ses": { "purpose": "Transactional email (notifications, magic links, password reset)" }
+  },
+  "observability": {
+    "cloudwatch_logs": [
+      "/aws/ecs/afritalent-dev-frontend",
+      "/aws/ecs/afritalent-dev-backend",
+      "/aws/lambda/afritalent-dev-webhook-stripe",
+      "/aws/lambda/afritalent-dev-webhook-flutterwave",
+      "/aws/lambda/afritalent-dev-orchestrator-step",
+      "/aws/states/afritalent-dev-orchestrator"
+    ],
+    "dashboards": ["afritalent-dev-observability"],
+    "alarms_targets": ["ECS service health", "ALB 5xx", "Lambda errors", "Aurora CPU/connections"]
+  },
+  "cost": {
+    "budgets": [
+      { "name": "afritalent-dev-monthly", "monthly_usd": 150, "alert_email": "alozeus1@gmail.com" }
+    ]
+  },
+  "ci_cd": {
+    "github_actions": {
+      "workflow_deploy": ".github/workflows/deploy.yml",
+      "workflow_terraform": ".github/workflows/terraform.yml",
+      "workflow_ci": ".github/workflows/ci.yml",
+      "auth": "OIDC -> IAM role in 108188564905",
+      "deploy_flow": "build -> ECR push -> Lambda zip package -> terraform apply -> ECS deploy -> smoke test"
+    },
+    "terraform_state": {
+      "bucket": "afritalent-108188564905-tfstate",
+      "key": "dev-new/terraform.tfstate",
+      "lock_table": "afritalent-108188564905-tflocks"
+    }
+  },
+  "traffic_rules": {
+    "allowed_sources": {
+      "public_internet_cloudfront": { "cidrs": ["0.0.0.0/0"], "ports": [443], "via": "CloudFront -> WAF -> ALB" },
+      "public_internet_alb_direct": { "cidrs": ["0.0.0.0/0"], "ports": [80, 443], "note": "Debug only — ALB SG accepts internet but production traffic flows via CloudFront" },
+      "stripe_flutterwave_webhooks": { "cidrs": ["0.0.0.0/0"], "ports": [443], "via": "Lambda Function URLs (AuthType=NONE; signature verified in code)" }
+    },
+    "domains": {
+      "public": ["d2j3ahmgbbdup1.cloudfront.net"],
+      "future_public": ["afri-talent.com (delegated to DigitalOcean today; not yet on AWS)"]
+    }
+  },
+  "notes": [
+    "Custom domain afri-talent.com is NOT yet cut over to AWS — Route 53 zone exists but registrar still points at DigitalOcean. ACM cert not validated.",
+    "ElastiCache Redis module exists but is commented out in main.tf. App ships with REDIS_REQUIRED=false.",
+    "Separate trust S3 bucket module exists but is commented out — trust artefacts currently colocated under trust/ prefix in the uploads bucket.",
+    "NAT instance (t4g.nano) is used instead of NAT Gateway to save cost on dev. SPOF accepted for dev environment."
+  ]
+}

@@ -79,3 +79,27 @@ variable "aws_region" {
   type        = string
   default     = "us-east-1"
 }
+
+variable "interface_endpoints" {
+  description = "Interface VPC endpoint service suffixes to create. Empty list disables paid PrivateLink endpoints; private subnets still use the NAT route."
+  type        = list(string)
+  default = [
+    "ecr.api",
+    "ecr.dkr",
+    "logs",
+    "ssm",
+    "ssmmessages",
+    "ec2messages",
+    "secretsmanager",
+    "sts",
+    "kms",
+    "sqs",
+    "states",
+    "events",
+  ]
+
+  validation {
+    condition     = length(distinct(var.interface_endpoints)) == length(var.interface_endpoints)
+    error_message = "interface_endpoints must not contain duplicates."
+  }
+}

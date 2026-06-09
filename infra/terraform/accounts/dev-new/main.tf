@@ -15,9 +15,12 @@
 module "vpc" {
   source = "../../modules/vpc"
 
-  name_prefix = var.name_prefix
-  aws_region  = var.aws_region
-  # All other vars (CIDRs, AZs, container_ports) use module defaults.
+  name_prefix         = var.name_prefix
+  aws_region          = var.aws_region
+  interface_endpoints = []
+  # Build-phase cost control: private subnets already default-route through the
+  # t4g.nano NAT instance. Keep free S3/DynamoDB gateway endpoints, but remove
+  # paid interface endpoint hourly spend until higher availability testing.
 }
 
 module "nat_instance" {
@@ -69,6 +72,7 @@ module "aurora" {
   min_acu                  = var.aurora_min_acu
   max_acu                  = var.aurora_max_acu
   seconds_until_auto_pause = var.aurora_seconds_until_auto_pause
+  storage_type             = var.aurora_storage_type
 
   # Wave 8 §9.3 — backups, DR, deletion protection.
   # backup_retention_period also defines the PITR window (spec: ≥ 14 days).

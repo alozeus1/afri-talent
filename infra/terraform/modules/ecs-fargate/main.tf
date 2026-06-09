@@ -320,8 +320,16 @@ resource "aws_ecs_service" "frontend" {
   desired_count    = var.desired_count
   platform_version = "LATEST"
 
-  # No launch_type — inherits cluster default capacity provider strategy
-  # (FARGATE base=1, FARGATE_SPOT weight=4).
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE"
+    base              = var.fargate_base
+    weight            = 1
+  }
+
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE_SPOT"
+    weight            = var.fargate_spot_weight
+  }
 
   enable_execute_command = true
 
@@ -357,6 +365,17 @@ resource "aws_ecs_service" "backend" {
   task_definition  = aws_ecs_task_definition.backend.arn
   desired_count    = var.desired_count
   platform_version = "LATEST"
+
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE"
+    base              = var.fargate_base
+    weight            = 1
+  }
+
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE_SPOT"
+    weight            = var.fargate_spot_weight
+  }
 
   enable_execute_command = true
 
