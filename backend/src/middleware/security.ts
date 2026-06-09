@@ -1,6 +1,8 @@
 import helmet from "helmet";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { Request, Response, NextFunction } from "express";
+import { createHash } from "crypto";
+import logger from "../lib/logger.js";
 
 // §2.8 — Helmet hardening.
 //
@@ -61,9 +63,63 @@ const isTestEnv =
   process.env.NODE_ENV === "development" ||
   process.env.E2E === "1";
 const UNSAFE_OBJECT_KEYS = new Set(["__proto__", "prototype", "constructor"]);
+const AUTHENTICATED_RATE_LIMIT_IP_WINDOW_MS = 10 * 60 * 1000;
+const AUTHENTICATED_RATE_LIMIT_SHARED_IP_THRESHOLD = Number.parseInt(
+  process.env.AUTHENTICATED_RATE_LIMIT_SHARED_IP_THRESHOLD ?? "8",
+  10
+);
+const authenticatedRateLimitIpUsers = new Map<
+  string,
+  { windowStart: number; userIds: Set<string>; alerted: boolean }
+>();
 
 function getRateLimitKey(req: Request): string {
   return ipKeyGenerator(req.ip ?? req.socket?.remoteAddress ?? "anonymous");
+}
+
+function hashRateLimitKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex").slice(0, 16);
+}
+
+function trackAuthenticatedRateLimitKey(req: Request, scope: string, userId: string): void {
+  if (!Number.isFinite(AUTHENTICATED_RATE_LIMIT_SHARED_IP_THRESHOLD)) return;
+  if (AUTHENTICATED_RATE_LIMIT_SHARED_IP_THRESHOLD <= 0) return;
+
+  const ipKey = getRateLimitKey(req);
+  if (ipKey === "anonymous") return;
+
+  const now = Date.now();
+  const existing = authenticatedRateLimitIpUsers.get(ipKey);
+  const entry =
+    existing && now - existing.windowStart < AUTHENTICATED_RATE_LIMIT_IP_WINDOW_MS
+      ? existing
+      : { windowStart: now, userIds: new Set<string>(), alerted: false };
+
+  entry.userIds.add(userId);
+  authenticatedRateLimitIpUsers.set(ipKey, entry);
+
+  if (!entry.alerted && entry.userIds.size >= AUTHENTICATED_RATE_LIMIT_SHARED_IP_THRESHOLD) {
+    entry.alerted = true;
+    logger.warn(
+      {
+        scope,
+        ipKeyHash: hashRateLimitKey(ipKey),
+        userCount: entry.userIds.size,
+        path: req.originalUrl ?? req.path,
+      },
+      "[rate-limit] many authenticated users observed behind one IP"
+    );
+  }
+}
+
+export function getAuthenticatedRateLimitKey(req: Request, scope: string): string {
+  const userId = req.user?.userId;
+  if (!userId) {
+    return `${scope}:unauthenticated`;
+  }
+
+  trackAuthenticatedRateLimitKey(req, scope, userId);
+  return `${scope}:user:${userId}`;
 }
 
 function isInternalPublicFetch(req: Request): boolean {
@@ -223,10 +279,7 @@ export const skillsLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => isTestEnv,
-  keyGenerator: (req: Request): string => {
-    const userId = (req as Request & { user?: { userId: string } }).user?.userId;
-    return userId ?? getRateLimitKey(req);
-  },
+  keyGenerator: (req: Request): string => getAuthenticatedRateLimitKey(req, "skills"),
   message: {
     error: "rate_limit_exceeded",
     code: "RATE_LIMIT_EXCEEDED",
@@ -248,10 +301,7 @@ export const generateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => isTestEnv,
-  keyGenerator: (req: Request): string => {
-    const userId = (req as Request & { user?: { userId: string } }).user?.userId;
-    return userId ?? getRateLimitKey(req);
-  },
+  keyGenerator: (req: Request): string => getAuthenticatedRateLimitKey(req, "generate"),
   message: {
     error: "rate_limit_exceeded",
     code: "RATE_LIMIT_EXCEEDED",
@@ -274,12 +324,7 @@ export const orchestratorLimiter = rateLimit({
   // Skip rate limiting in test environment so the test suite can make
   // many requests without exhausting the in-memory window counter.
   skip: () => isTestEnv,
-  keyGenerator: (req: Request): string => {
-    // Use user ID if authenticated (more precise), fallback to IP via the
-    // ipKeyGenerator helper (required by express-rate-limit v8 for IPv6 safety).
-    const userId = (req as Request & { user?: { userId: string } }).user?.userId;
-    return userId ?? getRateLimitKey(req);
-  },
+  keyGenerator: (req: Request): string => getAuthenticatedRateLimitKey(req, "orchestrator"),
   message: {
     error: "rate_limit_exceeded",
     message: "Too many AI assistant requests. Please wait a minute before trying again.",

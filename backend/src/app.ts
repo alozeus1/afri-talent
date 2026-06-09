@@ -11,7 +11,7 @@ import { initSentry, setupExpressErrorHandler, captureMessage } from "./lib/sent
 import { redisHealthStatus, isRedisRequired } from "./lib/redis.js";
 import { buildDegradedState } from "./lib/platform/health.js";
 import { isAnyBillingProviderConfigured } from "./lib/billing/index.js";
-import { optionalAuth } from "./middleware/auth.js";
+import { authenticate, optionalAuth } from "./middleware/auth.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import { csrfProtection, csrfErrorHandler } from "./middleware/csrf.js";
 import { adminTotpGate } from "./middleware/admin-totp-gate.js";
@@ -255,7 +255,7 @@ app.use(cookieParser());
 // points are exempt — see middleware/csrf.ts `skipCsrfProtection`.
 app.use(csrfProtection);
 
-app.use("/api/orchestrator", orchestratorLimiter, orchestratorRoutes);
+app.use("/api/orchestrator", authenticate, orchestratorLimiter, orchestratorRoutes);
 
 // Health check endpoint (for load balancers, k8s probes).
 //
@@ -472,7 +472,7 @@ app.use("/api/profile/resume-parser", resumeParserRoutes);
 app.use("/api/push", pushRoutes);
 app.use("/api/preferences", preferencesRoutes);
 app.use("/api/ats", atsRoutes);
-app.use("/api/mock-interviews", skillsLimiter, mockInterviewsRoutes);
+app.use("/api/mock-interviews", authenticate, skillsLimiter, mockInterviewsRoutes);
 app.use("/api/analytics", analyticsEventsRoutes);
 app.use("/api/social", socialRoutes);
 app.use("/api/salary-negotiation", salaryNegotiationRoutes);
@@ -485,13 +485,13 @@ app.use("/api/admin/rag", adminRagRoutes);
 app.use("/api/admin/blog", adminBlogRoutes);
 app.use("/api/bots", botsRoutes);
 // AI Skills (premium gated — require PROFESSIONAL plan + per-user rate limit)
-app.use("/api/skills/resume-builder", skillsLimiter, skillsResumeBuilderRoutes);
-app.use("/api/skills/resume-templates", skillsLimiter, skillsResumeTemplateRoutes);
-app.use("/api/skills/job-matcher", skillsLimiter, skillsJobMatcherRoutes);
-app.use("/api/skills/application-writer", skillsLimiter, skillsApplicationWriterRoutes);
-app.use("/api/skills/career-advisor", skillsLimiter, skillsCareerAdvisorRoutes);
-app.use("/api/career-gap", skillsLimiter, careerGapRoutes);
-app.use("/api/salary-benchmarks", skillsLimiter, salaryBenchmarksRoutes);
+app.use("/api/skills/resume-builder", authenticate, skillsLimiter, skillsResumeBuilderRoutes);
+app.use("/api/skills/resume-templates", authenticate, skillsLimiter, skillsResumeTemplateRoutes);
+app.use("/api/skills/job-matcher", authenticate, skillsLimiter, skillsJobMatcherRoutes);
+app.use("/api/skills/application-writer", authenticate, skillsLimiter, skillsApplicationWriterRoutes);
+app.use("/api/skills/career-advisor", authenticate, skillsLimiter, skillsCareerAdvisorRoutes);
+app.use("/api/career-gap", authenticate, skillsLimiter, careerGapRoutes);
+app.use("/api/salary-benchmarks", authenticate, skillsLimiter, salaryBenchmarksRoutes);
 
 // OpenAPI/Swagger docs
 app.get("/api/docs/spec.json", (_req, res) => {
