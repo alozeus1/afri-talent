@@ -69,8 +69,8 @@ const generateResumeSchema = z.object({
 // ── POST /api/skills/resume-builder/generate ──────────────────────────────────
 router.post(
   "/generate",
-  generateLimiter,
   authenticate,
+  generateLimiter,
   authorize(Role.CANDIDATE),
   requirePlan(SubscriptionPlan.PROFESSIONAL),
   async (req: Request, res: Response): Promise<void> => {
@@ -167,8 +167,8 @@ router.get(
 // ── POST /api/skills/resume-builder/scan-ats ─────────────────────────────────
 router.post(
   "/scan-ats",
-  generateLimiter,
   authenticate,
+  generateLimiter,
   authorize(Role.CANDIDATE),
   requirePlan(SubscriptionPlan.PROFESSIONAL),
   async (req: Request, res: Response): Promise<void> => {
@@ -240,8 +240,8 @@ router.post(
 //   4. Per-user AI quotas + generateLimiter rate limit (existing)
 router.post(
   "/ats-rubric/score",
-  generateLimiter,
   authenticate,
+  generateLimiter,
   authorize(Role.CANDIDATE),
   requirePlan(SubscriptionPlan.PROFESSIONAL),
   async (req: Request, res: Response): Promise<void> => {

@@ -4,7 +4,6 @@ import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { authenticate, authorize } from "../../middleware/auth.js";
 import { requirePlan } from "../../middleware/subscription.js";
-import { skillsLimiter } from "../../middleware/security.js";
 import prisma from "../../lib/prisma.js";
 import logger from "../../lib/logger.js";
 import { getUserEntitlements } from "../../lib/billing/entitlements.js";
@@ -64,7 +63,6 @@ router.get(
   "/",
   authenticate,
   authorize(Role.CANDIDATE),
-  skillsLimiter,
   async (req: Request, res: Response) => {
     try {
       const userId = req.user!.userId;
@@ -165,7 +163,6 @@ router.get(
   "/:id/download",
   authenticate,
   authorize(Role.CANDIDATE),
-  skillsLimiter,
   async (req: Request, res: Response) => {
     try {
       const { id } = downloadParamsSchema.parse(req.params);
@@ -299,7 +296,6 @@ router.post(
   authenticate,
   authorize(Role.CANDIDATE),
   requirePlan(SubscriptionPlan.PROFESSIONAL),
-  skillsLimiter,
   async (req: Request, res: Response) => {
     try {
       const { id } = fillParamsSchema.parse(req.params);

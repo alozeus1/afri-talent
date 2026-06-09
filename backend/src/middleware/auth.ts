@@ -31,6 +31,11 @@ function extractToken(req: Request): string | null {
 }
 
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
+  if (req.user && req.rawToken) {
+    next();
+    return;
+  }
+
   const token = extractToken(req);
 
   if (!token) {

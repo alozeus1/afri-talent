@@ -42,8 +42,8 @@ const submitSchema = z.object({
 // ── POST /api/skills/application-writer/generate ─────────────────────────────
 router.post(
   "/generate",
-  generateLimiter,
   authenticate,
+  generateLimiter,
   authorize(Role.CANDIDATE),
   requirePlan(SubscriptionPlan.PROFESSIONAL),
   async (req: Request, res: Response): Promise<void> => {
