@@ -18,8 +18,6 @@ import {
 
 const router = Router();
 
-// Processed event IDs for idempotency (resets on restart; use Redis for production)
-const processedEvents = new Set<string>();
 const WEBHOOK_IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 function parseRawJsonBody(req: Request): Record<string, unknown> | null {
@@ -42,32 +40,32 @@ function parseRawJsonBody(req: Request): Record<string, unknown> | null {
   return null;
 }
 
-async function reserveEventId(eventId: string): Promise<boolean> {
+async function reserveEventId(provider: BillingProvider, eventId: string): Promise<boolean> {
+  const key = `${provider}:${eventId}`;
+
+  try {
+    await prisma.billingWebhookIdempotencyKey.create({
+      data: {
+        key,
+        provider,
+        eventId,
+        expiresAt: new Date(Date.now() + WEBHOOK_IDEMPOTENCY_TTL_SECONDS * 1000),
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return false;
+    }
+    throw error;
+  }
+
   if (redisClient) {
-    try {
-      const result = await redisClient.set(
-        `idempotency:stripe:${eventId}`,
-        new Date().toISOString(),
-        "EX",
-        WEBHOOK_IDEMPOTENCY_TTL_SECONDS,
-        "NX",
-      );
-      return result === "OK";
-    } catch {
-      // Fall back to in-memory duplicate protection.
-    }
-  }
-
-  if (processedEvents.has(eventId)) {
-    return false;
-  }
-
-  processedEvents.add(eventId);
-  if (processedEvents.size > 10000) {
-    const first = processedEvents.values().next().value;
-    if (first) {
-      processedEvents.delete(first);
-    }
+    await redisClient.set(
+      `idempotency:${key}`,
+      new Date().toISOString(),
+      "EX",
+      WEBHOOK_IDEMPOTENCY_TTL_SECONDS,
+    ).catch(() => undefined);
   }
 
   return true;
@@ -221,7 +219,7 @@ router.post("/flutterwave", async (req: Request, res: Response) => {
     return;
   }
 
-  const reserved = await reserveEventId(`flutterwave:${rawEventId}`);
+  const reserved = await reserveEventId(BillingProvider.FLUTTERWAVE, rawEventId);
   if (!reserved) {
     res.json({ received: true, duplicate: true });
     return;
@@ -426,7 +424,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
   }
 
   // Idempotency guard
-  const reserved = await reserveEventId(event.id);
+  const reserved = await reserveEventId(BillingProvider.STRIPE, event.id);
   if (!reserved) {
     await recordBillingEvent({
       source: "STRIPE_WEBHOOK",
