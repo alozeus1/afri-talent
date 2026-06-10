@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ResumeTemplate } from "@/lib/api";
-import { Lock, Download, Eye } from "lucide-react";
+import { Lock, Download, Eye, FileDown } from "lucide-react";
 
 interface TemplateCardProps {
   template: ResumeTemplate;
@@ -12,8 +12,10 @@ interface TemplateCardProps {
   userPlan: string;
   onDownload: (template: ResumeTemplate, format: string) => void;
   onFill?: (template: ResumeTemplate) => void;
+  onExportPdf?: (template: ResumeTemplate) => void;
   isDownloading?: boolean;
   isFilling?: boolean;
+  isExportingPdf?: boolean;
 }
 
 export function TemplateCard({
@@ -22,8 +24,10 @@ export function TemplateCard({
   userPlan,
   onDownload,
   onFill,
+  onExportPdf,
   isDownloading,
   isFilling,
+  isExportingPdf,
 }: TemplateCardProps) {
   const htmlFile = template.files.find((f) => f.format === "HTML");
   const pdfFile = template.files.find((f) => f.format === "PDF");
@@ -121,6 +125,18 @@ export function TemplateCard({
                   onClick={() => onFill(template)}
                 >
                   {isFilling ? "Filling..." : "Use with my data"}
+                </Button>
+              )}
+              {userPlan === "PROFESSIONAL" && onExportPdf && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  disabled={isExportingPdf}
+                  onClick={() => onExportPdf(template)}
+                >
+                  <FileDown className="mr-1 h-3.5 w-3.5" />
+                  {isExportingPdf ? "Preparing PDF..." : "Export PDF with my data"}
                 </Button>
               )}
             </>
