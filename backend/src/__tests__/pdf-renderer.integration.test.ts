@@ -6,7 +6,11 @@ import {
     closePdfRenderer,
 } from "../lib/pdf/html-to-pdf.js";
 
-const chromiumAvailable = isPdfRendererAvailable();
+// Gate the real-render suite on the explicit CHROMIUM_PATH signal that the
+// backend Docker image sets, not on incidental binary presence: CI runners
+// ship a chromium at a default path that existsSync() finds but cannot
+// actually launch, which made this suite run (and fail) instead of skipping.
+const chromiumAvailable = Boolean(process.env.CHROMIUM_PATH?.trim()) && isPdfRendererAvailable();
 
 describe("resolveChromiumPath", () => {
     const original = process.env.CHROMIUM_PATH;
