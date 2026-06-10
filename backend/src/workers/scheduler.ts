@@ -23,6 +23,7 @@ import { runApplyClickoutNudgeCycle, APPLY_CLICKOUT_NUDGE_INTERVAL_MS } from "./
 import { runApplyStuckMonitorCycle, APPLY_STUCK_MONITOR_INTERVAL_MS } from "./apply-stuck-monitor.js";
 import { startApplyBatchWorker } from "./apply-batch-worker.js";
 import { startApplyEmailWorker } from "./apply-email-worker.js";
+import { startApplyAtsWorker } from "./apply-ats-worker.js";
 import { runOperationalSnapshotCycle } from "./operational-snapshot.js";
 import { runBillingReconciliationWorker } from "./billing-reconciliation.js";
 import { runCandidateRetentionWorker } from "./candidate-retention.js";
@@ -263,6 +264,8 @@ export function startScheduler(): void {
   startApplyBatchWorker();
   // PR Q — Track B (EMAIL_DRAFT) sender (no-op when APPLY_QUEUES_ENABLED=0).
   startApplyEmailWorker();
+  // PR S — Track A (ATS_API_*) submitter (no-op when APPLY_QUEUES_ENABLED=0).
+  startApplyAtsWorker();
 
   const opsDelay = setTimeout(() => {
     void safeRun("ops-snapshot", runOperationalSnapshotCycle);
