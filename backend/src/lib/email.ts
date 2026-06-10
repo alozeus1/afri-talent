@@ -101,6 +101,91 @@ async function sendEmail(opts: SendEmailOptions): Promise<void> {
   }
 }
 
+// ── Apply-pathway sender (PR Q) ──────────────────────────────────────────────
+//
+// Unlike the notification templates above, the EMAIL_DRAFT track needs the
+// SES MessageId back (it becomes the EMAIL_MESSAGE_ID submission proof) and
+// sets Reply-To to the candidate so employers respond directly to them.
+// Dev mode (no SES_FROM_EMAIL) returns a synthetic id so the apply pathway
+// remains testable end-to-end locally.
+
+export async function sendApplyDraftEmail(opts: {
+  to: string;
+  replyTo: string;
+  subject: string;
+  html: string;
+  text: string;
+}): Promise<{ messageId: string }> {
+  const recipientDomain = opts.to.includes("@") ? opts.to.split("@")[1] : "unknown";
+
+  if (IS_DEV) {
+    logger.info(
+      { to: opts.to, replyTo: opts.replyTo, subject: opts.subject },
+      "[email] dev mode — apply email not sent",
+    );
+    return { messageId: `dev-${Date.now()}` };
+  }
+
+  const command = new SendEmailCommand({
+    Source: FROM_EMAIL,
+    Destination: { ToAddresses: [opts.to] },
+    ReplyToAddresses: [opts.replyTo],
+    Message: {
+      Subject: { Data: opts.subject, Charset: "UTF-8" },
+      Body: {
+        Html: { Data: opts.html, Charset: "UTF-8" },
+        Text: { Data: opts.text, Charset: "UTF-8" },
+      },
+    },
+  });
+
+  try {
+    const response = await withRetry(
+      () => getSES().send(command),
+      {
+        operationName: "email_apply_draft",
+        attempts: 3,
+        initialDelayMs: 500,
+      },
+    );
+    const messageId = response.MessageId ?? `ses-${Date.now()}`;
+    logger.info({ to: opts.to, subject: opts.subject, messageId }, "[email] apply email sent");
+    recordOpsEvent({
+      metricName: "notification_delivery_success",
+      category: "notifications",
+      details: {
+        channel: "email",
+        template: "apply_draft",
+        recipient_domain: recipientDomain,
+      },
+    });
+    return { messageId };
+  } catch (error) {
+    await pushDeadLetter({
+      category: "email",
+      source: "apply_draft",
+      reasonCode: "email_send_failed",
+      error,
+      payload: {
+        subject: opts.subject,
+        recipient_domain: recipientDomain,
+      },
+    });
+    recordOpsEvent({
+      metricName: "notification_delivery_failure",
+      category: "notifications",
+      outcome: "failure",
+      severity: "warning",
+      details: {
+        channel: "email",
+        template: "apply_draft",
+        recipient_domain: recipientDomain,
+      },
+    });
+    throw error;
+  }
+}
+
 // ── Email templates ──────────────────────────────────────────────────────────
 
 export async function newMessageEmail(opts: {
