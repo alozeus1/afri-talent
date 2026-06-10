@@ -26,6 +26,7 @@
 import { ApplyStrategy, SubmissionProofKind, SubmissionStatus } from "@prisma/client";
 import { getApplyQueue } from "../queues/apply-queues.js";
 import { composeAndSendApplyEmail, EmployerOptedOutError } from "./email-draft.js";
+import { submitApplicationToAts } from "./ats-submit.js";
 import logger from "../logger.js";
 
 export interface DispatchInput {
@@ -60,10 +61,10 @@ export interface DispatchFailure {
 export type DispatchResult = DispatchSuccess | DispatchFailure;
 
 const NOT_YET_IMPLEMENTED: Record<ApplyStrategy, string | null> = {
-  ATS_API_GREENHOUSE: "ATS_API_GREENHOUSE adapter ships in PR S",
-  ATS_API_LEVER:      "ATS_API_LEVER adapter ships in PR S",
-  ATS_API_ASHBY:      "ATS_API_ASHBY adapter ships in PR S",
-  ATS_API_WORKABLE:   "ATS_API_WORKABLE adapter ships in PR S",
+  ATS_API_GREENHOUSE: null, // PR S — implemented below
+  ATS_API_LEVER:      null, // PR S — implemented below
+  ATS_API_ASHBY:      "ATS_API_ASHBY needs ATSProvider/connection support before an adapter can ship",
+  ATS_API_WORKABLE:   null, // PR S — implemented below
   EMAIL_DRAFT:        null, // PR Q — implemented below
   OPERATOR_HANDOFF:   "OPERATOR_HANDOFF (Computer Use) track ships in PR T",
   ASSISTED_REDIRECT:  null,
@@ -93,6 +94,52 @@ export async function dispatchApply(input: DispatchInput): Promise<DispatchResul
       // clickout-confirm / clickout-deny finalises to SUBMITTED / FAILED;
       // 7-day silence transitions to NO_RESPONSE_TIMEOUT + FAILED.
       return assistedRedirectResult(input);
+    }
+
+    case ApplyStrategy.ATS_API_GREENHOUSE:
+    case ApplyStrategy.ATS_API_LEVER:
+    case ApplyStrategy.ATS_API_WORKABLE: {
+      // PR S — Track A. Queue path: enqueue and park in SUBMITTING; the
+      // apply-ats-worker submits + settles. Inline path: submit synchronously
+      // and hand the vendor application id (ATS_ID proof) to the route.
+      const queue = getApplyQueue("apply-ats-queue");
+      if (queue) {
+        try {
+          await queue.add(
+            "submit-ats-application",
+            { applicationId: input.applicationId, strategy: input.applyStrategy },
+            { jobId: `apply-ats-${input.applicationId}` },
+          );
+          return {
+            ok: true,
+            proofKind: SubmissionProofKind.ATS_ID,
+            proofRef: `queued:${input.applicationId}`,
+            provider: input.applyStrategy.replace("ATS_API_", "").toLowerCase(),
+            nextStatus: SubmissionStatus.SUBMITTING,
+          };
+        } catch (error) {
+          logger.warn(
+            { applicationId: input.applicationId, err: (error as Error).message },
+            "[dispatch] apply-ats enqueue failed; falling back to inline submit",
+          );
+        }
+      }
+
+      try {
+        const result = await submitApplicationToAts(input.applicationId, input.applyStrategy);
+        return {
+          ok: true,
+          proofKind: SubmissionProofKind.ATS_ID,
+          proofRef: result.externalApplicationId,
+          provider: result.provider.toLowerCase(),
+          providerApplicationId: result.externalApplicationId,
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : "ATS submission failed",
+        };
+      }
     }
 
     case ApplyStrategy.EMAIL_DRAFT: {

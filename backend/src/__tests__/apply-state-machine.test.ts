@@ -145,10 +145,13 @@ describe("§5.7 — dispatchApply", () => {
     if (result.ok) expect(result.proofRef.endsWith("|https://board/123")).toBe(true);
   });
 
-  it("ATS_API_GREENHOUSE stub-fails with a forward-pointer to PR S", async () => {
-    const result = await dispatchApply({ ...base, applyStrategy: "ATS_API_GREENHOUSE" });
+  // PR S implemented the Greenhouse/Lever/Workable adapters; their full
+  // behaviour is covered in apply-ats-submit.test.ts. Ashby stays stubbed
+  // until ATSProvider gains an ASHBY member + connection support.
+  it("ATS_API_ASHBY stub-fails with a clear reason", async () => {
+    const result = await dispatchApply({ ...base, applyStrategy: "ATS_API_ASHBY" });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("PR S");
+    if (!result.ok) expect(result.error).toMatch(/ashby/i);
   });
 
   // PR Q implemented the EMAIL_DRAFT track; full send/queue/opt-out behaviour

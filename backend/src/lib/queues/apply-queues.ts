@@ -95,3 +95,9 @@ export interface ApplyBatchJobData {
   jobId: string;
   customMessage?: string;
 }
+
+// PR S — apply-ats-queue payload (strategy selects the vendor adapter).
+export interface ApplyAtsJobData {
+  applicationId: string;
+  strategy: "ATS_API_GREENHOUSE" | "ATS_API_LEVER" | "ATS_API_WORKABLE";
+}
