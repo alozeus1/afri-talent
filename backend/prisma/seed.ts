@@ -57,6 +57,12 @@ async function main() {
       emailVerified: true,
       emailVerifiedAt: new Date(),
       accountRestrictionStatus: AccountRestrictionStatus.ACTIVE,
+      // H2 — the admin TOTP gate (middleware/admin-totp-gate.ts) only allows
+      // mutating admin actions once an admin is enrolled; during grace, reads
+      // pass but POST/PUT/PATCH/DELETE return 403. Seed the bootstrap admin as
+      // enrolled so admin-mutation flows (e.g. billing overrides) work for
+      // tests/local without a live TOTP enrolment. Login needs no TOTP code.
+      totpEnrolledAt: new Date(),
     },
   });
 
