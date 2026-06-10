@@ -1,7 +1,7 @@
 import helmet from "helmet";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { Request, Response, NextFunction } from "express";
-import { createHash } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 import logger from "../lib/logger.js";
 
 // §2.8 — Helmet hardening.
@@ -122,9 +122,38 @@ export function getAuthenticatedRateLimitKey(req: Request, scope: string): strin
   return `${scope}:user:${userId}`;
 }
 
+const INTERNAL_FETCH_HEADER = "x-afritalent-internal-fetch";
+
+function timingSafeStringEqual(a: string, b: string): boolean {
+  const digestA = createHash("sha256").update(a).digest();
+  const digestB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(digestA, digestB);
+}
+
+/**
+ * True only when the request carries the shared INTERNAL_FETCH_SECRET.
+ * The previous implementation trusted the static marker value
+ * "server-public-api", which any client could spoof to bypass rate limiting
+ * and bot protection for the public jobs/stats endpoints. Fails closed:
+ * no secret configured → no bypass. The Next.js server sends the secret
+ * from server-only env (see frontend/src/lib/server-public-api.ts).
+ */
+export function isTrustedInternalFetch(req: Request): boolean {
+  const secret = process.env.INTERNAL_FETCH_SECRET?.trim();
+  if (!secret) {
+    return false;
+  }
+
+  const marker = req.header(INTERNAL_FETCH_HEADER);
+  if (typeof marker !== "string" || marker.length === 0) {
+    return false;
+  }
+
+  return timingSafeStringEqual(marker, secret);
+}
+
 function isInternalPublicFetch(req: Request): boolean {
-  const marker = req.header("x-afritalent-internal-fetch");
-  if (marker !== "server-public-api") {
+  if (!isTrustedInternalFetch(req)) {
     return false;
   }
 
