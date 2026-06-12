@@ -27,7 +27,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1063.0",
     "@prisma/client": "5.22.0",
     "@sentry/node": "^10.43.0",
-    "@sentry/profiling-node": "^10.43.0",
+    "@sentry/profiling-node": "^10.57.0",
     "@types/cookie-parser": "^1.4.10",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.76.7",
