@@ -212,7 +212,10 @@ export async function getUserEntitlements(userId: string): Promise<Entitlements>
     select: { plan: true, status: true },
   });
 
-  if (!sub || sub.status === "CANCELLED" || sub.status === "INACTIVE") {
+  // Whitelist ACTIVE: any non-active status (PAST_DUE on failed payment,
+  // CANCELLED, INACTIVE) loses paid entitlements and falls back to FREE.
+  // This mirrors the requirePlan middleware, which gates on ACTIVE only.
+  if (!sub || sub.status !== "ACTIVE") {
     return getEntitlements(SubscriptionPlan.FREE);
   }
 

@@ -62,7 +62,7 @@ export default defineConfig({
       name: "mobile-web",
       testMatch: /ui-.*\.spec\.ts$/,
       dependencies: ["setup"],
-      use: { ...devices["iPhone 13"], baseURL: APP_URL },
+      use: { ...devices["Pixel 5"], baseURL: APP_URL },
     },
   ],
 });
