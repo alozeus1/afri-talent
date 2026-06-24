@@ -22,6 +22,14 @@ import { SubmissionProofKind, SubmissionStatus } from "@prisma/client";
 import prisma from "../prisma.js";
 import logger from "../logger.js";
 import { sendApplyDraftEmail } from "../email.js";
+import { runOnce } from "../ai/langgraph/tools/idempotency.js";
+
+// Opt-in idempotency guard around the SES send. Off by default → identical
+// behavior. When APPLY_SES_IDEMPOTENCY=1, a retry/replay for the same
+// application reuses the prior MessageId instead of sending a duplicate email.
+function sesIdempotencyEnabled(): boolean {
+  return process.env.APPLY_SES_IDEMPOTENCY === "1";
+}
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -112,17 +120,28 @@ export async function composeAndSendApplyEmail(applicationId: string): Promise<A
     Reply directly to this email to reach the candidate.</p>
   `;
 
-  const { messageId } = await sendApplyDraftEmail({
-    to,
-    replyTo: application.candidate.email,
-    subject,
-    html,
-    text,
-  });
+  const send = () =>
+    sendApplyDraftEmail({
+      to,
+      replyTo: application.candidate.email,
+      subject,
+      html,
+      text,
+    }).then((r) => r.messageId);
+
+  let messageId: string;
+  let deduped = false;
+  if (sesIdempotencyEnabled()) {
+    const once = await runOnce("ses_apply_email", applicationId, send);
+    messageId = once.ref;
+    deduped = once.deduped;
+  } else {
+    messageId = await send();
+  }
 
   logger.info(
-    { applicationId, recipientDomain: domain, messageId },
-    "[apply-email] application email sent",
+    { applicationId, recipientDomain: domain, messageId, deduped },
+    deduped ? "[apply-email] duplicate send suppressed (idempotent)" : "[apply-email] application email sent",
   );
 
   return { messageId, to };
