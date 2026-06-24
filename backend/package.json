@@ -91,6 +91,6 @@
     "@xmldom/xmldom": "0.8.13",
     "fast-xml-parser": "5.8.0",
     "path-to-regexp": "8.4.2",
-    "undici": "7.24.0"
+    "undici": "7.28.0"
   }
 }
