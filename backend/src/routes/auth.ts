@@ -24,6 +24,12 @@ const router = Router();
 const COOKIE_NAME = "auth_token";
 const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
+// §2.10/H2 — admin TOTP enrolment grace. Deliberately shorter than the
+// session cookie: a stolen admin credential should not get a week of
+// MFA-free access. 48h is enough to enrol; mutations are blocked during
+// grace anyway (see middleware/admin-totp-gate.ts).
+const ADMIN_TOTP_GRACE_MS = 48 * 60 * 60 * 1000;
+
 function setAuthCookie(res: Response, token: string): void {
   const isProduction = process.env.NODE_ENV === "production";
   res.cookie(COOKIE_NAME, token, {
@@ -355,7 +361,7 @@ router.post("/login", authLimiter, validateHumanAuthSubmission, async (req: Requ
     ) {
       await prisma.user.update({
         where: { id: user.id },
-        data: { totpGraceUntil: new Date(Date.now() + COOKIE_MAX_AGE_MS) },
+        data: { totpGraceUntil: new Date(Date.now() + ADMIN_TOTP_GRACE_MS) },
       });
     }
 

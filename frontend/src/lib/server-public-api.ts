@@ -26,7 +26,14 @@ async function fetchServerPublicApi<T>(
   requestHeaders.set("Accept", "application/json");
 
   if (typeof window === "undefined") {
-    requestHeaders.set("x-afritalent-internal-fetch", "server-public-api");
+    // Shared secret proving this request comes from the Next.js server, not a
+    // browser. The backend disables its rate-limit/bot-protection bypass when
+    // the secret is missing or wrong (the old static marker was spoofable).
+    // Server-only env var — must NOT be NEXT_PUBLIC_*.
+    const internalFetchSecret = process.env.INTERNAL_FETCH_SECRET?.trim();
+    if (internalFetchSecret) {
+      requestHeaders.set("x-afritalent-internal-fetch", internalFetchSecret);
+    }
   }
 
   const response = await fetch(`${SERVER_API_URL}${path}`, {

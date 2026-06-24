@@ -145,16 +145,22 @@ describe("§5.7 — dispatchApply", () => {
     if (result.ok) expect(result.proofRef.endsWith("|https://board/123")).toBe(true);
   });
 
-  it("ATS_API_GREENHOUSE stub-fails with a forward-pointer to PR S", async () => {
-    const result = await dispatchApply({ ...base, applyStrategy: "ATS_API_GREENHOUSE" });
+  // PR S implemented the Greenhouse/Lever/Workable adapters; their full
+  // behaviour is covered in apply-ats-submit.test.ts. Ashby stays stubbed
+  // until ATSProvider gains an ASHBY member + connection support.
+  it("ATS_API_ASHBY stub-fails with a clear reason", async () => {
+    const result = await dispatchApply({ ...base, applyStrategy: "ATS_API_ASHBY" });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("PR S");
+    if (!result.ok) expect(result.error).toMatch(/ashby/i);
   });
 
-  it("EMAIL_DRAFT stub-fails with a forward-pointer to PR Q", async () => {
+  // PR Q implemented the EMAIL_DRAFT track; full send/queue/opt-out behaviour
+  // is covered in apply-email-draft.test.ts. Here we only assert the guard
+  // that applies regardless of transport: no detected apply email → clean fail.
+  it("EMAIL_DRAFT fails cleanly when the job has no detected apply email", async () => {
     const result = await dispatchApply({ ...base, applyStrategy: "EMAIL_DRAFT" });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("PR Q");
+    if (!result.ok) expect(result.error).toMatch(/no detected apply email/i);
   });
 
   it("OPERATOR_HANDOFF stub-fails with a forward-pointer to PR T", async () => {

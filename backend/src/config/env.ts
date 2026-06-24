@@ -1,3 +1,5 @@
+import { validatePriceCatalogEnv } from "../lib/billing/provider-catalog.js";
+
 const VALID_NODE_ENVS = new Set(["development", "test", "production", "staging"]);
 
 function requireEnv(name: string): string {
@@ -41,11 +43,10 @@ export function validateRuntimeEnv(): void {
     requireEnv("ANTHROPIC_API_KEY");
     requireEnv("SENTRY_DSN");
 
-    // If Flutterwave payments are enabled, the webhook signature secret is
-    // mandatory — without it the webhook endpoint cannot authenticate
-    // requests and rejects everything (fail closed). Fail the deploy instead.
-    if (process.env.FLUTTERWAVE_SECRET_KEY?.trim()) {
-      requireEnv("FLUTTERWAVE_SECRET_HASH");
-    }
+    // M5 — if provider price catalogs are configured, they must be
+    // well-formed (valid JSON, PLAN:REGION:INTERVAL:CURRENCY keys, non-empty
+    // provider ids). A malformed catalog previously parsed to {} silently and
+    // broke checkout at runtime; fail the deploy instead.
+    validatePriceCatalogEnv();
   }
 }

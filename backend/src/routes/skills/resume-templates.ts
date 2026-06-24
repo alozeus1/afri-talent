@@ -9,6 +9,8 @@ import logger from "../../lib/logger.js";
 import { getUserEntitlements } from "../../lib/billing/entitlements.js";
 import { Role, SubscriptionPlan } from "@prisma/client";
 import { fillTemplate } from "../../lib/ai/skills/template-filler.js";
+import { requireFeatureFlag } from "../../middleware/feature-flags.js";
+import { renderHtmlToPdf, isPdfRendererAvailable } from "../../lib/pdf/html-to-pdf.js";
 
 const router = Router();
 
@@ -284,6 +286,116 @@ router.get(
   }
 );
 
+// ── Shared fill pipeline ──────────────────────────────────────────────────────
+// Loads the template HTML from S3 and fills it with the user's saved resume.
+// Used by POST /:id/fill (HTML download) and POST /:id/export-pdf.
+
+type FilledHtmlResult =
+  | { ok: true; html: string }
+  | { ok: false; status: number; error: string };
+
+async function buildFilledResumeHtml(
+  templateId: string,
+  userId: string,
+  email: string,
+): Promise<FilledHtmlResult> {
+  const template = await prisma.resumeTemplate.findUnique({
+    where: { id: templateId },
+    include: { files: true },
+  });
+
+  if (!template || !template.isActive) {
+    return { ok: false, status: 404, error: "Template not found" };
+  }
+
+  const htmlFile = template.files.find((f) => f.format === "HTML" && f.s3Key);
+  if (!htmlFile || !htmlFile.s3Key || !BUCKET) {
+    return { ok: false, status: 503, error: "Template HTML source is not configured" };
+  }
+
+  const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: htmlFile.s3Key });
+  const response = await getS3Client().send(getCmd);
+  const templateHtml = await response.Body?.transformToString("utf-8");
+  if (!templateHtml) {
+    return { ok: false, status: 500, error: "Failed to read template source" };
+  }
+
+  const userResume = await prisma.userResume.findUnique({ where: { userId } });
+  if (!userResume) {
+    return {
+      ok: false,
+      status: 404,
+      error: "No saved resume found. Generate and save a resume first.",
+    };
+  }
+
+  const resumeContent = userResume.content as Record<string, unknown>;
+  const sections = resumeContent.sections as Record<string, unknown>;
+
+  const [user, candidateProfile] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true, phoneNumber: true } }),
+    prisma.candidateProfile.findUnique({ where: { userId } }),
+  ]);
+
+  const html = fillTemplate(templateHtml, {
+    fullName: user?.name || "",
+    email,
+    phone: user?.phoneNumber || undefined,
+    location: candidateProfile?.targetCountries?.[0] || undefined,
+    linkedinUrl: candidateProfile?.linkedinUrl || undefined,
+    githubUrl: candidateProfile?.githubUrl || undefined,
+    portfolioUrl: candidateProfile?.portfolioUrl || undefined,
+    resume: {
+      sections: {
+        summary: String(sections?.summary || ""),
+        skills: Array.isArray(sections?.skills) ? sections.skills as string[] : [],
+        experience: Array.isArray(sections?.experience)
+          ? (sections.experience as Array<Record<string, unknown>>).map((e) => ({
+              company: String(e.company || ""),
+              title: String(e.title || ""),
+              period: String(e.period || ""),
+              bullets: Array.isArray(e.bullets) ? e.bullets as string[] : [],
+            }))
+          : [],
+        education: Array.isArray(sections?.education)
+          ? (sections.education as Array<Record<string, unknown>>).map((e) => ({
+              institution: String(e.institution || ""),
+              degree: String(e.degree || ""),
+              period: String(e.period || ""),
+            }))
+          : [],
+        certifications: Array.isArray(sections?.certifications)
+          ? sections.certifications as string[]
+          : [],
+      },
+      rawText: userResume.rawText,
+      source: "ai",
+    },
+  });
+
+  return { ok: true, html };
+}
+
+async function uploadAndPresign(
+  key: string,
+  body: Buffer | string,
+  contentType: string,
+): Promise<string> {
+  const putCmd = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+  });
+  await getS3Client().send(putCmd);
+
+  return getSignedUrl(
+    getS3Client(),
+    new GetObjectCommand({ Bucket: BUCKET, Key: key }),
+    { expiresIn: DOWNLOAD_URL_EXPIRY_SECONDS },
+  );
+}
+
 // ── POST /api/skills/resume-templates/:id/fill ───────────────────────────────
 // Auto-fill an HTML template with the user's saved resume data.
 // Auth: CANDIDATE + PROFESSIONAL only
@@ -301,100 +413,15 @@ router.post(
       const { id } = fillParamsSchema.parse(req.params);
       const userId = req.user!.userId;
 
-      const template = await prisma.resumeTemplate.findUnique({
-        where: { id },
-        include: { files: true },
-      });
-
-      if (!template || !template.isActive) {
-        res.status(404).json({ error: "Template not found" });
+      const built = await buildFilledResumeHtml(id, userId, req.user!.email);
+      if (!built.ok) {
+        res.status(built.status).json({ error: built.error });
         return;
       }
-
-      // Find HTML file
-      const htmlFile = template.files.find((f) => f.format === "HTML" && f.s3Key);
-      if (!htmlFile || !htmlFile.s3Key || !BUCKET) {
-        res.status(503).json({ error: "Template HTML source is not configured" });
-        return;
-      }
-
-      // Fetch the HTML template from S3
-      const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: htmlFile.s3Key });
-      const response = await getS3Client().send(getCmd);
-      const templateHtml = await response.Body?.transformToString("utf-8");
-      if (!templateHtml) {
-        res.status(500).json({ error: "Failed to read template source" });
-        return;
-      }
-
-      // Fetch user's saved resume
-      const userResume = await prisma.userResume.findUnique({ where: { userId } });
-      if (!userResume) {
-        res.status(404).json({ error: "No saved resume found. Generate and save a resume first." });
-        return;
-      }
-
-      const resumeContent = userResume.content as Record<string, unknown>;
-      const sections = resumeContent.sections as Record<string, unknown>;
-
-      // Fetch user and profile for contact details
-      const [user, candidateProfile] = await Promise.all([
-        prisma.user.findUnique({ where: { id: userId }, select: { name: true, phoneNumber: true } }),
-        prisma.candidateProfile.findUnique({ where: { userId } }),
-      ]);
-
-      const filledHtml = fillTemplate(templateHtml, {
-        fullName: user?.name || "",
-        email: req.user!.email,
-        phone: user?.phoneNumber || undefined,
-        location: candidateProfile?.targetCountries?.[0] || undefined,
-        linkedinUrl: candidateProfile?.linkedinUrl || undefined,
-        githubUrl: candidateProfile?.githubUrl || undefined,
-        portfolioUrl: candidateProfile?.portfolioUrl || undefined,
-        resume: {
-          sections: {
-            summary: String(sections?.summary || ""),
-            skills: Array.isArray(sections?.skills) ? sections.skills as string[] : [],
-            experience: Array.isArray(sections?.experience)
-              ? (sections.experience as Array<Record<string, unknown>>).map((e) => ({
-                  company: String(e.company || ""),
-                  title: String(e.title || ""),
-                  period: String(e.period || ""),
-                  bullets: Array.isArray(e.bullets) ? e.bullets as string[] : [],
-                }))
-              : [],
-            education: Array.isArray(sections?.education)
-              ? (sections.education as Array<Record<string, unknown>>).map((e) => ({
-                  institution: String(e.institution || ""),
-                  degree: String(e.degree || ""),
-                  period: String(e.period || ""),
-                }))
-              : [],
-            certifications: Array.isArray(sections?.certifications)
-              ? sections.certifications as string[]
-              : [],
-          },
-          rawText: userResume.rawText,
-          source: "ai",
-        },
-      });
 
       // Upload filled file to S3 (temporary, 1-hour TTL via lifecycle or manual cleanup)
       const filledKey = `templates/filled/${userId}/${id}-${Date.now()}.html`;
-      const putCmd = new PutObjectCommand({
-        Bucket: BUCKET,
-        Key: filledKey,
-        Body: filledHtml,
-        ContentType: "text/html",
-      });
-      await getS3Client().send(putCmd);
-
-      // Generate presigned URL
-      const presignedUrl = await getSignedUrl(
-        getS3Client(),
-        new GetObjectCommand({ Bucket: BUCKET, Key: filledKey }),
-        { expiresIn: DOWNLOAD_URL_EXPIRY_SECONDS }
-      );
+      const presignedUrl = await uploadAndPresign(filledKey, built.html, "text/html");
 
       // Log download
       await prisma.templateDownload.create({
@@ -417,6 +444,66 @@ router.post(
       }
       logger.error({ error }, "[resume-templates] Failed to fill template");
       res.status(500).json({ error: "Failed to fill template" });
+    }
+  }
+);
+
+// ── POST /api/skills/resume-templates/:id/export-pdf ─────────────────────────
+// Workstream B — server-side PDF export of the candidate's filled resume.
+// Renders the filled HTML to PDF (headless chromium, JS disabled, network
+// blocked), uploads to S3 and returns a presigned download URL.
+// Auth: CANDIDATE + PROFESSIONAL; gated by RESUME_PDF_EXPORT_ENABLED.
+router.post(
+  "/:id/export-pdf",
+  requireFeatureFlag("RESUME_PDF_EXPORT_ENABLED"),
+  authenticate,
+  authorize(Role.CANDIDATE),
+  requirePlan(SubscriptionPlan.PROFESSIONAL),
+  async (req: Request, res: Response) => {
+    try {
+      const { id } = fillParamsSchema.parse(req.params);
+      const userId = req.user!.userId;
+
+      if (!isPdfRendererAvailable()) {
+        res.status(503).json({
+          error: "PDF rendering is not available on this server",
+          code: "PDF_RENDERER_UNAVAILABLE",
+        });
+        return;
+      }
+
+      const built = await buildFilledResumeHtml(id, userId, req.user!.email);
+      if (!built.ok) {
+        res.status(built.status).json({ error: built.error });
+        return;
+      }
+
+      const pdf = await renderHtmlToPdf(built.html);
+
+      const pdfKey = `templates/filled/${userId}/${id}-${Date.now()}.pdf`;
+      const presignedUrl = await uploadAndPresign(pdfKey, pdf, "application/pdf");
+
+      await prisma.templateDownload.create({
+        data: {
+          userId,
+          templateId: id,
+          format: "PDF",
+          source: "resume_builder",
+        },
+      });
+
+      res.json({
+        downloadUrl: presignedUrl,
+        sizeBytes: pdf.length,
+        expiresAt: new Date(Date.now() + DOWNLOAD_URL_EXPIRY_SECONDS * 1000).toISOString(),
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid request", details: error.flatten() });
+        return;
+      }
+      logger.error({ error }, "[resume-templates] Failed to export PDF");
+      res.status(500).json({ error: "Failed to export PDF" });
     }
   }
 );

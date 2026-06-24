@@ -3717,10 +3717,16 @@ export interface TemplateDownloadResponse {
   expiresAt: string | null;
 }
 
+export interface TemplatePdfExportResponse extends TemplateDownloadResponse {
+  sizeBytes: number;
+}
+
 export const templates = {
   list: () => fetchAPI<TemplateListResponse>("/api/skills/resume-templates"),
   download: (id: string, format: string) =>
     fetchAPI<TemplateDownloadResponse>(`/api/skills/resume-templates/${id}/download?format=${encodeURIComponent(format)}`),
   fill: (id: string) =>
     fetchAPI<TemplateDownloadResponse>(`/api/skills/resume-templates/${id}/fill`, { method: "POST" }),
+  exportPdf: (id: string) =>
+    fetchAPI<TemplatePdfExportResponse>(`/api/skills/resume-templates/${id}/export-pdf`, { method: "POST" }),
 };

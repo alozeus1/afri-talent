@@ -17,6 +17,7 @@ export default function ResumeTemplatesPage() {
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [fillingId, setFillingId] = useState<string | null>(null);
+  const [exportingPdfId, setExportingPdfId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -62,6 +63,26 @@ export default function ResumeTemplatesPage() {
       setError(err instanceof Error ? err.message : "Could not fill template with your data.");
     } finally {
       setFillingId(null);
+    }
+  }
+
+  async function handleExportPdf(template: ResumeTemplate) {
+    setExportingPdfId(template.id);
+    setError(null);
+    try {
+      const response = await templates.exportPdf(template.id);
+      window.location.assign(response.downloadUrl);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      // Backend feature flag off / chromium unavailable → friendly copy
+      // instead of the raw 503 error string.
+      if (/not enabled|not available/i.test(message)) {
+        setError("PDF export isn't available yet on this workspace. Use \"Use with my data\" for the HTML version meanwhile.");
+      } else {
+        setError(message || "Could not export your resume as PDF.");
+      }
+    } finally {
+      setExportingPdfId(null);
     }
   }
 
@@ -114,8 +135,10 @@ export default function ResumeTemplatesPage() {
               userPlan={catalog.userPlan}
               onDownload={handleDownload}
               onFill={catalog.userPlan === "PROFESSIONAL" ? handleFill : undefined}
+              onExportPdf={catalog.userPlan === "PROFESSIONAL" ? handleExportPdf : undefined}
               isDownloading={downloadingId === template.id}
               isFilling={fillingId === template.id}
+              isExportingPdf={exportingPdfId === template.id}
             />
           ))}
         </div>
