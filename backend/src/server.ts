@@ -4,11 +4,13 @@ import logger from "./lib/logger.js";
 import { ensureBootstrapAdmin } from "./lib/admin-bootstrap.js";
 import { captureException, flushSentry } from "./lib/sentry.js";
 import { startScheduler, stopScheduler } from "./workers/scheduler.js";
+import { bootstrapLangGraph } from "./lib/ai/langgraph/index.js";
 
 const PORT = process.env.PORT || 4000;
 
 async function startServer() {
   await ensureBootstrapAdmin();
+  await bootstrapLangGraph(); // no-op when LANGGRAPH_ENABLED!=1
 
   return app.listen(PORT, () => {
     logger.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "Server started");

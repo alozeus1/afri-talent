@@ -9,6 +9,8 @@
 import logger from "../../logger.js";
 import type { WorkflowType } from "./state/schemas.js";
 import { setupCheckpointer } from "./memory/checkpointer.js";
+import { registerGraphEventSink } from "./observability/graphEvents.js";
+import { createPrismaGraphEventSink } from "./tools/prismaTools.js";
 
 /** Global kill-switch. Off by default so production behavior is unchanged. */
 export function isLangGraphEnabled(): boolean {
@@ -37,6 +39,7 @@ export async function bootstrapLangGraph(): Promise<void> {
     return;
   }
   try {
+    registerGraphEventSink(createPrismaGraphEventSink());
     await setupCheckpointer();
     logger.info("[graph] LangGraph layer bootstrapped");
   } catch (err) {

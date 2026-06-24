@@ -14,6 +14,11 @@ import { randomUUID } from "crypto";
 import { z } from "zod/v4";
 import logger from "../../logger.js";
 import { emitMatchAgentDurationMs } from "../../observability/metrics.js";
+import { isGraphEnabled } from "../langgraph/index.js";
+import {
+  runOrchestratorViaGraph,
+  workflowForRunType,
+} from "../langgraph/graphs/orchestratorWrap.graph.js";
 import {
   ResumeParserAgent,
   JobParserAgent,
@@ -269,6 +274,17 @@ class BudgetExceededError extends Error {
 // ── Orchestrator entry point ───────────────────────────────────────────────────
 
 export async function runOrchestrator(input: OrchestratorInput): Promise<OrchestratorOutput> {
+  // Strangler delegation: when the LangGraph flag is on for this workflow, run
+  // through the wrap graph (state + checkpoint + audit + events). The graph calls
+  // runOrchestratorCore, so behavior is identical and there is no recursion.
+  // Flag off (default) → call the core directly: zero behavior change.
+  if (isGraphEnabled(workflowForRunType(input.run_type))) {
+    return runOrchestratorViaGraph(input, runOrchestratorCore);
+  }
+  return runOrchestratorCore(input);
+}
+
+export async function runOrchestratorCore(input: OrchestratorInput): Promise<OrchestratorOutput> {
   const {
     run_type,
     user_id,
