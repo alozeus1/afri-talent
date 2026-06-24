@@ -65,8 +65,8 @@ export async function runOrchestratorViaGraph(
 
   const graph = new StateGraph(BaseGraphAnnotation)
     .addNode("init", async () => {
-      emitGraphEvent({ graphRunId, workflowType, threadId, type: "graph_started" });
       await createGraphRun({ graphRunId, workflowType, threadId, userId: input.user_id });
+      emitGraphEvent({ graphRunId, workflowType, threadId, type: "graph_started" });
       return { graphRunId, workflowType, status: "RUNNING" as GraphRunStatus, currentStep: "execute" };
     })
     .addNode("execute", async () => {
