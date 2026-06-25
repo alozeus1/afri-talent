@@ -1,6 +1,6 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: June 7, 2026 (cost anomaly remediation expanded)
+Last updated: June 25, 2026 (dev stack suspended and RDS Proxy removed)
 
 > [!IMPORTANT]
 > **Architecture changed on 2026-05-10.** The shared environment has moved off
@@ -8,6 +8,136 @@ Last updated: June 7, 2026 (cost anomaly remediation expanded)
 > Serverless v2 + Lambda + CloudFront/WAF in the new AWS account `108188564905`.
 > Anything below that references `*.awsapprunner.com`, `afritalent-staging-*`
 > AWS resources, or the old account ID is historical and no longer live.
+
+## Update on June 25, 2026: Dev stack suspended for cost control
+
+After explicit human approval, the live AfriTalent dev webapp was paused in
+AWS account `108188564905` to stop unused runtime spend while preserving a
+straightforward redeploy path.
+
+Actions applied with local AWS profile `afritalent`:
+
+- ECS service `afritalent-dev-frontend` scaled to desired count `0`.
+- ECS service `afritalent-dev-backend` scaled to desired count `0`.
+- EventBridge rule `afritalent-dev-blog-automation-weekly` disabled.
+- NAT instance `i-097d412dc779da13d` stopped.
+
+Post-change verification:
+
+- ECS services are `ACTIVE` with `desiredCount=0`, `runningCount=0`, and
+  `pendingCount=0`.
+- Frontend task definition retained:
+  `arn:aws:ecs:us-east-1:108188564905:task-definition/afritalent-dev-frontend:44`.
+- Backend task definition retained:
+  `arn:aws:ecs:us-east-1:108188564905:task-definition/afritalent-dev-backend:46`.
+- EventBridge rule `afritalent-dev-blog-automation-weekly` is `DISABLED`.
+- NAT instance `i-097d412dc779da13d` is `stopped`.
+- Aurora cluster `afritalent-dev-aurora` remains `available` with Serverless v2
+  `MinCapacity=0`, `MaxCapacity=4`, `SecondsUntilAutoPause=1800`, deletion
+  protection enabled, and 30-day backup retention.
+
+Follow-up RDS Proxy cost removal, also after explicit human approval:
+
+- Terraform targeted destroy was checked first but was not applied because it
+  planned to destroy 39 resources, including Lambda/observability resources and
+  `/afritalent/dev/DATABASE_URL`.
+- RDS Proxy `afritalent-dev-rds-proxy` was deleted directly through AWS RDS.
+- AWS now returns `DBProxyNotFoundFault` for `afritalent-dev-rds-proxy`.
+- The deleted proxy resources were removed from Terraform state:
+  `module.rds_proxy.aws_db_proxy.proxy`,
+  `module.rds_proxy.aws_db_proxy_default_target_group.proxy`, and
+  `module.rds_proxy.aws_db_proxy_target.aurora`.
+- The RDS Proxy IAM role and inline policy remain tracked in Terraform state;
+  they do not carry meaningful idle cost and should make the next Terraform
+  recreate path smaller.
+- `/afritalent/dev/DATABASE_URL` remains in SSM and Terraform state, but it
+  points at the deleted proxy endpoint until Terraform recreates the proxy and
+  refreshes dependent values during redeploy.
+
+Important remaining cost note: this is still a reversible suspension, not a
+full Terraform destroy. It stops ECS task runtime, the NAT instance, RDS Proxy
+hourly spend, and the weekly blog Lambda schedule. Managed resources such as
+ALB, CloudFront/WAF, AWS Config, Security Hub, GuardDuty, KMS keys, S3, ECR,
+logs, Secrets Manager, backups, and Terraform state remain in place and may
+continue to incur some cost.
+
+Suspend commands used:
+
+```bash
+AWS_PROFILE=afritalent aws ecs update-service \
+  --region us-east-1 \
+  --cluster afritalent-dev \
+  --service afritalent-dev-frontend \
+  --desired-count 0
+
+AWS_PROFILE=afritalent aws ecs update-service \
+  --region us-east-1 \
+  --cluster afritalent-dev \
+  --service afritalent-dev-backend \
+  --desired-count 0
+
+AWS_PROFILE=afritalent aws events disable-rule \
+  --region us-east-1 \
+  --name afritalent-dev-blog-automation-weekly
+
+AWS_PROFILE=afritalent aws ec2 stop-instances \
+  --region us-east-1 \
+  --instance-ids i-097d412dc779da13d
+
+AWS_PROFILE=afritalent aws rds delete-db-proxy \
+  --region us-east-1 \
+  --db-proxy-name afritalent-dev-rds-proxy
+
+AWS_PROFILE=afritalent terraform -chdir=infra/terraform/accounts/dev-new state rm \
+  module.rds_proxy.aws_db_proxy_target.aurora \
+  module.rds_proxy.aws_db_proxy_default_target_group.proxy \
+  module.rds_proxy.aws_db_proxy.proxy
+```
+
+To resume the dev webapp for testing:
+
+```bash
+# Recreate the deleted RDS Proxy and refresh dependent Terraform-managed values
+# such as the DATABASE_URL parameter before starting ECS tasks.
+AWS_PROFILE=afritalent terraform -chdir=infra/terraform/accounts/dev-new apply
+
+AWS_PROFILE=afritalent aws ec2 start-instances \
+  --region us-east-1 \
+  --instance-ids i-097d412dc779da13d
+
+AWS_PROFILE=afritalent aws ec2 wait instance-running \
+  --region us-east-1 \
+  --instance-ids i-097d412dc779da13d
+
+AWS_PROFILE=afritalent aws ecs update-service \
+  --region us-east-1 \
+  --cluster afritalent-dev \
+  --service afritalent-dev-frontend \
+  --desired-count 1
+
+AWS_PROFILE=afritalent aws ecs update-service \
+  --region us-east-1 \
+  --cluster afritalent-dev \
+  --service afritalent-dev-backend \
+  --desired-count 1
+
+AWS_PROFILE=afritalent aws ecs wait services-stable \
+  --region us-east-1 \
+  --cluster afritalent-dev \
+  --services afritalent-dev-frontend afritalent-dev-backend
+```
+
+Re-enable the weekly blog automation only when intentionally testing or
+operating that workflow:
+
+```bash
+AWS_PROFILE=afritalent aws events enable-rule \
+  --region us-east-1 \
+  --name afritalent-dev-blog-automation-weekly
+```
+
+After resuming, validate the CloudFront app URL and backend health before
+treating staging as operational.
 
 ## Update on June 7, 2026: Cost anomaly investigation
 
