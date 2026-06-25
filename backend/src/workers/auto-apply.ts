@@ -15,6 +15,8 @@ import { randomUUID } from "crypto";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { generateQuickCoverLetter } from "../lib/ai/cover-letter.js";
+import { isGraphEnabled } from "../lib/ai/langgraph/index.js";
+import { evaluateAutopilotGate } from "../lib/ai/langgraph/integration/candidateAutopilotAdapter.js";
 
 const AUTO_APPLY_SCORE_THRESHOLD = parseInt(process.env.AUTO_APPLY_SCORE_THRESHOLD || "75", 10);
 const MAX_AUTO_APPLIES_PER_CYCLE = parseInt(process.env.MAX_AUTO_APPLIES_PER_CYCLE || "20", 10);
@@ -81,8 +83,31 @@ export async function runAutoApplyCycle(): Promise<void> {
     take: MAX_AUTO_APPLIES_PER_CYCLE,
   });
 
+  // Rollout: optional LangGraph autopilot safety gate (per user, cached per
+  // cycle). Flag off → not consulted, behavior unchanged. When on, opted-out /
+  // unentitled / high-risk / incomplete-profile users are skipped before any pack
+  // is prepared. Generation below is untouched.
+  const autopilotGateEnabled = isGraphEnabled("candidate_autopilot");
+  const gateCache = new Map<string, boolean>();
+
   for (const alert of alerts) {
     try {
+      if (autopilotGateEnabled) {
+        let allowed = gateCache.get(alert.userId);
+        if (allowed === undefined) {
+          const gate = await evaluateAutopilotGate(alert.userId);
+          allowed = gate.allowed;
+          gateCache.set(alert.userId, allowed);
+          if (!allowed) {
+            logger.info({ userId: alert.userId.slice(0, 8), reason: gate.reason }, "[auto-apply] autopilot gate blocked user");
+          }
+        }
+        if (!allowed) {
+          skipped++;
+          continue;
+        }
+      }
+
       // Skip if already applied
       const existingApp = await prisma.application.findFirst({
         where: {
