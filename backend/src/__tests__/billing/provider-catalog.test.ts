@@ -23,6 +23,32 @@ describe("parseCatalogStrict (M5)", () => {
         expect(catalog[VALID_KEY]).toBe("price_123");
     });
 
+    it("normalizes the legacy nested catalog shape", () => {
+        const catalog = parseCatalogStrict(
+            JSON.stringify({
+                afritalent_professional: {
+                    name: "AfriTalent Professional",
+                    prices: {
+                        usd: {
+                            monthly: "price_monthly",
+                            yearly: "price_yearly",
+                            discount_monthly: "price_discount",
+                        },
+                    },
+                },
+            }),
+            "TEST_CATALOG",
+        );
+
+        expect(catalog[buildCatalogKey(SubscriptionPlan.PROFESSIONAL, BillingRegion.ROW, BillingInterval.MONTHLY, "USD")]).toBe(
+            "price_monthly",
+        );
+        expect(catalog[buildCatalogKey(SubscriptionPlan.PROFESSIONAL, BillingRegion.AFRICA, BillingInterval.YEARLY, "USD")]).toBe(
+            "price_yearly",
+        );
+        expect(Object.values(catalog)).not.toContain("price_discount");
+    });
+
     it("returns an empty catalog for unset/blank env", () => {
         expect(parseCatalogStrict(undefined, "TEST_CATALOG")).toEqual({});
         expect(parseCatalogStrict("   ", "TEST_CATALOG")).toEqual({});
@@ -50,6 +76,12 @@ describe("parseCatalogStrict (M5)", () => {
         expect(() =>
             parseCatalogStrict(JSON.stringify({ [VALID_KEY]: "" }), "TEST_CATALOG"),
         ).toThrow(/TEST_CATALOG failed validation/);
+    });
+
+    it("throws on invalid legacy catalog entries", () => {
+        expect(() =>
+            parseCatalogStrict(JSON.stringify({ afritalent_professional: { prices: { usd: { weekly: "price_1" } } } }), "TEST_CATALOG"),
+        ).toThrow(/unknown legacy interval key/);
     });
 });
 
@@ -103,5 +135,26 @@ describe("runtime resolution still works after validation", () => {
                 "USD",
             ),
         ).toBe("price_xyz");
+    });
+
+    it("resolves a price id from the legacy nested catalog", () => {
+        process.env.STRIPE_PRICE_CATALOG_JSON = JSON.stringify({
+            afritalent_professional: {
+                prices: {
+                    usd: {
+                        monthly: "price_legacy",
+                    },
+                },
+            },
+        });
+
+        expect(
+            resolveStripeCatalogPriceId(
+                SubscriptionPlan.PROFESSIONAL,
+                BillingRegion.ROW,
+                BillingInterval.MONTHLY,
+                "USD",
+            ),
+        ).toBe("price_legacy");
     });
 });
