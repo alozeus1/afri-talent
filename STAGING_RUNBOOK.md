@@ -1122,3 +1122,64 @@ At launch, the bootstrap admin account must monitor the trust queue daily.
 Verification submissions that sit `PENDING` more than 48 hours degrade
 the user experience — verified users get higher-quality job matches and
 skip job moderation queues.
+
+---
+
+## LangGraph orchestration layer
+
+The AI subsystem runs through a LangGraph layer (`backend/src/lib/ai/langgraph/`).
+Full design + per-phase docs: `docs/langgraph/` (`README.md`, `DEPLOYMENT_CHECKLIST.md`).
+LangGraph owns AI workflow state + sequencing + human-in-the-loop; BullMQ remains
+the scheduler/executor. Everything is gated behind env flags (default OFF).
+
+### Current staging state (account dev-new)
+Set in `infra/terraform/accounts/dev-new/main.tf` backend task env:
+- `LANGGRAPH_ENABLED=1` — global switch; enables every WIRED graph unless a
+  per-graph flag is `0`.
+- `LANGGRAPH_JOB_INGESTION_QUALITY=1` — explicit (redundant with global; kept for
+  clarity / independent prod control).
+
+With the global flag on, these WIRED graphs are live: orchestrator wrap
+(resume_review / job_match / apply_pack — output parity + audit), job-ingestion
+quality gate (aggregator `upsertJob`), interview-prep (`/autopilot/interview-prep`
+adds `readinessScore`), and the candidate-autopilot safety gate (auto-apply worker).
+Unwired graphs (apply-submission HITL, blog, follow-up, trust verification/
+moderation, billing_recovery) are inert until their adapters are wired, regardless
+of the flag.
+
+### DB objects (applied by the container entrypoint `prisma migrate deploy`)
+- `GraphRun`, `GraphRunEvent`, `IdempotencyKey` (migration `..._add_langgraph_orchestration`).
+- `SemanticDocument.embeddingVector vector(1536)` + HNSW index (`..._add_semantic_pgvector_column`) — additive, unused until `RAG_PGVECTOR=1` + backfill.
+- LangGraph checkpointer tables (`checkpoints*`) are created at boot by
+  `setupCheckpointer()` when `LANGGRAPH_ENABLED=1` (requires the runtime DB role to
+  have DDL — same role that runs entrypoint migrations).
+
+### Flags (all default OFF)
+| Flag | Effect |
+|---|---|
+| `LANGGRAPH_ENABLED` | global switch + bootstraps checkpointer/event sink |
+| `LANGGRAPH_<WORKFLOW>` | per-graph canary (e.g. `LANGGRAPH_APPLY_PACK`); `0` disables even if global on |
+| `APPLY_SES_IDEMPOTENCY` | idempotent SES apply emails (standalone; not graph-wired) |
+| `RAG_PGVECTOR` | native pgvector ANN search (requires backfill first) |
+| `AI_MODEL_FAST` / `AI_MODEL_QUAL` | model overrides |
+
+### Verify it's working
+- `GraphRun` rows accumulate; `GraphRunEvent` has per-node events.
+- CloudWatch: `langgraph_graph_started/completed/failed`, `langgraph_run_outcome`,
+  `job_ingestion_decision`.
+- Jobs may land in `JobStatus.PENDING_REVIEW` (ingestion `hold`) — confirm an admin
+  surface lists them, else they are invisible to users.
+- `[auto-apply] autopilot gate blocked user` logs show gated users.
+
+### Rollback (no code redeploy)
+- Set `LANGGRAPH_ENABLED=0` (everything off → legacy paths) or a single
+  `LANGGRAPH_<WORKFLOW>=0` in the task env.
+- Migrations are additive; no rollback needed. The checkpointer schema can be
+  truncated without touching business data.
+
+### Watch on first enable / after changes
+- Confirm `setupCheckpointer()` created `checkpoints*` tables (backend log:
+  `[graph] Postgres checkpointer tables ready`).
+- Persistence failures are non-fatal (best-effort) — runs still complete; a spike in
+  `[graph] *failed (non-fatal)` warnings means the DB role lacks rights or a table is
+  missing.
