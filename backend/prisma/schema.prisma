@@ -2920,21 +2920,24 @@ model ChatMessage {
 // ──────────────── Semantic Retrieval Foundation ────────────────
 
 model SemanticDocument {
-  id                  String   @id @default(uuid())
-  namespace           String   @db.VarChar(100)
-  sourceType          String   @db.VarChar(100)
-  sourceId            String   @db.VarChar(191)
-  title               String?  @db.VarChar(300)
-  content             String   @db.Text
+  id                  String                       @id @default(uuid())
+  namespace           String                       @db.VarChar(100)
+  sourceType          String                       @db.VarChar(100)
+  sourceId            String                       @db.VarChar(191)
+  title               String?                      @db.VarChar(300)
+  content             String                       @db.Text
   metadata            Json?
   embedding           Float[]
+  // Native pgvector column for ANN search (Phase 6). Nullable + additive;
+  // populated by dual-write during rollout. Managed via raw SQL (Unsupported).
+  embeddingVector     Unsupported("vector(1536)")?
   embeddingDimensions Int
-  embeddingProvider   String   @db.VarChar(50)
-  embeddingModel      String   @db.VarChar(100)
-  checksum            String   @db.VarChar(64)
-  lastIndexedAt       DateTime @default(now())
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  embeddingProvider   String                       @db.VarChar(50)
+  embeddingModel      String                       @db.VarChar(100)
+  checksum            String                       @db.VarChar(64)
+  lastIndexedAt       DateTime                     @default(now())
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
 
   @@unique([namespace, sourceType, sourceId])
   @@index([namespace, sourceType])
