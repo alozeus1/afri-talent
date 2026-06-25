@@ -26,6 +26,8 @@ import {
 import { generateQuickCoverLetter } from "../lib/ai/cover-letter.js";
 import { getApplyQueue } from "../lib/queues/apply-queues.js";
 import { getUserEntitlements } from "../lib/billing/entitlements.js";
+import { isGraphEnabled } from "../lib/ai/langgraph/index.js";
+import { runInterviewPrepRollout } from "../lib/ai/langgraph/integration/interviewPrepAdapter.js";
 import {
   buildFollowUpDraft,
   buildInterviewPrepPack,
@@ -579,13 +581,14 @@ router.post(
         return;
       }
 
-      const pack = await buildInterviewPrepPack({
-        user,
-        profile,
-        application,
-        job: application.job,
-      });
+      const prepInput = { user, profile, application, job: application.job };
+      if (isGraphEnabled("interview_prep")) {
+        const out = await runInterviewPrepRollout(prepInput, userId);
+        res.status(201).json({ pack: out.pack, readinessScore: out.readinessScore });
+        return;
+      }
 
+      const pack = await buildInterviewPrepPack(prepInput);
       res.status(201).json({ pack });
     } catch (err) {
       logger.error({ err, applicationId }, "[autopilot] interview prep failed");
