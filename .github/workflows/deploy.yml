@@ -295,6 +295,63 @@ jobs:
           TF_VAR_lambda_artifact_dir: ${{ github.workspace }}/infra/terraform/accounts/dev-new/lambda-packages
         run: terraform apply -auto-approve -input=false
 
+      - name: Roll ECS services to new task definitions
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          CLUSTER="$(terraform output -raw ecs_cluster_name)"
+          FRONTEND_SERVICE="${CLUSTER}-frontend"
+          BACKEND_SERVICE="${CLUSTER}-backend"
+
+          FRONTEND_TASK_DEF="$(aws ecs describe-task-definition \
+            --task-definition "$FRONTEND_SERVICE" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)"
+          BACKEND_TASK_DEF="$(aws ecs describe-task-definition \
+            --task-definition "$BACKEND_SERVICE" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)"
+
+          FRONTEND_IMAGE="$(aws ecs describe-task-definition \
+            --task-definition "$FRONTEND_TASK_DEF" \
+            --query "taskDefinition.containerDefinitions[?name=='frontend'].image | [0]" \
+            --output text)"
+          BACKEND_IMAGE="$(aws ecs describe-task-definition \
+            --task-definition "$BACKEND_TASK_DEF" \
+            --query "taskDefinition.containerDefinitions[?name=='backend'].image | [0]" \
+            --output text)"
+
+          case "$FRONTEND_IMAGE" in
+            *":${IMAGE_TAG}") ;;
+            *)
+              echo "::error::Latest frontend task definition does not use image tag ${IMAGE_TAG}: ${FRONTEND_IMAGE}" >&2
+              exit 1
+              ;;
+          esac
+
+          case "$BACKEND_IMAGE" in
+            *":${IMAGE_TAG}") ;;
+            *)
+              echo "::error::Latest backend task definition does not use image tag ${IMAGE_TAG}: ${BACKEND_IMAGE}" >&2
+              exit 1
+              ;;
+          esac
+
+          aws ecs update-service \
+            --cluster "$CLUSTER" \
+            --service "$FRONTEND_SERVICE" \
+            --task-definition "$FRONTEND_TASK_DEF" \
+            --force-new-deployment >/dev/null
+          aws ecs update-service \
+            --cluster "$CLUSTER" \
+            --service "$BACKEND_SERVICE" \
+            --task-definition "$BACKEND_TASK_DEF" \
+            --force-new-deployment >/dev/null
+
+          aws ecs wait services-stable \
+            --cluster "$CLUSTER" \
+            --services "$FRONTEND_SERVICE" "$BACKEND_SERVICE"
+
   # ---------------------------------------------------------------------------
   # 5. Smoke test against the deployed CloudFront / ALB endpoint.
   # ---------------------------------------------------------------------------
