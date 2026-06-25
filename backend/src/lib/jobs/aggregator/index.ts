@@ -38,6 +38,12 @@ import { classifyApplyStrategy } from "../apply-strategy.js";
 import { resolveEffectiveApplyStrategy } from "../../apply/caps.js";
 import { normalizeCompany, normalizeLocation } from "../normalize.js";
 import { buildDedupKeys, findDuplicate, type DedupMatch } from "../dedup.js";
+import { isGraphEnabled } from "../../ai/langgraph/index.js";
+import {
+  gateJobIngestion,
+  jobPersistenceForDecision,
+  type JobPersistenceOverride,
+} from "../../ai/langgraph/integration/jobIngestionAdapter.js";
 
 interface AggregatedJobGroup {
   canonical: AggregatedJob;
@@ -637,6 +643,30 @@ export class JobAggregator {
     const finalStrategy = effective.effective;
     const finalApplyEmail = effective.downgradedFromEmailDraft ? null : applyDecision.applyEmailDetected ?? null;
 
+    // Rollout: optional LangGraph ingestion-quality gate. Flag-gated — when off,
+    // qualityOverride stays undefined and persistence is unchanged (PUBLISHED/LOW).
+    // reject → skip persistence; hold → PENDING_REVIEW; warn → PUBLISHED+MEDIUM.
+    let qualityOverride: JobPersistenceOverride | undefined;
+    if (isGraphEnabled("job_ingestion_quality")) {
+      const gate = await gateJobIngestion({
+        jobRef: job.externalId,
+        source: job.source,
+        fingerprint,
+        title: job.title,
+        company: job.company,
+        description: job.description,
+        requirements: job.requirements,
+        hasSalary: Boolean(job.salary && (job.salary.min != null || job.salary.max != null)),
+        hasLocation: Boolean(job.location && job.location.trim()),
+        postedAt: job.postedAt,
+      });
+      const mapped = jobPersistenceForDecision(gate.decision, gate.scamScore);
+      if (mapped === null) {
+        return { outcome: "skipped" }; // rejected by the quality gate
+      }
+      qualityOverride = mapped;
+    }
+
     const jobData = {
       title: job.title,
       slug,
@@ -661,7 +691,7 @@ export class JobAggregator {
       salaryMax: job.salary?.max,
       currency: job.salary?.currency,
       tags: job.skills,
-      status: "PUBLISHED" as const,
+      status: qualityOverride?.status ?? ("PUBLISHED" as const),
       publishedAt: job.postedAt,
       visaSponsorship: job.visaSponsorship,
       relocationAssistance: job.relocationAssistance,
@@ -674,8 +704,8 @@ export class JobAggregator {
       companyCareerSourceId: job.companyCareerSourceId ?? null,
       lastCheckedAt: new Date(),
       isExpired: false,
-      riskScore: 0,
-      riskLevel: "LOW" as const,
+      riskScore: qualityOverride?.riskScore ?? 0,
+      riskLevel: qualityOverride?.riskLevel ?? ("LOW" as const),
       qualityCheckedAt: new Date(),
       ...intelligence,
     };
