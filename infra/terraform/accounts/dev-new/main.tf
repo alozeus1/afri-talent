@@ -251,19 +251,21 @@ module "ecs_fargate" {
   app_s3_bucket_arn = module.s3_uploads.bucket_arn
 
   backend_env = {
-    NODE_ENV                      = "production"
-    PORT                          = "3001"
-    MOCK_AI                       = "0"
-    AI_DISABLED                   = "0"
-    FRONTEND_URL                  = "https://d2j3ahmgbbdup1.cloudfront.net"
-    DAILY_APPLY_PACK_LIMIT        = "10"
-    DAILY_JOB_MATCH_LIMIT         = "50"
-    DAILY_RESUME_REVIEW_LIMIT     = "20"
-    ORCHESTRATOR_TOKEN_BUDGET_MAX = "120000"
-    SEMANTIC_INDEX_ENABLED        = "0"
-    SMS_ENABLED                   = "0"
-    AWS_REGION                    = var.aws_region
-    BLOG_AUTOMATION_ENABLED       = "1" # all blog API keys populated 2026-05-08
+    NODE_ENV                       = "production"
+    PORT                           = "3001"
+    MOCK_AI                        = "0"
+    AI_DISABLED                    = "0"
+    FRONTEND_URL                   = "https://d2j3ahmgbbdup1.cloudfront.net"
+    DAILY_APPLY_PACK_LIMIT         = "10"
+    DAILY_JOB_MATCH_LIMIT          = "50"
+    DAILY_RESUME_REVIEW_LIMIT      = "20"
+    ORCHESTRATOR_TOKEN_BUDGET_MAX  = "120000"
+    SEMANTIC_INDEX_ENABLED         = "0"
+    SMS_ENABLED                    = "0"
+    AWS_REGION                     = var.aws_region
+    BLOG_AUTOMATION_ENABLED        = "1" # all blog API keys populated 2026-05-08
+    LANGGRAPH_ENABLED              = "1"
+    LANGGRAPH_JOB_INGESTION_QUALITY = "1"
   }
 
   # SSM SecureString -> env var. Each value is the parameter ARN.
