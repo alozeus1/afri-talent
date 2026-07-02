@@ -145,6 +145,11 @@ export function PricingExperience({
           <p className="mt-3 text-sm text-gray-500 max-w-3xl mx-auto">
             {checkoutRoutingHint}
           </p>
+          <p className="mt-2 text-sm font-medium text-emerald-700 max-w-3xl mx-auto">
+            {region === "AFRICA"
+              ? "Fair local pricing: plans for Africa are priced for African markets — not converted from US rates."
+              : "Prices are localized to your region and shown in your regional currency."}
+          </p>
         </div>
       </section>
 
