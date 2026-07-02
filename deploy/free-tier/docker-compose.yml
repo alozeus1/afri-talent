@@ -1,0 +1,103 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AfriTalent — free-tier deployment (backend half)
+#
+# Topology:
+#   Frontend  → Vercel (free tier, deployed from /frontend)
+#   Database  → Neon   (free tier, managed Postgres with pgvector)
+#   Backend   → this compose file, on any small VM
+#               (Oracle Cloud Always Free ARM VM recommended — $0/month)
+#   Redis     → local container (free)
+#   TLS/proxy → Caddy with automatic Let's Encrypt certificates
+#
+# The existing AWS Terraform stack is untouched — this is an alternative,
+# not a replacement. Both deploy the same Docker images.
+#
+# Usage:
+#   cp .env.example .env        # fill in values (see README.md)
+#   docker compose up -d --build
+#
+# Optional local Postgres (if you don't want Neon):
+#   docker compose --profile local-db up -d --build
+#   then set DATABASE_URL=postgresql://afritalent:afritalent@postgres:5432/afritalent
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      RUN_DB_MIGRATIONS: "1" # entrypoint runs `prisma migrate deploy` at boot
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    expose:
+      - "4000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # e.g. api.yourdomain.com — Caddy provisions TLS automatically
+      API_DOMAIN: ${API_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - backend
+
+  # Optional: local Postgres with pgvector for testing without Neon.
+  # Enable with: docker compose --profile local-db up -d
+  postgres:
+    profiles: ["local-db"]
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: afritalent
+      POSTGRES_PASSWORD: afritalent
+      POSTGRES_DB: afritalent
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U afritalent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis-data:
+  caddy-data:
+  caddy-config:
+  postgres-data:
