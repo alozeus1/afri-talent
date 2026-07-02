@@ -11,6 +11,7 @@ import prisma from "./prisma.js";
 import { buildJobSearchWhere, buildPreferenceContext, fetchRankedJobs, type JobSearchFilters, type RankedPublicJob } from "./jobs/search.js";
 import { createUserNotification } from "./notifications.js";
 import { candidateWeeklyDigestEmail } from "./email.js";
+import { sendBotJobDigest } from "./bots/outbound.js";
 import { recordOpsEvent } from "./ops/events.js";
 
 const MAX_RECOMMENDATION_CANDIDATES = 250;
@@ -802,6 +803,20 @@ async function dispatchLifecycleEvent(input: {
       })),
       digestUrl: `${DEFAULT_FRONTEND_URL}/candidate/preferences`,
     }).catch(() => undefined);
+
+    // WhatsApp/Telegram fan-out — inert unless the bot bridge is configured
+    // (PHASE4_BOTS_ENABLED + BOT_BRIDGE_OUTBOUND_URL). Same weeklyDigests
+    // preference gate as email; per-subscription opt-in enforced downstream.
+    const digestLines = input.email.topJobs
+      .slice(0, 5)
+      .map(
+        (job, i) =>
+          `${i + 1}. ${job.title} — ${job.employer?.companyName ?? job.sourceName ?? "Company"} (${job.location})\n${DEFAULT_FRONTEND_URL}/jobs/${job.slug}`,
+      );
+    const digestText =
+      `🌍 Your AfriTalent weekly digest\n\n${digestLines.join("\n\n")}\n\n` +
+      `Manage alerts: ${DEFAULT_FRONTEND_URL}/candidate/preferences`;
+    await sendBotJobDigest(input.context.user.id, digestText).catch(() => undefined);
   }
 
   recordOpsEvent({
