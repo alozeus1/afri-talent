@@ -82,6 +82,7 @@ import adminAlertsRoutes from "./routes/admin-alerts.js";
 import adminBulkRoutes from "./routes/admin-bulk.js";
 import adminBlogRoutes from "./routes/admin-blog.js";
 import adminTotpRoutes from "./routes/admin-totp.js";
+import onboardingRoutes from "./routes/onboarding.js";
 // AI Skills routes (premium, additive)
 import skillsResumeBuilderRoutes from "./routes/skills/resume-builder.js";
 import skillsResumeTemplateRoutes from "./routes/skills/resume-templates.js";
@@ -483,6 +484,7 @@ app.use("/api/admin/trust", adminTrustRoutes);
 app.use("/api/admin/totp", adminTotpRoutes);
 app.use("/api/admin/rag", adminRagRoutes);
 app.use("/api/admin/blog", adminBlogRoutes);
+app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/bots", botsRoutes);
 // AI Skills (premium gated — require PROFESSIONAL plan + per-user rate limit)
 app.use("/api/skills/resume-builder", authenticate, skillsLimiter, skillsResumeBuilderRoutes);

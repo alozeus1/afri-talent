@@ -177,6 +177,32 @@ export const jobs = {
     fetchAPI<Job[]>("/api/jobs/employer/my-jobs", { token }),
 };
 
+// Onboarding — free "first look" instant matches
+export interface InstantMatch {
+  id: string;
+  title: string;
+  slug: string;
+  location: string;
+  type: string;
+  workplaceType: string | null;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  currency: string | null;
+  companyName: string;
+  hiresFromAfrica: boolean;
+  publishedAt: string | null;
+  matchedSkills: string[];
+  matchScore: number;
+}
+
+export const onboarding = {
+  instantMatches: (token?: string) =>
+    fetchAPI<{ profileReady: boolean; matches: InstantMatch[] }>(
+      "/api/onboarding/instant-matches",
+      { token },
+    ),
+};
+
 // Applications
 export const applications = {
   apply: (data: { jobId: string; cvUrl?: string; coverLetter?: string }, token?: string) =>
