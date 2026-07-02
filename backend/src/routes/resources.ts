@@ -24,7 +24,7 @@ router.get("/", async (req: Request, res: Response) => {
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const take = parseInt(limit as string);
 
-    const [resources, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       prisma.resource.findMany({
         where,
         select: {
@@ -35,6 +35,7 @@ router.get("/", async (req: Request, res: Response) => {
           category: true,
           coverImage: true,
           publishedAt: true,
+          content: true,
         },
         orderBy: { publishedAt: "desc" },
         skip,
@@ -42,6 +43,12 @@ router.get("/", async (req: Request, res: Response) => {
       }),
       prisma.resource.count({ where }),
     ]);
+
+    // Expose read time (~200 wpm) without shipping full content in list payloads
+    const resources = rows.map(({ content, ...rest }) => ({
+      ...rest,
+      readMinutes: Math.max(1, Math.ceil(content.split(/\s+/).length / 200)),
+    }));
 
     res.json({
       resources,

@@ -29,7 +29,6 @@ import { runBillingReconciliationWorker } from "./billing-reconciliation.js";
 import { runCandidateRetentionWorker } from "./candidate-retention.js";
 import { runSemanticIndexWorker } from "./semantic-indexer.js";
 import { runSkillsJobEmbedder } from "./skills-job-embedder.js";
-import { runBlogAutomationCycle, BLOG_AUTOMATION_INTERVAL_MS } from "./blog-automation.js";
 import { pushDeadLetter, recordWorkerState, withRetry } from "../lib/ops/resilience.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
 
@@ -306,14 +305,10 @@ export function startScheduler(): void {
   }, 150_000);
   intervals.push(skillsEmbedDelay as unknown as IntervalRef);
 
-  // Weekly blog automation — generates AI-authored blog posts for human review.
-  // Disabled by default; set BLOG_AUTOMATION_ENABLED=1 to activate.
-  intervals.push(
-    setInterval(
-      () => void safeRun("blog-automation", runBlogAutomationCycle),
-      BLOG_AUTOMATION_INTERVAL_MS,
-    )
-  );
+  // NOTE: weekly blog automation is intentionally NOT scheduled here. Its
+  // canonical trigger is the blog-automation Lambda (EventBridge cron, Mondays
+  // 09:00 UTC). An in-process interval here would race the Lambda and produce
+  // duplicate weekly drafts whenever both are enabled.
 }
 
 export function stopScheduler(): void {

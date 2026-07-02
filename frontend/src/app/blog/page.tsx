@@ -21,6 +21,7 @@ interface BlogPost {
   coverImage?: string;
   publishedAt?: string;
   category: string;
+  readMinutes?: number;
 }
 
 interface BlogListResponse {
@@ -43,9 +44,8 @@ function formatDate(iso: string) {
   });
 }
 
-function estimateReadTime(excerpt: string) {
-  const words = excerpt.split(/\s+/).length;
-  return Math.max(3, Math.ceil(words * 8)); // rough estimate based on excerpt
+function readTime(post: BlogPost) {
+  return post.readMinutes ?? 4; // API-computed from full content; digests average ~4 min
 }
 
 // ── Hero / Featured post ──────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ function FeaturedPost({ post }: { post: BlogPost }) {
           <div className="flex items-center gap-4 text-gray-400 text-sm">
             {post.publishedAt && <span>{formatDate(post.publishedAt)}</span>}
             <span>·</span>
-            <span>{estimateReadTime(post.excerpt)} min read</span>
+            <span>{readTime(post)} min read</span>
             <span className="ml-2 text-emerald-400 group-hover:underline font-medium">
               Read now →
             </span>
@@ -119,7 +119,7 @@ function PostCard({ post }: { post: BlogPost }) {
           </h3>
           <p className="text-gray-500 text-sm line-clamp-3 leading-relaxed">{post.excerpt}</p>
           <div className="mt-4 flex items-center justify-between">
-            <span className="text-xs text-gray-400">{estimateReadTime(post.excerpt)} min read</span>
+            <span className="text-xs text-gray-400">{readTime(post)} min read</span>
             <span className="text-xs text-emerald-600 font-medium group-hover:underline">Read →</span>
           </div>
         </CardContent>
