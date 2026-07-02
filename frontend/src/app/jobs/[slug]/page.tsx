@@ -124,6 +124,7 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                         variant="success"
                       />
                     )}
+                    {job.hiresFromAfrica && <TrustBadge label="Hires from Africa" variant="success" />}
                     {job.trust?.companyReviewed && <TrustBadge label="Company reviewed" variant="info" />}
                     {job.trust?.jobQualityChecked && <TrustBadge label="Job quality checked" variant="success" />}
                     {job.trust?.newEmployerCaution && (

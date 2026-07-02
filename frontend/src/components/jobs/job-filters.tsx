@@ -13,6 +13,7 @@ interface JobFiltersProps {
   seniority: string;
   visaSponsorship: string;
   relocationAssistance: string;
+  hiresFromAfrica: string;
   remote: string;
   onSearchChange: (value: string) => void;
   onLocationChange: (value: string) => void;
@@ -22,6 +23,7 @@ interface JobFiltersProps {
   onSeniorityChange: (value: string) => void;
   onVisaSponsorshipChange: (value: string) => void;
   onRelocationChange: (value: string) => void;
+  onHiresFromAfricaChange: (value: string) => void;
   onRemoteChange: (value: string) => void;
   onClear: () => void;
 }
@@ -66,6 +68,7 @@ export function JobFilters({
   seniority,
   visaSponsorship,
   relocationAssistance,
+  hiresFromAfrica,
   remote,
   onSearchChange,
   onLocationChange,
@@ -75,10 +78,11 @@ export function JobFilters({
   onSeniorityChange,
   onVisaSponsorshipChange,
   onRelocationChange,
+  onHiresFromAfricaChange,
   onRemoteChange,
   onClear,
 }: JobFiltersProps) {
-  const hasFilters = search || location || type || jobField || workplaceType || seniority || visaSponsorship || relocationAssistance || remote;
+  const hasFilters = search || location || type || jobField || workplaceType || seniority || visaSponsorship || relocationAssistance || hiresFromAfrica || remote;
 
   return (
     <div className="surface-panel-strong gloss-card mb-8 rounded-[2rem] p-6">
@@ -216,6 +220,18 @@ export function JobFilters({
         >
           {relocationAssistance && <Check className="w-4 h-4" />}
           Relocation Support
+        </button>
+        <button
+          type="button"
+          onClick={() => onHiresFromAfricaChange(hiresFromAfrica ? "" : "true")}
+          aria-pressed={Boolean(hiresFromAfrica)}
+          aria-label="Toggle jobs verified to hire from Africa"
+          className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${
+            hiresFromAfrica ? "border-amber-600 bg-amber-600 text-white shadow-[0_12px_30px_rgba(217,119,6,0.22)]" : "bg-white/70 text-gray-700 border-[rgba(15,23,32,0.12)] hover:border-amber-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
+          }`}
+        >
+          {hiresFromAfrica && <Check className="w-4 h-4" />}
+          Hires from Africa
         </button>
       </div>
     </div>

@@ -93,6 +93,7 @@ export function JobsSearchShell({ filters, isPending = false, onNavigate, result
         seniority={draft.seniority}
         visaSponsorship={draft.visaSponsorship}
         relocationAssistance={draft.relocationAssistance}
+        hiresFromAfrica={draft.hiresFromAfrica}
         remote={draft.remote}
         onSearchChange={(value) => updateDraft({ search: value })}
         onLocationChange={(value) => updateDraft({ location: value })}
@@ -102,6 +103,7 @@ export function JobsSearchShell({ filters, isPending = false, onNavigate, result
         onSeniorityChange={(value) => updateDraft({ seniority: value })}
         onVisaSponsorshipChange={(value) => updateDraft({ visaSponsorship: value })}
         onRelocationChange={(value) => updateDraft({ relocationAssistance: value })}
+        onHiresFromAfricaChange={(value) => updateDraft({ hiresFromAfrica: value })}
         onRemoteChange={(value) => updateDraft({ remote: value })}
         onClear={() =>
           setDraft({
@@ -113,6 +115,7 @@ export function JobsSearchShell({ filters, isPending = false, onNavigate, result
             seniority: "",
             visaSponsorship: "",
             relocationAssistance: "",
+            hiresFromAfrica: "",
             remote: "",
             page: 1,
             limit: filters.limit,

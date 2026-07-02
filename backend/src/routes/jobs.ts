@@ -30,6 +30,7 @@ import logger from "../lib/logger.js";
 import { classifyJobField as classifyTaxonomyField } from "../lib/ai/skills/job-field-classifier.js";
 import { classifyApplyStrategy } from "../lib/jobs/apply-strategy.js";
 import { resolveEffectiveApplyStrategy } from "../lib/apply/caps.js";
+import { postedJobHiresFromAfrica } from "../lib/jobs/africa-signal.js";
 import { normalizeCompany, normalizeLocation } from "../lib/jobs/normalize.js";
 
 const router = Router();
@@ -208,7 +209,7 @@ router.get("/", optionalAuth, anonymousJobsLimiter, blockAnonymousJobsAutomation
 
     const {
       search, query: queryAlias, location, type, jobField, workplaceType, seniority,
-      visaSponsorship, relocationAssistance, remote, remoteOnly,
+      visaSponsorship, relocationAssistance, hiresFromAfrica, remote, remoteOnly,
       salaryMin, salaryMax, country, employmentType, provider, includeExpandedKeywords, sortBy,
       page = "1", limit = "10", forAI,
     } = req.query;
@@ -233,6 +234,7 @@ router.get("/", optionalAuth, anonymousJobsLimiter, blockAnonymousJobsAutomation
       seniority: seniority as string | undefined,
       visaSponsorship: visaSponsorship as string | undefined,
       relocationAssistance: relocationAssistance === "true",
+      hiresFromAfrica: hiresFromAfrica === "true",
       remote: remote === "true" || remoteOnly === "true",
       salaryMin: salaryMin ? parseInt(salaryMin as string, 10) : null,
       salaryMax: salaryMax ? parseInt(salaryMax as string, 10) : null,
@@ -513,6 +515,12 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
         location: normalizedLocation.display || jobData.location,
         slug: generateSlug(jobData.title),
         tags: jobData.tags || [],
+        hiresFromAfrica: postedJobHiresFromAfrica({
+          title: jobData.title,
+          description: jobData.description,
+          location: jobData.location,
+          workplaceType: jobData.workplaceType ?? null,
+        }),
         status: requiresModeration ? JobStatus.PENDING_REVIEW : JobStatus.PUBLISHED,
         publishedAt,
         employerId: employer.id,
@@ -756,6 +764,12 @@ router.put("/:id", authenticate, authorize(Role.EMPLOYER), requireAccountStandin
       where: { id: req.params.id },
       data: {
         ...data,
+        hiresFromAfrica: postedJobHiresFromAfrica({
+          title: data.title ?? existingJob.title,
+          description: data.description ?? existingJob.description,
+          location: data.location ?? existingJob.location,
+          workplaceType: data.workplaceType ?? existingJob.workplaceType,
+        }),
         status: requiresModeration ? JobStatus.PENDING_REVIEW : JobStatus.PUBLISHED,
         publishedAt: nextPublishedAt,
         riskScore: jobRisk.score,

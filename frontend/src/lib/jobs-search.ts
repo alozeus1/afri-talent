@@ -9,6 +9,7 @@ export interface JobSearchState extends Required<Pick<JobListParams, "page" | "l
   seniority: string;
   visaSponsorship: string;
   relocationAssistance: string;
+  hiresFromAfrica: string;
   remote: string;
 }
 
@@ -41,6 +42,7 @@ export function parseJobSearchState(
     seniority: readStringParam(searchParams.seniority),
     visaSponsorship: readStringParam(searchParams.visaSponsorship),
     relocationAssistance: readStringParam(searchParams.relocationAssistance),
+    hiresFromAfrica: readStringParam(searchParams.hiresFromAfrica),
     remote: readStringParam(searchParams.remote),
     page: readPositiveInt(searchParams.page, 1),
     limit: readPositiveInt(searchParams.limit, DEFAULT_JOB_RESULTS_LIMIT),
@@ -57,6 +59,7 @@ export function hasActiveJobFilters(filters: Partial<JobSearchState>): boolean {
       filters.seniority ||
       filters.visaSponsorship ||
       filters.relocationAssistance ||
+      filters.hiresFromAfrica ||
       filters.remote,
   );
 }
@@ -71,6 +74,7 @@ export function toJobListParams(state: JobSearchState): JobListParams {
     seniority: state.seniority || undefined,
     visaSponsorship: state.visaSponsorship || undefined,
     relocationAssistance: state.relocationAssistance || undefined,
+    hiresFromAfrica: state.hiresFromAfrica || undefined,
     remote: state.remote || undefined,
     page: state.page,
     limit: state.limit,
@@ -89,6 +93,7 @@ export function buildJobsHref(nextState: Partial<JobSearchState>): string {
     ["seniority", nextState.seniority],
     ["visaSponsorship", nextState.visaSponsorship],
     ["relocationAssistance", nextState.relocationAssistance],
+    ["hiresFromAfrica", nextState.hiresFromAfrica],
     ["remote", nextState.remote],
     ["page", nextState.page],
     ["limit", nextState.limit],

@@ -86,6 +86,14 @@ export function JobCard({ job }: JobCardProps) {
                     />
                   </Coachmark>
                 )}
+                {job.hiresFromAfrica && (
+                  <Coachmark
+                    title="Hires from Africa"
+                    description="This role is verified as open to applicants based in Africa — located in Africa, remote-worldwide, or offering visa sponsorship."
+                  >
+                    <TrustBadge label="Hires from Africa" variant="success" />
+                  </Coachmark>
+                )}
                 {job.trust?.companyReviewed && (
                   <TrustBadge label="Company reviewed" variant="info" />
                 )}

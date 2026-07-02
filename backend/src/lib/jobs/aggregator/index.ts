@@ -13,7 +13,7 @@ import type {
   JobRegion,
   SourceFetchDiagnostics,
 } from "./types.js";
-import { AFRICA_FRIENDLY_KEYWORDS } from "./types.js";
+import { aggregatedJobHiresFromAfrica } from "../africa-signal.js";
 import { buildJobIntelligenceUpdate, buildSourceFingerprint } from "../discovery.js";
 import { RemoteOKSource } from "./sources/remoteok.js";
 import { WeWorkRemotelySource } from "./sources/weworkremotely.js";
@@ -696,6 +696,7 @@ export class JobAggregator {
       visaSponsorship: job.visaSponsorship,
       relocationAssistance: job.relocationAssistance,
       eligibleCountries: job.eligibleCountries,
+      hiresFromAfrica: aggregatedJobHiresFromAfrica(job),
       jobSource: "AGGREGATED" as const,
       sourceUrl: job.sourceUrl,
       sourceId: job.externalId,
@@ -747,20 +748,7 @@ export class JobAggregator {
 
   // Filter jobs that are likely to accept African candidates
   filterAfricaFriendly(jobs: AggregatedJob[]): AggregatedJob[] {
-    return jobs.filter((job) => {
-      // Jobs from Africa are always included
-      if (job.region === "AFRICA") return true;
-
-      // Remote global jobs are included
-      if (job.region === "REMOTE_GLOBAL" && job.locationType === "remote") return true;
-
-      // Jobs with visa sponsorship
-      if (job.visaSponsorship === "YES") return true;
-
-      // Jobs mentioning Africa-friendly keywords
-      const text = `${job.title} ${job.description}`.toLowerCase();
-      return AFRICA_FRIENDLY_KEYWORDS.some((kw) => text.includes(kw));
-    });
+    return jobs.filter((job) => aggregatedJobHiresFromAfrica(job));
   }
 
   getEnabledSources(): JobSource[] {

@@ -1397,6 +1397,7 @@ export interface Job {
   tags: string[];
   visaSponsorship?: "YES" | "NO" | "UNKNOWN";
   relocationAssistance?: boolean;
+  hiresFromAfrica?: boolean;
   eligibleCountries?: string[];
   jobSource?: "EMPLOYER_POSTED" | "AGGREGATED";
   sourceName?: string;
@@ -1435,6 +1436,7 @@ export interface JobListParams {
   seniority?: string;
   visaSponsorship?: string;
   relocationAssistance?: string;
+  hiresFromAfrica?: string;
   remote?: string;
   remoteOnly?: string;
   salaryMin?: number;
