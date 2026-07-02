@@ -23,6 +23,7 @@ describe("jobs-search helpers", () => {
       seniority: "",
       visaSponsorship: "",
       relocationAssistance: "",
+      hiresFromAfrica: "",
       remote: "true",
       page: 3,
       limit: 12,
