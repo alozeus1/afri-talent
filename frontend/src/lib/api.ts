@@ -177,6 +177,32 @@ export const jobs = {
     fetchAPI<Job[]>("/api/jobs/employer/my-jobs", { token }),
 };
 
+// Onboarding — free "first look" instant matches
+export interface InstantMatch {
+  id: string;
+  title: string;
+  slug: string;
+  location: string;
+  type: string;
+  workplaceType: string | null;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  currency: string | null;
+  companyName: string;
+  hiresFromAfrica: boolean;
+  publishedAt: string | null;
+  matchedSkills: string[];
+  matchScore: number;
+}
+
+export const onboarding = {
+  instantMatches: (token?: string) =>
+    fetchAPI<{ profileReady: boolean; matches: InstantMatch[] }>(
+      "/api/onboarding/instant-matches",
+      { token },
+    ),
+};
+
 // Applications
 export const applications = {
   apply: (data: { jobId: string; cvUrl?: string; coverLetter?: string }, token?: string) =>
@@ -1397,6 +1423,7 @@ export interface Job {
   tags: string[];
   visaSponsorship?: "YES" | "NO" | "UNKNOWN";
   relocationAssistance?: boolean;
+  hiresFromAfrica?: boolean;
   eligibleCountries?: string[];
   jobSource?: "EMPLOYER_POSTED" | "AGGREGATED";
   sourceName?: string;
@@ -1435,6 +1462,7 @@ export interface JobListParams {
   seniority?: string;
   visaSponsorship?: string;
   relocationAssistance?: string;
+  hiresFromAfrica?: string;
   remote?: string;
   remoteOnly?: string;
   salaryMin?: number;
@@ -3093,7 +3121,7 @@ export interface SalaryReportItem {
 
 export interface SalaryReportResponse {
   reports: SalaryReportItem[];
-  aggregates: { avg: number; min: number; max: number; median: number; count: number } | null;
+  stats: { avg: number | null; min: number | null; max: number | null; median: number | null; count: number } | null;
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 

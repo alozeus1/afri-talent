@@ -15,6 +15,8 @@ import {
   CandidateRetentionSummaryResponse,
   CandidateTrustDashboard,
   emailVerification,
+  onboarding,
+  InstantMatch,
   trust,
 } from "@/lib/api";
 import { candidateRetentionEvents } from "@/lib/analytics";
@@ -73,13 +75,6 @@ const planLabels: Record<string, string> = {
   PROFESSIONAL: "Professional",
 };
 
-const MOCK_RECOMMENDED_JOBS = [
-  { id: "1", title: "Senior Frontend Engineer", company: "Paystack", location: "Lagos (Hybrid)", salary: "$70k - $90k", type: "FULL-TIME" },
-  { id: "2", title: "Lead Product Designer", company: "Flutterwave", location: "Remote", salary: "$80k - $110k", type: "FULL-TIME" },
-  { id: "3", title: "Fullstack Developer", company: "Andela", location: "Remote", salary: "$60k - $85k", type: "CONTRACT" },
-  { id: "4", title: "Backend Engineer (Go)", company: "Monzo", location: "London (Relocation)", salary: "£85k - £105k", type: "FULL-TIME" },
-];
-
 function buildFallbackNextActions(params: {
   completeness: number;
   applicationCount: number;
@@ -117,6 +112,8 @@ export default function CandidateDashboard() {
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [trustDashboard, setTrustDashboard] = useState<CandidateTrustDashboard | null>(null);
   const [retentionSummary, setRetentionSummary] = useState<CandidateRetentionSummaryResponse | null>(null);
+  const [instantMatches, setInstantMatches] = useState<InstantMatch[]>([]);
+  const [matchesProfileReady, setMatchesProfileReady] = useState(true);
   const [emailVerified, setEmailVerified] = useState<boolean>(true);
   const [sendingVerification, setSendingVerification] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
@@ -153,6 +150,15 @@ export default function CandidateDashboard() {
         .status()
         .then(setBillingStatus)
         .catch(console.error);
+
+      // First-look instant matches (free for every plan)
+      onboarding
+        .instantMatches()
+        .then((data) => {
+          setInstantMatches(data.matches);
+          setMatchesProfileReady(data.profileReady);
+        })
+        .catch(() => {});
 
       trust
         .candidateSummary()
@@ -608,47 +614,82 @@ export default function CandidateDashboard() {
         </Link>
       </div>
 
-      {/* Recommended For You Section */}
+      {/* Recommended For You Section — live first-look matches */}
       <div className="mb-10">
         <div className="flex justify-between items-end mb-4">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Recommended For You</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Sample early-tester matches. Real recommendations appear as profile and job data improve.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {matchesProfileReady
+                ? "Live matches based on your skills and target roles — refreshed as new jobs arrive."
+                : "Fresh Africa-friendly roles. Add your skills to unlock personalized matching."}
+            </p>
           </div>
           <Link href={localizePath("/jobs", locale)} className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
             View all <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
-        
-        <div className="flex overflow-x-auto gap-4 pb-4 snap-x hide-scrollbar">
-          {MOCK_RECOMMENDED_JOBS.map((job) => (
-            <Link key={job.id} href={localizePath(`/jobs/${job.id}`, locale)} className="min-w-[300px] sm:min-w-[340px] snap-start group">
-              <Card className="h-full hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md transition-all duration-300 group-hover:-translate-y-1 bg-white dark:bg-zinc-950/50">
-                <CardContent className="p-5">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-1">{job.title}</h3>
-                      <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">{job.company}</p>
-                      <p className="mt-1 text-[11px] font-medium text-amber-700">Demo sample</p>
+
+        {instantMatches.length === 0 ? (
+          <Card className="bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900">
+            <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                  Your first 10 matches are minutes away
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                  Add your skills and target roles and we&apos;ll instantly surface live jobs matched to you — free on every plan.
+                </p>
+              </div>
+              <Link href={localizePath("/candidate/profile", locale)}>
+                <Button>Complete profile →</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="flex overflow-x-auto gap-4 pb-4 snap-x hide-scrollbar">
+            {instantMatches.map((job) => (
+              <Link key={job.id} href={localizePath(`/jobs/${job.slug}`, locale)} className="min-w-[300px] sm:min-w-[340px] snap-start group">
+                <Card className="h-full hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md transition-all duration-300 group-hover:-translate-y-1 bg-white dark:bg-zinc-950/50">
+                  <CardContent className="p-5">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-1">{job.title}</h3>
+                        <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">{job.companyName}</p>
+                      </div>
+                      <Badge variant="default" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300">
+                        {job.type}
+                      </Badge>
                     </div>
-                    <Badge variant="default" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300">
-                      {job.type}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-4 mb-3">
-                    <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {job.location}</span>
-                  </div>
-                  <div className="font-semibold text-gray-900 dark:text-gray-100 border-t border-gray-100 dark:border-zinc-800 pt-3">
-                    {job.salary}
-                  </div>
-                  <p className="mt-3 text-xs text-gray-500">
-                    Possible match: role, remote/global signal, and salary visibility should be verified before applying.
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-4 mb-3">
+                      <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {job.location}</span>
+                      {job.hiresFromAfrica && (
+                        <span className="text-emerald-700 dark:text-emerald-400 font-medium">Hires from Africa</span>
+                      )}
+                    </div>
+                    {(job.salaryMin != null || job.salaryMax != null) && (
+                      <div className="font-semibold text-gray-900 dark:text-gray-100 border-t border-gray-100 dark:border-zinc-800 pt-3">
+                        {[job.salaryMin, job.salaryMax]
+                          .filter((v): v is number => v != null)
+                          .map((v) => `${job.currency ?? "$"}${Math.round(v / 1000)}k`)
+                          .join(" – ")}
+                      </div>
+                    )}
+                    {job.matchedSkills.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {job.matchedSkills.map((skill) => (
+                          <span key={skill} className="rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
         </Tabs.Content>
 

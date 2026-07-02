@@ -1,0 +1,18 @@
+# Caddy reverse proxy — automatic HTTPS for the backend API.
+# API_DOMAIN comes from .env (e.g. api.yourdomain.com).
+# With API_DOMAIN=localhost Caddy serves plain HTTP on :80 for local testing.
+
+{$API_DOMAIN} {
+	encode gzip
+
+	# Backend API
+	reverse_proxy backend:4000
+
+	# Basic hardening
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		-Server
+	}
+}

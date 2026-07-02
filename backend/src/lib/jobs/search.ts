@@ -24,6 +24,7 @@ export interface JobSearchFilters {
   seniority?: string;
   visaSponsorship?: string;
   relocationAssistance?: boolean;
+  hiresFromAfrica?: boolean;
   remote?: boolean;
   salaryMin?: number | null;
   salaryMax?: number | null;
@@ -347,6 +348,10 @@ export function buildJobSearchWhere(filters: JobSearchFilters): Prisma.JobWhereI
 
   if (filters.relocationAssistance) {
     conditions.push({ relocationAssistance: true });
+  }
+
+  if (filters.hiresFromAfrica) {
+    conditions.push({ hiresFromAfrica: true });
   }
 
   if (filters.remote) {

@@ -270,11 +270,12 @@ router.get("/entitlements/:plan", async (req: Request, res: Response) => {
 });
 
 function extractIpCountry(req: Request): string | null {
-  // CloudFront / CloudFlare / AWS ALB headers
+  // CloudFront / CloudFlare / Vercel / AWS ALB geo headers
   return (
     (req.headers["cf-ipcountry"] as string) ||
     (req.headers["x-country-code"] as string) ||
     (req.headers["cloudfront-viewer-country"] as string) ||
+    (req.headers["x-vercel-ip-country"] as string) ||
     null
   );
 }

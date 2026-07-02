@@ -976,6 +976,9 @@ model Job {
   visaSponsorship            VisaSponsorshipStatus @default(UNKNOWN)
   relocationAssistance       Boolean               @default(false)
   eligibleCountries          String[]
+  // Verified "Hires from Africa" signal — computed at ingestion from region,
+  // remote-worldwide eligibility, visa sponsorship, and Africa-friendly wording.
+  hiresFromAfrica            Boolean               @default(false)
   jobSource                  JobSource             @default(EMPLOYER_POSTED)
   sourceUrl                  String?
   sourceId                   String? // external ATS/job board ID (for dedup)
@@ -1036,6 +1039,7 @@ model Job {
   @@index([workplaceType])
   @@index([seniority])
   @@index([visaSponsorship])
+  @@index([hiresFromAfrica])
   @@index([jobSource])
   @@index([sourceId])
   @@index([sourceFingerprint])

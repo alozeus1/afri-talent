@@ -17,9 +17,13 @@ import logger from "../lib/logger.js";
 import { generateQuickCoverLetter } from "../lib/ai/cover-letter.js";
 import { isGraphEnabled } from "../lib/ai/langgraph/index.js";
 import { evaluateAutopilotGate } from "../lib/ai/langgraph/integration/candidateAutopilotAdapter.js";
+import { checkApplyCaps } from "../lib/apply/caps.js";
 
 const AUTO_APPLY_SCORE_THRESHOLD = parseInt(process.env.AUTO_APPLY_SCORE_THRESHOLD || "75", 10);
 const MAX_AUTO_APPLIES_PER_CYCLE = parseInt(process.env.MAX_AUTO_APPLIES_PER_CYCLE || "20", 10);
+// Employer-trust guardrail: at most N AI-prepared applications per candidate
+// per day, regardless of how many high-scoring alerts exist.
+const AUTO_APPLY_DAILY_USER_CAP = parseInt(process.env.AUTO_APPLY_DAILY_USER_CAP || "5", 10);
 const AUTO_APPLY_INTERVAL_MS = parseInt(process.env.AUTO_APPLY_INTERVAL_MINUTES || "60", 10) * 60 * 1000;
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
@@ -89,6 +93,10 @@ export async function runAutoApplyCycle(): Promise<void> {
   // is prepared. Generation below is untouched.
   const autopilotGateEnabled = isGraphEnabled("candidate_autopilot");
   const gateCache = new Map<string, boolean>();
+  // Per-user daily counter (seeded from DB once per user per cycle)
+  const dailyCountCache = new Map<string, number>();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
 
   for (const alert of alerts) {
     try {
@@ -119,6 +127,37 @@ export async function runAutoApplyCycle(): Promise<void> {
         skipped++;
         continue;
       }
+
+      // Employer-trust guardrails — the same caps the manual apply path
+      // enforces: max 1 application per job per 60 days, max 3 distinct jobs
+      // per employer per 30 days. Prevents AI volume from spamming employers.
+      const capResult = await checkApplyCaps(prisma, alert.userId, alert.jobId);
+      if (!capResult.ok) {
+        logger.debug(
+          { userId: alert.userId.slice(0, 8), code: capResult.code },
+          "[auto-apply] apply cap reached — skipping alert",
+        );
+        skipped++;
+        continue;
+      }
+
+      // Per-user daily volume cap
+      let dailyCount = dailyCountCache.get(alert.userId);
+      if (dailyCount === undefined) {
+        dailyCount = await prisma.application.count({
+          where: {
+            candidateId: alert.userId,
+            createdAt: { gte: todayStart },
+            notes: { startsWith: "[AI Auto-Applied]" },
+          },
+        });
+      }
+      if (dailyCount >= AUTO_APPLY_DAILY_USER_CAP) {
+        dailyCountCache.set(alert.userId, dailyCount);
+        skipped++;
+        continue;
+      }
+      dailyCountCache.set(alert.userId, dailyCount + 1);
 
       // Get candidate profile
       const profile = await prisma.candidateProfile.findUnique({
