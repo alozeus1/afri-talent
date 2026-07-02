@@ -16,6 +16,12 @@ Terraform stack. Same code, same Docker images, different hosts.
 What you give up vs. the AWS stack: high availability (one VM), autoscaling,
 and WAF. The application behaves identically.
 
+> **As-built record:** the live deployment runs the backend **natively**
+> (no Docker) on an Oracle ARM VM and uses a Vercel proxy rewrite instead of
+> Caddy/TLS. See [`DEPLOYMENT_NOTES.md`](./DEPLOYMENT_NOTES.md) for the
+> actual topology, the `native/` run scripts, and the remaining go-live
+> checklist. The Docker path below remains valid for hosts where Docker works.
+
 ---
 
 ## Step 1 — Neon database (~5 minutes)

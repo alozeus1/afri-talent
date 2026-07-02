@@ -6,6 +6,20 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
 
+  // Free-tier deployment: when BACKEND_PROXY_ORIGIN is set (e.g. on Vercel),
+  // /api/* and /health are proxied server-side to the backend origin. This
+  // lets the HTTPS frontend talk to an HTTP-only backend VM without
+  // mixed-content blocking, and makes API calls same-origin (no CORS).
+  // Unset (default) → no rewrites, behavior unchanged.
+  async rewrites() {
+    const target = process.env.BACKEND_PROXY_ORIGIN?.replace(/\/+$/, "");
+    if (!target) return [];
+    return [
+      { source: "/api/:path*", destination: `${target}/api/:path*` },
+      { source: "/health", destination: `${target}/health` },
+    ];
+  },
+
   // Optimize images
   images: {
     formats: ["image/avif", "image/webp"],
