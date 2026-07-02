@@ -18,6 +18,16 @@ const { runBlogPipelineMock } = vi.hoisted(() => ({
 
 vi.mock("../../lib/blog/pipeline.js", () => ({
   runBlogPipeline: runBlogPipelineMock,
+  persistDraft: vi.fn(),
+  notifyAdmin: vi.fn(),
+}));
+
+// LangGraph flags are unset in tests → the direct pipeline path is exercised.
+// Mock the adapter so importing the handler never pulls in the graph layer.
+vi.mock("../../lib/ai/langgraph/integration/blogAutomationAdapter.js", () => ({
+  isBlogGraphActive: () => false,
+  runBlogPipelineViaGraph: vi.fn(),
+  resumeBlogApprovalViaGraph: vi.fn(),
 }));
 
 // Stable Context stub for handler invocation.
