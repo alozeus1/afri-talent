@@ -1,119 +1,72 @@
-"use client";
+// Server component: fetches the resource on the server so blog posts and
+// guides ship with full SEO metadata (title, description, OpenGraph, Twitter
+// card) and readable HTML on first byte. Interactivity lives in the client
+// child (ResourceArticle).
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import Image from "next/image";
-import ReactMarkdown from "react-markdown";
-import { resources, Resource } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import FeedbackToast from "@/components/ui/feedback-toast";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import type { Resource } from "@/lib/api";
+import ResourceArticle from "./resource-article";
 
-export default function ResourceDetailPage() {
-  const params = useParams();
-  const [resource, setResource] = useState<Resource | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
+const API_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:4000";
 
-  useEffect(() => {
-    async function fetchResource() {
-      try {
-        const data = await resources.get(params.slug as string);
-        setResource(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load resource");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchResource();
-    
-    // Show feedback toast after a delay
-    const timer = setTimeout(() => setShowFeedback(true), 5000);
-    return () => clearTimeout(timer);
-  }, [params.slug]);
+// Published resources change rarely; revalidate every 5 minutes.
+const REVALIDATE_SECONDS = 300;
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+async function fetchResource(slug: string): Promise<Resource | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/resources/${encodeURIComponent(slug)}`, {
+      next: { revalidate: REVALIDATE_SECONDS },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as Resource;
+  } catch {
+    return null;
+  }
+}
+
+interface PageProps {
+  params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const resource = await fetchResource(slug);
+  if (!resource) {
+    return { title: "Resource not found | AfriTalent" };
   }
 
-  if (error || !resource) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
-          {error || "Resource not found"}
-        </div>
-        <Link href="/resources">
-          <Button variant="outline">Back to Resources</Button>
-        </Link>
-      </div>
-    );
+  const description = resource.excerpt.slice(0, 160);
+
+  return {
+    title: `${resource.title} | AfriTalent`,
+    description,
+    openGraph: {
+      title: resource.title,
+      description,
+      type: "article",
+      publishedTime: resource.publishedAt,
+      images: resource.coverImage ? [{ url: resource.coverImage }] : undefined,
+    },
+    twitter: {
+      card: resource.coverImage ? "summary_large_image" : "summary",
+      title: resource.title,
+      description,
+      images: resource.coverImage ? [resource.coverImage] : undefined,
+    },
+  };
+}
+
+export default async function ResourceDetailPage({ params }: PageProps) {
+  const { slug } = await params;
+  const resource = await fetchResource(slug);
+
+  if (!resource) {
+    notFound();
   }
 
-  return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <Link href="/resources" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
-        <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Resources
-      </Link>
-
-      <article className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {resource.coverImage && (
-          <div className="relative h-64 md:h-80 bg-gray-200">
-            <Image
-              src={resource.coverImage}
-              alt={resource.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 896px"
-              priority
-            />
-          </div>
-        )}
-
-        <div className="p-8">
-          <Badge variant="info" className="mb-4">{resource.category}</Badge>
-          
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            {resource.title}
-          </h1>
-
-          {resource.publishedAt && (
-            <p className="text-gray-500 mb-6">
-              Published on {new Date(resource.publishedAt).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric"
-              })}
-            </p>
-          )}
-
-          <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-            {resource.excerpt}
-          </p>
-
-          <div className="prose prose-emerald max-w-none prose-headings:font-bold prose-headings:text-gray-900 prose-p:text-gray-700 prose-p:leading-relaxed prose-a:text-emerald-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-gray-900 prose-li:text-gray-700">
-            <ReactMarkdown>{resource.content}</ReactMarkdown>
-          </div>
-        </div>
-      </article>
-      
-      <FeedbackToast 
-        visible={showFeedback}
-        onClose={() => setShowFeedback(false)}
-        onFeedback={(type, reason) => {
-          console.log("Feedback received:", type, reason);
-          // Here you would normally send to your API
-        }}
-      />
-    </div>
-  );
+  return <ResourceArticle resource={resource} />;
 }

@@ -10,6 +10,24 @@ import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 import { useNetworkProfile } from "@/lib/network-profile";
 
+// The Blog link only appears once at least one weekly digest is published, so
+// an empty archive is never linked from the nav. Cached at module level — one
+// request per full page load, shared across header remounts.
+const BLOG_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+let blogAvailabilityPromise: Promise<boolean> | null = null;
+
+function checkBlogAvailable(): Promise<boolean> {
+  if (!blogAvailabilityPromise) {
+    blogAvailabilityPromise = fetch(
+      `${BLOG_API_URL}/api/resources?category=${encodeURIComponent("Weekly Hiring Trends")}&limit=1`
+    )
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => (data?.pagination?.total ?? 0) > 0)
+      .catch(() => false);
+  }
+  return blogAvailabilityPromise;
+}
+
 export function Header() {
   const locale = useLocale();
   const t = useT();
@@ -19,6 +37,17 @@ export function Header() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [showBlogLink, setShowBlogLink] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void checkBlogAvailable().then((available) => {
+      if (!cancelled) setShowBlogLink(available);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!user || !online) return;
@@ -167,6 +196,11 @@ export function Header() {
               <Link href={href("/learning")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 {t("nav.learn")}
               </Link>
+              {showBlogLink && (
+                <Link href={href("/blog")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+                  Blog
+                </Link>
+              )}
               <Link href={href("/pricing")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 {t("nav.pricing")}
               </Link>
@@ -291,6 +325,7 @@ export function Header() {
                 { href: "/salaries", label: t("nav.salaries") },
                 { href: "/interviews", label: t("nav.interviews") },
                 { href: "/learning", label: t("nav.learn") },
+                ...(showBlogLink ? [{ href: "/blog", label: "Blog" }] : []),
                 { href: "/pricing", label: t("nav.pricing") },
                 { href: "/trust", label: "Trust" },
               ].map((item) => (
