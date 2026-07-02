@@ -19,9 +19,27 @@ if [ -z "${BLOG_TRIGGER_ADMIN_TOKEN:-}" ]; then
 fi
 
 PORT="${PORT:-4000}"
-echo "$(date -u +%FT%TZ) triggering weekly blog pipeline on localhost:$PORT"
-curl -fsS -X POST "http://localhost:${PORT}/api/admin/blog/trigger" \
+BASE="http://localhost:${PORT}"
+
+# CSRF double-submit: /api/auth/me seeds the CSRF cookie and returns the
+# matching token; the POST must echo it as X-CSRF-Token alongside the cookie.
+COOKIE_JAR="$(mktemp)"
+trap 'rm -f "$COOKIE_JAR"' EXIT
+
+CSRF_TOKEN="$(curl -fsS -c "$COOKIE_JAR" --max-time 15 \
   -H "Authorization: Bearer ${BLOG_TRIGGER_ADMIN_TOKEN}" \
+  "${BASE}/api/auth/me" | grep -o '"csrfToken":"[^"]*"' | cut -d'"' -f4)"
+
+if [ -z "$CSRF_TOKEN" ]; then
+  echo "$(date -u +%FT%TZ) could not obtain CSRF token (expired admin token?) — aborting"
+  exit 1
+fi
+
+echo "$(date -u +%FT%TZ) triggering weekly blog pipeline on ${BASE}"
+curl -fsS -X POST "${BASE}/api/admin/blog/trigger" \
+  -b "$COOKIE_JAR" \
+  -H "Authorization: Bearer ${BLOG_TRIGGER_ADMIN_TOKEN}" \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   --max-time 30
 echo ""

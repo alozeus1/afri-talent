@@ -24,9 +24,25 @@ if [ "${API_DOMAIN:-localhost}" != "localhost" ]; then
   API_BASE="https://${API_DOMAIN}"
 fi
 
+# CSRF double-submit: /api/auth/me seeds the CSRF cookie and returns the
+# matching token; the POST must echo it as X-CSRF-Token alongside the cookie.
+COOKIE_JAR="$(mktemp)"
+trap 'rm -f "$COOKIE_JAR"' EXIT
+
+CSRF_TOKEN="$(curl -fsS -c "$COOKIE_JAR" --max-time 15 \
+  -H "Authorization: Bearer ${BLOG_TRIGGER_ADMIN_TOKEN}" \
+  "${API_BASE}/api/auth/me" | grep -o '"csrfToken":"[^"]*"' | cut -d'"' -f4)"
+
+if [ -z "$CSRF_TOKEN" ]; then
+  echo "$(date -u +%FT%TZ) could not obtain CSRF token (expired admin token?) — aborting"
+  exit 1
+fi
+
 echo "$(date -u +%FT%TZ) triggering weekly blog pipeline via ${API_BASE}"
 curl -fsS -X POST "${API_BASE}/api/admin/blog/trigger" \
+  -b "$COOKIE_JAR" \
   -H "Authorization: Bearer ${BLOG_TRIGGER_ADMIN_TOKEN}" \
+  -H "X-CSRF-Token: ${CSRF_TOKEN}" \
   -H "Content-Type: application/json" \
   --max-time 30
 echo ""

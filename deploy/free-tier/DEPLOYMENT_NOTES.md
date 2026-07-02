@@ -62,7 +62,9 @@ on the VM — outbound-only, needs no inbound ports at all, and gives a real
 Key values (placeholders here — real values only on the VM):
 
 ```
-DATABASE_URL=postgresql://neondb_owner:<PASSWORD>@ep-delicate-dust-ai5a9mu3-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+# Quotes are REQUIRED: the native scripts bash-source this file, and an
+# unquoted & in the connection string would truncate the value.
+DATABASE_URL="postgresql://neondb_owner:<PASSWORD>@ep-delicate-dust-ai5a9mu3-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 FRONTEND_URL=https://afri-talent.vercel.app
 PORT=4000
 NODE_ENV=production
