@@ -186,8 +186,12 @@ export async function runBlogPipelineViaGraph(): Promise<BlogPipelineResult> {
 
 /**
  * Find the interrupted graph run that created this resource. The graph emits
- * human_approval_requested with details.resource_id; fall back to the newest
- * blog run awaiting approval (weekly cadence — at most one is pending).
+ * human_approval_requested with details.resource_id — an exact match on that
+ * event is REQUIRED. No fallback: resuming "the newest pending blog run" could
+ * publish an unrelated draft when the admin is approving a legacy-path post,
+ * bypassing that draft's own approval gate. If the event row is missing (its
+ * persistence is best-effort), we skip the resume and the direct path stays
+ * authoritative; the graph run simply remains open for audit.
  */
 async function findGraphRunIdForResource(resourceId: string): Promise<string | null> {
   const evt = await prisma.graphRunEvent.findFirst({
@@ -198,14 +202,7 @@ async function findGraphRunIdForResource(resourceId: string): Promise<string | n
     orderBy: { createdAt: "desc" },
     select: { graphRunId: true },
   });
-  if (evt) return evt.graphRunId;
-
-  const run = await prisma.graphRun.findFirst({
-    where: { workflowType: "blog_automation", status: "AWAITING_APPROVAL" },
-    orderBy: { createdAt: "desc" },
-    select: { graphRunId: true },
-  });
-  return run?.graphRunId ?? null;
+  return evt?.graphRunId ?? null;
 }
 
 /**

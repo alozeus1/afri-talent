@@ -16,15 +16,23 @@ const API_URL =
 // Published resources change rarely; revalidate every 5 minutes.
 const REVALIDATE_SECONDS = 300;
 
-async function fetchResource(slug: string): Promise<Resource | null> {
+type FetchResult =
+  | { kind: "ok"; resource: Resource }
+  | { kind: "not-found" }
+  | { kind: "error" };
+
+// Only a backend 404 maps to the public 404 page; transient failures (5xx,
+// 429, network) must surface as an error state, not "Resource not found".
+async function fetchResource(slug: string): Promise<FetchResult> {
   try {
     const res = await fetch(`${API_URL}/api/resources/${encodeURIComponent(slug)}`, {
       next: { revalidate: REVALIDATE_SECONDS },
     });
-    if (!res.ok) return null;
-    return (await res.json()) as Resource;
+    if (res.status === 404) return { kind: "not-found" };
+    if (!res.ok) return { kind: "error" };
+    return { kind: "ok", resource: (await res.json()) as Resource };
   } catch {
-    return null;
+    return { kind: "error" };
   }
 }
 
@@ -34,11 +42,16 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const resource = await fetchResource(slug);
-  if (!resource) {
+  const result = await fetchResource(slug);
+  if (result.kind === "not-found") {
     return { title: "Resource not found | AfriTalent" };
   }
+  if (result.kind === "error") {
+    // Transient backend failure — neutral metadata, never "not found"
+    return { title: "Resources | AfriTalent" };
+  }
 
+  const { resource } = result;
   const description = resource.excerpt.slice(0, 160);
 
   return {
@@ -62,11 +75,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ResourceDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const resource = await fetchResource(slug);
+  const result = await fetchResource(slug);
 
-  if (!resource) {
+  if (result.kind === "not-found") {
     notFound();
   }
+  if (result.kind === "error") {
+    // Rendered by the route-level error boundary (error.tsx) with a retry path
+    throw new Error("Failed to load resource");
+  }
 
-  return <ResourceArticle resource={resource} />;
+  return <ResourceArticle resource={result.resource} />;
 }
