@@ -155,7 +155,8 @@ export default function SalariesPage() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | null) => {
+    if (amount == null) return "—";
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -286,7 +287,7 @@ export default function SalariesPage() {
       {hasSearched && !searchLoading && searchData && (
         <div className="mb-10">
           {/* Aggregate Card */}
-          {searchData.aggregates && (
+          {searchData.stats && (
             <Card className="mb-6">
               <CardHeader>
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -299,31 +300,31 @@ export default function SalariesPage() {
                   <div className="text-center">
                     <p className="text-sm text-gray-500">Average</p>
                     <p className="text-xl font-bold text-emerald-600">
-                      {formatCurrency(searchData.aggregates.avg)}
+                      {formatCurrency(searchData.stats.avg)}
                     </p>
                   </div>
                   <div className="text-center">
                     <p className="text-sm text-gray-500">Minimum</p>
                     <p className="text-xl font-bold text-gray-900">
-                      {formatCurrency(searchData.aggregates.min)}
+                      {formatCurrency(searchData.stats.min)}
                     </p>
                   </div>
                   <div className="text-center">
                     <p className="text-sm text-gray-500">Maximum</p>
                     <p className="text-xl font-bold text-gray-900">
-                      {formatCurrency(searchData.aggregates.max)}
+                      {formatCurrency(searchData.stats.max)}
                     </p>
                   </div>
                   <div className="text-center">
                     <p className="text-sm text-gray-500">Median</p>
                     <p className="text-xl font-bold text-gray-900">
-                      {formatCurrency(searchData.aggregates.median)}
+                      {formatCurrency(searchData.stats.median)}
                     </p>
                   </div>
                   <div className="text-center">
                     <p className="text-sm text-gray-500">Reports</p>
                     <p className="text-xl font-bold text-gray-900">
-                      {searchData.aggregates.count}
+                      {searchData.stats.count}
                     </p>
                   </div>
                 </div>

@@ -3121,7 +3121,7 @@ export interface SalaryReportItem {
 
 export interface SalaryReportResponse {
   reports: SalaryReportItem[];
-  aggregates: { avg: number; min: number; max: number; median: number; count: number } | null;
+  stats: { avg: number | null; min: number | null; max: number | null; median: number | null; count: number } | null;
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 

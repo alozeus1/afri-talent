@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { EarlyAccessProof } from "@/components/home/early-access-proof";
 import { HeroStats } from "@/components/home/hero-stats";
+import { MarketPulse } from "@/components/home/market-pulse";
+import { SuccessStories } from "@/components/home/success-stories";
 import { Button } from "@/components/ui/button";
 import { Globe, Plane, ShieldCheck, Sparkles } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
@@ -132,6 +134,8 @@ export function HomePageContent() {
 
       <HeroStats />
 
+      <MarketPulse />
+
       <section className="section-shell py-20">
         <div className="page-frame">
           <div className="mb-16 text-center">
@@ -198,6 +202,7 @@ export function HomePageContent() {
           </div>
         </div>
       </section>
+      <SuccessStories />
       <EarlyAccessProof />
       <section className="px-0 py-20">
         <div className="page-frame text-center">
