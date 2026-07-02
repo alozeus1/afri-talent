@@ -1,28 +1,25 @@
 #!/usr/bin/env bash
-# Weekly blog pipeline trigger — replaces the AWS EventBridge + Lambda pair
-# in the free-tier deployment. Install on the VM's crontab (Mondays 09:00 UTC):
+# Weekly blog pipeline trigger for the native (no-Docker) deployment.
+# Crontab (Mondays 09:00 UTC):
+#   0 9 * * 1 /home/ubuntu/afri-talent/deploy/free-tier/native/native-blog-weekly-cron.sh >> $HOME/afritalent-blog.log 2>&1
 #
-#   crontab -e
-#   0 9 * * 1 /home/ubuntu/afri-talent/deploy/free-tier/blog-weekly-cron.sh >> /var/log/afritalent-blog-cron.log 2>&1
-#
-# Requires BLOG_TRIGGER_ADMIN_TOKEN in the .env next to this script
-# (an admin user's JWT — POST /api/auth/login with the admin account).
+# Hits the local backend directly, so no domain/TLS is needed.
+# Requires BLOG_TRIGGER_ADMIN_TOKEN in deploy/free-tier/.env.
 
 set -euo pipefail
-cd "$(dirname "$0")"
-
-# shellcheck disable=SC1091
-source .env 2>/dev/null || { echo "missing .env"; exit 1; }
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DEPLOY_DIR="$(dirname "$SCRIPT_DIR")"
+set -a; # shellcheck disable=SC1091
+source "$DEPLOY_DIR/.env" 2>/dev/null || { echo "missing .env"; exit 1; }
+set +a
 
 if [ -z "${BLOG_TRIGGER_ADMIN_TOKEN:-}" ]; then
   echo "$(date -u +%FT%TZ) BLOG_TRIGGER_ADMIN_TOKEN not set — skipping"
   exit 0
 fi
 
-API_BASE="http://localhost"
-if [ "${API_DOMAIN:-localhost}" != "localhost" ]; then
-  API_BASE="https://${API_DOMAIN}"
-fi
+PORT="${PORT:-4000}"
+BASE="http://localhost:${PORT}"
 
 # CSRF double-submit: /api/auth/me seeds the CSRF cookie and returns the
 # matching token; the POST must echo it as X-CSRF-Token alongside the cookie.
@@ -31,15 +28,15 @@ trap 'rm -f "$COOKIE_JAR"' EXIT
 
 CSRF_TOKEN="$(curl -fsS -c "$COOKIE_JAR" --max-time 15 \
   -H "Authorization: Bearer ${BLOG_TRIGGER_ADMIN_TOKEN}" \
-  "${API_BASE}/api/auth/me" | grep -o '"csrfToken":"[^"]*"' | cut -d'"' -f4)"
+  "${BASE}/api/auth/me" | grep -o '"csrfToken":"[^"]*"' | cut -d'"' -f4)"
 
 if [ -z "$CSRF_TOKEN" ]; then
   echo "$(date -u +%FT%TZ) could not obtain CSRF token (expired admin token?) — aborting"
   exit 1
 fi
 
-echo "$(date -u +%FT%TZ) triggering weekly blog pipeline via ${API_BASE}"
-curl -fsS -X POST "${API_BASE}/api/admin/blog/trigger" \
+echo "$(date -u +%FT%TZ) triggering weekly blog pipeline on ${BASE}"
+curl -fsS -X POST "${BASE}/api/admin/blog/trigger" \
   -b "$COOKIE_JAR" \
   -H "Authorization: Bearer ${BLOG_TRIGGER_ADMIN_TOKEN}" \
   -H "X-CSRF-Token: ${CSRF_TOKEN}" \
