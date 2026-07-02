@@ -52,6 +52,11 @@ const applySchema = z.object({
 const batchApplySchema = z.object({
   jobIds: z.array(z.string()).min(1).max(50),
   customMessage: z.string().max(2000).optional(),
+  /**
+   * Same explicit-consent contract as single apply: a batch is never queued
+   * without the candidate's confirmation.
+   */
+  confirm: z.literal(true, "Consent required: set confirm=true to submit."),
 });
 
 const settingsSchema = z.object({
