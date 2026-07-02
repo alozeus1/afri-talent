@@ -1,6 +1,6 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: June 25, 2026 (dev stack suspended and RDS Proxy removed)
+Last updated: July 2, 2026 (blog automation hardening + LangGraph blog wiring)
 
 > [!IMPORTANT]
 > **Architecture changed on 2026-05-10.** The shared environment has moved off
@@ -8,6 +8,38 @@ Last updated: June 25, 2026 (dev stack suspended and RDS Proxy removed)
 > Serverless v2 + Lambda + CloudFront/WAF in the new AWS account `108188564905`.
 > Anything below that references `*.awsapprunner.com`, `afritalent-staging-*`
 > AWS resources, or the old account ID is historical and no longer live.
+
+## Update on July 2, 2026: Blog automation hardening (code-only, no live changes)
+
+Shipped on branch `claude/multi-agent-blog-automation-VraHY`; the dev stack
+remains suspended, so nothing changed in AWS. Summary of code changes:
+
+- **Removed the in-process blog scheduler interval** (`workers/scheduler.ts`
+  no longer registers `blog-automation`; `workers/blog-automation.ts` deleted).
+  The blog-automation Lambda (EventBridge `cron(0 9 ? * MON *)`) is now the
+  ONLY trigger. This closes a duplicate-post race: the dev-new backend task env
+  sets `BLOG_AUTOMATION_ENABLED=1`, which previously also armed a 7-day
+  in-process `setInterval` alongside the Lambda.
+- **Fact-check agent now fails CLOSED**: a Claude batch error scores items 0
+  (previously neutral 50 + whitelist bonus could pass unverified content).
+  Results are matched by positional id instead of model-echoed URL. Scoring
+  runs on `AI_FAST_MODEL` (override: `BLOG_FACT_CHECK_MODEL`), temperature 0.
+- **Writer improvements**: temperature 0.4; RSS job posts are labeled
+  `job_listing` and used only as market signals (never cited in Sources);
+  URLs cited in the last 60 days of posts are excluded from re-sourcing.
+- **LangGraph blog graph is now WIRED behind a double opt-in**: the Lambda,
+  `POST /api/admin/blog/trigger`, and admin approve/reject routes go through
+  `blogAutomationAdapter` only when `LANGGRAPH_ENABLED=1` AND
+  `LANGGRAPH_BLOG_AUTOMATION=1` (unlike other wired graphs, the per-graph flag
+  must be explicitly "1"). Flag off (current state everywhere) = direct
+  pipeline path, unchanged. Approval resume is best-effort; the admin route's
+  direct publish stays authoritative.
+- **Frontend**: `/resources/[slug]` is server-rendered with full SEO metadata
+  (OpenGraph/Twitter); the public header shows a Blog link only when at least
+  one published post exists in the `Weekly Hiring Trends` category; `/blog`
+  read-time display fixed (API-computed `readMinutes`).
+- Latent bug fixed: admin-blog approve/reject fallback used `req.user.id`
+  (undefined — JWT payload field is `userId`).
 
 ## Update on June 25, 2026: Dev stack suspended for cost control
 
@@ -1273,9 +1305,11 @@ With the global flag on, these WIRED graphs are live: orchestrator wrap
 (resume_review / job_match / apply_pack — output parity + audit), job-ingestion
 quality gate (aggregator `upsertJob`), interview-prep (`/autopilot/interview-prep`
 adds `readinessScore`), and the candidate-autopilot safety gate (auto-apply worker).
-Unwired graphs (apply-submission HITL, blog, follow-up, trust verification/
+Unwired graphs (apply-submission HITL, follow-up, trust verification/
 moderation, billing_recovery) are inert until their adapters are wired, regardless
-of the flag.
+of the flag. The blog graph was wired on 2026-07-02 but requires an explicit
+double opt-in (`LANGGRAPH_ENABLED=1` AND `LANGGRAPH_BLOG_AUTOMATION=1`) — with
+the per-graph flag unset it stays on the direct pipeline path.
 
 ### DB objects (applied by the container entrypoint `prisma migrate deploy`)
 - `GraphRun`, `GraphRunEvent`, `IdempotencyKey` (migration `..._add_langgraph_orchestration`).

@@ -29,10 +29,16 @@
 //   BLOG_ADMIN_NOTIFICATION_EMAIL — admin notify target (optional)
 //   SES_FROM_EMAIL, SES_REGION    — admin notify transport (optional)
 //   FRONTEND_URL                  — used in notify email link to /admin/blog
+//   LANGGRAPH_ENABLED + LANGGRAPH_BLOG_AUTOMATION — both "1" routes the run
+//     through the blog_automation graph (audit trail + idempotent publish)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Context } from "aws-lambda";
 import { runBlogPipeline } from "../lib/blog/pipeline.js";
+import {
+  isBlogGraphActive,
+  runBlogPipelineViaGraph,
+} from "../lib/ai/langgraph/integration/blogAutomationAdapter.js";
 import logger from "../lib/logger.js";
 
 const log = logger.child({ lambda: "blog-automation" });
@@ -80,10 +86,15 @@ export const handler = async (
     };
   }
 
-  const result = await runBlogPipeline();
+  // LANGGRAPH_ENABLED=1 + LANGGRAPH_BLOG_AUTOMATION=1 routes the run through
+  // the blog_automation graph (GraphRun audit + idempotent approval/publish);
+  // otherwise the direct pipeline runs unchanged.
+  const viaGraph = isBlogGraphActive();
+  const result = viaGraph ? await runBlogPipelineViaGraph() : await runBlogPipeline();
 
   log.info(
     {
+      via_graph: viaGraph,
       success: result.success,
       resource_id: result.resourceId,
       title: result.title,

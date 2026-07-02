@@ -16,7 +16,12 @@ import { CREDIBILITY_WHITELIST } from "../types.js";
 
 const log = logger.child({ agent: "FactCheckAgent" });
 
-const QUAL = process.env.AI_QUALITY_MODEL || "claude-sonnet-4-6";
+// Scoring short excerpts is a classification task — the fast tier handles it
+// at a fraction of the cost. Override with BLOG_FACT_CHECK_MODEL if needed.
+const MODEL =
+  process.env.BLOG_FACT_CHECK_MODEL ||
+  process.env.AI_FAST_MODEL ||
+  "claude-haiku-4-5-20251001";
 const CREDIBILITY_THRESHOLD = 60;
 
 let _client: Anthropic | null = null;
@@ -33,7 +38,7 @@ function getClient(): Anthropic {
 // ── Zod schema for Claude output ──────────────────────────────────────────────
 
 const FactCheckItemSchema = z.object({
-  url: z.string(),
+  id: z.number().int().min(0),
   credibilityScore: z.number().min(0).max(100),
   verificationNotes: z.string(),
   keyFacts: z.array(z.string()),
@@ -62,13 +67,14 @@ RULES:
 - keyFacts: extract 2–5 specific, cite-able facts or data points from the article (numbers, percentages, named companies, specific countries)
 - If an article has NO extractable facts, give it a score ≤ 30
 - Do NOT fabricate facts — only extract what is explicitly stated
-- Return ONLY valid JSON, no prose, no markdown fences
+- Echo back each item's numeric "id" EXACTLY as given — results are matched by id
+- Return one result per input item, ONLY valid JSON, no prose, no markdown fences
 
 Output schema:
 {
   "items": [
     {
-      "url": "exact url from input",
+      "id": <numeric id from input>,
       "credibilityScore": 0-100,
       "verificationNotes": "brief explanation of score",
       "keyFacts": ["fact 1", "fact 2"]
@@ -82,19 +88,22 @@ async function factCheckBatch(batch: RawContent[]): Promise<FactCheckOutput> {
   const client = getClient();
 
   const userContent = JSON.stringify(
-    batch.map((item) => ({
+    batch.map((item, id) => ({
+      id,
       url: item.url,
       title: item.title,
       excerpt: item.excerpt,
       sourceDomain: item.sourceDomain,
+      sourceType: item.sourceType,
     })),
     null,
     2
   );
 
   const response = await client.messages.create({
-    model: QUAL,
+    model: MODEL,
     max_tokens: 2048,
+    temperature: 0,
     system: FACT_CHECK_SYSTEM,
     messages: [{ role: "user", content: `Articles to fact-check:\n${userContent}` }],
   });
@@ -141,19 +150,41 @@ export async function FactCheckAgent(items: RawContent[]): Promise<VerifiedConte
   for (const batch of batches) {
     try {
       const result = await factCheckBatch(batch);
+      // Match by positional id — deterministic, immune to URL rewording
       for (const fc of result.items) {
-        verifiedMap.set(fc.url, {
+        const source = batch[fc.id];
+        if (!source) {
+          log.warn({ id: fc.id }, "[FactCheckAgent] result id out of range — ignoring");
+          continue;
+        }
+        verifiedMap.set(source.url, {
           credibilityScore: fc.credibilityScore,
           verificationNotes: fc.verificationNotes,
           keyFacts: fc.keyFacts,
         });
       }
+      // Items the model omitted fail closed
+      for (const item of batch) {
+        if (!verifiedMap.has(item.url)) {
+          verifiedMap.set(item.url, {
+            credibilityScore: 0,
+            verificationNotes: "Fact-check result missing for item — failed closed",
+            keyFacts: [],
+          });
+        }
+      }
     } catch (err) {
-      log.warn({ err }, "[FactCheckAgent] batch failed, assigning neutral scores");
+      // Fail CLOSED: a fact-check outage must never let unverified content
+      // through. Score 0 keeps these items below threshold even after the
+      // domain whitelist bonus is applied.
+      log.warn(
+        { err, dropped: batch.length },
+        "[FactCheckAgent] batch failed — failing closed, items will not pass"
+      );
       for (const item of batch) {
         verifiedMap.set(item.url, {
-          credibilityScore: 50,
-          verificationNotes: "Fact-check unavailable — batch error",
+          credibilityScore: 0,
+          verificationNotes: "Fact-check unavailable — failed closed (batch error)",
           keyFacts: [],
         });
       }

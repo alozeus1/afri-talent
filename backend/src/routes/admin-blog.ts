@@ -16,6 +16,11 @@ import { ReviewStatus, ReviewTargetType, Role } from "@prisma/client";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { runBlogPipeline } from "../lib/blog/pipeline.js";
+import {
+  isBlogGraphActive,
+  runBlogPipelineViaGraph,
+  resumeBlogApprovalViaGraph,
+} from "../lib/ai/langgraph/integration/blogAutomationAdapter.js";
 import logger from "../lib/logger.js";
 import { BLOG_CATEGORY } from "../lib/blog/types.js";
 
@@ -144,6 +149,8 @@ router.put("/:id/approve", async (req: Request, res: Response) => {
       return;
     }
 
+    const adminId = req.user!.userId;
+
     // Publish the resource and update the review in a transaction
     const [updatedPost] = await prisma.$transaction([
       prisma.resource.update({
@@ -164,11 +171,17 @@ router.put("/:id/approve", async (req: Request, res: Response) => {
                 status: ReviewStatus.APPROVED,
                 targetType: ReviewTargetType.RESOURCE,
                 targetResourceId: post.id,
-                reviewerId: (req as unknown as { user: { id: string } }).user.id,
+                reviewerId: adminId,
               },
             }),
           ]),
     ]);
+
+    // Close the graph's approval interrupt (audit trail); best-effort — the
+    // direct publish above is authoritative and the graph publish is idempotent.
+    if (isBlogGraphActive()) {
+      await resumeBlogApprovalViaGraph(post.id, { approved: true, adminId });
+    }
 
     log.info({ resourceId: post.id, title: post.title }, "blog post approved and published");
 
@@ -195,6 +208,8 @@ router.put("/:id/reject", async (req: Request, res: Response) => {
       return;
     }
 
+    const adminId = req.user!.userId;
+
     // Update review record
     if (post.adminReviews[0]) {
       await prisma.adminReview.update({
@@ -208,9 +223,14 @@ router.put("/:id/reject", async (req: Request, res: Response) => {
           notes: data.notes,
           targetType: ReviewTargetType.RESOURCE,
           targetResourceId: post.id,
-          reviewerId: (req as unknown as { user: { id: string } }).user.id,
+          reviewerId: adminId,
         },
       });
+    }
+
+    // Close the graph's approval interrupt with the rejection (audit trail)
+    if (isBlogGraphActive()) {
+      await resumeBlogApprovalViaGraph(post.id, { approved: false, adminId, notes: data.notes });
     }
 
     log.info({ resourceId: post.id, title: post.title }, "blog post rejected");
@@ -234,7 +254,9 @@ router.post("/trigger", async (_req: Request, res: Response) => {
   // Fire pipeline in background — return immediately so HTTP doesn't time out
   setImmediate(async () => {
     try {
-      const result = await runBlogPipeline();
+      const result = isBlogGraphActive()
+        ? await runBlogPipelineViaGraph()
+        : await runBlogPipeline();
       log.info({ result }, "manual blog pipeline trigger complete");
     } catch (err) {
       log.error({ err }, "manual blog pipeline trigger failed");

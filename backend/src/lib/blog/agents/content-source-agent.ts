@@ -16,8 +16,8 @@
 import { parseStringPromise } from "xml2js";
 import prisma from "../../prisma.js";
 import logger from "../../logger.js";
-import type { RawContent } from "../types.js";
-import { AFRICA_RELEVANCE_KEYWORDS } from "../types.js";
+import type { RawContent, SourceType } from "../types.js";
+import { AFRICA_RELEVANCE_KEYWORDS, BLOG_CATEGORY } from "../types.js";
 
 const log = logger.child({ agent: "ContentSourceAgent" });
 
@@ -103,6 +103,7 @@ async function fetchHackerNews(): Promise<RawContent[]> {
         excerpt,
         sourceName: "Hacker News",
         sourceDomain: "news.ycombinator.com",
+        sourceType: "article",
         publishedAt: story.time
           ? new Date(story.time * 1000).toISOString()
           : new Date().toISOString(),
@@ -150,6 +151,7 @@ async function fetchDevTo(): Promise<RawContent[]> {
           excerpt: article.description?.slice(0, 300) || article.title,
           sourceName: "Dev.to",
           sourceDomain: "dev.to",
+          sourceType: "article",
           publishedAt: article.published_at,
           relevanceScore,
         });
@@ -167,7 +169,8 @@ async function fetchDevTo(): Promise<RawContent[]> {
 async function fetchRssFeed(
   url: string,
   sourceName: string,
-  sourceDomain: string
+  sourceDomain: string,
+  sourceType: SourceType
 ): Promise<RawContent[]> {
   const results: RawContent[] = [];
   try {
@@ -199,6 +202,7 @@ async function fetchRssFeed(
         excerpt: description || title,
         sourceName,
         sourceDomain,
+        sourceType,
         publishedAt: new Date(pubDate).toISOString(),
         relevanceScore,
       });
@@ -257,6 +261,7 @@ async function fetchNewsAPI(): Promise<RawContent[]> {
           excerpt: article.description?.slice(0, 300) ?? article.title,
           sourceName: article.source.name,
           sourceDomain: domainOf(article.url),
+          sourceType: "article",
           publishedAt: article.publishedAt,
           relevanceScore,
         });
@@ -322,6 +327,7 @@ async function fetchInternalTrends(weekOf: Date): Promise<RawContent[]> {
         excerpt,
         sourceName: "AfriTalent Platform",
         sourceDomain: "afritalent.io",
+        sourceType: "internal_data",
         publishedAt: weekOf.toISOString(),
         relevanceScore: 100,
       },
@@ -334,14 +340,46 @@ async function fetchInternalTrends(weekOf: Date): Promise<RawContent[]> {
 
 // ── Deduplication ─────────────────────────────────────────────────────────────
 
+function normalizeUrl(url: string): string {
+  return url.trim().toLowerCase().replace(/\/+$/, "");
+}
+
 function deduplicate(items: RawContent[]): RawContent[] {
   const seen = new Set<string>();
   return items.filter((item) => {
-    const key = item.url.trim().toLowerCase();
+    const key = normalizeUrl(item.url);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+}
+
+/**
+ * URLs already cited in recent published/pending blog posts, so consecutive
+ * weekly issues don't recycle the same evergreen sources. Fails open (empty
+ * set) — a lookup error must not block the pipeline.
+ */
+async function fetchRecentlyCitedUrls(lookbackDays = 60): Promise<Set<string>> {
+  try {
+    const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
+    const recent = await prisma.resource.findMany({
+      where: { category: BLOG_CATEGORY, createdAt: { gte: since } },
+      select: { content: true },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+    });
+
+    const cited = new Set<string>();
+    for (const post of recent) {
+      for (const match of post.content.matchAll(/\]\((https?:\/\/[^)\s]+)\)/g)) {
+        cited.add(normalizeUrl(match[1]));
+      }
+    }
+    return cited;
+  } catch (err) {
+    log.warn({ err }, "[ContentSourceAgent] cited-URL lookup failed — no exclusions applied");
+    return new Set();
+  }
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -349,21 +387,24 @@ function deduplicate(items: RawContent[]): RawContent[] {
 export async function ContentSourceAgent(weekOf: Date): Promise<RawContent[]> {
   log.info({ weekOf: weekOf.toISOString() }, "[ContentSourceAgent] starting");
 
-  const [hn, devTo, wwr, remoteCo, newsApi, internal] = await Promise.allSettled([
+  const [hn, devTo, wwr, remoteCo, newsApi, internal, citedUrls] = await Promise.allSettled([
     fetchHackerNews(),
     fetchDevTo(),
     fetchRssFeed(
       "https://weworkremotely.com/remote-jobs.rss",
       "WeWorkRemotely",
-      "weworkremotely.com"
+      "weworkremotely.com",
+      "job_listing"
     ),
     fetchRssFeed(
       "https://remote.co/remote-jobs/feed/",
       "Remote.co",
-      "remote.co"
+      "remote.co",
+      "job_listing"
     ),
     fetchNewsAPI(),
     fetchInternalTrends(weekOf),
+    fetchRecentlyCitedUrls(),
   ]);
 
   const all: RawContent[] = [];
@@ -371,7 +412,11 @@ export async function ContentSourceAgent(weekOf: Date): Promise<RawContent[]> {
     if (result.status === "fulfilled") all.push(...result.value);
   }
 
-  const unique = deduplicate(all);
+  const previouslyCited = citedUrls.status === "fulfilled" ? citedUrls.value : new Set<string>();
+  const unique = deduplicate(all).filter(
+    // Internal snapshot is regenerated fresh each week, so it is never stale
+    (i) => i.sourceType === "internal_data" || !previouslyCited.has(normalizeUrl(i.url))
+  );
 
   // Keep at most 30 items sorted by relevance desc to limit token cost in Agent 2
   const top = unique
@@ -380,7 +425,7 @@ export async function ContentSourceAgent(weekOf: Date): Promise<RawContent[]> {
     .slice(0, 30);
 
   log.info(
-    { total: all.length, unique: unique.length, passing: top.length },
+    { total: all.length, unique: unique.length, passing: top.length, excludedAsCited: previouslyCited.size },
     "[ContentSourceAgent] done"
   );
 
