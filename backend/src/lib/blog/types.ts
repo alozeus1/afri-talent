@@ -2,12 +2,21 @@
 // Blog Automation — shared types for all 5 pipeline agents
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * How a sourced item should be treated by the writer:
+ *  - article       → citable editorial/news content
+ *  - job_listing   → market demand signal; never cited in the Sources section
+ *  - internal_data → AfriTalent platform data (ground truth)
+ */
+export type SourceType = "article" | "job_listing" | "internal_data";
+
 export interface RawContent {
   title: string;
   url: string;
   excerpt: string;
   sourceName: string;
   sourceDomain: string;
+  sourceType: SourceType;
   publishedAt: string;
   relevanceScore: number;
 }

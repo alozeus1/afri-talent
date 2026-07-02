@@ -83,7 +83,12 @@ Your writing style:
 - Practical: end with actionable steps readers can take this week
 - Professional: clean formatting, no jargon bloat, no filler
 
-You will receive a list of verified articles and data points. Synthesize them into ONE compelling weekly blog post.
+You will receive a list of verified items. Each has a TYPE:
+- article       → citable editorial/news content; may appear in ## Sources
+- job_listing   → a live job posting; treat ONLY as a market demand signal (e.g. "companies like X are hiring for Y"). NEVER cite job listings in ## Sources.
+- internal_data → AfriTalent platform data; cite as "AfriTalent platform data"
+
+Synthesize them into ONE compelling weekly blog post.
 
 MANDATORY blog structure (use these exact markdown headings):
 
@@ -138,6 +143,7 @@ export async function BlogWriterAgent(
     .map(
       (item) =>
         `SOURCE: ${item.sourceName} (${item.sourceDomain})\n` +
+        `TYPE: ${item.sourceType}\n` +
         `URL: ${item.url}\n` +
         `TITLE: ${item.title}\n` +
         `EXCERPT: ${item.excerpt}\n` +
@@ -154,6 +160,9 @@ export async function BlogWriterAgent(
   const response = await client.messages.create({
     model: QUAL,
     max_tokens: 4096,
+    // Low-but-nonzero: keep the prose engaging while staying anchored to the
+    // provided facts and citations.
+    temperature: 0.4,
     system: BLOG_WRITER_SYSTEM,
     messages: [{ role: "user", content: userContent }],
   });
