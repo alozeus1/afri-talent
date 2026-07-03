@@ -17,6 +17,7 @@ import {
   type AfricaEligibilityStatus,
 } from "@/lib/job-trust-labels";
 import { ReportJobButton } from "@/components/jobs/report-job-button";
+import { JobFitPanel } from "@/components/jobs/job-fit-panel";
 
 const AFRICA_STATUS_STYLES: Record<AfricaEligibilityStatus, { box: string; dot: string }> = {
   confirmed: {
@@ -304,6 +305,8 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                   </div>
                 );
               })()}
+
+              <JobFitPanel jobTags={job.tags} />
 
               {job.discovery && (
                 <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
