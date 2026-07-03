@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { AFRICAN_COUNTRY_NAMES, OTHER_COUNTRY_NAMES, WORLDWIDE_OPTION } from "@/lib/countries";
+import { parseProfilePeriod } from "@/lib/profile-period";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -147,11 +148,7 @@ function CountrySelect({
 // existing string format ("2022-03 – Present") so no schema change is needed;
 // best-effort parses previously saved free-text values.
 function PeriodPicker({ value, onChange }: { value: string; onChange: (next: string) => void }) {
-  const parsed = (value || "").match(/(\d{4})(?:-(\d{2}))?/g) ?? [];
-  const toMonth = (raw?: string) => (raw ? (raw.length === 4 ? `${raw}-01` : raw) : "");
-  const start = toMonth(parsed[0]);
-  const isPresent = /present|current/i.test(value || "");
-  const end = isPresent ? "" : toMonth(parsed[1]);
+  const { start, end, isPresent } = parseProfilePeriod(value);
 
   const emit = (s: string, e: string, present: boolean) => {
     if (!s && !e && !present) return onChange("");

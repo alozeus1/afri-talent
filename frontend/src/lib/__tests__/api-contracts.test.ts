@@ -6,6 +6,7 @@ import {
   billing,
   candidateAnalytics,
   pricing,
+  profile,
   publicStats,
   savedSearches,
 } from "../api";
@@ -40,6 +41,56 @@ describe("Frontend API contract builders", () => {
     expect(JSON.parse(options.body)).toEqual({
       email: "candidate@example.com",
       password: "Password123!",
+    });
+  });
+
+  it("seeds a missing CSRF token before a mutating request", async () => {
+    document.cookie = "afri_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ csrfToken: "fresh-csrf-token" }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+      } as Response);
+
+    await profile.update({ bio: "Updated profile" });
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe(
+      "http://localhost:4000/api/auth/me",
+    );
+    expect((global.fetch as jest.Mock).mock.calls[1][1].headers).toMatchObject({
+      "X-CSRF-Token": "fresh-csrf-token",
+    });
+  });
+
+  it("refreshes and retries a multipart request after CSRF_INVALID", async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: "Invalid CSRF token", code: "CSRF_INVALID" }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ csrfToken: "refreshed-csrf-token" }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ draft: {} }),
+      } as Response);
+
+    await profile.parseResume(new File(["resume"], "resume.pdf", { type: "application/pdf" }));
+
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+    expect((global.fetch as jest.Mock).mock.calls[1][0]).toBe(
+      "http://localhost:4000/api/auth/me",
+    );
+    expect((global.fetch as jest.Mock).mock.calls[2][1].headers).toMatchObject({
+      "X-CSRF-Token": "refreshed-csrf-token",
     });
   });
 
