@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { AFRICAN_COUNTRY_NAMES, OTHER_COUNTRY_NAMES, WORLDWIDE_OPTION } from "@/lib/countries";
+import {
+  AFRICAN_COUNTRIES,
+  OTHER_COUNTRIES,
+  WORLDWIDE_CODE,
+  WORLDWIDE_OPTION,
+  countryDisplayName,
+} from "@/lib/countries";
 import { parseProfilePeriod } from "@/lib/profile-period";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -114,8 +120,8 @@ function CountrySelect({
       <div className="flex flex-wrap gap-2 mb-2">
         {values.map((country) => (
           <span key={country} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-            {country}
-            <button type="button" onClick={() => onChange(values.filter((c) => c !== country))} className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 font-bold" aria-label={`Remove ${country}`}>
+            {countryDisplayName(country)}
+            <button type="button" onClick={() => onChange(values.filter((c) => c !== country))} className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 font-bold" aria-label={`Remove ${countryDisplayName(country)}`}>
               ×
             </button>
           </span>
@@ -128,15 +134,17 @@ function CountrySelect({
         aria-label={`Add ${label.toLowerCase()}`}
       >
         <option value="">Add a country…</option>
-        <option value={WORLDWIDE_OPTION}>{WORLDWIDE_OPTION}</option>
+        {/* Values are ISO codes ("NG", "GLOBAL") so they match
+            Job.eligibleCountries exactly in search and retention matching. */}
+        <option value={WORLDWIDE_CODE}>{WORLDWIDE_OPTION}</option>
         <optgroup label="Africa">
-          {AFRICAN_COUNTRY_NAMES.map((c) => (
-            <option key={c} value={c}>{c}</option>
+          {AFRICAN_COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>{c.name}</option>
           ))}
         </optgroup>
         <optgroup label="Rest of world">
-          {OTHER_COUNTRY_NAMES.map((c) => (
-            <option key={c} value={c}>{c}</option>
+          {OTHER_COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>{c.name}</option>
           ))}
         </optgroup>
       </select>

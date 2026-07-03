@@ -1512,6 +1512,7 @@ export interface Job {
   expiresAt?: string | null;
   status: string;
   publishedAt?: string;
+  lastCheckedAt?: string | null;
   createdAt: string;
   moderationRequired?: boolean;
   trust?: JobTrustSummary;
