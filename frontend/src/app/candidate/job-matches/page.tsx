@@ -93,9 +93,9 @@ export default function JobMatchesPage() {
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">AI Job Matches</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Available on Basic and Professional plans. Basic starts at $9.99/month and unlocks personalized match scoring, skill-gap analysis, and saved match history.
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">AI Job Matches</h1>
+            <p className="text-sm text-gray-500 mt-1 dark:text-gray-400">
+              Available on the Professional plan — unlocks personalized match scoring, skill-gap analysis, and saved match history.
             </p>
             <div className="flex items-center gap-2 flex-wrap mt-2">
               <button
@@ -117,7 +117,7 @@ export default function JobMatchesPage() {
             <Button
               onClick={handleReEmbed}
               disabled={embedding}
-              className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm"
+              className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm dark:text-gray-300 dark:border-zinc-700 dark:bg-zinc-900"
             >
               {embedding ? "Updating..." : "Refresh Matches"}
             </Button>
@@ -139,6 +139,14 @@ export default function JobMatchesPage() {
           >
             <p className="font-medium">{error.title}</p>
             <p className="mt-0.5">{error.description}</p>
+            {error.tone === "warning" && (
+              <Link
+                href="/pricing"
+                className="mt-2 inline-block rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+              >
+                See plans & upgrade →
+              </Link>
+            )}
           </div>
         )}
 
@@ -183,11 +191,11 @@ export default function JobMatchesPage() {
                     <div className="flex-1 min-w-0">
                       <Link
                         href={`/jobs/${match.slug}`}
-                        className="font-semibold text-gray-900 hover:text-blue-600 truncate block"
+                        className="font-semibold text-gray-900 hover:text-blue-600 truncate block dark:text-gray-100"
                       >
                         {match.title}
                       </Link>
-                      <p className="text-sm text-gray-500 mt-0.5">
+                      <p className="text-sm text-gray-500 mt-0.5 dark:text-gray-400">
                         {match.company} · {match.location}
                       </p>
                       <div className="flex gap-2 mt-2 flex-wrap">
@@ -221,7 +229,7 @@ export default function JobMatchesPage() {
                       {/* AI Explanation */}
                       {match.explanation && (
                         <p
-                          className="mt-2 text-xs text-gray-500 italic"
+                          className="mt-2 text-xs text-gray-500 italic dark:text-gray-400"
                           data-testid="match-explanation"
                         >
                           {match.explanation}

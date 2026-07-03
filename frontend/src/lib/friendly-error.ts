@@ -143,7 +143,14 @@ export function toFriendlyError(err: unknown): FriendlyError {
 
 function extractApiError(err: unknown): ApiLikeError {
   if (err instanceof Error) {
-    return { message: err.message };
+    // ApiError from the API client carries status/code — use them so 401/403
+    // map to actionable messages instead of the generic fallback.
+    const withMeta = err as Error & { status?: unknown; code?: unknown };
+    return {
+      message: err.message,
+      status: typeof withMeta.status === "number" ? withMeta.status : undefined,
+      code: typeof withMeta.code === "string" ? withMeta.code : undefined,
+    };
   }
   if (typeof err === "string") {
     return { message: err };

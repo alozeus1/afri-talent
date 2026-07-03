@@ -27,16 +27,23 @@ interface SendEmailOptions {
 async function sendEmail(opts: SendEmailOptions): Promise<void> {
   const recipientDomain = opts.to.includes("@") ? opts.to.split("@")[1] : "unknown";
 
-  // Dev mode: log instead of send if SES_FROM_EMAIL is not configured
+  // No SES_FROM_EMAIL configured: log loudly and record a SKIP — never a
+  // success. Previously this reported notification_delivery_success in "dev
+  // mode", which hid missing email config in real deployments (verification
+  // emails silently dropped while metrics looked healthy).
   if (IS_DEV) {
-    logger.info({ to: opts.to, subject: opts.subject }, "[email] dev mode — email not sent");
+    logger.warn(
+      { to: opts.to, subject: opts.subject },
+      "[email] SES_FROM_EMAIL not configured — email NOT sent (set SES_FROM_EMAIL + AWS credentials to enable delivery)",
+    );
     logger.debug({ text: opts.text }, "[email] body");
     recordOpsEvent({
-      metricName: "notification_delivery_success",
+      metricName: "notification_delivery_skipped",
       category: "notifications",
+      severity: "warning",
       details: {
         channel: "email",
-        mode: "dev",
+        reason: "ses_not_configured",
         template: opts.templateName ?? "generic",
         recipient_domain: recipientDomain,
       },

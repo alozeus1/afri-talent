@@ -34,7 +34,8 @@ export function parseJobSearchState(
   searchParams: Record<string, string | string[] | undefined>,
 ): JobSearchState {
   return {
-    search: readStringParam(searchParams.search),
+    // `query` is an accepted alias (salary-page role links, external deep links)
+    search: readStringParam(searchParams.search) || readStringParam(searchParams.query),
     location: readStringParam(searchParams.location),
     type: readStringParam(searchParams.type),
     jobField: readStringParam(searchParams.jobField),

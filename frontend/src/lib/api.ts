@@ -17,6 +17,50 @@ function isMutating(method: string | undefined): boolean {
   return m !== "GET" && m !== "HEAD" && m !== "OPTIONS";
 }
 
+// §2.3 — the CSRF cookie is seeded by /api/auth/me. If a mutating request
+// fires before any /me call (or after the cookie expired), the token is
+// missing and the backend rejects the write with CSRF_INVALID ("profile
+// never saves"). ensureCsrfToken lazily (re)seeds it, deduplicating
+// concurrent refreshes.
+let csrfSeedPromise: Promise<string | undefined> | null = null;
+
+async function ensureCsrfToken(force = false): Promise<string | undefined> {
+  if (!force) {
+    const existing = readCsrfCookie();
+    if (existing) return existing;
+  }
+  if (!csrfSeedPromise) {
+    csrfSeedPromise = fetch(`${API_URL}/api/auth/me`, { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) return readCsrfCookie();
+        const data = (await res.json().catch(() => null)) as { csrfToken?: string } | null;
+        return data?.csrfToken ?? readCsrfCookie();
+      })
+      .catch(() => readCsrfCookie())
+      .finally(() => {
+        csrfSeedPromise = null;
+      });
+  }
+  return csrfSeedPromise;
+}
+
+/** Error thrown by the API client — carries status + code for friendly-error mapping. */
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  currentPlan?: string;
+  requiredPlan?: string;
+
+  constructor(message: string, status: number, body?: Record<string, unknown>) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = typeof body?.code === "string" ? body.code : undefined;
+    this.currentPlan = typeof body?.currentPlan === "string" ? body.currentPlan : undefined;
+    this.requiredPlan = typeof body?.requiredPlan === "string" ? body.requiredPlan : undefined;
+  }
+}
+
 interface FetchOptions extends RequestInit {
   token?: string;
 }
@@ -45,24 +89,41 @@ async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promis
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
 
-  // §2.3 — attach CSRF token on mutating requests (the backend skips this for
-  // exempt routes; sending it always is harmless but tighten to non-GET only).
+  // §2.3 — attach CSRF token on mutating requests, seeding it first if the
+  // cookie is missing (fixes "CSRF token missing" on profile save).
   if (isMutating(fetchOptions.method)) {
-    const csrf = readCsrfCookie();
+    const csrf = await ensureCsrfToken();
     if (csrf) {
       (headers as Record<string, string>)["X-CSRF-Token"] = csrf;
     }
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...fetchOptions,
-    headers,
-    credentials: "include", // send HttpOnly cookie on every request
-  });
+  const doFetch = () =>
+    fetch(`${API_URL}${endpoint}`, {
+      ...fetchOptions,
+      headers,
+      credentials: "include", // send HttpOnly cookie on every request
+    });
+
+  let response = await doFetch();
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(error.error || "Request failed");
+
+    // One retry with a freshly-seeded token when the server says the CSRF
+    // token was stale/invalid (e.g. cookie expired mid-session).
+    if (response.status === 403 && error?.code === "CSRF_INVALID" && isMutating(fetchOptions.method)) {
+      const fresh = await ensureCsrfToken(true);
+      if (fresh) {
+        (headers as Record<string, string>)["X-CSRF-Token"] = fresh;
+        response = await doFetch();
+        if (response.ok) return response.json();
+        const retryError = await response.json().catch(() => ({ error: "Request failed" }));
+        throw new ApiError(retryError.error || "Request failed", response.status, retryError);
+      }
+    }
+
+    throw new ApiError(error.error || "Request failed", response.status, error);
   }
 
   return response.json();
@@ -78,9 +139,9 @@ async function fetchMultipartAPI<T>(endpoint: string, options: Omit<FetchOptions
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
 
-  // §2.3 — same CSRF rule for multipart uploads.
+  // §2.3 — same CSRF rule for multipart uploads (seeded if missing).
   if (isMutating(fetchOptions.method)) {
-    const csrf = readCsrfCookie();
+    const csrf = await ensureCsrfToken();
     if (csrf) {
       (headers as Record<string, string>)["X-CSRF-Token"] = csrf;
     }
@@ -95,7 +156,7 @@ async function fetchMultipartAPI<T>(endpoint: string, options: Omit<FetchOptions
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(error.error || "Request failed");
+    throw new ApiError(error.error || "Request failed", response.status, error);
   }
 
   return response.json();
