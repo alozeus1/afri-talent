@@ -12,6 +12,9 @@ import {
 
 describe("Frontend API contract builders", () => {
   beforeEach(() => {
+    // Seed the CSRF cookie so mutating requests don't trigger the lazy
+    // /api/auth/me token seeding (fetchAPI ensures a token before writes).
+    document.cookie = "afri_csrf=test-csrf-token";
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({}),
