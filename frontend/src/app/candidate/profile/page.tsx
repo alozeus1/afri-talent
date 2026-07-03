@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { AFRICAN_COUNTRY_NAMES, OTHER_COUNTRY_NAMES, WORLDWIDE_OPTION } from "@/lib/countries";
-import { parseProfilePeriod } from "@/lib/profile-period";
+import { AFRICAN_COUNTRIES, OTHER_COUNTRIES, WORLDWIDE_CODE, WORLDWIDE_OPTION, countryDisplayName } from "@/lib/countries";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -114,8 +113,8 @@ function CountrySelect({
       <div className="flex flex-wrap gap-2 mb-2">
         {values.map((country) => (
           <span key={country} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-            {country}
-            <button type="button" onClick={() => onChange(values.filter((c) => c !== country))} className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 font-bold" aria-label={`Remove ${country}`}>
+            {countryDisplayName(country)}
+            <button type="button" onClick={() => onChange(values.filter((c) => c !== country))} className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 font-bold" aria-label={`Remove ${countryDisplayName(country)}`}>
               ×
             </button>
           </span>
@@ -128,15 +127,17 @@ function CountrySelect({
         aria-label={`Add ${label.toLowerCase()}`}
       >
         <option value="">Add a country…</option>
-        <option value={WORLDWIDE_OPTION}>{WORLDWIDE_OPTION}</option>
+        {/* Values are ISO codes ("NG", "GLOBAL") so they match
+            Job.eligibleCountries exactly in search and retention matching. */}
+        <option value={WORLDWIDE_CODE}>{WORLDWIDE_OPTION}</option>
         <optgroup label="Africa">
-          {AFRICAN_COUNTRY_NAMES.map((c) => (
-            <option key={c} value={c}>{c}</option>
+          {AFRICAN_COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>{c.name}</option>
           ))}
         </optgroup>
         <optgroup label="Rest of world">
-          {OTHER_COUNTRY_NAMES.map((c) => (
-            <option key={c} value={c}>{c}</option>
+          {OTHER_COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>{c.name}</option>
           ))}
         </optgroup>
       </select>
@@ -148,7 +149,20 @@ function CountrySelect({
 // existing string format ("2022-03 – Present") so no schema change is needed;
 // best-effort parses previously saved free-text values.
 function PeriodPicker({ value, onChange }: { value: string; onChange: (next: string) => void }) {
-  const { start, end, isPresent } = parseProfilePeriod(value);
+  // Parse each side of the separator independently so an end-only selection
+  // ("– 2025-06", e.g. a graduation date picked first) never migrates into
+  // the Start field on re-render.
+  const toMonth = (side: string) => {
+    const m = side.match(/(\d{4})(?:-(\d{2}))?/);
+    return m ? (m[2] ? `${m[1]}-${m[2]}` : `${m[1]}-01`) : "";
+  };
+  const raw = value || "";
+  const sepIndex = raw.search(/\s[–-]\s|–/);
+  const [startSide, endSide] =
+    sepIndex >= 0 ? [raw.slice(0, sepIndex), raw.slice(sepIndex + 1)] : [raw, ""];
+  const start = toMonth(startSide);
+  const isPresent = /present|current/i.test(raw);
+  const end = isPresent ? "" : toMonth(endSide);
 
   const emit = (s: string, e: string, present: boolean) => {
     if (!s && !e && !present) return onChange("");
