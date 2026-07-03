@@ -11,14 +11,30 @@ import { JobApplyPanel } from "@/components/jobs/job-apply-panel";
 import { splitJobDescriptionSections } from "@/lib/job-description";
 import { formatSalaryRange } from "@/lib/salary";
 import { getJobDetailServer } from "@/lib/server-public-api";
-import { africaEligibility, deriveJobTrustLabels } from "@/lib/job-trust-labels";
+import {
+  africaEligibility,
+  deriveJobTrustLabels,
+  type AfricaEligibilityStatus,
+} from "@/lib/job-trust-labels";
 import { ReportJobButton } from "@/components/jobs/report-job-button";
 
-const AFRICA_STATUS_STYLES: Record<string, { box: string; dot: string }> = {
-  confirmed: { box: "border-emerald-200 bg-emerald-50/70", dot: "bg-emerald-500" },
-  possible: { box: "border-amber-200 bg-amber-50/70", dot: "bg-amber-500" },
-  restricted: { box: "border-red-200 bg-red-50/70", dot: "bg-red-500" },
-  not_confirmed: { box: "border-gray-200 bg-gray-50", dot: "bg-gray-400" },
+const AFRICA_STATUS_STYLES: Record<AfricaEligibilityStatus, { box: string; dot: string }> = {
+  confirmed: {
+    box: "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/20",
+    dot: "bg-emerald-500",
+  },
+  possible: {
+    box: "border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/20",
+    dot: "bg-amber-500",
+  },
+  restricted: {
+    box: "border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/20",
+    dot: "bg-red-500",
+  },
+  not_confirmed: {
+    box: "border-gray-200 bg-gray-50 dark:border-zinc-700 dark:bg-zinc-900/60",
+    dot: "bg-gray-400",
+  },
 };
 
 type JobDetailPageProps = {
@@ -256,29 +272,32 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                 const verdict = africaEligibility(job);
                 const style = AFRICA_STATUS_STYLES[verdict.status];
                 const labels = deriveJobTrustLabels(job);
-                const lastVerified = job.lastCheckedAt ?? job.publishedAt;
+                const dateLabel = job.lastCheckedAt
+                  ? `Last verified ${new Date(job.lastCheckedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                  : job.publishedAt
+                    ? `Published ${new Date(job.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                    : null;
                 return (
                   <div className={`mb-6 rounded-2xl border p-6 ${style.box}`}>
-                    <h3 className="mb-2 flex items-center gap-2 font-semibold text-gray-900">
+                    <h3 className="mb-2 flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100">
                       <span className={`inline-block h-2.5 w-2.5 rounded-full ${style.dot}`} aria-hidden />
                       Can I apply from Africa?
                     </h3>
-                    <p className="font-medium text-gray-900">{verdict.headline}</p>
-                    <ul className="mt-2 space-y-1 text-sm text-gray-600">
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{verdict.headline}</p>
+                    <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
                       {verdict.reasons.map((reason) => (
                         <li key={reason}>• {reason}</li>
                       ))}
                     </ul>
-                    <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-200/70 pt-3">
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-200/70 pt-3 dark:border-zinc-700">
                       {labels.map((l) => (
                         <TrustBadge key={l.label} label={l.label} variant={l.variant === "default" ? "info" : l.variant} />
                       ))}
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
                       <span>
                         Source: {job.sourceName ?? job.employer?.companyName ?? "Unknown"}
-                        {lastVerified &&
-                          ` · Last verified ${new Date(lastVerified).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
+                        {dateLabel && ` · ${dateLabel}`}
                       </span>
                       <ReportJobButton jobId={job.id} />
                     </div>

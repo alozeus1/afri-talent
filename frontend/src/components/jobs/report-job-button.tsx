@@ -79,6 +79,7 @@ export function ReportJobButton({ jobId }: { jobId: string }) {
         onChange={(e) => setDetails(e.target.value)}
         placeholder="Anything that helps us review (optional)"
         rows={2}
+        maxLength={4000}
         className="mb-3 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-gray-100"
       />
       {state === "error" && (

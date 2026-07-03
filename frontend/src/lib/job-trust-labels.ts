@@ -3,15 +3,9 @@
 // unknown we say "Not confirmed" — never a guess.
 
 import type { Job } from "@/lib/api";
+import { AFRICAN_COUNTRIES } from "@/lib/countries";
 
-// ISO codes mirroring backend AFRICAN_COUNTRIES (aggregator/types.ts)
-export const AFRICAN_COUNTRY_CODES = new Set([
-  "DZ", "AO", "BJ", "BW", "BF", "BI", "CV", "CM", "CF", "TD", "KM", "CG", "CD",
-  "CI", "DJ", "EG", "GQ", "ER", "SZ", "ET", "GA", "GM", "GH", "GN", "GW", "KE",
-  "LS", "LR", "LY", "MG", "MW", "ML", "MR", "MU", "MA", "MZ", "NA", "NE", "NG",
-  "RW", "ST", "SN", "SC", "SL", "SO", "ZA", "SS", "SD", "TZ", "TG", "TN", "UG",
-  "ZM", "ZW",
-]);
+export const AFRICAN_COUNTRY_CODES = new Set(AFRICAN_COUNTRIES.map((country) => country.code));
 
 export interface JobTrustLabel {
   label: string;
@@ -31,19 +25,24 @@ export function deriveJobTrustLabels(job: Job): JobTrustLabel[] {
     labels.push({ label: "Visa status confirmed", variant: "success" });
   }
 
-  const lastSeen = job.lastCheckedAt ?? job.publishedAt;
-  if (lastSeen) {
-    const ageHours = (Date.now() - new Date(lastSeen).getTime()) / 3_600_000;
+  const freshnessDate = job.lastCheckedAt ?? job.publishedAt;
+  if (freshnessDate) {
+    const ageHours = (Date.now() - new Date(freshnessDate).getTime()) / 3_600_000;
     if (ageHours >= 0 && ageHours <= RECENT_REFRESH_HOURS) {
-      labels.push({ label: "Recently refreshed", variant: "info" });
+      labels.push({
+        label: job.lastCheckedAt ? "Recently refreshed" : "Recently published",
+        variant: "info",
+      });
     }
   }
 
-  labels.push(
-    job.jobSource === "AGGREGATED"
-      ? { label: "External source", variant: "default" }
-      : { label: "Apply on AfriTalent", variant: "info" },
-  );
+  if (job.jobSource === "AGGREGATED") {
+    labels.push({ label: "External source", variant: "default" });
+  } else if (job.jobSource === "EMPLOYER_POSTED") {
+    labels.push({ label: "Apply on AfriTalent", variant: "info" });
+  } else {
+    labels.push({ label: "Source not confirmed", variant: "default" });
+  }
 
   return labels;
 }
@@ -69,10 +68,10 @@ export function africaEligibility(job: Job): AfricaEligibility {
     (job.workplaceType ?? "").toLowerCase() === "remote" ||
     job.location.toLowerCase().includes("remote");
 
-  if (job.hiresFromAfrica) {
+  if (job.hiresFromAfrica || hasAfricanCountry || isWorldwide) {
     if (hasAfricanCountry) reasons.push("The listing names African countries as eligible.");
+    if (isWorldwide) reasons.push("The listing is open to applicants worldwide.");
     if (job.visaSponsorship === "YES") reasons.push("The employer sponsors visas.");
-    if (isRemote && isWorldwide) reasons.push("The role is remote and open worldwide.");
     if (reasons.length === 0) reasons.push("The listing signals openness to applicants based in Africa.");
     return {
       status: "confirmed",

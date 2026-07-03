@@ -22,6 +22,26 @@ describe("africaEligibility", () => {
     expect(verdict.reasons.length).toBeGreaterThan(0);
   });
 
+  it("confirms when an African country is explicitly eligible", () => {
+    const verdict = africaEligibility({
+      ...baseJob,
+      location: "Lagos",
+      eligibleCountries: ["NG"],
+    });
+    expect(verdict.status).toBe("confirmed");
+    expect(verdict.reasons[0]).toContain("African countries");
+  });
+
+  it("confirms when the listing is explicitly open worldwide", () => {
+    const verdict = africaEligibility({
+      ...baseJob,
+      location: "London",
+      eligibleCountries: ["GLOBAL"],
+    });
+    expect(verdict.status).toBe("confirmed");
+    expect(verdict.reasons[0]).toContain("worldwide");
+  });
+
   it("restricts when eligible countries exclude Africa and GLOBAL", () => {
     const verdict = africaEligibility({ ...baseJob, location: "Berlin", eligibleCountries: ["DE", "US"] });
     expect(verdict.status).toBe("restricted");
@@ -60,5 +80,19 @@ describe("deriveJobTrustLabels", () => {
   it("shows Apply on AfriTalent for employer-posted jobs without extras", () => {
     const labels = deriveJobTrustLabels({ ...baseJob, jobSource: "EMPLOYER_POSTED" }).map((l) => l.label);
     expect(labels).toEqual(["Apply on AfriTalent"]);
+  });
+
+  it("describes publication as publication rather than verification", () => {
+    const labels = deriveJobTrustLabels({
+      ...baseJob,
+      publishedAt: new Date().toISOString(),
+      jobSource: "EMPLOYER_POSTED",
+    }).map((l) => l.label);
+    expect(labels).toEqual(["Recently published", "Apply on AfriTalent"]);
+  });
+
+  it("does not claim an unknown source is on-platform", () => {
+    const labels = deriveJobTrustLabels(baseJob).map((l) => l.label);
+    expect(labels).toEqual(["Source not confirmed"]);
   });
 });

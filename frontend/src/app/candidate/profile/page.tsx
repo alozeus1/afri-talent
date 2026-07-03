@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { AFRICAN_COUNTRIES, OTHER_COUNTRIES, WORLDWIDE_CODE, WORLDWIDE_OPTION, countryDisplayName } from "@/lib/countries";
+import {
+  AFRICAN_COUNTRIES,
+  OTHER_COUNTRIES,
+  WORLDWIDE_CODE,
+  WORLDWIDE_OPTION,
+  countryDisplayName,
+} from "@/lib/countries";
+import { parseProfilePeriod } from "@/lib/profile-period";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -149,20 +156,7 @@ function CountrySelect({
 // existing string format ("2022-03 – Present") so no schema change is needed;
 // best-effort parses previously saved free-text values.
 function PeriodPicker({ value, onChange }: { value: string; onChange: (next: string) => void }) {
-  // Parse each side of the separator independently so an end-only selection
-  // ("– 2025-06", e.g. a graduation date picked first) never migrates into
-  // the Start field on re-render.
-  const toMonth = (side: string) => {
-    const m = side.match(/(\d{4})(?:-(\d{2}))?/);
-    return m ? (m[2] ? `${m[1]}-${m[2]}` : `${m[1]}-01`) : "";
-  };
-  const raw = value || "";
-  const sepIndex = raw.search(/\s[–-]\s|–/);
-  const [startSide, endSide] =
-    sepIndex >= 0 ? [raw.slice(0, sepIndex), raw.slice(sepIndex + 1)] : [raw, ""];
-  const start = toMonth(startSide);
-  const isPresent = /present|current/i.test(raw);
-  const end = isPresent ? "" : toMonth(endSide);
+  const { start, end, isPresent } = parseProfilePeriod(value);
 
   const emit = (s: string, e: string, present: boolean) => {
     if (!s && !e && !present) return onChange("");
