@@ -147,15 +147,33 @@ async function fetchMultipartAPI<T>(endpoint: string, options: Omit<FetchOptions
     }
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...fetchOptions,
-    headers,
-    body: options.body,
-    credentials: "include",
-  });
+  const doFetch = () =>
+    fetch(`${API_URL}${endpoint}`, {
+      ...fetchOptions,
+      headers,
+      body: options.body,
+      credentials: "include",
+    });
+
+  let response = await doFetch();
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: "Request failed" }));
+
+    // Same stale-token retry as the JSON path: the seed may have run before
+    // login (anonymous session token), so the first upload after auth can
+    // fail CSRF_INVALID — refresh once and resend (FormData is reusable).
+    if (response.status === 403 && error?.code === "CSRF_INVALID" && isMutating(fetchOptions.method)) {
+      const fresh = await ensureCsrfToken(true);
+      if (fresh) {
+        (headers as Record<string, string>)["X-CSRF-Token"] = fresh;
+        response = await doFetch();
+        if (response.ok) return response.json();
+        const retryError = await response.json().catch(() => ({ error: "Request failed" }));
+        throw new ApiError(retryError.error || "Request failed", response.status, retryError);
+      }
+    }
+
     throw new ApiError(error.error || "Request failed", response.status, error);
   }
 
