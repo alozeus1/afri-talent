@@ -614,6 +614,32 @@ export default function CandidateDashboard() {
         </Link>
       </div>
 
+      {/* My workspace — simple section map (roadmap Phase 2 IA) */}
+      <div className="mb-10">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">My workspace</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {[
+            { href: "/candidate/resumes", label: "My Resume", desc: "Versions & health" },
+            { href: "/candidate/applications", label: "My Applications", desc: "Status & follow-ups" },
+            { href: "/candidate/interview-prep", label: "My Interviews", desc: "Prep & practice" },
+            { href: "/learning", label: "My Learning", desc: "Paths & progress" },
+            { href: "/candidate/job-matches", label: "Job Matches", desc: "AI match scores" },
+            { href: "/candidate/saved-searches", label: "Saved Searches", desc: "Alerts & filters" },
+            { href: "/candidate/trust", label: "My Trust Profile", desc: "Verification status" },
+            { href: "/candidate/preferences", label: "Settings", desc: "Alerts & privacy" },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={localizePath(item.href, locale)}
+              className="rounded-xl border border-gray-200 bg-white p-4 transition hover:border-emerald-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-950/50 dark:hover:border-emerald-700"
+            >
+              <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{item.label}</p>
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{item.desc}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+
       {/* Recommended For You Section — live first-look matches */}
       <div className="mb-10">
         <div className="flex justify-between items-end mb-4">
