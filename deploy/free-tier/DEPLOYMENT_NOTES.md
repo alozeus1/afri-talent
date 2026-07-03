@@ -104,7 +104,7 @@ registration verification email). To enable delivery:
    ```
 5. **Restart** (stop + start scripts below), then **test** by registering a
    fresh account — the verification email should arrive. If not,
-   `tail -50 native/backend.log`: "SES not configured — email NOT sent"
+   `tail -50 native/backend.log`: "SES_FROM_EMAIL not configured — email NOT sent"
    means step 4 didn't load; an SES error means identity/sandbox issues.
 
 ## Operating the native backend
