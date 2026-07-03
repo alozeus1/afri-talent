@@ -80,6 +80,33 @@ ANTHROPIC_API_KEY=<key>       # required for AI features; AI_DISABLED=1 to run w
 AI_DISABLED=1                 # currently on until the key is added
 ```
 
+## Enabling email (SES) — verification emails, digests, notifications
+
+Without `SES_FROM_EMAIL`, the backend logs a warning and records
+`notification_delivery_skipped` — no email is ever sent (this includes the
+registration verification email). To enable delivery:
+
+1. **Verify a sender identity** — AWS Console → SES (region `us-east-1`) →
+   Identities → Create identity → verify your from-address (or whole domain).
+2. **Sandbox caveat** — new SES accounts can only deliver to *verified
+   recipient* addresses. For real signups, request production access:
+   SES → Account dashboard → Request production access (typically ~24h).
+   Until then, verify your own test inboxes as recipients.
+3. **Minimal IAM user** — create `afritalent-ses` with a policy allowing only
+   `ses:SendEmail` and `ses:SendRawEmail`; generate an access key.
+4. **Add to `.env`** on the VM:
+   ```
+   SES_FROM_EMAIL="noreply@yourdomain.com"   # the verified identity
+   SES_REGION=us-east-1
+   AWS_REGION=us-east-1
+   AWS_ACCESS_KEY_ID="..."
+   AWS_SECRET_ACCESS_KEY="..."
+   ```
+5. **Restart** (stop + start scripts below), then **test** by registering a
+   fresh account — the verification email should arrive. If not,
+   `tail -50 native/backend.log`: "SES not configured — email NOT sent"
+   means step 4 didn't load; an SES error means identity/sandbox issues.
+
 ## Operating the native backend
 
 ```bash
