@@ -282,6 +282,31 @@ export const onboarding = {
     ),
 };
 
+// Saved jobs — candidate bookmarks
+export interface SavedJobItem {
+  id: string;
+  createdAt: string;
+  job: {
+    id: string; title: string; slug: string; location: string; type: string;
+    workplaceType: string | null; salaryMin: number | null; salaryMax: number | null;
+    currency: string | null; hiresFromAfrica: boolean; isExpired: boolean;
+    publishedAt: string | null; sourceName: string | null;
+    employer: { companyName: string } | null;
+  };
+}
+
+export const savedJobs = {
+  list: () => fetchAPI<{ saved: SavedJobItem[] }>("/api/saved-jobs"),
+  ids: () => fetchAPI<{ jobIds: string[] }>("/api/saved-jobs/ids"),
+  save: (jobId: string) =>
+    fetchAPI<{ saved: { id: string; jobId: string } }>("/api/saved-jobs", {
+      method: "POST",
+      body: JSON.stringify({ jobId }),
+    }),
+  unsave: (jobId: string) =>
+    fetchAPI<{ success: boolean }>(`/api/saved-jobs/${jobId}`, { method: "DELETE" }),
+};
+
 // Applications
 export const applications = {
   apply: (data: { jobId: string; cvUrl?: string; coverLetter?: string }, token?: string) =>
