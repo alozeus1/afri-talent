@@ -71,6 +71,23 @@ async function reserveEventId(provider: BillingProvider, eventId: string): Promi
   return true;
 }
 
+/**
+ * Release a previously reserved idempotency key so the provider's retry (or a
+ * manual redelivery) can re-process the event. Call this when processing fails
+ * AFTER the key was reserved — otherwise the reservation permanently swallows
+ * the retry and, e.g., a charged-but-not-activated subscription is never
+ * reconciled automatically.
+ */
+async function releaseEventId(provider: BillingProvider, eventId: string): Promise<void> {
+  const key = `${provider}:${eventId}`;
+  await prisma.billingWebhookIdempotencyKey
+    .delete({ where: { key } })
+    .catch(() => undefined);
+  if (redisClient) {
+    await redisClient.del(`idempotency:${key}`).catch(() => undefined);
+  }
+}
+
 async function activateFlutterwaveSubscription(input: {
   userId: string;
   plan: SubscriptionPlan;
@@ -410,6 +427,11 @@ router.post("/flutterwave", async (req: Request, res: Response) => {
     });
     res.status(200).json({ received: true });
   } catch (error) {
+    // Processing failed after the idempotency key was reserved. Release it so
+    // Flutterwave's retry (this response is a 500) can re-activate the charge —
+    // otherwise a charged customer is left unactivated until manual reconcile.
+    await releaseEventId(BillingProvider.FLUTTERWAVE, rawEventId).catch(() => undefined);
+
     await pushDeadLetter({
       category: "webhook",
       source: "flutterwave",
@@ -659,12 +681,19 @@ router.post("/stripe", async (req: Request, res: Response) => {
         const sub = event.data.object as unknown as {
           id: string;
           status: string;
-          current_period_end: number;
-          items: { data: Array<{ price: { id: string } }> };
+          current_period_end?: number | null;
+          items: { data: Array<{ price: { id: string }; current_period_end?: number | null }> };
         };
         const priceId = sub.items.data[0]?.price.id;
         const plan = priceId ? getPlanFromPriceId(priceId) : undefined;
         const status = mapStripeSubscriptionStatus(sub.status);
+        // Stripe moved current_period_end onto the subscription item in newer
+        // API versions; fall back to the (legacy) top-level field. Guard against
+        // undefined so we never persist an Invalid Date.
+        const periodEndUnix = sub.items.data[0]?.current_period_end ?? sub.current_period_end;
+        const currentPeriodEnd = typeof periodEndUnix === "number" && Number.isFinite(periodEndUnix)
+          ? new Date(periodEndUnix * 1000)
+          : null;
         const existing = await prisma.subscription.findFirst({
           where: { stripeSubId: sub.id },
           select: { userId: true, id: true },
@@ -675,7 +704,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
           data: {
             ...(plan && { plan }),
             status,
-            currentPeriodEnd: new Date(sub.current_period_end * 1000),
+            ...(currentPeriodEnd && { currentPeriodEnd }),
           },
         });
 
@@ -1063,6 +1092,12 @@ router.post("/stripe", async (req: Request, res: Response) => {
         reason: "handler_error",
       },
     });
+    // Release the idempotency reservation so a manual Stripe redelivery can
+    // re-process this event (subscription upserts and audit writes are
+    // idempotent). We still return 200 to suppress automatic Stripe retries
+    // since state may be partially applied.
+    await releaseEventId(BillingProvider.STRIPE, event.id).catch(() => undefined);
+
     // Return 200 to prevent Stripe from retrying (state may be partially applied)
     res.json({ received: true, error: "Handler error — check server logs" });
   }

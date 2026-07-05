@@ -193,6 +193,34 @@ export function resolveStripeCatalogPriceId(
   return catalog[buildCatalogKey(plan, region, interval, currency)] ?? null;
 }
 
+const VALID_PLANS = new Set<string>(Object.values(SubscriptionPlan));
+
+/**
+ * Reverse lookup: given a Stripe price id, return the plan it maps to via the
+ * configured STRIPE_PRICE_CATALOG_JSON (keys are PLAN:REGION:INTERVAL:CURRENCY).
+ *
+ * Returns null when the price id is not present in the env catalog. Callers MUST
+ * treat null as "unknown price — do not change the plan" rather than downgrading:
+ * checkout can mint subscriptions on regional/yearly catalog price ids that are
+ * absent from the legacy per-price env vars, and a later customer.subscription.*
+ * webhook must never silently move a paying customer to FREE.
+ */
+export function resolvePlanFromStripePriceId(priceId: string): SubscriptionPlan | null {
+  if (!priceId) {
+    return null;
+  }
+  const catalog = parseCatalogEnv(process.env.STRIPE_PRICE_CATALOG_JSON);
+  for (const [key, value] of Object.entries(catalog)) {
+    if (value === priceId) {
+      const plan = key.split(":")[0];
+      if (VALID_PLANS.has(plan)) {
+        return plan as SubscriptionPlan;
+      }
+    }
+  }
+  return null;
+}
+
 export function resolveFlutterwaveCatalogPlanId(
   plan: SubscriptionPlan,
   region: BillingRegion,

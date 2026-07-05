@@ -71,6 +71,37 @@ describe("JobJsonLd", () => {
     expect(script).toBeNull();
   });
 
+  it("escapes HTML-significant characters so job fields cannot break out of the <script> tag (stored XSS)", () => {
+    const payload = '</script><script>alert(document.cookie)</script>';
+    const { container } = render(
+      <JobJsonLd
+        job={{
+          ...baseJob,
+          title: payload,
+          description: '<img src=x onerror=alert(1)> & "quoted"',
+          employer: { ...baseJob.employer, companyName: '</script><b>x</b>' },
+        }}
+      />,
+    );
+
+    const script = container.querySelector("script[type='application/ld+json']");
+    const raw = script?.textContent || "";
+
+    // The serialized JSON-LD must not contain a raw closing tag or raw '<'
+    // that could terminate the script element and inject live markup.
+    expect(raw.toLowerCase()).not.toContain("</script>");
+    expect(raw).not.toContain("<script");
+    expect(raw).not.toContain("<");
+    expect(raw).not.toContain(">");
+
+    // Escaping is lossless: parsing recovers the original title verbatim (the
+    // payload is inert data, not executable markup). `description` additionally
+    // passes through normalizeJobDescription, so it is HTML-stripped defense-in-depth.
+    const parsed = JSON.parse(raw) as { title: string; description: string };
+    expect(parsed.title).toBe(payload);
+    expect(typeof parsed.description).toBe("string");
+  });
+
   describe("§4.4 — validThrough = min(expiresAt, datePosted + 60 days)", () => {
     const POSTED = new Date("2026-03-01T00:00:00.000Z");
     const SIXTY_DAY_CAP = new Date(POSTED.getTime() + JSONLD_VALID_THROUGH_DAYS * 86_400_000);

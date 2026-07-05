@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { SubscriptionPlan } from "@prisma/client";
+import { resolvePlanFromStripePriceId } from "./billing/provider-catalog.js";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY?.trim() || "";
 
@@ -30,9 +31,18 @@ export function getStripe(): Stripe {
   return _stripe;
 }
 
-export function getPlanFromPriceId(priceId: string): SubscriptionPlan {
+/**
+ * Resolve a Stripe price id to a subscription plan.
+ *
+ * Checks the legacy per-price env vars first, then the regional price catalog
+ * (STRIPE_PRICE_CATALOG_JSON). Returns null when the price id is unrecognized —
+ * callers must NOT downgrade on null. Returning FREE here previously caused
+ * paying customers who checked out on a catalog/yearly price to be silently
+ * moved to FREE on the next customer.subscription.updated webhook.
+ */
+export function getPlanFromPriceId(priceId: string): SubscriptionPlan | null {
   for (const [plan, id] of Object.entries(STRIPE_PRICES)) {
-    if (id === priceId) return plan as SubscriptionPlan;
+    if (id && id === priceId) return plan as SubscriptionPlan;
   }
-  return SubscriptionPlan.FREE;
+  return resolvePlanFromStripePriceId(priceId);
 }

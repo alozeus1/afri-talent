@@ -111,7 +111,24 @@ export function JobJsonLd({ job }: JobJsonLdProps) {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
     />
   );
+}
+
+/**
+ * Serialize JSON-LD for embedding in a <script> tag. `JSON.stringify` does not
+ * escape `<`, `>`, or `&`, so employer- or aggregator-controlled fields (title,
+ * description, company name) could otherwise inject `</script><script>…` and
+ * execute arbitrary markup on the public job page. Escaping these to their
+ * `\uXXXX` forms keeps the output valid JSON while making script breakout and
+ * U+2028/U+2029 line-separator issues impossible.
+ */
+function serializeJsonLd(data: Record<string, unknown>): string {
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 }
