@@ -18,6 +18,7 @@ import {
 } from "@/lib/job-trust-labels";
 import { ReportJobButton } from "@/components/jobs/report-job-button";
 import { JobFitPanel } from "@/components/jobs/job-fit-panel";
+import { SaveJobButton } from "@/components/jobs/save-job-button";
 
 const AFRICA_STATUS_STYLES: Record<AfricaEligibilityStatus, { box: string; dot: string }> = {
   confirmed: {
@@ -300,7 +301,7 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                         Source: {job.sourceName ?? job.employer?.companyName ?? "Unknown"}
                         {dateLabel && ` · ${dateLabel}`}
                       </span>
-                      <ReportJobButton jobId={job.id} />
+                      <span className="flex items-center gap-3"><SaveJobButton jobId={job.id} /><ReportJobButton jobId={job.id} /></span>
                     </div>
                   </div>
                 );
