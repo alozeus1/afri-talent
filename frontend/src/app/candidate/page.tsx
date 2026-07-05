@@ -624,6 +624,7 @@ export default function CandidateDashboard() {
             { href: "/candidate/interview-prep", label: "My Interviews", desc: "Prep & practice" },
             { href: "/learning", label: "My Learning", desc: "Paths & progress" },
             { href: "/candidate/job-matches", label: "Job Matches", desc: "AI match scores" },
+            { href: "/candidate/saved-jobs", label: "Saved Jobs", desc: "Bookmarked roles" },
             { href: "/candidate/saved-searches", label: "Saved Searches", desc: "Alerts & filters" },
             { href: "/candidate/trust", label: "My Trust Profile", desc: "Verification status" },
             { href: "/candidate/preferences", label: "Settings", desc: "Alerts & privacy" },
