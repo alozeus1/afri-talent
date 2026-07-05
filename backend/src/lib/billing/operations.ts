@@ -564,7 +564,7 @@ async function compareRemoteSubscription(
     });
   }
 
-  if (remotePlan !== subscription.plan) {
+  if (remotePlan !== null && remotePlan !== subscription.plan) {
     mismatches += 1;
     await upsertBillingDiscrepancy({
       userId: subscription.userId,

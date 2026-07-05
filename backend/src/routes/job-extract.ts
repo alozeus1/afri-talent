@@ -16,6 +16,7 @@ import * as cheerio from "cheerio";
 import { authenticate, authorize } from "../middleware/auth.js";
 import logger from "../lib/logger.js";
 import { Role } from "@prisma/client";
+import { safePublicFetch, SsrfError } from "../lib/security/ssrf.js";
 
 const router = Router();
 
@@ -53,7 +54,7 @@ router.post(
 
       let html: string;
       try {
-        const response = await fetch(url, {
+        const response = await safePublicFetch(url, {
           signal: controller.signal,
           headers: {
             "User-Agent": "Mozilla/5.0 (compatible; AfriTalentBot/1.0; +https://afritalent.com)",
@@ -68,6 +69,12 @@ router.post(
         }
 
         html = await response.text();
+      } catch (fetchErr) {
+        if (fetchErr instanceof SsrfError) {
+          res.status(400).json({ error: "The provided URL is not allowed" });
+          return;
+        }
+        throw fetchErr;
       } finally {
         clearTimeout(timeout);
       }
