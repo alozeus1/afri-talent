@@ -761,6 +761,7 @@ model RegionConfig {
 // ──────────────── Existing Models ────────────────
 
 model User {
+  savedJobs SavedJob[] @relation("UserSavedJobs")
   id                       String                   @id @default(uuid())
   email                    String                   @unique
   password                 String                   @default("")
@@ -939,6 +940,7 @@ model EmployerTalentPoolCandidate {
 }
 
 model Job {
+  savedBy SavedJob[] @relation("JobSavedBy")
   id                 String         @id @default(uuid())
   title              String
   slug               String         @unique
@@ -3360,4 +3362,18 @@ model IdempotencyKey {
   @@unique([scope, key])
   @@index([scope, createdAt(sort: Desc)])
   @@index([expiresAt])
+}
+
+// Saved jobs — roadmap Phase 2/D. Plain user↔job bookmark; no cascade to Job
+// deletion is required because aggregated jobs expire rather than delete.
+model SavedJob {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation("UserSavedJobs", fields: [userId], references: [id], onDelete: Cascade)
+  jobId     String
+  job       Job      @relation("JobSavedBy", fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, jobId])
+  @@index([userId, createdAt(sort: Desc)])
 }
