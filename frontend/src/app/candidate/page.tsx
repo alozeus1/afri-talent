@@ -626,6 +626,7 @@ export default function CandidateDashboard() {
             { href: "/candidate/job-matches", label: "Job Matches", desc: "AI match scores" },
             { href: "/candidate/saved-jobs", label: "Saved Jobs", desc: "Bookmarked roles" },
             { href: "/candidate/saved-searches", label: "Saved Searches", desc: "Alerts & filters" },
+            { href: "/immigration", label: "Visa & Relocation", desc: "Readiness tracker" },
             { href: "/candidate/trust", label: "My Trust Profile", desc: "Verification status" },
             { href: "/candidate/preferences", label: "Settings", desc: "Alerts & privacy" },
           ].map((item) => (

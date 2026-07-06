@@ -288,7 +288,7 @@ export default function ImmigrationPage() {
   if (!user || (user.role !== "CANDIDATE" && user.role !== "ADMIN")) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-24 text-center">
-        <p className="text-gray-600">
+        <p className="text-gray-600 dark:text-gray-400">
           This page is available for candidates only. Please log in with a
           candidate account.
         </p>
@@ -301,20 +301,43 @@ export default function ImmigrationPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Header */}
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Immigration Visa Tracker
+      {/* Header — what this page is for and how to use it */}
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+          Visa &amp; Relocation Readiness
         </h1>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-          Track your visa application journey step by step. Start from a
-          template or create a custom process.
+        <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          Your personal tracker for the visa journey behind a job offer. Pick the
+          visa route you&apos;re pursuing, and AfriTalent gives you the full step-by-step
+          checklist for that country — mark each step as you complete it, keep your
+          documents list in one place, and always know exactly where you stand.
         </p>
+        <div className="mx-auto mt-6 grid max-w-3xl grid-cols-1 gap-3 text-left sm:grid-cols-3">
+          {[
+            { n: "1", t: "Pick your route", d: "Choose a visa template for your target country — or build a custom process." },
+            { n: "2", t: "Work the checklist", d: "Each route comes with its real-world steps and document requirements." },
+            { n: "3", t: "Track your status", d: "Update steps as you go: researching → documents → submitted → waiting → approved." },
+          ].map((s) => (
+            <div key={s.n} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950/50">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">{s.n}</span>
+              <p className="mt-2 text-sm font-semibold text-gray-900 dark:text-gray-100">{s.t}</p>
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{s.d}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Not legal advice — required framing */}
+      <div className="mb-12 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" role="note">
+        <strong>Informational only — not legal advice.</strong> Visa rules change
+        frequently and vary by nationality and circumstances. Always verify each
+        step against official government sources, and consult a qualified
+        immigration professional before making decisions.
       </div>
 
       {/* Visa Templates */}
       <section className="mb-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 dark:text-gray-100">
           Visa Templates
         </h2>
 
@@ -351,10 +374,10 @@ export default function ImmigrationPage() {
                 >
                   <CardContent className="p-6">
                     <span className="text-4xl mb-3 block">{info.emoji}</span>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">
+                    <h3 className="text-lg font-bold text-gray-900 mb-2 dark:text-gray-100">
                       {template.visaType}
                     </h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-gray-600 mb-4 dark:text-gray-400">
                       {info.description}
                     </p>
                     {template.steps.length > 0 && (
@@ -380,7 +403,7 @@ export default function ImmigrationPage() {
       {/* My Immigration Processes */}
       <section className="mb-12">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             My Immigration Processes
           </h2>
           <Button onClick={() => setShowCreateForm(true)}>
@@ -404,7 +427,7 @@ export default function ImmigrationPage() {
           <Card>
             <CardContent className="p-12 text-center">
               <p className="text-4xl mb-4">🌍</p>
-              <p className="text-gray-600 mb-2">
+              <p className="text-gray-600 mb-2 dark:text-gray-400">
                 Start tracking your visa application journey
               </p>
               <p className="text-sm text-gray-400 mb-6">
@@ -442,12 +465,12 @@ export default function ImmigrationPage() {
                     >
                       <div>
                         <div className="flex items-center gap-3 mb-1">
-                          <h3 className="text-lg font-semibold text-gray-900">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                             {process.visaType}
                           </h3>
                           {statusBadge(process.status)}
                         </div>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
                           Target: {process.targetCountry}
                           {process.startDate &&
                             ` · Started ${new Date(process.startDate).toLocaleDateString()}`}
@@ -456,8 +479,8 @@ export default function ImmigrationPage() {
                       <div className="flex items-center gap-4">
                         <div className="w-48">
                           <div className="flex items-center justify-between text-sm mb-1">
-                            <span className="text-gray-500">Progress</span>
-                            <span className="font-medium text-gray-900">
+                            <span className="text-gray-500 dark:text-gray-400">Progress</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">
                               {completedSteps}/{totalSteps}
                             </span>
                           </div>
@@ -478,7 +501,7 @@ export default function ImmigrationPage() {
                     {isExpanded && (
                       <div className="mt-6 pt-4 border-t border-gray-100">
                         {process.notes && (
-                          <p className="text-sm text-gray-500 mb-4 italic">
+                          <p className="text-sm text-gray-500 mb-4 italic dark:text-gray-400">
                             {process.notes}
                           </p>
                         )}
@@ -612,11 +635,11 @@ export default function ImmigrationPage() {
           <Card className="w-full max-w-lg mb-10">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                   Start New Process
                 </h2>
                 <button
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                  className="text-gray-400 hover:text-gray-600 text-2xl dark:text-gray-400"
                   onClick={() => {
                     setShowCreateForm(false);
                     setCreateError(null);
@@ -659,13 +682,13 @@ export default function ImmigrationPage() {
                 <div className="w-full">
                   <label
                     htmlFor="create-notes"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300"
                   >
                     Notes (optional)
                   </label>
                   <textarea
                     id="create-notes"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px] dark:border-zinc-700"
                     placeholder="Any notes about your process..."
                     value={createData.notes}
                     onChange={(e) =>
@@ -777,7 +800,7 @@ function StepRow({
           )}
         </div>
         {step.description && (
-          <p className="text-xs text-gray-500 mt-0.5">{step.description}</p>
+          <p className="text-xs text-gray-500 mt-0.5 dark:text-gray-400">{step.description}</p>
         )}
         <div className="flex flex-wrap items-center gap-3 mt-1">
           {step.dueDate && (
