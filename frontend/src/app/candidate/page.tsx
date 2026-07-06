@@ -92,6 +92,7 @@ const workspaceLinks: { href: string; label: string; desc: string; badge?: strin
   { href: "/immigration", label: "Visa & Relocation", desc: "Readiness tracker" },
   { href: "/candidate/trust", label: "My Trust Profile", desc: "Verification status" },
   { href: "/candidate/preferences", label: "Settings", desc: "Alerts & privacy" },
+  { href: "/candidate/settings", label: "Privacy & Data", desc: "Export or delete account" },
 ];
 
 function buildFallbackNextActions(params: {
