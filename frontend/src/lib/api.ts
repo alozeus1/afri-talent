@@ -3375,6 +3375,8 @@ export interface LearningResourceItem {
   isFree: boolean;
   imageUrl: string | null;
   featured: boolean;
+  /** Only on /recommended, and only when the candidate has profile skills: the skills this course covers that the candidate lacks. */
+  gapSkills?: string[];
 }
 
 export interface LearningListResponse {

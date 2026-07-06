@@ -303,7 +303,15 @@ router.get("/recommended", authenticate, authorize(Role.CANDIDATE), async (req: 
       return !resourceSkills.some((rs) => candidateSkills.includes(rs));
     });
 
-    res.json(recommended.slice(0, 10));
+    // Every remaining resource skill is one the candidate doesn't have — the gap it fills.
+    // The featured fallback above intentionally omits gapSkills: without profile
+    // skills we can't truthfully claim a gap.
+    res.json(
+      recommended.slice(0, 10).map((resource) => ({
+        ...resource,
+        gapSkills: resource.skills.filter((skill) => !candidateSkills.includes(skill.toLowerCase())),
+      })),
+    );
   } catch (error) {
     console.error("Recommended learning error:", error);
     res.status(500).json({ error: "Internal server error" });
