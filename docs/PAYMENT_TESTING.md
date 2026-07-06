@@ -33,11 +33,11 @@ When prompted, use **PIN `3310`** and **OTP `12345`**; expiry any future date.
 
 | Card number | Type | CVV |
 |---|---|---|
-| `5531 8866 5214 6950` | Mastercard ✅ | `564` |
-| `4187 4274 1556 4246` | Visa ✅ | `828` |
-| `5840 4062 5099 3823` | Mastercard (3DS/OTP) | `170` |
+| `4187 4274 1556 4246` | Visa ✅ (verified working in sandbox) | `828` |
 
-Full list: https://developer.flutterwave.com/docs/test-cards
+> The Mastercard number `5531 8866 5214 6950` that circulates in some guides **fails the Luhn check** and is rejected by the sandbox — use the Visa above, or copy a current Mastercard number straight from the official docs.
+
+Full list (authoritative — cards change): https://developer.flutterwave.com/docs/test-cards
 
 ---
 
