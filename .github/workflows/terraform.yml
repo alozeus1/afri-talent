@@ -197,6 +197,44 @@ jobs:
         if: steps.probe.outputs.present == 'true'
         run: terraform validate
 
+  validate-prod:
+    name: Terraform Validate (afritalent-prod)
+    runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    needs: [changes]
+    if: needs.changes.outputs.infra_changed == 'true'
+    defaults:
+      run:
+        working-directory: infra/terraform/accounts/afritalent-prod
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Skip if prod stack not yet wired
+        id: probe
+        shell: bash
+        run: |
+          if [ ! -f main.tf ] && [ ! -f versions.tf ]; then
+            echo "afritalent-prod account stack not present; skipping."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Terraform
+        if: steps.probe.outputs.present == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform init (no backend)
+        if: steps.probe.outputs.present == 'true'
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        if: steps.probe.outputs.present == 'true'
+        run: terraform validate
+
   plan-dev-new:
     name: Terraform Plan (dev-new)
     runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
