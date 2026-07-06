@@ -75,6 +75,25 @@ const planLabels: Record<string, string> = {
   PROFESSIONAL: "Professional",
 };
 
+// "My workspace" section map (roadmap Phase 2 IA + Workstream-C career tools)
+const workspaceLinks: { href: string; label: string; desc: string; badge?: string }[] = [
+  { href: "/candidate/resumes", label: "My Resume", desc: "Versions & health" },
+  { href: "/candidate/applications", label: "My Applications", desc: "Status & follow-ups" },
+  { href: "/candidate/interview-prep", label: "My Interviews", desc: "Prep & practice" },
+  { href: "/learning", label: "My Learning", desc: "Paths & progress" },
+  { href: "/candidate/job-matches", label: "Job Matches", desc: "AI match scores" },
+  { href: "/candidate/saved-jobs", label: "Saved Jobs", desc: "Bookmarked roles" },
+  { href: "/candidate/saved-searches", label: "Saved Searches", desc: "Alerts & filters" },
+  { href: "/candidate/calendar", label: "Calendar", desc: "Interviews & reminders" },
+  { href: "/candidate/career-gap", label: "Career Gap Explainer", desc: "Frame resume gaps" },
+  { href: "/candidate/career-advisor", label: "Career Advisor", desc: "AI career roadmap", badge: "Premium" },
+  { href: "/candidate/salary", label: "Salary Guide", desc: "Benchmarks & negotiation" },
+  { href: "/candidate/referrals", label: "Referrals", desc: "Invite & earn" },
+  { href: "/immigration", label: "Visa & Relocation", desc: "Readiness tracker" },
+  { href: "/candidate/trust", label: "My Trust Profile", desc: "Verification status" },
+  { href: "/candidate/preferences", label: "Settings", desc: "Alerts & privacy" },
+];
+
 function buildFallbackNextActions(params: {
   completeness: number;
   applicationCount: number;
@@ -618,24 +637,16 @@ export default function CandidateDashboard() {
       <div className="mb-10">
         <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">My workspace</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {[
-            { href: "/candidate/resumes", label: "My Resume", desc: "Versions & health" },
-            { href: "/candidate/applications", label: "My Applications", desc: "Status & follow-ups" },
-            { href: "/candidate/interview-prep", label: "My Interviews", desc: "Prep & practice" },
-            { href: "/learning", label: "My Learning", desc: "Paths & progress" },
-            { href: "/candidate/job-matches", label: "Job Matches", desc: "AI match scores" },
-            { href: "/candidate/saved-jobs", label: "Saved Jobs", desc: "Bookmarked roles" },
-            { href: "/candidate/saved-searches", label: "Saved Searches", desc: "Alerts & filters" },
-            { href: "/immigration", label: "Visa & Relocation", desc: "Readiness tracker" },
-            { href: "/candidate/trust", label: "My Trust Profile", desc: "Verification status" },
-            { href: "/candidate/preferences", label: "Settings", desc: "Alerts & privacy" },
-          ].map((item) => (
+          {workspaceLinks.map((item) => (
             <Link
               key={item.href}
               href={localizePath(item.href, locale)}
               className="rounded-xl border border-gray-200 bg-white p-4 transition hover:border-emerald-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-950/50 dark:hover:border-emerald-700"
             >
-              <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{item.label}</p>
+              <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm flex items-center gap-2">
+                {item.label}
+                {item.badge && <Badge variant="info">{item.badge}</Badge>}
+              </p>
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{item.desc}</p>
             </Link>
           ))}

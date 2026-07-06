@@ -3805,7 +3805,29 @@ export const skills = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  // Salary Benchmarks — cheap DB lookup, no AI call or quota
+  searchSalaryBenchmarks: (params: { role: string; country?: string; level?: string }) => {
+    const searchParams = new URLSearchParams({ role: params.role });
+    if (params.country) searchParams.set("country", params.country);
+    if (params.level) searchParams.set("level", params.level);
+    return fetchAPI<{ benchmarks: SalaryBenchmarkRow[] }>(
+      `/api/salary-benchmarks/search?${searchParams.toString()}`
+    );
+  },
 };
+
+export interface SalaryBenchmarkRow {
+  role: string;
+  level: string;
+  country: string;
+  currency: string;
+  salaryMin: number;
+  salaryMedian: number;
+  salaryMax: number;
+  sampleSize: number;
+  lastUpdated: string;
+}
 
 // ── Resume Templates ──────────────────────────────────────────────────────────
 
