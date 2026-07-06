@@ -25,18 +25,18 @@ sequences the gaps into phases. Companion to `STAGING_RUNBOOK.md` and
 | Admin | Reviews, moderation, blog approval, ops dashboards, feature flags via env |
 | Security | RBAC middleware, CSRF double-submit, rate limiting, bot protection, Gitleaks/Semgrep/Trivy in CI, audit events |
 
-### Known bugs (from 2026-07-02 UI test session)
+### Known bugs (from 2026-07-02 UI test session) — all resolved 2026-07-06
 | # | Bug | Severity | Status |
 |---|---|---|---|
-| B1 | Profile save fails with "CSRF token missing" — profile never updates | **Critical** | Fix in flight |
-| B2 | AI job matching / ATS / resume review appear broken for new users | High | Mostly plan-gating (PROFESSIONAL) surfaced as raw errors — needs friendly upgrade UX + real error separation |
-| B3 | No verification email on registration | High (config) | SES not configured on free-tier VM — needs `SES_FROM_EMAIL` + AWS creds in `.env`, or a fallback provider |
-| B4 | Dark mode: some text/CTAs invisible | Medium | Contrast audit pass needed |
-| B5 | Target country is free text | Medium | Country dropdown fix in flight |
-| B6 | Profile dates manual text entry | Medium | Native date/month pickers fix in flight |
-| B7 | Learning completion not reflected on landing card | Medium | Fix in flight |
-| B8 | Salary page role cards don't link to filtered jobs | Low | Fix in flight |
-| B9 | Visa page purpose unclear | Medium | Phase 6 redesign (tracker + checklist + disclaimer) |
+| B1 | Profile save fails with "CSRF token missing" | **Critical** | **Shipped** (#219/#220) — lazy CSRF seeding + retry, JSON and multipart |
+| B2 | AI features surfaced raw errors for plan-gated users | High | **Shipped** (#219/#220) — ApiError status/code, upgrade CTA, copy fixed |
+| B3 | No verification email on registration | High (config) | **Code shipped** (#219/#220) — skips now log loudly as `notification_delivery_skipped`; delivery still needs the SES setup in `deploy/free-tier/DEPLOYMENT_NOTES.md` |
+| B4 | Dark mode: invisible text/CTAs | Medium | **Shipped** (#219/#220 + #226) — profile, learning, job-matches, immigration |
+| B5 | Target country free text | Medium | **Shipped** (#219/#220 + #221) — dropdown storing ISO codes matching `Job.eligibleCountries` |
+| B6 | Profile dates manual entry | Medium | **Shipped** (#219/#220) — calendar month pickers, side-aware parsing |
+| B7 | Learning completion not reflected | Medium | **Shipped** (#219/#220) — featured cards show Complete/In-progress + Review |
+| B8 | Salary role cards didn't filter jobs | Low | **Shipped** (#219/#220) — `?query=` accepted as search alias |
+| B9 | Visa page purpose unclear | Medium | **Shipped** (#226) — readiness explainer, how-it-works, legal disclaimer |
 
 ### Risky / handle with care
 - Aggregated jobs' unknown fields must render "Not confirmed", never guesses.
@@ -56,16 +56,16 @@ sequences the gaps into phases. Companion to `STAGING_RUNBOOK.md` and
 
 ## 3. Phased roadmap
 
-**Phase 0 — Bug triage (now):** B1, B2 (UX layer), B5, B6, B7, B8 + dark-mode
+**Phase 0 — Bug triage — ✅ SHIPPED (#219/#220):** B1, B2 (UX layer), B5, B6, B7, B8 + dark-mode
 quick pass on the affected screens. Ship as one PR.
 
-**Phase 1 — Job data quality & trust labels:** user-facing label set
+**Phase 1 — Job data quality & trust labels — ✅ SHIPPED (#221; card-level pills remain):** user-facing label set
 (Verified employer / Salary available / Recently refreshed / External source /
 Possible duplicate / Needs review), explicit "Unknown/Not confirmed"
 rendering, expired/duplicate surfacing. Mostly *display* work — the metadata
 already exists on `Job`.
 
-**Phase 2 — Job detail page + "Can I apply from Africa?":** dedicated section
+**Phase 2 — Job detail page + "Can I apply from Africa?" — ✅ LARGELY SHIPPED (#221 verdict/report, #222 fit panel + workspace, #225 saved jobs; sticky apply bar remains):** dedicated section
 computing Confirmed / Possibly / Not confirmed / Region-restricted from
 `hiresFromAfrica`, `eligibleCountries`, `visaSponsorship`, `workplaceType`;
 sticky apply/save bar; report-suspicious-job button (route exists in trust
@@ -86,7 +86,7 @@ server-side (new `LearningProgress` model), gap→course mapping fed by match
 results ("missing Kubernetes → do this lab first"), admin-managed content via
 Resource CMS categories.
 
-**Phase 6 — Visa & relocation readiness:** informational tracker (statuses:
+**Phase 6 — Visa & relocation readiness — ✅ SHIPPED (#226, clarity pass on existing tracker; reminders/statuses vocabulary remain):** informational tracker (statuses:
 Not started → Researching → Sponsorship confirmed → Documents → Submitted →
 Waiting → Approved/Rejected/Closed), document checklist, reminders via
 existing notification system, country notes, prominent not-legal-advice
@@ -120,3 +120,50 @@ RBAC on every new route; candidate data visible to employers only after an
 application or explicit consent; resumes via signed URLs only; AI outputs
 logged with PII controls; deletion/export honored; no legal advice framing on
 visa content.
+
+
+## Verification Report — cycle closed 2026-07-06
+
+**Shipped (all squash-merged to `main`, Vercel auto-deployed):**
+| PR | Contents |
+|---|---|
+| #219/#220 | Bug-bash round 1 (B1–B8 fixes) + this roadmap |
+| #221 | Phase 1: truth-first trust labels, "Can I apply from Africa?" verdict, report-suspicious-job, ISO-code country picker |
+| #222 | Phase 2: deterministic job-fit panel, dashboard "My workspace" map |
+| #225 | Saved jobs end-to-end — `SavedJob` model + migration, `/api/saved-jobs`, save toggle, `/candidate/saved-jobs` |
+| #226 | Phase 6: visa readiness explainer, legal disclaimer, dark-mode pass, dashboard entry |
+
+**Tested:** backend + frontend `tsc --noEmit` clean on every PR; 112+ Jest
+tests (14 new for trust labels/verdicts); ESLint clean; full CI green on the
+final head of each PR (incl. Playwright E2E + Lighthouse); Codex review
+findings fixed and resolved on #220/#221 (multipart CSRF retry, period-parse
+side handling, ISO country codes).
+
+**Screens affected:** job detail, jobs list/filters, candidate dashboard,
+candidate profile, learning, job matches, salaries, immigration,
+`/candidate/saved-jobs` (new).
+
+**Remains:** Phases 3–5 and 7–9 (resume-health surface, interview-prep
+expansion, server-side learning progress, company trust pages, content
+engine, admin consolidation); Phase 1 card pills; Phase 2 sticky apply bar.
+
+**Risks / operational notes:**
+- GitHub Actions intermittently dropped `pull_request` webhook events during
+  the cycle (#218/#220/#221) — worked around with amend+force-push; check
+  repo Settings → Webhooks if it recurs.
+- Codex is out of review credits — no automated review on #222/#225/#226.
+- **VM action required** to complete the cycle: sync + restart applies the
+  SavedJob migration and backend fixes (`git pull` → backend `npm ci &&
+  npx prisma generate && npm run build` → `native-backend-stop.sh &&
+  native-backend-start.sh`).
+- B3 email delivery still needs the SES setup (DEPLOYMENT_NOTES.md).
+
+**Live smoke checklist (acceptance for this cycle):** save/unsave a job and
+check `/candidate/saved-jobs`; open a job detail — verdict card, fit panel,
+trust labels, save + report buttons; `/immigration` explainer + disclaimer;
+dashboard workspace grid; dark-mode on profile/learning/matches; profile
+save round-trips.
+
+**Recommended next phase:** Phase 5 — persist learning progress server-side
+and map job-match skill gaps to course recommendations; then Phase 1 card
+pills; then Phase 7 company trust pages.
