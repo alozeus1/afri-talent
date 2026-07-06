@@ -2,22 +2,36 @@ import pino from "pino";
 
 const isProduction = process.env.NODE_ENV === "production";
 
+// Redacted key paths. Pino wildcards only match one level deep, so both the
+// bare key and the `*.` form are listed for every sensitive field. Phone/OTP
+// keys are included so notification payloads and SMS-provider errors can
+// never leak them, even from a future stray log call.
+export const redactPaths = [
+  "req.headers.authorization",
+  "req.headers.cookie",
+  "password",
+  "*.password",
+  "token",
+  "*.token",
+  "secret",
+  "*.secret",
+  "phone",
+  "*.phone",
+  "phoneNumber",
+  "*.phoneNumber",
+  "otp",
+  "*.otp",
+  "otpCode",
+  "*.otpCode",
+];
+
 // Configure Pino logger
 export const logger = pino({
   level: process.env.LOG_LEVEL || (isProduction ? "info" : "debug"),
-  
+
   // Redact sensitive fields
   redact: {
-    paths: [
-      "req.headers.authorization",
-      "req.headers.cookie",
-      "password",
-      "*.password",
-      "token",
-      "*.token",
-      "secret",
-      "*.secret",
-    ],
+    paths: redactPaths,
     censor: "[REDACTED]",
   },
 
