@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { skills } from "@/lib/api";
+import { skills, SalaryBenchmarkRow } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ export default function SalaryPage() {
   const [currentSalary, setCurrentSalary] = useState("");
   const [targetSalary, setTargetSalary] = useState("");
   const [result, setResult] = useState<NegotiationResult | null>(null);
+  const [benchmarks, setBenchmarks] = useState<SalaryBenchmarkRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -45,6 +46,15 @@ export default function SalaryPage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setBenchmarks([]);
+
+    // Market data lookup — cheap DB read, no quota. Fails silently: the
+    // benchmark section is simply omitted when there is no data.
+    skills
+      .searchSalaryBenchmarks({ role: role.trim() })
+      .then((data) => setBenchmarks(data.benchmarks))
+      .catch(() => setBenchmarks([]));
+
     try {
       const data = await skills.getSalaryNegotiation({
         role: role.trim(),
@@ -77,6 +87,7 @@ export default function SalaryPage() {
     setCurrentSalary("");
     setTargetSalary("");
     setResult(null);
+    setBenchmarks([]);
     setError(null);
     setCopied(false);
   }
@@ -242,6 +253,54 @@ export default function SalaryPage() {
                 </p>
               </CardContent>
             </Card>
+
+            {/* Market Data — shown only when benchmark rows exist */}
+            {benchmarks.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-semibold text-gray-900">Market Data</h2>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Salary benchmarks matching &quot;{role}&quot; from our database
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+                          <th className="py-2 pr-4 font-medium">Role</th>
+                          <th className="py-2 pr-4 font-medium">Level</th>
+                          <th className="py-2 pr-4 font-medium">Country</th>
+                          <th className="py-2 pr-4 font-medium">Min</th>
+                          <th className="py-2 pr-4 font-medium">Median</th>
+                          <th className="py-2 pr-4 font-medium">Max</th>
+                          <th className="py-2 font-medium">Sample</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {benchmarks.map((row, i) => (
+                          <tr key={i} className="border-b border-gray-100 text-gray-700">
+                            <td className="py-2 pr-4">{row.role}</td>
+                            <td className="py-2 pr-4 capitalize">{row.level}</td>
+                            <td className="py-2 pr-4">{row.country}</td>
+                            <td className="py-2 pr-4">
+                              {row.currency} {row.salaryMin.toLocaleString()}
+                            </td>
+                            <td className="py-2 pr-4 font-semibold text-gray-900">
+                              {row.currency} {row.salaryMedian.toLocaleString()}
+                            </td>
+                            <td className="py-2 pr-4">
+                              {row.currency} {row.salaryMax.toLocaleString()}
+                            </td>
+                            <td className="py-2 text-gray-500">{row.sampleSize}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Talking Points */}
             <Card>
