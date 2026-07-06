@@ -88,6 +88,21 @@ async function releaseEventId(provider: BillingProvider, eventId: string): Promi
   }
 }
 
+/**
+ * Flutterwave returns `card.country` as values like "NIGERIA NG" (country name +
+ * ISO code), but UserBillingProfile.country/stripeCountry are VARCHAR(2) ISO
+ * alpha-2. Persisting the raw value overflows the column and makes the webhook
+ * fail — leaving a paid customer un-activated. Extract the 2-letter code (or
+ * null) so activation is never blocked by the country string.
+ */
+export function normalizeCardCountry(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const upper = value.trim().toUpperCase();
+  if (/^[A-Z]{2}$/.test(upper)) return upper;
+  const codes = upper.split(/[^A-Z]+/).filter((token) => /^[A-Z]{2}$/.test(token));
+  return codes.length > 0 ? codes[codes.length - 1] : null;
+}
+
 async function activateFlutterwaveSubscription(input: {
   userId: string;
   plan: SubscriptionPlan;
@@ -356,7 +371,7 @@ router.post("/flutterwave", async (req: Request, res: Response) => {
           billingRegion: (checkoutMetadata.billingRegion as "AFRICA" | "EUROPE" | "ROW" | null) ?? "AFRICA",
           customerEmail,
           customerId: verified.customer?.id ? String(verified.customer.id) : null,
-          cardCountry: typeof card.country === "string" ? card.country : null,
+          cardCountry: normalizeCardCountry(card.country),
           rawPayload: payload as Prisma.InputJsonValue,
         });
       } else {
