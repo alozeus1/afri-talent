@@ -1,6 +1,6 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: July 2, 2026 (blog automation hardening + LangGraph blog wiring)
+Last updated: July 6, 2026 (product improvement cycle #219–#226 closed)
 
 > [!IMPORTANT]
 > **Architecture changed on 2026-05-10.** The shared environment has moved off
@@ -8,6 +8,22 @@ Last updated: July 2, 2026 (blog automation hardening + LangGraph blog wiring)
 > Serverless v2 + Lambda + CloudFront/WAF in the new AWS account `108188564905`.
 > Anything below that references `*.awsapprunner.com`, `afritalent-staging-*`
 > AWS resources, or the old account ID is historical and no longer live.
+
+## Update on July 6, 2026: Product improvement cycle closed (PRs #219–#226)
+
+Bug-bash + roadmap Phases 0/1/2(partial)/6 all merged to `main` and
+auto-deployed to Vercel. Full verification report:
+`docs/product-roadmap-2026H2.md` §"Verification Report — cycle closed
+2026-07-06". Highlights: CSRF save fix, trust labels + "Can I apply from
+Africa?" verdict, job-fit panel, saved jobs (**includes a DB migration**),
+visa readiness redesign.
+
+**Pending free-tier VM action:** sync + restart to apply the `SavedJob`
+migration and backend fixes — on the VM:
+`git pull` → `cd backend && npm ci && npx prisma generate && npm run build`
+→ `cd ../deploy/free-tier/native && ./native-backend-stop.sh &&
+./native-backend-start.sh` (start script runs `prisma migrate deploy`).
+Also still pending: SES email setup (see DEPLOYMENT_NOTES.md).
 
 ## Update on July 2, 2026: Blog automation hardening (code-only, no live changes)
 
