@@ -41,7 +41,10 @@ export function validateRuntimeEnv(): void {
       requireEnv("FLUTTERWAVE_SECRET_HASH");
     }
     requireEnv("ANTHROPIC_API_KEY");
-    requireEnv("SENTRY_DSN");
+    // SENTRY_DSN is optional — initSentry() disables itself when absent.
+    if (!process.env.SENTRY_DSN?.trim()) {
+      console.warn("[env] SENTRY_DSN not set — Sentry error tracking disabled");
+    }
 
     // M5 — if provider price catalogs are configured, they must be
     // well-formed (valid JSON, PLAN:REGION:INTERVAL:CURRENCY keys, non-empty
