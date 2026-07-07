@@ -1546,6 +1546,7 @@ export interface Job {
   rankingExplanation?: JobRankingExplanation;
   sourceLineage?: JobSourceLineageItem[];
   employer: {
+    id?: string;
     companyName: string;
     location: string;
     website?: string | null;

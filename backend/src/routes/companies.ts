@@ -6,6 +6,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { authenticate, authorize } from "../middleware/auth.js";
 import prisma from "../lib/prisma.js";
+import { employerBadgeLabel } from "../lib/trust/risk.js";
 
 const router = Router();
 
@@ -80,11 +81,27 @@ router.get("/", async (req, res) => {
       }),
     ]);
 
+    // Truth-first: only claim an employer hires from Africa when at least one
+    // of its published jobs actually does.
+    const africaGroups = employers.length
+      ? await prisma.job.groupBy({
+          by: ["employerId"],
+          where: {
+            employerId: { in: employers.map((e) => e.id) },
+            status: "PUBLISHED",
+            hiresFromAfrica: true,
+          },
+          _count: { _all: true },
+        })
+      : [];
+    const africaEmployerIds = new Set(africaGroups.map((g) => g.employerId));
+
     const normalizedCompanies = companies.map((company) => ({
       ...company,
       companyName: company.name,
       headquarters: company.headquarters,
       verified: Boolean(company.verifiedAt),
+      trustBadge: null,
       profileType: "COMPANY" as const,
       jobCount: 0,
     }));
@@ -96,8 +113,11 @@ router.get("/", async (req, res) => {
       headquarters: employer.location,
       website: employer.website,
       size: null,
-      hiresFromAfrica: true,
+      hiresFromAfrica: africaEmployerIds.has(employer.id),
       verified: Boolean(employer.trustProfile?.postingEligibility),
+      trustBadge: employer.trustProfile
+        ? employerBadgeLabel(employer.trustProfile.verificationLevel)
+        : "Unverified employer",
       ratingAggregate: null,
       profileType: "EMPLOYER" as const,
       jobCount: employer._count.jobs,
@@ -172,6 +192,10 @@ router.get("/:id", async (req, res) => {
         return res.status(404).json({ error: "Company not found" });
       }
 
+      const africaJobCount = await prisma.job.count({
+        where: { employerId: employer.id, status: "PUBLISHED", hiresFromAfrica: true },
+      });
+
       return res.json({
         company: {
           id: employer.id,
@@ -180,9 +204,13 @@ router.get("/:id", async (req, res) => {
           industry: null,
           headquarters: employer.location,
           website: employer.website,
+          bio: employer.bio,
           size: null,
-          hiresFromAfrica: true,
+          hiresFromAfrica: africaJobCount > 0,
           verified: Boolean(employer.trustProfile?.postingEligibility),
+          trustBadge: employer.trustProfile
+            ? employerBadgeLabel(employer.trustProfile.verificationLevel)
+            : "Unverified employer",
           ratingAggregate: null,
           reviews: [],
           jobCount: employer._count.jobs,
@@ -205,7 +233,17 @@ router.get("/:id", async (req, res) => {
       },
     });
 
-    res.json({ company: { ...company, jobCount } });
+    res.json({
+      company: {
+        ...company,
+        companyName: company.name,
+        bio: company.description,
+        logoUrl: company.logo,
+        trustBadge: null,
+        profileType: "COMPANY",
+        jobCount,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch company" });
   }

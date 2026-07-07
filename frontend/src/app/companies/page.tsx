@@ -23,9 +23,10 @@ interface Company {
   jobCount?: number;
   logoUrl?: string | null;
   brandColor?: string | null;
+  trustBadge?: string | null;
   ratingAggregate: {
-    averageOverall: number;
-    reviewCount: number;
+    averageOverall: number | null;
+    totalReviews: number;
   } | null;
 }
 
@@ -246,12 +247,13 @@ export default function CompaniesPage() {
                         </p>
                       )}
 
-                      {company.ratingAggregate && company.ratingAggregate.reviewCount > 0 && (
+                      {company.ratingAggregate && company.ratingAggregate.totalReviews > 0 &&
+                        company.ratingAggregate.averageOverall != null && (
                         <div className="mb-3">
                           <StarRating rating={company.ratingAggregate.averageOverall} />
                           <p className="text-xs text-gray-500 mt-1">
-                            {company.ratingAggregate.reviewCount} review
-                            {company.ratingAggregate.reviewCount !== 1 ? "s" : ""}
+                            {company.ratingAggregate.totalReviews} review
+                            {company.ratingAggregate.totalReviews !== 1 ? "s" : ""}
                           </p>
                         </div>
                       )}
@@ -261,7 +263,7 @@ export default function CompaniesPage() {
                           <Badge variant="success">Hires from Africa</Badge>
                         )}
                         {company.profileType === "EMPLOYER" && (
-                          <Badge variant="info">Registered employer</Badge>
+                          <Badge variant="info">{company.trustBadge ?? "Registered employer"}</Badge>
                         )}
                         {(company.jobCount ?? 0) > 0 && (
                           <Badge>{company.jobCount} open role{company.jobCount === 1 ? "" : "s"}</Badge>

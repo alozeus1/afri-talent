@@ -143,6 +143,7 @@ const DUMMY_JOB = {
     employerId: "emp123",
     status: "PUBLISHED",
     employer: {
+        id: "emp123",
         companyName: "TechCorp",
         location: "Lagos",
         createdAt: new Date(),
@@ -258,6 +259,8 @@ describe("Jobs API", () => {
             expect(res.status).toBe(200);
             expect(res.body.id).toBe("job123");
             expect(res.body.slug).toBe("frontend-engineer-123");
+            // employer.id powers the job-detail -> company-page link
+            expect(res.body.employer.id).toBe("emp123");
         });
 
         it("returns 200 with emitNoJsonLd flag for expired jobs (§4.4 default)", async () => {
