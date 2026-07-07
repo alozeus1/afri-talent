@@ -291,6 +291,7 @@ export interface SavedJobItem {
     workplaceType: string | null; salaryMin: number | null; salaryMax: number | null;
     currency: string | null; hiresFromAfrica: boolean; isExpired: boolean;
     publishedAt: string | null; sourceName: string | null;
+    eligibleCountries?: string[]; visaSponsorship?: "YES" | "NO" | "UNKNOWN";
     employer: { companyName: string } | null;
   };
 }
@@ -1545,6 +1546,7 @@ export interface Job {
   rankingExplanation?: JobRankingExplanation;
   sourceLineage?: JobSourceLineageItem[];
   employer: {
+    id?: string;
     companyName: string;
     location: string;
     website?: string | null;

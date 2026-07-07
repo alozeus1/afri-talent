@@ -141,7 +141,13 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                 <div>
                   <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 dark:text-gray-100">{job.title}</h1>
                   <p className="text-emerald-600 font-semibold text-lg">
-                    {job.employer?.companyName || job.sourceName || "Company"}
+                    {job.employer?.id ? (
+                      <Link href={`/companies/${job.employer.id}`} className="hover:underline">
+                        {job.employer.companyName}
+                      </Link>
+                    ) : (
+                      job.employer?.companyName || job.sourceName || "Company"
+                    )}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {job.employer?.trust && (

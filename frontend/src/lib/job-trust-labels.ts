@@ -47,6 +47,24 @@ export function deriveJobTrustLabels(job: Job): JobTrustLabel[] {
   return labels;
 }
 
+// Compact Africa-eligibility pill for dense list cards. Returns null when the
+// card already carries the "Hires from Africa" badge (avoids duplication) and
+// for not_confirmed (no pill makes no claim; the detail page shows the full
+// verdict).
+export function africaPill(job: Job): JobTrustLabel | null {
+  if (job.hiresFromAfrica) return null;
+  switch (africaEligibility(job).status) {
+    case "confirmed":
+      return { label: "Open to Africa", variant: "success" };
+    case "possible":
+      return { label: "Possibly open to Africa", variant: "info" };
+    case "restricted":
+      return { label: "Region-restricted", variant: "warning" };
+    default:
+      return null;
+  }
+}
+
 export type AfricaEligibilityStatus =
   | "confirmed"
   | "possible"

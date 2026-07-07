@@ -6,6 +6,7 @@ import { Job } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrustBadge } from "@/components/trust/trust-badge";
+import { africaPill } from "@/lib/job-trust-labels";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { formatSalaryRange } from "@/lib/salary";
 import { jobDiscoveryEvents } from "@/lib/analytics";
@@ -28,6 +29,7 @@ export function JobCard({ job }: JobCardProps) {
     salaryPeriod: job.salaryPeriod,
   });
   const freshnessLabel = job.discovery?.freshnessLabel?.toLowerCase() ?? null;
+  const africa = africaPill(job);
   const discoverySummary = job.rankingExplanation?.summary || job.trust?.guidance;
   // Use ISO date (YYYY-MM-DD) to keep server and client output identical and avoid
   // React hydration mismatches caused by locale-sensitive formatters.
@@ -93,6 +95,17 @@ export function JobCard({ job }: JobCardProps) {
                   >
                     <TrustBadge label="Hires from Africa" variant="success" />
                   </Coachmark>
+                )}
+                {africa && (
+                  <TrustBadge
+                    label={africa.label}
+                    variant={africa.variant === "default" ? "info" : africa.variant}
+                  />
+                )}
+                {job.isExpired && (
+                  <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-900/30 dark:text-red-300">
+                    Expired
+                  </span>
                 )}
                 {job.trust?.companyReviewed && (
                   <TrustBadge label="Company reviewed" variant="info" />

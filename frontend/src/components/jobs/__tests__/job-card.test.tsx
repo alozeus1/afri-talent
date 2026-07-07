@@ -112,4 +112,21 @@ describe("JobCard", () => {
       "/en/jobs/senior-backend-engineer",
     );
   });
+
+  it("shows the Africa-eligibility pill when confirmed via eligible countries", () => {
+    render(<JobCard job={job} />);
+    expect(screen.getByText("Open to Africa")).toBeInTheDocument();
+  });
+
+  it("suppresses the Africa pill when the Hires from Africa badge already renders", () => {
+    render(<JobCard job={{ ...job, hiresFromAfrica: true }} />);
+    expect(screen.getByText("Hires from Africa")).toBeInTheDocument();
+    expect(screen.queryByText("Open to Africa")).not.toBeInTheDocument();
+  });
+
+  it("shows Region-restricted and Expired pills", () => {
+    render(<JobCard job={{ ...job, eligibleCountries: ["DE", "US"], isExpired: true }} />);
+    expect(screen.getByText("Region-restricted")).toBeInTheDocument();
+    expect(screen.getByText("Expired")).toBeInTheDocument();
+  });
 });

@@ -4,7 +4,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { savedJobs, SavedJobItem } from "@/lib/api";
+import { savedJobs, SavedJobItem, Job } from "@/lib/api";
+import { africaPill } from "@/lib/job-trust-labels";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,6 +76,10 @@ export default function SavedJobsPage() {
                       <span>·</span>
                       <span>{item.job.type}</span>
                       {item.job.hiresFromAfrica && <Badge variant="success">Hires from Africa</Badge>}
+                      {(() => {
+                        const pill = africaPill(item.job as unknown as Job);
+                        return pill ? <Badge variant={pill.variant}>{pill.label}</Badge> : null;
+                      })()}
                       {item.job.isExpired && <Badge variant="warning">Expired</Badge>}
                     </div>
                   </div>

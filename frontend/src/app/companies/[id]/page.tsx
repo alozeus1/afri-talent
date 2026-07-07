@@ -12,13 +12,13 @@ import { Input } from "@/components/ui/input";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 interface CompanyRatingAggregate {
-  averageOverall: number;
-  averageCulture: number;
-  averageSalary: number;
-  averageWorkLife: number;
-  averageManagement: number;
-  averageGrowth: number;
-  reviewCount: number;
+  averageOverall: number | null;
+  averageCulture: number | null;
+  averageSalary: number | null;
+  averageWorkLife: number | null;
+  averageManagement: number | null;
+  averageGrowth: number | null;
+  totalReviews: number;
 }
 
 interface CompanyReview {
@@ -45,7 +45,8 @@ interface CompanyDetail {
   bio: string | null;
   hiresFromAfrica: boolean;
   verified: boolean;
-  visaTrustScore: number | null;
+  trustBadge?: string | null;
+  sponsorshipTrustScore?: number | null;
   ratingAggregate: CompanyRatingAggregate | null;
   reviews: CompanyReview[];
 }
@@ -123,8 +124,8 @@ export default function CompanyDetailPage() {
           credentials: "include",
         });
         if (!res.ok) throw new Error("Failed to load company");
-        const json: CompanyDetail = await res.json();
-        setCompany(json);
+        const json: { company: CompanyDetail } = await res.json();
+        setCompany(json.company);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load company");
       } finally {
@@ -155,7 +156,8 @@ export default function CompanyDetailPage() {
         credentials: "include",
       });
       if (updated.ok) {
-        setCompany(await updated.json());
+        const json: { company: CompanyDetail } = await updated.json();
+        setCompany(json.company);
       }
       setShowReviewForm(false);
       setReviewForm({
@@ -211,8 +213,14 @@ export default function CompanyDetailPage() {
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold text-gray-900">{company.companyName}</h1>
-                {company.verified && <Badge variant="info">Verified</Badge>}
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{company.companyName}</h1>
+                {company.trustBadge ? (
+                  <Badge variant={company.trustBadge === "Unverified employer" ? "default" : "info"}>
+                    {company.trustBadge}
+                  </Badge>
+                ) : (
+                  company.verified && <Badge variant="info">Verified</Badge>
+                )}
               </div>
               {company.industry && (
                 <p className="text-gray-600 mb-1">{company.industry}</p>
@@ -231,17 +239,21 @@ export default function CompanyDetailPage() {
                   {company.website}
                 </a>
               )}
-              {company.bio && (
-                <p className="text-gray-600 mt-3">{company.bio}</p>
+              {company.bio ? (
+                <p className="text-gray-600 mt-3 dark:text-gray-400">{company.bio}</p>
+              ) : (
+                <p className="text-gray-400 text-sm mt-3 dark:text-gray-500">
+                  About this company: not enough verified data yet.
+                </p>
               )}
             </div>
             <div className="flex flex-wrap gap-2 sm:flex-col sm:items-end">
               {company.hiresFromAfrica && (
                 <Badge variant="success">Hires from Africa</Badge>
               )}
-              {company.visaTrustScore != null && company.visaTrustScore > 0 && (
+              {company.sponsorshipTrustScore != null && company.sponsorshipTrustScore > 0 && (
                 <Badge variant="info">
-                  Visa Trust Score: {company.visaTrustScore}/10
+                  Sponsorship trust score: {company.sponsorshipTrustScore}/10
                 </Badge>
               )}
             </div>
@@ -257,33 +269,35 @@ export default function CompanyDetailPage() {
               <h2 className="text-lg font-semibold text-gray-900">Ratings</h2>
             </CardHeader>
             <CardContent>
-              {ratings && ratings.reviewCount > 0 ? (
+              {ratings && ratings.totalReviews > 0 && ratings.averageOverall != null ? (
                 <div className="space-y-4">
                   <div className="text-center mb-4">
-                    <div className="text-4xl font-bold text-gray-900 mb-1">
+                    <div className="text-4xl font-bold text-gray-900 mb-1 dark:text-gray-100">
                       {ratings.averageOverall.toFixed(1)}
                     </div>
                     <StarRating rating={ratings.averageOverall} />
                     <p className="text-sm text-gray-500 mt-1">
-                      {ratings.reviewCount} review{ratings.reviewCount !== 1 ? "s" : ""}
+                      {ratings.totalReviews} review{ratings.totalReviews !== 1 ? "s" : ""}
                     </p>
                   </div>
                   <div className="space-y-3">
-                    <RatingBar label="Culture" value={ratings.averageCulture} />
-                    <RatingBar label="Salary" value={ratings.averageSalary} />
-                    <RatingBar label="Work-Life" value={ratings.averageWorkLife} />
-                    <RatingBar label="Management" value={ratings.averageManagement} />
-                    <RatingBar label="Growth" value={ratings.averageGrowth} />
+                    {ratings.averageCulture != null && <RatingBar label="Culture" value={ratings.averageCulture} />}
+                    {ratings.averageSalary != null && <RatingBar label="Salary" value={ratings.averageSalary} />}
+                    {ratings.averageWorkLife != null && <RatingBar label="Work-Life" value={ratings.averageWorkLife} />}
+                    {ratings.averageManagement != null && <RatingBar label="Management" value={ratings.averageManagement} />}
+                    {ratings.averageGrowth != null && <RatingBar label="Growth" value={ratings.averageGrowth} />}
                   </div>
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-4">No reviews yet</p>
+                <p className="text-gray-500 text-center py-4">
+                  Not enough verified data yet — no approved reviews so far.
+                </p>
               )}
             </CardContent>
           </Card>
 
           <div className="mt-6">
-            <Link href={`/jobs?company=${company.id}`}>
+            <Link href={`/jobs?query=${encodeURIComponent(company.companyName)}`}>
               <Button variant="outline" className="w-full">
                 View Jobs by {company.companyName}
               </Button>
@@ -416,7 +430,7 @@ export default function CompanyDetailPage() {
               {company.reviews.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-500">
-                    No reviews yet. Be the first to share your experience!
+                    No verified reviews yet. Be the first to share your experience!
                   </p>
                 </div>
               ) : (

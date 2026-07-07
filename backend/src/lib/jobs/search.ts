@@ -37,6 +37,7 @@ export interface JobSearchFilters {
 export const publicJobInclude = Prisma.validator<Prisma.JobInclude>()({
   employer: {
     select: {
+      id: true,
       companyName: true,
       location: true,
       website: true,
