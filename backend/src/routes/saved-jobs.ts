@@ -34,6 +34,7 @@ router.get("/", async (req: Request, res: Response) => {
             id: true, title: true, slug: true, location: true, type: true,
             workplaceType: true, salaryMin: true, salaryMax: true, currency: true,
             hiresFromAfrica: true, isExpired: true, publishedAt: true,
+            eligibleCountries: true, visaSponsorship: true,
             sourceName: true, employer: { select: { companyName: true } },
           },
         },

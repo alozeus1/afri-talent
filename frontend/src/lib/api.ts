@@ -291,6 +291,7 @@ export interface SavedJobItem {
     workplaceType: string | null; salaryMin: number | null; salaryMax: number | null;
     currency: string | null; hiresFromAfrica: boolean; isExpired: boolean;
     publishedAt: string | null; sourceName: string | null;
+    eligibleCountries?: string[]; visaSponsorship?: "YES" | "NO" | "UNKNOWN";
     employer: { companyName: string } | null;
   };
 }

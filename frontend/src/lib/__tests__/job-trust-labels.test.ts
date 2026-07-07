@@ -1,4 +1,4 @@
-import { africaEligibility, deriveJobTrustLabels } from "@/lib/job-trust-labels";
+import { africaEligibility, africaPill, deriveJobTrustLabels } from "@/lib/job-trust-labels";
 import type { Job } from "@/lib/api";
 
 const baseJob = {
@@ -57,6 +57,32 @@ describe("africaEligibility", () => {
     const verdict = africaEligibility({ ...baseJob, location: "London" });
     expect(verdict.status).toBe("not_confirmed");
     expect(verdict.headline).toBe("Not confirmed");
+  });
+});
+
+describe("africaPill", () => {
+  it("returns null when hiresFromAfrica is set — the card already shows that badge", () => {
+    expect(africaPill({ ...baseJob, hiresFromAfrica: true })).toBeNull();
+    expect(africaPill({ ...baseJob, hiresFromAfrica: true, eligibleCountries: ["NG"] })).toBeNull();
+  });
+
+  it("shows Open to Africa when confirmed via eligible countries", () => {
+    const pill = africaPill({ ...baseJob, location: "Lagos", eligibleCountries: ["NG"] });
+    expect(pill).toEqual({ label: "Open to Africa", variant: "success" });
+  });
+
+  it("shows Possibly open for remote listings with unstated eligibility", () => {
+    const pill = africaPill({ ...baseJob, workplaceType: "remote" });
+    expect(pill).toEqual({ label: "Possibly open to Africa", variant: "info" });
+  });
+
+  it("warns on region-restricted listings", () => {
+    const pill = africaPill({ ...baseJob, location: "Berlin", eligibleCountries: ["DE", "US"] });
+    expect(pill).toEqual({ label: "Region-restricted", variant: "warning" });
+  });
+
+  it("returns null for not_confirmed — a dense card should make no claim", () => {
+    expect(africaPill({ ...baseJob, location: "London" })).toBeNull();
   });
 });
 
