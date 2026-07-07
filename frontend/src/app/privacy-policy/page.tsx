@@ -26,6 +26,7 @@ export default function PrivacyPolicyPage() {
           <p><strong>Information you provide:</strong> Name, email address, resume content, employment history, skills, and other profile information you choose to submit.</p>
           <p className="mt-2"><strong>Automatically collected:</strong> Log data including IP address, browser type, pages visited, and session duration. We do not log raw resume or job description text in our application logs.</p>
           <p className="mt-2"><strong>AI-processed data:</strong> When you use our AI Assistant, your resume and job descriptions are processed by Claude (Anthropic) to generate match scores and tailored materials. We store structured outputs in our database — not raw text.</p>
+          <p className="mt-2"><strong>Product analytics:</strong> We collect first-party usage events (such as an event name, the page path, and a randomly generated session identifier) and send them to our own API to understand how the product is used and to improve it. This data stays on our infrastructure — we do not use third-party advertising or analytics trackers.</p>
         </section>
 
         <section>

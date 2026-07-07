@@ -2722,7 +2722,24 @@ export const profile = {
       },
     ),
   analytics: () => fetchAPI<ProfileAnalytics>("/api/profile/analytics"),
+  // GDPR — download a copy of the candidate's stored data.
+  exportData: () => fetchAPI<ProfileDataExport>("/api/profile/export"),
+  // GDPR — request account deletion (soft delete with a 30-day grace period).
+  requestAccountDeletion: () =>
+    fetchAPI<{ message: string; requestedAt: string }>("/api/profile/delete-request", {
+      method: "POST",
+    }),
 };
+
+// GDPR data export payload returned by GET /api/profile/export.
+export interface ProfileDataExport {
+  exportedAt: string;
+  userId: string;
+  profile: Record<string, unknown> | null;
+  resume: { hasResume: boolean; updatedAt: string } | null;
+  applicationCount: number;
+  applicationStatuses: Array<{ id: string; status: string; createdAt: string }>;
+}
 
 // Notifications
 export const notifications = {
