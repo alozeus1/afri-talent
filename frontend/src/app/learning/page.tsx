@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { filterCoursesByQuery, filterFallbackLessons } from "@/lib/learning-search";
+import { Skeleton } from "@/components/ui/skeleton";
 import { billing, BillingStatus, learning, LearningResourceItem } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -152,30 +155,10 @@ function isEarlyLesson(course: LearningResourceItem): course is EarlyLearningLes
   return "steps" in course && Array.isArray((course as EarlyLearningLesson).steps);
 }
 
-function filterFallbackLessons(filters: {
-  category: string;
-  difficulty: string;
-  freeOnly: boolean;
-  query: string;
-}): EarlyLearningLesson[] {
-  const query = filters.query.trim().toLowerCase();
-  return EARLY_LEARNING_LESSONS.filter((lesson) => {
-    if (filters.category && lesson.category !== filters.category) return false;
-    if (filters.difficulty && lesson.difficulty !== filters.difficulty) return false;
-    if (filters.freeOnly && !lesson.isFree) return false;
-    if (!query) return true;
-    return [
-      lesson.title,
-      lesson.description ?? "",
-      lesson.category,
-      lesson.skills.join(" "),
-    ].join(" ").toLowerCase().includes(query);
-  });
-}
-
-export default function LearningPage() {
+function LearningPageContent() {
   const t = useT();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [courses, setCourses] = useState<LearningResourceItem[]>([]);
   const [featured, setFeatured] = useState<LearningResourceItem[]>([]);
@@ -198,6 +181,15 @@ export default function LearningPage() {
   const [totalPages, setTotalPages] = useState(1);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Deep links like /learning?search=kubernetes (job fit panel gap chips) seed the search box.
+  const searchFromUrl = searchParams.get("search") ?? "";
+  useEffect(() => {
+    if (searchFromUrl) {
+      setQuery(searchFromUrl);
+      setPage(1);
+    }
+  }, [searchFromUrl]);
 
   useEffect(() => {
     try {
@@ -359,12 +351,7 @@ export default function LearningPage() {
   };
 
   const displayedCourses = query.trim() && !usingFallbackContent
-    ? courses.filter((course) =>
-        [course.title, course.description ?? "", course.category, course.skills.join(" ")]
-          .join(" ")
-          .toLowerCase()
-          .includes(query.trim().toLowerCase()),
-      )
+    ? filterCoursesByQuery(courses, query)
     : courses;
   const currentPlan = billingStatus?.plan ?? "FREE";
 
@@ -473,6 +460,11 @@ export default function LearningPage() {
                     </Badge>
                   </div>
                   <h3 className="font-semibold text-gray-900 text-sm line-clamp-2 mb-2 dark:text-gray-100">{course.title}</h3>
+                  {course.gapSkills && course.gapSkills.length > 0 && (
+                    <p className="text-xs font-medium text-emerald-700 mb-2 dark:text-emerald-400">
+                      Fills your gap: {course.gapSkills.slice(0, 3).join(", ")}
+                    </p>
+                  )}
                   {course.durationHours && (
                     <p className="text-xs text-gray-500 mb-2 dark:text-gray-400">{course.durationHours}h</p>
                   )}
@@ -881,5 +873,20 @@ export default function LearningPage() {
         showApprovedFeedback
       />
     </div>
+  );
+}
+
+export default function LearningPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      }
+    >
+      <LearningPageContent />
+    </Suspense>
   );
 }
