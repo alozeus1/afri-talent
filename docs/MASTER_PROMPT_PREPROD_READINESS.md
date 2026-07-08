@@ -64,7 +64,11 @@ Unchanged from `CLAUDE.md` / `AGENTS.md` / `STAGING_RUNBOOK.md`:
 
 1. **Apply dispatch is 5/7** (`backend/src/lib/apply/dispatch.ts`): ASSISTED_REDIRECT,
    EMAIL_DRAFT, ATS_API_{GREENHOUSE,LEVER,WORKABLE} implemented; **ATS_API_ASHBY** and
-   **OPERATOR_HANDOFF** are documented stubs.
+   **OPERATOR_HANDOFF** are documented stubs. **Resolved for pre-prod (2026-07-08):**
+   OPERATOR_HANDOFF is flag-gated off (PR #238) so ATS-host jobs degrade to
+   ASSISTED_REDIRECT instead of hard-failing; a backfill re-classifies existing rows
+   (PR #239). Ashby stays flag-off (unverifiable without a real Ashby key). See §4
+   decisions.
 2. **ATS scanner** (`backend/src/lib/ai/skills/ats-scanner.ts`): keyword-overlap only,
    not format/parse-aware.
 3. **Resume PDF export**: builder + 3 templates exist; end-to-end download to a valid,
@@ -77,30 +81,44 @@ Unchanged from `CLAUDE.md` / `AGENTS.md` / `STAGING_RUNBOOK.md`:
 
 Each step: branch → PR → CI green → human review. Show test evidence per step.
 
+**Decisions locked (2026-07-08):**
+- **MOCK_AI parity is the verification standard.** Do NOT run the live-AI agentic
+  E2E suites (no real Anthropic/OpenAI spend); MOCK_AI stubs are sufficient. This
+  drops the `E2E_RUN_AGENTIC=1` item from WS-2.
+- **Operator-handoff: degrade to clickout (done).** `OPERATOR_HANDOFF` is flag-gated
+  off (PR #238) so ATS-host jobs fall through to `ASSISTED_REDIRECT` instead of
+  hard-failing; `--reclassify-operator-handoff` backfill (PR #239) flips existing
+  stored rows. Building the Computer Use track is out of scope for pre-prod.
+- **Ashby-apply: stays flag-off.** Unverifiable without a real Ashby employer API
+  key, so deferred behind `APPLY_ATS_ASHBY_ENABLED` rather than shipped untested.
+
 **WS-1 — Make the environment testable (human-gated resume).**
 - With human approval, resume the dev stack per `STAGING_RUNBOOK.md` (terraform apply to
   recreate RDS Proxy, start NAT `i-097d412dc779da13d`, scale both ECS services to 1,
   wait services-stable). Validate `/health` = 200 and CloudFront serves the app.
 - Seed published jobs + test users (`prisma db seed`) so matching/apply/schema flows
-  have data. Confirm `E2E_RUN_AGENTIC` and Stripe test keys are wired for the E2E env.
+  have data. Wire Stripe test keys for the E2E env. **After seeding, run
+  `npx tsx backend/scripts/jobs/backfill-apply-strategy.ts --reclassify-operator-handoff`
+  (dry-run first)** so any seeded OPERATOR_HANDOFF rows become appliable.
 
 **WS-2 — Close the E2E coverage holes (the core of this brief).**
 - **Job matching**: fix whatever makes the match endpoint not return 200 in the test
   env (likely embedding/pgvector/seed), then **un-skip** `agentic-job-matching`'s hard
-  `test.skip(true, ...)` and prove it green.
-- **Live-AI path**: run the agentic suites with `E2E_RUN_AGENTIC=1` against the seeded
-  env at least once; capture pass/fail for job_match, cover_letter, apply_pack.
+  `test.skip(true, ...)` and prove it green (under MOCK_AI).
+- **Live-AI path**: NOT required — MOCK_AI parity is the standard (see decisions).
+  Ensure the MOCK_AI-gated agentic assertions pass; skip the `E2E_RUN_AGENTIC` runs.
 - **Billing**: configure Stripe test keys in the E2E env so
   `phase2-stripe-billing-api` runs; add a Flutterwave sandbox smoke. Prove checkout →
   webhook → entitlement end-to-end (the signed-webhook technique is in
   `local-db-testing-env` memory).
-- Exit criterion: **0 core-loop tests skipped for env/config reasons.**
+- Exit criterion: **0 core-loop tests skipped for env/config reasons** (agentic
+  live-AI suites excepted — intentionally MOCK_AI-only).
 
 **WS-3 — Verify the unproven product paths.**
 - Resume PDF export: generate a PDF for all 3 templates, assert it downloads and is
   ATS-parseable. Add an E2E/integration test.
 - Apply dispatch: confirm EMAIL_DRAFT + the 3 ATS-API adapters work against sandbox/
-  fixtures; decide whether ASHBY + OPERATOR_HANDOFF are pre-prod scope or flag-deferred.
+  fixtures. (ASHBY + OPERATOR_HANDOFF are flag-deferred — decided 2026-07-08, §4.)
 - ATS scanner: at minimum document that it is keyword-only so testers don't over-trust
   the score; format-awareness is a launch (not pre-prod) item unless prioritized.
 
@@ -117,10 +135,11 @@ Each step: branch → PR → CI green → human review. Show test evidence per s
 ## 5. Definition of done (pre-prod)
 
 - [ ] Dev stack resumed, `/health` 200, app reachable, DB seeded (human-approved).
-- [ ] Core-loop E2E all pass with **zero env/config skips**: candidate register→verify→
-      resume→**match (un-skipped)**→apply→track; employer post→triage→talent-search;
-      admin moderate; **AI job_match + cover_letter + apply_pack** proven with live model;
-      **checkout→webhook→entitlement** proven in Stripe test + Flutterwave sandbox.
+- [ ] Core-loop E2E all pass with **zero env/config skips** (agentic live-AI suites
+      excepted — MOCK_AI parity): candidate register→verify→resume→**match (un-skipped)**→
+      apply→track; employer post→triage→talent-search; admin moderate; **AI job_match +
+      cover_letter + apply_pack** proven under MOCK_AI; **checkout→webhook→entitlement**
+      proven in Stripe test + Flutterwave sandbox.
 - [ ] Resume PDF export verified for all templates.
 - [ ] No half-built feature reachable by a tester (flag-hidden otherwise).
 - [ ] Sign-off packet written; `STAGING_RUNBOOK.md` current.
@@ -131,9 +150,9 @@ Each step: branch → PR → CI green → human review. Show test evidence per s
 - Approve resuming the dev stack for the testing window (it incurs cost; it was
   re-confirmed suspended 2026-07-06)?
 - Are Stripe **test** keys + Flutterwave **sandbox** creds available for the E2E env?
-- Is running the live-AI agentic suites (real Anthropic/OpenAI spend) in scope for
-  pre-prod verification, or is MOCK_AI parity sufficient?
-- Are ASHBY apply + OPERATOR_HANDOFF in pre-prod scope, or explicitly deferred/flagged?
+
+_Resolved 2026-07-08: MOCK_AI parity is sufficient (no live-AI suites); ASHBY +
+OPERATOR_HANDOFF are flag-deferred (see §4 decisions)._
 
 ---
 
