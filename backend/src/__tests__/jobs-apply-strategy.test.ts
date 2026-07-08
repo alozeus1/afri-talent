@@ -11,6 +11,7 @@ beforeEach(() => {
   delete process.env.APPLY_ATS_LEVER_ENABLED;
   delete process.env.APPLY_ATS_ASHBY_ENABLED;
   delete process.env.APPLY_ATS_WORKABLE_ENABLED;
+  delete process.env.APPLY_OPERATOR_HANDOFF_ENABLED;
 });
 
 afterEach(() => {
@@ -25,7 +26,14 @@ describe("§5.2 — ATS_API_* gated by per-vendor env flag", () => {
     ).toEqual({ strategy: "ATS_API_GREENHOUSE" });
   });
 
-  it("falls through to OPERATOR_HANDOFF when the Greenhouse flag is off", () => {
+  it("degrades to ASSISTED_REDIRECT when the Greenhouse flag is off (operator handoff also off)", () => {
+    expect(
+      classifyApplyStrategy({ jobSource: "GREENHOUSE", sourceUrl: "https://boards.greenhouse.io/x/jobs/1" }),
+    ).toEqual({ strategy: "ASSISTED_REDIRECT" });
+  });
+
+  it("routes to OPERATOR_HANDOFF for a known ATS host only when that flag is on", () => {
+    process.env.APPLY_OPERATOR_HANDOFF_ENABLED = "1";
     expect(
       classifyApplyStrategy({ jobSource: "GREENHOUSE", sourceUrl: "https://boards.greenhouse.io/x/jobs/1" }),
     ).toEqual({ strategy: "OPERATOR_HANDOFF", applyFormDomain: "boards.greenhouse.io" });
@@ -45,8 +53,9 @@ describe("§5.2 — ATS_API_* gated by per-vendor env flag", () => {
 
   it("does not unlock other vendors when a different flag is on", () => {
     process.env.APPLY_ATS_GREENHOUSE_ENABLED = "1";
+    // LEVER has no API flag on and operator handoff is off → clickout fallback.
     expect(classifyApplyStrategy({ jobSource: "LEVER", sourceUrl: "https://jobs.lever.co/x/2" }))
-      .toEqual({ strategy: "OPERATOR_HANDOFF", applyFormDomain: "jobs.lever.co" });
+      .toEqual({ strategy: "ASSISTED_REDIRECT" });
   });
 });
 
@@ -106,6 +115,19 @@ describe("§5.2 — EMAIL_DRAFT — parseable apply email in description", () =>
 });
 
 describe("§5.2 — OPERATOR_HANDOFF — known form-based ATS hosts", () => {
+  // Operator handoff is flag-gated OFF by default; enable it for this block so
+  // the host-matching behaviour is covered independent of the default.
+  beforeEach(() => {
+    process.env.APPLY_OPERATOR_HANDOFF_ENABLED = "1";
+  });
+
+  it("degrades to ASSISTED_REDIRECT for a known host when the flag is off", () => {
+    delete process.env.APPLY_OPERATOR_HANDOFF_ENABLED;
+    expect(
+      classifyApplyStrategy({ jobSource: "INDEED_US", sourceUrl: "https://example.wd5.myworkdayjobs.com/foo/job/123" }),
+    ).toEqual({ strategy: "ASSISTED_REDIRECT" });
+  });
+
   it("matches Workday (myworkdayjobs.com)", () => {
     expect(
       classifyApplyStrategy({ jobSource: "INDEED_US", sourceUrl: "https://example.wd5.myworkdayjobs.com/foo/job/123" }),

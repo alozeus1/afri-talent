@@ -100,6 +100,18 @@ function isAtsApiEnabled(strategy: keyof typeof ATS_API_FLAGS): boolean {
   return process.env[flag.env] === "1" || process.env[flag.env] === "true";
 }
 
+// OPERATOR_HANDOFF (Computer Use, PR T) is not built yet, so dispatchApply()
+// hard-fails it. Until that track ships it must stay OFF by default: when
+// disabled the classifier skips the host match and the job degrades to
+// ASSISTED_REDIRECT (clickout), so every candidate can always apply. Flip the
+// flag only once the operator track can actually submit.
+function isOperatorHandoffEnabled(): boolean {
+  return (
+    process.env.APPLY_OPERATOR_HANDOFF_ENABLED === "1" ||
+    process.env.APPLY_OPERATOR_HANDOFF_ENABLED === "true"
+  );
+}
+
 function tryAtsApi(jobSource: string | null | undefined): ApplyStrategy | null {
   if (!jobSource) return null;
   for (const [strategy, cfg] of Object.entries(ATS_API_FLAGS) as Array<[keyof typeof ATS_API_FLAGS, typeof ATS_API_FLAGS[string]]>) {
@@ -160,10 +172,14 @@ export function classifyApplyStrategy(input: ApplyStrategyInput): ApplyStrategyR
     return { strategy: ApplyStrategy.EMAIL_DRAFT, applyEmailDetected: email };
   }
 
-  // 3. OPERATOR_HANDOFF — known form-based ATS host.
-  const formHost = tryOperatorHandoff(input.sourceUrl, input.applicationUrl);
-  if (formHost) {
-    return { strategy: ApplyStrategy.OPERATOR_HANDOFF, applyFormDomain: formHost };
+  // 3. OPERATOR_HANDOFF — known form-based ATS host. Flag-gated: until the
+  // Computer Use track (PR T) can actually submit, these jobs degrade to the
+  // ASSISTED_REDIRECT fallback below rather than hard-failing at dispatch.
+  if (isOperatorHandoffEnabled()) {
+    const formHost = tryOperatorHandoff(input.sourceUrl, input.applicationUrl);
+    if (formHost) {
+      return { strategy: ApplyStrategy.OPERATOR_HANDOFF, applyFormDomain: formHost };
+    }
   }
 
   // 4. Fallback.
