@@ -1,6 +1,6 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: July 6, 2026 (product improvement cycle #219–#226 closed)
+Last updated: July 7, 2026 (suspension re-confirmed; PRs #230–#235 merged while suspended)
 
 > [!IMPORTANT]
 > **Architecture changed on 2026-05-10.** The shared environment has moved off
@@ -8,6 +8,29 @@ Last updated: July 6, 2026 (product improvement cycle #219–#226 closed)
 > Serverless v2 + Lambda + CloudFront/WAF in the new AWS account `108188564905`.
 > Anything below that references `*.awsapprunner.com`, `afritalent-staging-*`
 > AWS resources, or the old account ID is historical and no longer live.
+
+## Update on July 7, 2026: Stack remains suspended; CI deploys advanced the task definitions
+
+The dev stack remains in the June 25 suspended state (founder re-confirmed
+keep-suspended on 2026-07-06). `https://d2j3ahmgbbdup1.cloudfront.net`
+returns **503 from the ALB (`server: awselb/2.0`)** — this is the expected
+suspended behavior, not an outage.
+
+PRs #230–#235 (plus dependabot #173/#174/#193) merged to `main` and deploy
+run `28836178803` completed successfully against the suspended stack: it
+registered new task definitions and repointed both ECS services via
+`aws ecs update-service --force-new-deployment` (desired count stayed 0, so
+`services-stable` passed trivially; the smoke test skipped because
+`vars.PROD_DOMAIN` is unset). Consequences for the live state:
+
+- Both services now point at the **July 7 task definition revisions**; the
+  June 25 note's "retained" ARNs (`afritalent-dev-frontend:44`,
+  `afritalent-dev-backend:46`) are superseded.
+- The June 25 resume procedure below is unchanged and, when run, will start
+  the **latest images** (all merges through #235) — no extra deploy needed.
+- Today's `terraform apply` only updated IAM roles/policies and Lambda
+  functions in place; ECS `desired_count`/`task_definition` drift is ignored
+  by lifecycle rules, so Terraform did not (and will not) resume the stack.
 
 ## Update on July 6, 2026: Product improvement cycle closed (PRs #219–#226)
 
