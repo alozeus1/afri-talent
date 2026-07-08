@@ -13,12 +13,20 @@
 //   --dry-run        Classify but do not write (default false).
 //   --batch-size=N   Rows per page (default 500).
 //   --limit=N        Cap total rows processed (default no cap).
+//   --reclassify-operator-handoff
+//                    Re-classify existing OPERATOR_HANDOFF rows instead of the
+//                    default NULL backfill. Use after flag-gating operator
+//                    handoff off (APPLY_OPERATOR_HANDOFF_ENABLED unset): rows
+//                    that used to hard-fail at dispatch flip to EMAIL_DRAFT /
+//                    ASSISTED_REDIRECT so candidates can apply. No-op for rows
+//                    that still classify to OPERATOR_HANDOFF (flag on).
 //
-// Re-runnable: the WHERE applyStrategy IS NULL filter narrows successive runs
-// to unhandled rows.
+// Re-runnable: the default NULL filter narrows successive runs to unhandled
+// rows; --reclassify-operator-handoff narrows as rows flip away from handoff.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import "dotenv/config";
+import { ApplyStrategy } from "@prisma/client";
 import prisma from "../../src/lib/prisma.js";
 import { classifyApplyStrategy } from "../../src/lib/jobs/apply-strategy.js";
 
@@ -26,12 +34,14 @@ interface Args {
   dryRun: boolean;
   batchSize: number;
   limit: number | null;
+  reclassifyOperatorHandoff: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
-  const out: Args = { dryRun: false, batchSize: 500, limit: null };
+  const out: Args = { dryRun: false, batchSize: 500, limit: null, reclassifyOperatorHandoff: false };
   for (const arg of argv) {
     if (arg === "--dry-run") out.dryRun = true;
+    else if (arg === "--reclassify-operator-handoff") out.reclassifyOperatorHandoff = true;
     else if (arg.startsWith("--batch-size=")) out.batchSize = Math.max(1, parseInt(arg.split("=")[1], 10));
     else if (arg.startsWith("--limit=")) out.limit = Math.max(1, parseInt(arg.split("=")[1], 10));
   }
@@ -41,6 +51,19 @@ function parseArgs(argv: string[]): Args {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   console.log("[backfill-apply-strategy] starting", args);
+
+  if (args.reclassifyOperatorHandoff && process.env.APPLY_OPERATOR_HANDOFF_ENABLED) {
+    console.warn(
+      "[backfill-apply-strategy] APPLY_OPERATOR_HANDOFF_ENABLED is set — OPERATOR_HANDOFF rows will re-classify back to OPERATOR_HANDOFF (no-op). Unset it to degrade them to clickout.",
+    );
+  }
+
+  // Default: fill rows that never got a strategy. --reclassify-operator-handoff:
+  // re-run the classifier over rows currently parked on the un-shippable
+  // OPERATOR_HANDOFF track so they flip to an appliable strategy.
+  const targetFilter = args.reclassifyOperatorHandoff
+    ? { applyStrategy: ApplyStrategy.OPERATOR_HANDOFF }
+    : { applyStrategy: null };
 
   let processed = 0;
   const counts: Record<string, number> = {};
@@ -56,7 +79,7 @@ async function main() {
     const take = Math.min(args.batchSize, remaining);
     const rows = await prisma.job.findMany({
       where: {
-        applyStrategy: null,
+        ...targetFilter,
         ...(cursor ? { id: { gt: cursor } } : {}),
       },
       select: {
