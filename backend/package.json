@@ -26,7 +26,7 @@
     "@aws-sdk/client-ses": "^3.1063.0",
     "@aws-sdk/s3-request-presigner": "^3.1063.0",
     "@langchain/core": "^1.2.1",
-    "@langchain/langgraph": "^1.4.5",
+    "@langchain/langgraph": "^1.4.7",
     "@langchain/langgraph-checkpoint-postgres": "^1.0.3",
     "@prisma/client": "5.22.0",
     "@sentry/node": "^10.43.0",
