@@ -146,7 +146,13 @@ export type CandidateVerificationResult =
   | { status: "AWAITING_ADMIN"; graphRunId: string; threadId: string; review: DocumentReview };
 
 function ids(candidateId: string, graphRunId?: string) {
-  return { graphRunId: graphRunId ?? `candidate-verify:${candidateId}`, threadId: `candidate:${candidateId}:verification` };
+  // See employerVerification.graph.ts: an explicit graphRunId (per-artifact
+  // rollout) gets its own thread so concurrent submissions don't collide; the
+  // default per-candidate thread is preserved for resume callers.
+  return {
+    graphRunId: graphRunId ?? `candidate-verify:${candidateId}`,
+    threadId: graphRunId ? `candidate-verify:thread:${graphRunId}` : `candidate:${candidateId}:verification`,
+  };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

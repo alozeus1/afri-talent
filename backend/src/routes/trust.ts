@@ -30,6 +30,8 @@ import {
   trustPriorityForReport,
 } from "../lib/trust/service.js";
 import { assessContentRisk, riskLevelForScore } from "../lib/trust/risk.js";
+import { runEmployerVerificationRollout } from "../lib/ai/langgraph/integration/employerVerificationAdapter.js";
+import { runCandidateVerificationRollout } from "../lib/ai/langgraph/integration/candidateVerificationAdapter.js";
 import { createUserNotification } from "../lib/notifications.js";
 import { isSmsConfigured, sendSms } from "../lib/sms/africasTalking.js";
 
@@ -526,6 +528,12 @@ router.post(
       ]);
 
       const trustProfile = await refreshEmployerTrustProfile(employer.id);
+
+      // Rollout: run the employer-verification graph so HIGH-risk employers pause
+      // at a TOTP-gated admin review (→ REQUESTED → n8n email alert). Flag-gated
+      // and non-blocking; no-op when LANGGRAPH_EMPLOYER_VERIFICATION is off.
+      void runEmployerVerificationRollout(employer.id, { artifactId: artifact.id }).catch(() => undefined);
+
       res.status(201).json({
         artifact: mapArtifact(artifact),
         trust: employerTrustSummary(trustProfile),
@@ -865,6 +873,16 @@ router.post(
       });
 
       const refreshedTrustProfile = await refreshCandidateTrustProfile(req.user!.userId);
+
+      // Rollout: run the candidate-verification graph. A submitted document routes
+      // to a TOTP-gated document review (→ REQUESTED → n8n email alert). Only a
+      // document reference is passed, never content. Flag-gated and non-blocking;
+      // no-op when LANGGRAPH_CANDIDATE_VERIFICATION is off.
+      void runCandidateVerificationRollout(req.user!.userId, {
+        artifactId: artifact.id,
+        documentRef: artifact.fileKey ?? artifact.externalUrl ?? artifact.id,
+      }).catch(() => undefined);
+
       res.status(201).json({
         artifact: mapArtifact(artifact),
         trust: candidateTrustSummary(refreshedTrustProfile),
