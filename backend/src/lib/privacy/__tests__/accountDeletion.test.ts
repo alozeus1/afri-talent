@@ -7,6 +7,8 @@ const { mockPrisma } = vi.hoisted(() => {
       user: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn().mockResolvedValue({}) },
       candidateProfile: { updateMany: del() },
       resume: { deleteMany: del() },
+      userResume: { deleteMany: del() },
+      candidateResumeVersion: { deleteMany: del() },
       verificationArtifact: { deleteMany: del() },
       mockInterviewSession: { deleteMany: del() },
       oAuthAccount: { deleteMany: del() },
@@ -41,6 +43,10 @@ describe("anonymizeUser", () => {
     expect(updateArg.data.email).toContain("removed.invalid");
     expect(updateArg.data.password).toBe("");
     expect(updateArg.data.accountRestrictionStatus).toBe("SUSPENDED");
+    // All resume PII deleted — uploaded AND generated/parsed tables.
+    expect(mockPrisma.resume.deleteMany).toHaveBeenCalledWith({ where: { profile: { userId: "u1" } } });
+    expect(mockPrisma.userResume.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });
+    expect(mockPrisma.candidateResumeVersion.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });
     // Access paths cut.
     expect(mockPrisma.oAuthAccount.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });
     expect(mockPrisma.verificationArtifact.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });

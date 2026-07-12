@@ -51,6 +51,12 @@ export async function anonymizeUser(userId: string): Promise<AnonymizeResult> {
     }),
     // Sensitive documents and their DB references (ID docs, CVs, recordings).
     prisma.resume.deleteMany({ where: { profile: { userId } } }),
+    // Generated/parsed resume PII lives in separate userId-keyed tables with no
+    // user-delete cascade, so anonymization (which keeps the User row) must
+    // delete them explicitly. userResume cascades to its AtsReports; a
+    // resumeVersion reference is SetNull, so neither delete is blocked.
+    prisma.userResume.deleteMany({ where: { userId } }),
+    prisma.candidateResumeVersion.deleteMany({ where: { userId } }),
     prisma.verificationArtifact.deleteMany({ where: { userId } }),
     prisma.mockInterviewSession.deleteMany({ where: { userId } }),
     // Every credential / access path.
