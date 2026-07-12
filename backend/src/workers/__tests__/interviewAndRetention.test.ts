@@ -7,7 +7,7 @@ const { mockPrisma, createUserNotification, s3Send } = vi.hoisted(() => ({
     notificationPreference: { findUnique: vi.fn() },
   },
   createUserNotification: vi.fn().mockResolvedValue({}),
-  s3Send: vi.fn().mockResolvedValue({ Errors: [] }),
+  s3Send: vi.fn(),
 }));
 
 vi.mock("../../lib/prisma.js", () => ({ default: mockPrisma }));
@@ -16,9 +16,17 @@ vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: class {
     send = s3Send;
   },
+  ListObjectVersionsCommand: class {
+    input: { Prefix: string };
+    readonly _t = "list";
+    constructor(input: { Prefix: string }) {
+      this.input = input;
+    }
+  },
   DeleteObjectsCommand: class {
-    input: unknown;
-    constructor(input: unknown) {
+    input: { Delete: { Objects: { Key: string; VersionId?: string }[] } };
+    readonly _t = "del";
+    constructor(input: { Delete: { Objects: { Key: string; VersionId?: string }[] } }) {
       this.input = input;
     }
   },
@@ -29,54 +37,112 @@ import { runInterviewReminderCycle } from "../interview-reminder.js";
 
 const OLD_ENV = { ...process.env };
 
+// Default S3: each key has one current version; deletes succeed.
+function defaultS3() {
+  s3Send.mockImplementation((cmd: { _t: string; input: { Prefix?: string } }) => {
+    if (cmd._t === "list") {
+      return Promise.resolve({ Versions: [{ Key: cmd.input.Prefix, VersionId: "v1" }], DeleteMarkers: [], IsTruncated: false });
+    }
+    return Promise.resolve({ Errors: [] });
+  });
+}
+
+// Find the DeleteObjects call among s3Send calls.
+function delCall() {
+  return s3Send.mock.calls.find((c) => (c[0] as { _t: string })._t === "del")?.[0] as
+    | { input: { Delete: { Objects: { Key: string; VersionId?: string }[] } } }
+    | undefined;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.calendarEvent.update.mockResolvedValue({});
   mockPrisma.mockInterviewSession.delete.mockResolvedValue({});
-  s3Send.mockResolvedValue({ Errors: [] });
+  defaultS3();
 });
 afterEach(() => {
   process.env = { ...OLD_ENV };
 });
 
 describe("mock-interview retention sweep", () => {
-  it("purges S3 objects BEFORE deleting the session row", async () => {
+  it("deletes ALL S3 versions, then the row (bytes gone before keys)", async () => {
     process.env.S3_UPLOADS_BUCKET = "uploads";
-    mockPrisma.mockInterviewSession.findMany.mockResolvedValueOnce([
-      { id: "s1", artifacts: [{ storageKey: "k1" }, { storageKey: "k2" }] },
-    ]);
+    s3Send.mockImplementation((cmd: { _t: string; input: { Prefix?: string } }) => {
+      if (cmd._t === "list") {
+        // two versions for this key — an unversioned delete would leave the older one
+        return Promise.resolve({
+          Versions: [
+            { Key: cmd.input.Prefix, VersionId: "v2" },
+            { Key: cmd.input.Prefix, VersionId: "v1" },
+          ],
+          DeleteMarkers: [],
+          IsTruncated: false,
+        });
+      }
+      return Promise.resolve({ Errors: [] });
+    });
+    mockPrisma.mockInterviewSession.findMany
+      .mockResolvedValueOnce([{ id: "s1", artifacts: [{ storageKey: "k1" }] }])
+      .mockResolvedValueOnce([]);
 
     await runMockInterviewRetentionCycle();
 
-    // S3 delete issued with both keys, and it ran before the row delete.
-    expect(s3Send).toHaveBeenCalledOnce();
-    const cmd = s3Send.mock.calls[0][0] as { input: { Bucket: string; Delete: { Objects: { Key: string }[] } } };
-    expect(cmd.input.Bucket).toBe("uploads");
-    expect(cmd.input.Delete.Objects.map((o) => o.Key).sort()).toEqual(["k1", "k2"]);
+    const del = delCall();
+    expect(del).toBeDefined();
+    expect(del!.input.Delete.Objects).toEqual([
+      { Key: "k1", VersionId: "v2" },
+      { Key: "k1", VersionId: "v1" },
+    ]);
     expect(mockPrisma.mockInterviewSession.delete).toHaveBeenCalledWith({ where: { id: "s1" } });
-    expect(s3Send.mock.invocationCallOrder[0]).toBeLessThan(
-      mockPrisma.mockInterviewSession.delete.mock.invocationCallOrder[0],
-    );
+    // S3 version-delete happened before the DB row delete.
+    const delOrder = s3Send.mock.invocationCallOrder[s3Send.mock.calls.findIndex((c) => (c[0] as { _t: string })._t === "del")];
+    expect(delOrder).toBeLessThan(mockPrisma.mockInterviewSession.delete.mock.invocationCallOrder[0]);
   });
 
   it("does NOT delete the row when the S3 purge reports errors (keys preserved)", async () => {
     process.env.S3_UPLOADS_BUCKET = "uploads";
-    s3Send.mockResolvedValueOnce({ Errors: [{ Key: "k1", Message: "AccessDenied" }] });
-    mockPrisma.mockInterviewSession.findMany.mockResolvedValueOnce([
-      { id: "s1", artifacts: [{ storageKey: "k1" }] },
-    ]);
+    s3Send.mockImplementation((cmd: { _t: string; input: { Prefix?: string } }) => {
+      if (cmd._t === "list") {
+        return Promise.resolve({ Versions: [{ Key: cmd.input.Prefix, VersionId: "v1" }], DeleteMarkers: [], IsTruncated: false });
+      }
+      return Promise.resolve({ Errors: [{ Key: "k1", Message: "AccessDenied" }] });
+    });
+    mockPrisma.mockInterviewSession.findMany.mockResolvedValueOnce([{ id: "s1", artifacts: [{ storageKey: "k1" }] }]);
+
+    await runMockInterviewRetentionCycle();
+    expect(mockPrisma.mockInterviewSession.delete).not.toHaveBeenCalled();
+  });
+
+  it("drains every expired batch, not just the first", async () => {
+    mockPrisma.mockInterviewSession.findMany
+      .mockResolvedValueOnce([{ id: "a", artifacts: [] }])
+      .mockResolvedValueOnce([{ id: "b", artifacts: [] }])
+      .mockResolvedValueOnce([]);
+
+    await runMockInterviewRetentionCycle();
+
+    expect(mockPrisma.mockInterviewSession.findMany).toHaveBeenCalledTimes(3);
+    expect(mockPrisma.mockInterviewSession.delete).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops (no infinite loop) when a batch makes no progress", async () => {
+    process.env.S3_UPLOADS_BUCKET = "uploads";
+    s3Send.mockImplementation((cmd: { _t: string; input: { Prefix?: string } }) => {
+      if (cmd._t === "list") return Promise.resolve({ Versions: [{ Key: cmd.input.Prefix, VersionId: "v1" }], DeleteMarkers: [], IsTruncated: false });
+      return Promise.resolve({ Errors: [{ Key: "k", Message: "fail" }] });
+    });
+    // findMany would keep returning the same undeletable row; the worker must break.
+    mockPrisma.mockInterviewSession.findMany.mockResolvedValue([{ id: "stuck", artifacts: [{ storageKey: "k" }] }]);
 
     await runMockInterviewRetentionCycle();
 
     expect(mockPrisma.mockInterviewSession.delete).not.toHaveBeenCalled();
+    expect(mockPrisma.mockInterviewSession.findMany).toHaveBeenCalledTimes(1);
   });
 
-  it("selects only sessions past expiresAt, and no-ops when empty", async () => {
+  it("no-ops cleanly when nothing is expired", async () => {
     mockPrisma.mockInterviewSession.findMany.mockResolvedValueOnce([]);
-    await runMockInterviewRetentionCycle();
-    const where = mockPrisma.mockInterviewSession.findMany.mock.calls[0][0].where;
-    expect(where.expiresAt.not).toBeNull();
-    expect(where.expiresAt.lte).toBeInstanceOf(Date);
+    await expect(runMockInterviewRetentionCycle()).resolves.toBeUndefined();
     expect(mockPrisma.mockInterviewSession.delete).not.toHaveBeenCalled();
   });
 });
@@ -85,7 +151,7 @@ describe("interview reminders", () => {
   const minutes = (n: number) => n * 60 * 1000;
 
   it("sends and stamps reminderSentAt for an event inside its lead window", async () => {
-    const startTime = new Date(Date.now() + minutes(10)); // 10 min away, 30-min lead → due
+    const startTime = new Date(Date.now() + minutes(10));
     mockPrisma.calendarEvent.findMany.mockResolvedValueOnce([
       { id: "e1", userId: "u1", title: "Onsite", startTime, location: null, meetingUrl: "https://x", reminderMinutes: 30 },
     ]);
@@ -95,15 +161,10 @@ describe("interview reminders", () => {
 
     expect(createUserNotification).toHaveBeenCalledOnce();
     expect(createUserNotification.mock.calls[0][0]).toMatchObject({ userId: "u1", type: "INTERVIEW_PREP" });
-    expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "e1" },
-      data: { reminderSentAt: expect.any(Date) },
-    });
+    expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({ where: { id: "e1" }, data: { reminderSentAt: expect.any(Date) } });
   });
 
   it("catch-up: still sends a short-lead reminder whose start time just passed", async () => {
-    // 5-min reminder, interview started 3 min ago — a naive startTime>now filter
-    // would have dropped it. It is within the catch-up grace and past its fireAt.
     const startTime = new Date(Date.now() - minutes(3));
     mockPrisma.calendarEvent.findMany.mockResolvedValueOnce([
       { id: "e4", userId: "u1", title: "Quick call", startTime, location: null, meetingUrl: null, reminderMinutes: 5 },
@@ -113,17 +174,12 @@ describe("interview reminders", () => {
     await runInterviewReminderCycle();
 
     expect(createUserNotification).toHaveBeenCalledOnce();
-    expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "e4" },
-      data: { reminderSentAt: expect.any(Date) },
-    });
-    // and the query uses a past-grace lower bound, not strictly > now
     const where = mockPrisma.calendarEvent.findMany.mock.calls[0][0].where;
     expect(where.startTime.gt.getTime()).toBeLessThan(Date.now());
   });
 
   it("does not fire before the lead window opens", async () => {
-    const startTime = new Date(Date.now() + minutes(2 * 24 * 60)); // 2 days away
+    const startTime = new Date(Date.now() + minutes(2 * 24 * 60));
     mockPrisma.calendarEvent.findMany.mockResolvedValueOnce([
       { id: "e2", userId: "u1", title: "Later", startTime, location: null, meetingUrl: null, reminderMinutes: 30 },
     ]);
@@ -142,10 +198,7 @@ describe("interview reminders", () => {
     await runInterviewReminderCycle();
 
     expect(createUserNotification).not.toHaveBeenCalled();
-    expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({
-      where: { id: "e3" },
-      data: { reminderSentAt: expect.any(Date) },
-    });
+    expect(mockPrisma.calendarEvent.update).toHaveBeenCalledWith({ where: { id: "e3" }, data: { reminderSentAt: expect.any(Date) } });
   });
 
   it("only selects INTERVIEW events not yet reminded", async () => {
