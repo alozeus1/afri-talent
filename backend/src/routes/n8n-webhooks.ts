@@ -96,6 +96,10 @@ router.post("/approval", async (req: Request, res: Response) => {
   }
 
   try {
+    // Persist DENIED. This is a hard terminal decision: every graph resume path
+    // calls assertGraphRunNotDenied() and refuses to resume a DENIED run, so a
+    // later console/user approval can never drive the paused checkpoint into a
+    // sensitive side effect (publish/send/verify) after an email deny.
     await prisma.graphRun.update({
       where: { graphRunId },
       data: { approvalState: "DENIED", status: "BLOCKED" },

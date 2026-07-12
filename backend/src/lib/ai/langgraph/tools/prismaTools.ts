@@ -9,9 +9,63 @@
 
 import prisma from "../../../prisma.js";
 import logger from "../../../logger.js";
+import { recordOpsEvent } from "../../../ops/events.js";
 import { emitApprovalRequested } from "../../../notifications/approvalWebhook.js";
 import type { GraphEvent, GraphEventSink } from "../observability/graphEvents.js";
 import type { GraphRunStatus, ApprovalState, WorkflowType } from "../state/schemas.js";
+
+/**
+ * Thrown when a resume is attempted on a run that was already denied out-of-band
+ * (e.g. the operator clicked "Deny" in the n8n approval email). This makes DENIED
+ * a hard terminal state: no later console/user approval can resume the paused
+ * LangGraph checkpoint into a sensitive side effect. Callers (HTTP routes) should
+ * map this to a 409 and surface "this request was already denied".
+ */
+export class GraphRunDeniedError extends Error {
+  readonly graphRunId: string;
+  constructor(graphRunId: string) {
+    super(`Graph run ${graphRunId} was denied and cannot be resumed`);
+    this.name = "GraphRunDeniedError";
+    this.graphRunId = graphRunId;
+  }
+}
+
+/** Whether a run's persisted approval decision is DENIED. Fails open (returns
+ * false) on a read error — the subsequent checkpoint invoke shares the same DB,
+ * so a real outage surfaces there rather than silently blocking approvals. */
+export async function isGraphRunDenied(graphRunId: string): Promise<boolean> {
+  try {
+    const row = await prisma.graphRun.findUnique({
+      where: { graphRunId },
+      select: { approvalState: true },
+    });
+    return row?.approvalState === "DENIED";
+  } catch (err) {
+    logger.warn(
+      { err: String(err), graph_run_id: graphRunId },
+      "[graph] isGraphRunDenied read failed (treating as not denied)",
+    );
+    return false;
+  }
+}
+
+/**
+ * Guard the entry of every resume path. If the run was denied out-of-band,
+ * record the blocked attempt and throw before any checkpoint invoke, so the
+ * graph's side effect (publish/send/verify) never executes.
+ */
+export async function assertGraphRunNotDenied(graphRunId: string): Promise<void> {
+  if (await isGraphRunDenied(graphRunId)) {
+    recordOpsEvent({
+      metricName: "langgraph_resume_blocked_denied",
+      category: "langgraph",
+      outcome: "held",
+      severity: "warning",
+      details: { graph_run_id: graphRunId },
+    });
+    throw new GraphRunDeniedError(graphRunId);
+  }
+}
 
 export interface CreateGraphRunInput {
   graphRunId: string;

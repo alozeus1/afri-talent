@@ -13,7 +13,7 @@ import { lastWriteWins } from "../state/reducers.js";
 import { getCheckpointer } from "../memory/checkpointer.js";
 import { emitGraphEvent } from "../observability/graphEvents.js";
 import { recordGraphRunOutcome } from "../observability/graphMetrics.js";
-import { createGraphRun, updateGraphRun } from "../tools/prismaTools.js";
+import { createGraphRun, updateGraphRun, assertGraphRunNotDenied } from "../tools/prismaTools.js";
 import { runOnce } from "../tools/idempotency.js";
 import type { GraphRunStatus } from "../state/schemas.js";
 
@@ -143,6 +143,7 @@ export async function startFollowUp(applicationId: string, deps: FollowUpDeps, g
 
 export async function resumeFollowUp(applicationId: string, decision: FollowUpApproval, deps: FollowUpDeps, graphRunId?: string): Promise<FollowUpResult> {
   const { graphRunId: gid, threadId } = ids(applicationId, graphRunId);
+  await assertGraphRunNotDenied(gid);
   emitGraphEvent({ graphRunId: gid, workflowType: WORKFLOW, threadId, type: "graph_resumed" });
   const { Command } = await import("@langchain/langgraph");
   const app = buildGraph(deps, { graphRunId: gid, threadId, applicationId });
