@@ -36,6 +36,7 @@ import profileRoutes from "./routes/profile.js";
 import filesRoutes from "./routes/files.js";
 import billingRoutes from "./routes/billing.js";
 import webhookRoutes from "./routes/webhooks.js";
+import n8nWebhookRoutes from "./routes/n8n-webhooks.js";
 import notificationsRoutes from "./routes/notifications.js";
 import messagesRoutes from "./routes/messages.js";
 import orchestratorRoutes from "./routes/orchestrator.js";
@@ -192,6 +193,9 @@ app.use(generalLimiter);
 
 // Stripe webhook — MUST be registered BEFORE express.json().
 // Stripe signature verification requires the raw request body bytes.
+// n8n approval callback mounts first (more specific prefix) and also needs the
+// raw body for its signed-token auth.
+app.use("/api/webhooks/n8n", express.raw({ type: "application/json" }), n8nWebhookRoutes);
 app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoutes);
 app.use("/api/ats/webhooks", express.raw({ type: "application/json" }), atsWebhookRoutes);
 

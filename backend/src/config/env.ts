@@ -43,6 +43,14 @@ export function validateRuntimeEnv(): void {
     requireEnv("ANTHROPIC_API_KEY");
     requireEnv("SENTRY_DSN");
 
+    // n8n approval broker: if the outbound webhook URL is set, the HMAC secret
+    // is mandatory. Without it the emitter cannot sign requests and the inbound
+    // callback rejects everything (fail closed). Fail the deploy instead of
+    // shipping an unauthenticated approval path.
+    if (process.env.N8N_APPROVAL_WEBHOOK_URL?.trim()) {
+      requireEnv("N8N_APPROVAL_HMAC_SECRET");
+    }
+
     // M5 — if provider price catalogs are configured, they must be
     // well-formed (valid JSON, PLAN:REGION:INTERVAL:CURRENCY keys, non-empty
     // provider ids). A malformed catalog previously parsed to {} silently and

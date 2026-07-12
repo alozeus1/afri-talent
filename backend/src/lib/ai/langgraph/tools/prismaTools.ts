@@ -9,6 +9,7 @@
 
 import prisma from "../../../prisma.js";
 import logger from "../../../logger.js";
+import { emitApprovalRequested } from "../../../notifications/approvalWebhook.js";
 import type { GraphEvent, GraphEventSink } from "../observability/graphEvents.js";
 import type { GraphRunStatus, ApprovalState, WorkflowType } from "../state/schemas.js";
 
@@ -60,7 +61,7 @@ export interface UpdateGraphRunInput {
 /** Update the GraphRun audit row. Best-effort. */
 export async function updateGraphRun(graphRunId: string, patch: UpdateGraphRunInput): Promise<void> {
   try {
-    await prisma.graphRun.update({
+    const updated = await prisma.graphRun.update({
       where: { graphRunId },
       data: {
         status: patch.status,
@@ -73,6 +74,29 @@ export async function updateGraphRun(graphRunId: string, patch: UpdateGraphRunIn
         errors: patch.errors === undefined ? undefined : (patch.errors as object),
       },
     });
+
+    // Human-gate seam: when a run pauses for human approval, notify the n8n
+    // approval broker so the operator gets an email with a deep link (real,
+    // TOTP-gated approval) and a one-click deny. Best-effort and non-fatal —
+    // must never break the graph. No-ops when the feature is unconfigured.
+    if (patch.approvalState === "REQUESTED") {
+      void emitApprovalRequested(
+        {
+          graphRunId: updated.graphRunId,
+          workflowType: updated.workflowType,
+          userId: updated.userId,
+          candidateId: updated.candidateId,
+          employerId: updated.employerId,
+          jobId: updated.jobId,
+          applicationId: updated.applicationId,
+          riskFlags: updated.riskFlags,
+          currentStep: updated.currentStep,
+        },
+        Math.floor(Date.now() / 1000),
+      ).catch((err) => {
+        logger.warn({ err: String(err), graph_run_id: graphRunId }, "[n8n] approval emit threw (non-fatal)");
+      });
+    }
   } catch (err) {
     logger.warn({ err: String(err), graph_run_id: graphRunId }, "[graph] updateGraphRun failed (non-fatal)");
   }
