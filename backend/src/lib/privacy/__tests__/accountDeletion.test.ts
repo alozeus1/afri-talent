@@ -6,11 +6,40 @@ const { mockPrisma } = vi.hoisted(() => {
     mockPrisma: {
       user: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn().mockResolvedValue({}) },
       candidateProfile: { updateMany: del() },
+      application: { updateMany: del() },
+      userBillingProfile: { updateMany: del() },
+      candidateTrustProfile: { updateMany: del() },
       resume: { deleteMany: del() },
       userResume: { deleteMany: del() },
       candidateResumeVersion: { deleteMany: del() },
+      coverLetterVersion: { deleteMany: del() },
       verificationArtifact: { deleteMany: del() },
       mockInterviewSession: { deleteMany: del() },
+      aiRun: { deleteMany: del() },
+      message: { deleteMany: del() },
+      chatConversation: { deleteMany: del() },
+      salaryNegotiationSession: { deleteMany: del() },
+      careerGapSession: { deleteMany: del() },
+      careerAdvice: { deleteMany: del() },
+      immigrationProcess: { deleteMany: del() },
+      calendarEvent: { deleteMany: del() },
+      companyReview: { deleteMany: del() },
+      interviewExperience: { deleteMany: del() },
+      salaryReport: { deleteMany: del() },
+      learningFeedback: { deleteMany: del() },
+      smsDeliveryLog: { deleteMany: del() },
+      phoneVerificationChallenge: { deleteMany: del() },
+      botSubscription: { deleteMany: del() },
+      pushSubscription: { deleteMany: del() },
+      socialProfile: { deleteMany: del() },
+      socialConnection: { deleteMany: del() },
+      referral: { deleteMany: del() },
+      candidateAgentTask: { deleteMany: del() },
+      candidateAutopilotProfile: { deleteMany: del() },
+      skillAssessment: { deleteMany: del() },
+      candidateVerifiedSkill: { deleteMany: del() },
+      candidatePartnerMarker: { deleteMany: del() },
+      employerTalentPoolCandidate: { deleteMany: del() },
       oAuthAccount: { deleteMany: del() },
       passwordResetToken: { deleteMany: del() },
       emailVerificationToken: { deleteMany: del() },
@@ -50,6 +79,25 @@ describe("anonymizeUser", () => {
     // Access paths cut.
     expect(mockPrisma.oAuthAccount.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });
     expect(mockPrisma.verificationArtifact.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });
+    // Free-text narratives / sensitive personal data erased.
+    expect(mockPrisma.immigrationProcess.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });
+    expect(mockPrisma.chatConversation.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });
+    expect(mockPrisma.message.deleteMany).toHaveBeenCalledWith({ where: { senderId: "u1" } });
+    expect(mockPrisma.salaryReport.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });
+    expect(mockPrisma.learningFeedback.deleteMany).toHaveBeenCalledWith({ where: { userId: "u1" } });
+    // Retention-sensitive rows scrubbed in place, not deleted.
+    expect(mockPrisma.application.updateMany).toHaveBeenCalledWith({
+      where: { candidateId: "u1" },
+      data: { coverLetter: null, notes: null, cvUrl: null },
+    });
+    expect(mockPrisma.userBillingProfile.updateMany).toHaveBeenCalledWith({
+      where: { userId: "u1" },
+      data: { taxIdValue: null, taxIdType: null },
+    });
+    expect(mockPrisma.candidateTrustProfile.updateMany).toHaveBeenCalledWith({
+      where: { userId: "u1" },
+      data: { phoneNumber: null },
+    });
   });
 
   it("is idempotent — skips a user already soft-deleted", async () => {

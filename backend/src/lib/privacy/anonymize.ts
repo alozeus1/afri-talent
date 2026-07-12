@@ -12,10 +12,18 @@
 // Idempotent: a user with deletedAt already set is skipped. Runs in a single
 // transaction so a partial scrub can't leave a half-erased account.
 //
-// NOT covered here (documented follow-ups): physical deletion of S3 objects
-// referenced by resumes / verification artifacts / interview recordings — there
-// is no S3 delete helper in the codebase yet; a bucket lifecycle rule or a
-// dedicated purge pass should reclaim the blobs. The DB references are removed.
+// NOT covered here (documented follow-ups):
+//   - Physical deletion of S3 objects referenced by resumes / verification
+//     artifacts / interview recordings — there is no S3 delete helper yet; a
+//     bucket lifecycle rule or dedicated purge should reclaim the blobs. The DB
+//     references are removed.
+//   - SemanticDocument (RAG index) may hold resume/profile text but is keyed by
+//     (namespace, sourceType, sourceId) with no userId column and a heterogeneous
+//     source-id convention, so a blind delete could hit other users' vectors.
+//     Needs the indexing owner to confirm the candidate source-id mapping first.
+//   - Kept intentionally (de-identified once the User row is scrubbed): billing
+//     ledgers (legal/tax retention), abuse reports & audit logs (safety),
+//     analytics/notification/saved-search/lifecycle rows.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import prisma from "../prisma.js";
@@ -43,28 +51,78 @@ export async function anonymizeUser(userId: string): Promise<AnonymizeResult> {
   if (!user) return { userId, status: "not_found" };
   if (user.deletedAt) return { userId, status: "already_deleted" };
 
+  // One atomic transaction: either the account is fully erased or nothing
+  // changes (no half-scrubbed state). Every delete below was FK-verified so it
+  // can't block the transaction: inbound references are all Cascade or SetNull.
   await prisma.$transaction([
-    // Free-text / profile PII (keep the row for FK integrity; blank the content).
+    // ── Scrub-in-place (keep the row; blank the PII) ──────────────────────────
+    // Profile free-text.
     prisma.candidateProfile.updateMany({
       where: { userId },
       data: { headline: null, bio: null, linkedinUrl: null, githubUrl: null, portfolioUrl: null },
     }),
-    // Sensitive documents and their DB references (ID docs, CVs, recordings).
+    // Applications are retained de-identified (row-delete is Restrict-blocked by
+    // MessageThread/AdminReview) — scrub the free text + CV link.
+    prisma.application.updateMany({
+      where: { candidateId: userId },
+      data: { coverLetter: null, notes: null, cvUrl: null },
+    }),
+    // Billing profile kept for financial/tax retention — null only the tax id.
+    prisma.userBillingProfile.updateMany({
+      where: { userId },
+      data: { taxIdValue: null, taxIdType: null },
+    }),
+    // Trust profile kept (de-identified score/history) — drop the phone copy.
+    prisma.candidateTrustProfile.updateMany({ where: { userId }, data: { phoneNumber: null } }),
+
+    // ── Documents / resumes (uploaded, generated, parsed) ─────────────────────
     prisma.resume.deleteMany({ where: { profile: { userId } } }),
-    // Generated/parsed resume PII lives in separate userId-keyed tables with no
-    // user-delete cascade, so anonymization (which keeps the User row) must
-    // delete them explicitly. userResume cascades to its AtsReports; a
-    // resumeVersion reference is SetNull, so neither delete is blocked.
-    prisma.userResume.deleteMany({ where: { userId } }),
+    prisma.userResume.deleteMany({ where: { userId } }), // cascades AtsReport
     prisma.candidateResumeVersion.deleteMany({ where: { userId } }),
+    prisma.coverLetterVersion.deleteMany({ where: { candidateId: userId } }),
     prisma.verificationArtifact.deleteMany({ where: { userId } }),
     prisma.mockInterviewSession.deleteMany({ where: { userId } }),
-    // Every credential / access path.
+    prisma.aiRun.deleteMany({ where: { userId } }), // cascades AiRunJob (tailored outputs)
+
+    // ── Free-text personal narratives / sessions ──────────────────────────────
+    prisma.message.deleteMany({ where: { senderId: userId } }),
+    prisma.chatConversation.deleteMany({ where: { userId } }), // cascades ChatMessage
+    prisma.salaryNegotiationSession.deleteMany({ where: { userId } }),
+    prisma.careerGapSession.deleteMany({ where: { candidateId: userId } }),
+    prisma.careerAdvice.deleteMany({ where: { userId } }),
+    prisma.immigrationProcess.deleteMany({ where: { userId } }), // cascades ImmigrationStep
+    prisma.calendarEvent.deleteMany({ where: { userId } }),
+
+    // ── Public contributions (userId is non-nullable → can't de-identify) ─────
+    prisma.companyReview.deleteMany({ where: { userId } }),
+    prisma.interviewExperience.deleteMany({ where: { userId } }),
+    prisma.salaryReport.deleteMany({ where: { userId } }),
+
+    // ── Copied-PII / contact identifiers / device channels ────────────────────
+    prisma.learningFeedback.deleteMany({ where: { userId } }), // snapshotted names
+    prisma.smsDeliveryLog.deleteMany({ where: { userId } }), // phone + message
+    prisma.phoneVerificationChallenge.deleteMany({ where: { candidateTrustProfile: { userId } } }),
+    prisma.botSubscription.deleteMany({ where: { userId } }), // chat handle
+    prisma.pushSubscription.deleteMany({ where: { userId } }), // device push channel
+    prisma.socialProfile.deleteMany({ where: { userId } }),
+    prisma.socialConnection.deleteMany({ where: { OR: [{ requesterId: userId }, { recipientId: userId }] } }),
+    prisma.referral.deleteMany({ where: { OR: [{ referrerId: userId }, { refereeId: userId }] } }),
+
+    // ── Autopilot / skills / evidence ─────────────────────────────────────────
+    prisma.candidateAgentTask.deleteMany({ where: { userId } }),
+    prisma.candidateAutopilotProfile.deleteMany({ where: { userId } }),
+    prisma.skillAssessment.deleteMany({ where: { userId } }),
+    prisma.candidateVerifiedSkill.deleteMany({ where: { userId } }),
+    prisma.candidatePartnerMarker.deleteMany({ where: { userId } }),
+    prisma.employerTalentPoolCandidate.deleteMany({ where: { candidateUserId: userId } }), // recruiter notes about the person
+
+    // ── Every credential / access path ────────────────────────────────────────
     prisma.oAuthAccount.deleteMany({ where: { userId } }),
     prisma.passwordResetToken.deleteMany({ where: { userId } }),
     prisma.emailVerificationToken.deleteMany({ where: { userId } }),
     prisma.userPhoneOtp.deleteMany({ where: { userId } }),
-    // Scrub the identity and lock the account.
+
+    // ── Scrub the identity and lock the account (keep the row for FK integrity) ─
     prisma.user.update({
       where: { id: userId },
       data: {
