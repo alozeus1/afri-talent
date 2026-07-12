@@ -23,6 +23,12 @@ export const INTERVIEW_REMINDER_INTERVAL_MS =
 // reminderMinutes gate below decides when a given event actually fires.
 const LOOKAHEAD_DAYS = 8;
 const DEFAULT_REMINDER_MINUTES = 30;
+// Catch-up window: include events whose startTime has *just* passed so a short
+// reminderMinutes (< the poll interval) can't fall between polls and be dropped.
+// e.g. a 5-min reminder for a 10:10 interview isn't due at the 10:00 poll, and
+// startTime <= now at 10:15 — without this grace the 10:15 poll would exclude
+// it entirely. It still sends (a few minutes late) rather than silently missing.
+const CATCHUP_GRACE_MS = INTERVIEW_REMINDER_INTERVAL_MS + 5 * 60 * 1000;
 
 export async function runInterviewReminderCycle(): Promise<void> {
   const now = new Date();
@@ -32,7 +38,7 @@ export async function runInterviewReminderCycle(): Promise<void> {
     where: {
       eventType: "INTERVIEW",
       reminderSentAt: null,
-      startTime: { gt: now, lte: horizon },
+      startTime: { gt: new Date(now.getTime() - CATCHUP_GRACE_MS), lte: horizon },
     },
     select: {
       id: true,
