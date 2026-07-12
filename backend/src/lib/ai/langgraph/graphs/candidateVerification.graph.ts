@@ -14,7 +14,7 @@ import { lastWriteWins } from "../state/reducers.js";
 import { getCheckpointer } from "../memory/checkpointer.js";
 import { emitGraphEvent } from "../observability/graphEvents.js";
 import { recordGraphRunOutcome } from "../observability/graphMetrics.js";
-import { createGraphRun, updateGraphRun } from "../tools/prismaTools.js";
+import { createGraphRun, updateGraphRun, assertGraphRunNotDenied } from "../tools/prismaTools.js";
 import { evaluateAdminDecision, type AdminDecision } from "../tools/trustTools.js";
 import type { GraphRunStatus } from "../state/schemas.js";
 
@@ -187,6 +187,7 @@ export async function resumeCandidateVerification(
   graphRunId?: string,
 ): Promise<CandidateVerificationResult> {
   const { graphRunId: gid, threadId } = ids(candidateId, graphRunId);
+  await assertGraphRunNotDenied(gid);
   emitGraphEvent({ graphRunId: gid, workflowType: WORKFLOW, threadId, type: "graph_resumed" });
   const { Command } = await import("@langchain/langgraph");
 
