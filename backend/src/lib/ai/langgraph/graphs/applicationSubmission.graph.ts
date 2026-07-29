@@ -23,7 +23,7 @@ import { lastWriteWins, appendReducer } from "../state/reducers.js";
 import { getCheckpointer } from "../memory/checkpointer.js";
 import { emitGraphEvent } from "../observability/graphEvents.js";
 import { recordGraphRunOutcome } from "../observability/graphMetrics.js";
-import { createGraphRun, updateGraphRun } from "../tools/prismaTools.js";
+import { createGraphRun, updateGraphRun, assertGraphRunNotDenied } from "../tools/prismaTools.js";
 import { runOnce } from "../tools/idempotency.js";
 import { validateApplyAcknowledgements, REQUIRED_ACKNOWLEDGEMENTS } from "../tools/applyTools.js";
 import type { GraphError, GraphRunStatus } from "../state/schemas.js";
@@ -223,6 +223,7 @@ export async function resumeApplicationApproval(
   meta?: SubmissionMeta,
 ): Promise<ApprovalOutcome> {
   const { graphRunId, threadId } = ids(applicationId, meta);
+  await assertGraphRunNotDenied(graphRunId);
   emitGraphEvent({ graphRunId, workflowType: WORKFLOW, threadId, type: "graph_resumed" });
 
   const app = buildSubmissionGraph(deps, { graphRunId, threadId, applicationId });

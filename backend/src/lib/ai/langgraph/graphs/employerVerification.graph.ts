@@ -17,7 +17,7 @@ import { lastWriteWins } from "../state/reducers.js";
 import { getCheckpointer } from "../memory/checkpointer.js";
 import { emitGraphEvent } from "../observability/graphEvents.js";
 import { recordGraphRunOutcome } from "../observability/graphMetrics.js";
-import { createGraphRun, updateGraphRun } from "../tools/prismaTools.js";
+import { createGraphRun, updateGraphRun, assertGraphRunNotDenied } from "../tools/prismaTools.js";
 import { tierFor, evaluateAdminDecision, type AdminDecision } from "../tools/trustTools.js";
 import type { GraphRunStatus, RiskTier } from "../state/schemas.js";
 
@@ -129,7 +129,14 @@ export type EmployerVerificationOutcome =
   | { status: "AWAITING_ADMIN"; graphRunId: string; threadId: string; review: EmployerAdminReview };
 
 function ids(employerId: string, graphRunId?: string) {
-  return { graphRunId: graphRunId ?? `employer-verify:${employerId}`, threadId: `employer:${employerId}:verification` };
+  // When a caller supplies an explicit graphRunId (e.g. the per-artifact rollout
+  // adapter), derive the thread from it so concurrent runs for the same employer
+  // don't collide on one checkpoint thread. Default path is unchanged, so resume
+  // callers that pass no graphRunId keep the canonical per-employer thread.
+  return {
+    graphRunId: graphRunId ?? `employer-verify:${employerId}`,
+    threadId: graphRunId ? `employer-verify:thread:${graphRunId}` : `employer:${employerId}:verification`,
+  };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -170,6 +177,7 @@ export async function resumeEmployerVerification(
   graphRunId?: string,
 ): Promise<EmployerVerificationOutcome> {
   const { graphRunId: gid, threadId } = ids(employerId, graphRunId);
+  await assertGraphRunNotDenied(gid);
   emitGraphEvent({ graphRunId: gid, workflowType: WORKFLOW, threadId, type: "graph_resumed" });
   const { Command } = await import("@langchain/langgraph");
 

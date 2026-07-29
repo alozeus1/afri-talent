@@ -7,8 +7,7 @@ import { computeProfileCompleteness } from "../lib/profile-completeness.js";
 import { refreshCandidateTrustProfile } from "../lib/trust/service.js";
 import logger from "../lib/logger.js";
 import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
-
-const ACCOUNT_DELETION_WINDOW_DAYS = 30;
+import { ACCOUNT_DELETION_WINDOW_DAYS } from "../lib/privacy/anonymize.js";
 
 const router = Router();
 
