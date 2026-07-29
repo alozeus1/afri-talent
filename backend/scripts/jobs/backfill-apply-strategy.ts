@@ -28,6 +28,7 @@
 import "dotenv/config";
 import { ApplyStrategy } from "@prisma/client";
 import prisma from "../../src/lib/prisma.js";
+import { resolveEffectiveApplyStrategy } from "../../src/lib/apply/caps.js";
 import { classifyApplyStrategy } from "../../src/lib/jobs/apply-strategy.js";
 
 interface Args {
@@ -114,15 +115,23 @@ async function main() {
         sourceUrl: row.sourceUrl,
         applicationUrl: row.applicationUrl,
       });
+      const effective = await resolveEffectiveApplyStrategy(prisma, {
+        applyStrategy: decision.strategy,
+        applyEmailDetected: decision.applyEmailDetected,
+      });
+      const finalStrategy = effective.effective;
+      const finalApplyEmail = effective.downgradedFromEmailDraft
+        ? null
+        : decision.applyEmailDetected ?? null;
 
-      counts[decision.strategy] = (counts[decision.strategy] ?? 0) + 1;
+      counts[finalStrategy] = (counts[finalStrategy] ?? 0) + 1;
 
       if (!args.dryRun) {
         await prisma.job.update({
           where: { id: row.id },
           data: {
-            applyStrategy: decision.strategy,
-            applyEmailDetected: decision.applyEmailDetected ?? null,
+            applyStrategy: finalStrategy,
+            applyEmailDetected: finalApplyEmail,
             applyFormDomain: decision.applyFormDomain ?? null,
           },
         });
