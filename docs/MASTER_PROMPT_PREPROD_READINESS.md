@@ -83,8 +83,9 @@ Each step: branch → PR → CI green → human review. Show test evidence per s
 
 **Decisions locked (2026-07-08):**
 - **MOCK_AI parity is the verification standard.** Do NOT run the live-AI agentic
-  E2E suites (no real Anthropic/OpenAI spend); MOCK_AI stubs are sufficient. This
-  drops the `E2E_RUN_AGENTIC=1` item from WS-2.
+  E2E suites against real Anthropic/OpenAI services. Run the agentic Playwright
+  suites with both `E2E_RUN_AGENTIC=1` and `MOCK_AI=1` so their test gates open
+  while the backend remains deterministic and cost-free.
 - **Operator-handoff: degrade to clickout (done).** `OPERATOR_HANDOFF` is flag-gated
   off (PR #238) so ATS-host jobs fall through to `ASSISTED_REDIRECT` instead of
   hard-failing; `--reclassify-operator-handoff` backfill (PR #239) flips existing
@@ -105,14 +106,16 @@ Each step: branch → PR → CI green → human review. Show test evidence per s
 - **Job matching**: fix whatever makes the match endpoint not return 200 in the test
   env (likely embedding/pgvector/seed), then **un-skip** `agentic-job-matching`'s hard
   `test.skip(true, ...)` and prove it green (under MOCK_AI).
-- **Live-AI path**: NOT required — MOCK_AI parity is the standard (see decisions).
-  Ensure the MOCK_AI-gated agentic assertions pass; skip the `E2E_RUN_AGENTIC` runs.
+- **Agentic path**: run the agentic Playwright suites with
+  `E2E_RUN_AGENTIC=1 MOCK_AI=1`; MOCK_AI parity is the standard (see decisions),
+  so real model calls are not required.
 - **Billing**: configure Stripe test keys in the E2E env so
   `phase2-stripe-billing-api` runs; add a Flutterwave sandbox smoke. Prove checkout →
   webhook → entitlement end-to-end (the signed-webhook technique is in
   `local-db-testing-env` memory).
-- Exit criterion: **0 core-loop tests skipped for env/config reasons** (agentic
-  live-AI suites excepted — intentionally MOCK_AI-only).
+- Exit criterion: **0 core-loop tests skipped for env/config reasons**. Agentic
+  suites must execute under MOCK_AI; only real-model validation is intentionally
+  out of scope.
 
 **WS-3 — Verify the unproven product paths.**
 - Resume PDF export: generate a PDF for all 3 templates, assert it downloads and is
@@ -135,8 +138,8 @@ Each step: branch → PR → CI green → human review. Show test evidence per s
 ## 5. Definition of done (pre-prod)
 
 - [ ] Dev stack resumed, `/health` 200, app reachable, DB seeded (human-approved).
-- [ ] Core-loop E2E all pass with **zero env/config skips** (agentic live-AI suites
-      excepted — MOCK_AI parity): candidate register→verify→resume→**match (un-skipped)**→
+- [ ] Core-loop E2E all pass with **zero env/config skips** (agentic suites execute
+      with `E2E_RUN_AGENTIC=1 MOCK_AI=1`): candidate register→verify→resume→**match (un-skipped)**→
       apply→track; employer post→triage→talent-search; admin moderate; **AI job_match +
       cover_letter + apply_pack** proven under MOCK_AI; **checkout→webhook→entitlement**
       proven in Stripe test + Flutterwave sandbox.
