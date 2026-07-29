@@ -2828,11 +2828,13 @@ model CalendarEvent {
   jobId           String?
   applicationId   String?
   reminderMinutes Int?              @default(30)
+  reminderSentAt  DateTime?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
   @@index([userId, startTime])
   @@index([userId, eventType])
+  @@index([eventType, reminderSentAt, startTime])
 }
 
 // ──────────────── Job Views / Profile Analytics ────────────────

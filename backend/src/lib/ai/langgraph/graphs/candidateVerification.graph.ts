@@ -14,7 +14,7 @@ import { lastWriteWins } from "../state/reducers.js";
 import { getCheckpointer } from "../memory/checkpointer.js";
 import { emitGraphEvent } from "../observability/graphEvents.js";
 import { recordGraphRunOutcome } from "../observability/graphMetrics.js";
-import { createGraphRun, updateGraphRun } from "../tools/prismaTools.js";
+import { createGraphRun, updateGraphRun, assertGraphRunNotDenied } from "../tools/prismaTools.js";
 import { evaluateAdminDecision, type AdminDecision } from "../tools/trustTools.js";
 import type { GraphRunStatus } from "../state/schemas.js";
 
@@ -146,7 +146,13 @@ export type CandidateVerificationResult =
   | { status: "AWAITING_ADMIN"; graphRunId: string; threadId: string; review: DocumentReview };
 
 function ids(candidateId: string, graphRunId?: string) {
-  return { graphRunId: graphRunId ?? `candidate-verify:${candidateId}`, threadId: `candidate:${candidateId}:verification` };
+  // See employerVerification.graph.ts: an explicit graphRunId (per-artifact
+  // rollout) gets its own thread so concurrent submissions don't collide; the
+  // default per-candidate thread is preserved for resume callers.
+  return {
+    graphRunId: graphRunId ?? `candidate-verify:${candidateId}`,
+    threadId: graphRunId ? `candidate-verify:thread:${graphRunId}` : `candidate:${candidateId}:verification`,
+  };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -187,6 +193,7 @@ export async function resumeCandidateVerification(
   graphRunId?: string,
 ): Promise<CandidateVerificationResult> {
   const { graphRunId: gid, threadId } = ids(candidateId, graphRunId);
+  await assertGraphRunNotDenied(gid);
   emitGraphEvent({ graphRunId: gid, workflowType: WORKFLOW, threadId, type: "graph_resumed" });
   const { Command } = await import("@langchain/langgraph");
 

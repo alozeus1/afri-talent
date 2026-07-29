@@ -352,6 +352,34 @@ router.post("/login", authLimiter, validateHumanAuthSubmission, async (req: Requ
       return;
     }
 
+    // Anonymized / closed account — deny. The scrubbed email means the lookup
+    // usually won't match, so this is a defensive backstop.
+    if (user.deletedAt) {
+      recordOpsEvent({
+        metricName: "login_failure",
+        category: "auth",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: { reason: "account_deleted" },
+      });
+      res.status(403).json({ error: "This account has been closed." });
+      return;
+    }
+
+    // "Sign in to cancel" — a successful login within the grace window cancels a
+    // pending deletion request so the reaper never touches the account.
+    if (user.deletionRequestedAt) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { deletionRequestedAt: null },
+      });
+      logger.info(
+        { userId: user.id.slice(0, 8) },
+        "[privacy] pending account deletion cancelled on login",
+      );
+    }
+
     // §2.10 — admins created after the migration do not get the SQL backfill.
     // Start their enrolment grace window on first successful password login.
     if (

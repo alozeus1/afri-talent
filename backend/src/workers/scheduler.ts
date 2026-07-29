@@ -29,6 +29,9 @@ import { runBillingReconciliationWorker } from "./billing-reconciliation.js";
 import { runCandidateRetentionWorker } from "./candidate-retention.js";
 import { runSemanticIndexWorker } from "./semantic-indexer.js";
 import { runSkillsJobEmbedder } from "./skills-job-embedder.js";
+import { runAccountDeletionCycle, ACCOUNT_DELETION_INTERVAL_MS } from "./account-deletion.js";
+import { runMockInterviewRetentionCycle, MOCK_INTERVIEW_RETENTION_INTERVAL_MS } from "./mock-interview-retention.js";
+import { runInterviewReminderCycle, INTERVIEW_REMINDER_INTERVAL_MS } from "./interview-reminder.js";
 import { pushDeadLetter, recordWorkerState, withRetry } from "../lib/ops/resilience.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
 
@@ -227,6 +230,34 @@ export function startScheduler(): void {
   // Daily cleanup of stale/expired job listings
   intervals.push(
     setInterval(() => void safeRun("job-cleanup", runJobCleanupCycle), CLEANUP_INTERVAL_MS)
+  );
+
+  // Daily account-deletion reaper: anonymize accounts past the 30-day window so
+  // the "permanently deleted within 30 days" promise is actually fulfilled.
+  intervals.push(
+    setInterval(() => void safeRun("account-deletion", runAccountDeletionCycle), ACCOUNT_DELETION_INTERVAL_MS)
+  );
+  const accountDeletionDelay = setTimeout(() => {
+    void safeRun("account-deletion", runAccountDeletionCycle);
+  }, 180_000);
+  intervals.push(accountDeletionDelay as unknown as IntervalRef);
+
+  // Daily mock-interview retention sweep: delete sessions past their expiresAt
+  // (cascades recordings/transcripts) so the stated retention window is enforced.
+  intervals.push(
+    setInterval(
+      () => void safeRun("mock-interview-retention", runMockInterviewRetentionCycle),
+      MOCK_INTERVIEW_RETENTION_INTERVAL_MS,
+    )
+  );
+
+  // Interview reminders: fire the "interviewReminders" pref for INTERVIEW
+  // calendar events entering their lead window (deduped via reminderSentAt).
+  intervals.push(
+    setInterval(
+      () => void safeRun("interview-reminder", runInterviewReminderCycle),
+      INTERVIEW_REMINDER_INTERVAL_MS,
+    )
   );
 
   // §4.4 — hourly stale-check sweep over the AGING batch.
