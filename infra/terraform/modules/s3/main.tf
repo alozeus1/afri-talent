@@ -129,13 +129,14 @@ resource "aws_iam_policy" "uploads_access" {
         Action = [
           "s3:PutObject",
           "s3:GetObject",
-          "s3:DeleteObject"
+          "s3:DeleteObject",
+          "s3:DeleteObjectVersion"
         ]
         Resource = local.put_get_resources
       },
       {
         Effect   = "Allow"
-        Action   = ["s3:ListBucket"]
+        Action   = ["s3:ListBucket", "s3:ListBucketVersions"]
         Resource = aws_s3_bucket.uploads.arn
         Condition = {
           StringLike = {

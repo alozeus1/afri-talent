@@ -142,7 +142,7 @@ variable "log_retention_days" {
 }
 
 variable "app_s3_bucket_arn" {
-  description = "Optional S3 bucket ARN granted to the task role (Get/Put). Empty = skipped."
+  description = "Optional S3 bucket ARN granted to the task role for upload and version-aware retention access. Empty = skipped."
   type        = string
   default     = ""
 }
