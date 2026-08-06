@@ -59,7 +59,7 @@ sequences the gaps into phases. Companion to `STAGING_RUNBOOK.md` and
 **Phase 0 — Bug triage — ✅ SHIPPED (#219/#220):** B1, B2 (UX layer), B5, B6, B7, B8 + dark-mode
 quick pass on the affected screens. Ship as one PR.
 
-**Phase 1 — Job data quality & trust labels — ✅ SHIPPED (#221; card-level pills remain):** user-facing label set
+**Phase 1 — Job data quality & trust labels — ✅ SHIPPED (#221 labels, #235 card pills):** user-facing label set
 (Verified employer / Salary available / Recently refreshed / External source /
 Possible duplicate / Needs review), explicit "Unknown/Not confirmed"
 rendering, expired/duplicate surfacing. Mostly *display* work — the metadata
@@ -81,10 +81,12 @@ deterministic parts; AI parts stay plan-gated with friendly upgrade prompts.
 (seed from public-domain taxonomies), practice history, STAR behavioral mode
 on top of existing mock-interview infra. Ethical-use guardrails documented.
 
-**Phase 5 — Learning dashboard:** per-role paths, completion persisted
-server-side (new `LearningProgress` model), gap→course mapping fed by match
-results ("missing Kubernetes → do this lab first"), admin-managed content via
-Resource CMS categories.
+**Phase 5 — Learning dashboard — ✅ SHIPPED (#230; targetRoles ranking boost
+deferred):** completion persisted server-side (`LearningProgress` model, May),
+gap→course mapping fed by match results — `/learning?search=<skill>` deep
+links from the job-fit panel filter the catalog, and `/api/learning/recommended`
+returns truthful `gapSkills` rendered as "Fills your gap" chips. Admin-managed
+content via Resource CMS categories remains.
 
 **Phase 6 — Visa & relocation readiness — ✅ SHIPPED (#226, clarity pass on existing tracker; reminders/statuses vocabulary remain):** informational tracker (statuses:
 Not started → Researching → Sponsorship confirmed → Documents → Submitted →
@@ -92,9 +94,11 @@ Waiting → Approved/Rejected/Closed), document checklist, reminders via
 existing notification system, country notes, prominent not-legal-advice
 disclaimer. Replaces the current vague page.
 
-**Phase 7 — Company trust pages:** merge `Company` (reviews,
-`hiresFromAfrica`) with `Employer`+trust profile into one public company
-surface; "Not enough verified data yet" for empty sections.
+**Phase 7 — Company trust pages — ✅ SHIPPED (#235; SEO/SSR for company pages
+deferred):** `Company` (reviews) and `Employer`+trust profile served from one
+normalized `/api/companies` surface; granular employer trust badge; derived
+(not hardcoded) hires-from-Africa; "Not enough verified data yet" empty
+states; job detail links to the employer's company page.
 
 **Phase 8 — Content engine:** blog categories (career advice, scam awareness,
 visa explainers, negotiation), related-jobs/learning links, author/updated
@@ -132,6 +136,8 @@ visa content.
 | #222 | Phase 2: deterministic job-fit panel, dashboard "My workspace" map |
 | #225 | Saved jobs end-to-end — `SavedJob` model + migration, `/api/saved-jobs`, save toggle, `/candidate/saved-jobs` |
 | #226 | Phase 6: visa readiness explainer, legal disclaimer, dark-mode pass, dashboard entry |
+| #230 | Phase 5 wrap-up: `/learning?search=` deep links, `gapSkills` on recommendations, "Fills your gap" chips (merged 2026-07-07) |
+| #235 | Phase 1 card pills (`africaPill` on job cards + saved jobs) and Phase 7 company trust pages (crash fix, granular trust badge, honest hires-from-Africa) (merged 2026-07-07) |
 
 **Tested:** backend + frontend `tsc --noEmit` clean on every PR; 112+ Jest
 tests (14 new for trust labels/verdicts); ESLint clean; full CI green on the
@@ -143,9 +149,11 @@ side handling, ISO country codes).
 candidate profile, learning, job matches, salaries, immigration,
 `/candidate/saved-jobs` (new).
 
-**Remains:** Phases 3–5 and 7–9 (resume-health surface, interview-prep
-expansion, server-side learning progress, company trust pages, content
-engine, admin consolidation); Phase 1 card pills; Phase 2 sticky apply bar.
+**Remains:** Phases 3, 4, 8, 9 (resume-health surface, interview-prep
+expansion, content engine, admin consolidation); Phase 2 sticky apply bar;
+deferred follow-ups — targetRoles-based ranking boost for learning
+recommendations (#230), SEO/SSR + sitemap for company pages (#235), Resource
+CMS admin content management (Phase 5).
 
 **Risks / operational notes:**
 - GitHub Actions intermittently dropped `pull_request` webhook events during
@@ -164,6 +172,15 @@ trust labels, save + report buttons; `/immigration` explainer + disclaimer;
 dashboard workspace grid; dark-mode on profile/learning/matches; profile
 save round-trips.
 
-**Recommended next phase:** Phase 5 — persist learning progress server-side
-and map job-match skill gaps to course recommendations; then Phase 1 card
-pills; then Phase 7 company trust pages.
+**Recommended next phase:** Phase 3 — unify the existing ATS rubric,
+matcher, and review flows into one "Resume health" surface (free tier gets
+the deterministic parts); then Phase 8 content engine on the blog pipeline.
+
+## Cycle addendum — 2026-07-07 (Phases 5, 1-remainder, 7)
+
+Shipped as #230 and #235 (see PR table above). Verified: full CI green on
+#230; #235 validated by local typecheck/lint/Jest/Vitest (19 frontend + 19
+backend tests on touched suites) and post-merge main CI. VM sync completed
+2026-08-06 (no migrations this cycle). Live smoke: `/learning?search=…`
+filters + gap chips; Africa pills on job cards/saved jobs; company pages
+load with granular badges and honest data; job detail → company link.

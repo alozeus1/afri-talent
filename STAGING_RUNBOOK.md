@@ -1,6 +1,6 @@
 # AfriTalent Shared Staging Handoff And Runbook
 
-Last updated: July 7, 2026 (suspension re-confirmed; PRs #230–#235 merged while suspended)
+Last updated: August 6, 2026 (free-tier VM synced for the #230/#235 cycle)
 
 > [!IMPORTANT]
 > **Architecture changed on 2026-05-10.** The shared environment has moved off
@@ -8,6 +8,29 @@ Last updated: July 7, 2026 (suspension re-confirmed; PRs #230–#235 merged whil
 > Serverless v2 + Lambda + CloudFront/WAF in the new AWS account `108188564905`.
 > Anything below that references `*.awsapprunner.com`, `afritalent-staging-*`
 > AWS resources, or the old account ID is historical and no longer live.
+
+## Update on August 6, 2026: Free-tier VM synced — July product cycle now live
+
+The July 7 product cycle (PR #230: Phase 5 learning gap→course mapping;
+PR #235: Phase 1 job-card Africa pills + Phase 7 company trust pages) is now
+fully live on the free-tier stack. No AWS/dev-stack changes — it remains in
+the June 25 suspended state.
+
+- Founder ran the standard VM sync on `tradebot-server` (2026-08-06):
+  `git pull` → backend `npm ci && npx prisma generate && npm run build` →
+  `native-backend-stop.sh && native-backend-start.sh`. Backend restarted
+  clean on :4000 (new pid); Prisma reported 54 migrations, **no pending
+  migrations** — correct, this cycle shipped none (the SavedJob migration
+  was applied during the July 6 sync).
+- Frontend was already live via Vercel auto-deploy on merge.
+- Live smoke checklist for the cycle: `/learning?search=kubernetes` filters
+  the catalog and recommended cards show "Fills your gap" chips; job cards
+  and `/candidate/saved-jobs` show Africa-eligibility pills; `/companies/:id`
+  loads without crashing, shows the granular employer trust badge and
+  derived (not hardcoded) hires-from-Africa; job detail company names link
+  to company pages.
+- Outstanding user-side items: SES setup for verification emails
+  (DEPLOYMENT_NOTES.md); Codex review credits still exhausted.
 
 ## Update on July 7, 2026: Stack remains suspended; CI deploys advanced the task definitions
 
