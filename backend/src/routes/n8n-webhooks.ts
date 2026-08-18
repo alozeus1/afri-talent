@@ -82,13 +82,6 @@ router.post("/approval", async (req: Request, res: Response) => {
     return;
   }
 
-  // Single-use (best-effort; deny is idempotent so failing open is safe).
-  const first = await consumeDecisionTokenOnce(graphRunId, DECISION_TOKEN_TTL_SECONDS);
-  if (!first) {
-    res.status(200).json({ status: "already_processed", graphRunId });
-    return;
-  }
-
   const run = await prisma.graphRun.findUnique({ where: { graphRunId } });
   if (!run) {
     res.status(404).json({ error: "Unknown graph run" });
@@ -100,10 +93,14 @@ router.post("/approval", async (req: Request, res: Response) => {
     // calls assertGraphRunNotDenied() and refuses to resume a DENIED run, so a
     // later console/user approval can never drive the paused checkpoint into a
     // sensitive side effect (publish/send/verify) after an email deny.
-    await prisma.graphRun.update({
-      where: { graphRunId },
+    const transition = await prisma.graphRun.updateMany({
+      where: { graphRunId, approvalState: { not: "DENIED" } },
       data: { approvalState: "DENIED", status: "BLOCKED" },
     });
+    if (transition.count === 0) {
+      res.status(200).json({ status: "already_processed", graphRunId });
+      return;
+    }
     await prisma.graphRunEvent.create({
       data: {
         graphRunId,
@@ -117,6 +114,10 @@ router.post("/approval", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Failed to record denial" });
     return;
   }
+
+  // Finalize only after the denial is durable. A Redis failure is harmless:
+  // the persisted terminal state makes provider retries idempotent.
+  await consumeDecisionTokenOnce(graphRunId, DECISION_TOKEN_TTL_SECONDS).catch(() => undefined);
 
   const meta = gateMetaFor(run.workflowType);
   recordOpsEvent({
