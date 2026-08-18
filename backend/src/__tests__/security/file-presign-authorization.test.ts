@@ -85,11 +85,41 @@ describe("file presign authorization", () => {
     }
   });
 
+  it("accepts only positive stored sizes through the inclusive 10 MiB boundary", async () => {
+    const register = () => request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key: `resumes/${ids.candidateA}/valid.pdf`, fileName: "valid.pdf" });
+    for (const size of [10 * 1024 * 1024 - 1, 10 * 1024 * 1024]) {
+      vi.clearAllMocks(); current(ids.candidateA, Role.CANDIDATE);
+      aws.head.mockResolvedValue({ ContentLength: size, ContentType: "application/pdf", ServerSideEncryption: "aws:kms" });
+      vi.mocked(prisma.candidateProfile.upsert).mockResolvedValue({ id: "profile-a" } as never);
+      vi.mocked(prisma.resume.create).mockResolvedValue({ id: "resume-a" } as never);
+      expect((await register()).status).toBe(201); expect(prisma.resume.create).toHaveBeenCalledOnce();
+    }
+    for (const size of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      vi.clearAllMocks(); current(ids.candidateA, Role.CANDIDATE);
+      aws.head.mockResolvedValue({ ContentLength: size, ContentType: "application/pdf", ServerSideEncryption: "aws:kms" });
+      expect((await register()).status).toBe(400); expect(prisma.resume.create).not.toHaveBeenCalled(); expect(prisma.candidateProfile.upsert).not.toHaveBeenCalled();
+    }
+  });
+
+  it("rejects every unsupported stored type and both extension/type mismatches", async () => {
+    const register = (s3Key = `resumes/${ids.candidateA}/valid.pdf`) => request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key, fileName: "valid.pdf" });
+    for (const contentType of ["text/html", "image/svg+xml", "application/javascript", "application/octet-stream", "application/x-msdownload"]) {
+      vi.clearAllMocks(); current(ids.candidateA, Role.CANDIDATE);
+      aws.head.mockResolvedValue({ ContentLength: 1, ContentType: contentType, ServerSideEncryption: "aws:kms" });
+      expect((await register()).status).toBe(400); expect(prisma.resume.create).not.toHaveBeenCalled();
+    }
+    for (const [key, contentType] of [[`resumes/${ids.candidateA}/valid.pdf`, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"], [`resumes/${ids.candidateA}/valid.docx`, "application/pdf"]]) {
+      vi.clearAllMocks(); current(ids.candidateA, Role.CANDIDATE);
+      aws.head.mockResolvedValue({ ContentLength: 1, ContentType: contentType, ServerSideEncryption: "aws:kms" });
+      expect((await register(key)).status).toBe(400); expect(prisma.resume.create).not.toHaveBeenCalled();
+    }
+  });
+
   it("rejects unsupported, encoded traversal, foreign, and inactive-account keys before HeadObject", async () => {
     const register = (key: string) => request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key: key, fileName: "x.pdf" });
     current(ids.candidateA, Role.CANDIDATE);
-    for (const key of [`resumes/${ids.candidateA}/x.exe`, `resumes/${ids.candidateA}/%2e%2e/${ids.candidateB}/x.pdf`, `resumes/${ids.candidateA}/./x.pdf`, `resumes/${ids.candidateB}/x.pdf`, `trust/candidates/${ids.candidateA}/x.pdf`]) {
-      const res = await register(key); expect(res.status).toBe(400); expect(aws.head).not.toHaveBeenCalled();
+    for (const key of [`resumes/${ids.candidateA}/x.exe`, `resumes/${ids.candidateA}/x.html`, `resumes/${ids.candidateA}/x.svg`, `resumes/${ids.candidateA}/x.zip`, `resumes/${ids.candidateA}/x.pdf.exe`, `resumes/${ids.candidateA}/%2e%2e/${ids.candidateB}/x.pdf`, `resumes/${ids.candidateA}/./x.pdf`, `resumes/${ids.candidateA}/x.pdf\r\nvalue`, `resumes/${ids.candidateA}/x.pdf\u0000`, `resumes/${ids.candidateB}/x.pdf`, `trust/candidates/${ids.candidateA}/x.pdf`, `trust/employers/${ids.candidateA}/x.pdf`]) {
+      const res = await register(key); expect(res.status, key).toBe(400); expect(aws.head).not.toHaveBeenCalled();
     }
     vi.clearAllMocks(); current(ids.candidateA, Role.CANDIDATE, "DELETED");
     const inactive = await register(`resumes/${ids.candidateA}/valid.pdf`); expect(inactive.status).toBe(401); expect(aws.head).not.toHaveBeenCalled(); expect(prisma.resume.create).not.toHaveBeenCalled();

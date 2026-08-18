@@ -9,6 +9,7 @@ import logger from "../lib/logger.js";
 import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import { ACCOUNT_DELETION_WINDOW_DAYS } from "../lib/privacy/anonymize.js";
 import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CONTROL_CHARACTER_FIELDS } from "../middleware/security.js";
 
 const router = Router();
 const RESUME_BUCKET = process.env.S3_UPLOADS_BUCKET;
@@ -249,6 +250,7 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
     if (
       !data.s3Key.startsWith(expectedPrefix) ||
       !keySuffix ||
+      (res.locals[CONTROL_CHARACTER_FIELDS] as Set<string> | undefined)?.has("s3Key") ||
       keySuffix.split("/").some((segment) => segment === "." || segment === "..") ||
       /%2e/i.test(data.s3Key) ||
       Array.from(data.s3Key).some((character) => {
@@ -271,7 +273,7 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
     try {
       const object = await resumeStorage().send(new HeadObjectCommand({ Bucket: RESUME_BUCKET, Key: data.s3Key }));
       if (
-        !Number.isFinite(object.ContentLength) || !object.ContentLength || object.ContentLength > RESUME_MAX_BYTES ||
+        !Number.isFinite(object.ContentLength) || !object.ContentLength || object.ContentLength <= 0 || object.ContentLength > RESUME_MAX_BYTES ||
         object.ContentType !== RESUME_TYPES[extension] || object.ServerSideEncryption !== "aws:kms"
       ) {
         res.status(400).json({ error: "Uploaded resume metadata is invalid" });
