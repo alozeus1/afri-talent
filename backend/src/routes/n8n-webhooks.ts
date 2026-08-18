@@ -93,22 +93,26 @@ router.post("/approval", async (req: Request, res: Response) => {
     // calls assertGraphRunNotDenied() and refuses to resume a DENIED run, so a
     // later console/user approval can never drive the paused checkpoint into a
     // sensitive side effect (publish/send/verify) after an email deny.
-    const transition = await prisma.graphRun.updateMany({
-      where: { graphRunId, approvalState: { not: "DENIED" } },
-      data: { approvalState: "DENIED", status: "BLOCKED" },
+    const transition = await prisma.$transaction(async (tx) => {
+      const result = await tx.graphRun.updateMany({
+        where: { graphRunId, approvalState: { not: "DENIED" } },
+        data: { approvalState: "DENIED", status: "BLOCKED" },
+      });
+      if (result.count === 0) return result;
+      await tx.graphRunEvent.create({
+        data: {
+          graphRunId,
+          type: "human_approval_denied",
+          node: "n8n_callback",
+          details: { source: "n8n_email", reason },
+        },
+      });
+      return result;
     });
     if (transition.count === 0) {
       res.status(200).json({ status: "already_processed", graphRunId });
       return;
     }
-    await prisma.graphRunEvent.create({
-      data: {
-        graphRunId,
-        type: "human_approval_denied",
-        node: "n8n_callback",
-        details: { source: "n8n_email", reason },
-      },
-    });
   } catch (err) {
     logger.error({ err: String(err), graph_run_id: graphRunId }, "[n8n] deny persist failed");
     res.status(500).json({ error: "Failed to record denial" });
