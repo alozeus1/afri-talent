@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const aws = vi.hoisted(() => { process.env.S3_UPLOADS_BUCKET = "test-private-uploads"; return { sign: vi.fn(), head: vi.fn(), commands: [] as any[] }; });
-vi.mock("@aws-sdk/client-s3", () => ({ S3Client: class { send = aws.head; }, PutObjectCommand: class { input: any; constructor(input: any) { this.input = input; aws.commands.push(input); } }, HeadObjectCommand: class { input: any; constructor(input: any) { this.input = input; aws.commands.push(input); } } }));
+const aws = vi.hoisted(() => { process.env.S3_UPLOADS_BUCKET = "test-private-uploads"; return { sign: vi.fn(), head: vi.fn(), get: vi.fn(), commands: [] as any[] }; });
+vi.mock("@aws-sdk/client-s3", () => ({ S3Client: class { send(command: any) { return command.kind === "get" ? aws.get(command) : aws.head(command); } }, PutObjectCommand: class { input: any; constructor(input: any) { this.input = input; aws.commands.push(input); } }, HeadObjectCommand: class { kind = "head"; input: any; constructor(input: any) { this.input = input; aws.commands.push(input); } }, GetObjectCommand: class { kind = "get"; input: any; constructor(input: any) { this.input = input; aws.commands.push(input); } } }));
 vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl: aws.sign }));
 vi.mock("../../middleware/account-standing.js", () => ({ requireAccountStanding: () => (_q: unknown, _s: unknown, next: () => void) => next() }));
 vi.mock("../../lib/prisma.js", () => ({ default: {
@@ -20,7 +20,8 @@ const token = (id: string, role: Role) => signToken({ userId: id, role, email: `
 function current(id: string, role: Role, state = "ACTIVE") { (prisma.user.findUnique as any).mockImplementation((args: any) => args?.where?.id === id && args?.select?.deletedAt === true && args?.select?.accountRestrictionStatus === true ? Promise.resolve({ id, email: `${id}@example.test`, role, deletedAt: state === "DELETED" ? new Date() : null, accountRestrictionStatus: state }) : undefined); }
 const valid = { scope: "resume", contentType: "application/pdf", fileName: "resume.pdf", fileSizeBytes: 1024 };
 
-beforeEach(() => { vi.clearAllMocks(); aws.commands.length = 0; aws.sign.mockResolvedValue("https://signed.example.test/redacted"); aws.head.mockResolvedValue({ ContentLength: 1024, ContentType: "application/pdf", ServerSideEncryption: "aws:kms" }); });
+const content = (bytes: number[]) => ({ Body: { async *[Symbol.asyncIterator]() { yield new Uint8Array(bytes); } } });
+beforeEach(() => { vi.clearAllMocks(); aws.commands.length = 0; aws.sign.mockResolvedValue("https://signed.example.test/redacted"); aws.head.mockResolvedValue({ ContentLength: 1024, ContentType: "application/pdf", ServerSideEncryption: "aws:kms" }); aws.get.mockResolvedValue(content([0x25, 0x50, 0x44, 0x46, 0x2d])); });
 
 describe("file presign authorization", () => {
   it("denies anonymous and invalid roles before constructing or signing S3 requests", async () => {
@@ -61,7 +62,26 @@ describe("file presign authorization", () => {
     vi.mocked(prisma.resume.create).mockResolvedValue({ id: "resume-a" } as never);
     vi.mocked(prisma.candidateProfile.findUnique).mockResolvedValue(null as never);
     const res = await request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key: `resumes/${ids.candidateA}/valid.pdf`, fileName: "valid.pdf" });
-    expect(res.status).toBe(201); expect(aws.head).toHaveBeenCalledOnce(); expect(prisma.resume.create).toHaveBeenCalledOnce();
+    expect(res.status).toBe(201); expect(aws.head).toHaveBeenCalledOnce(); expect(aws.get).toHaveBeenCalledOnce(); expect(aws.commands[1]).toEqual(expect.objectContaining({ Bucket: "test-private-uploads", Key: `resumes/${ids.candidateA}/valid.pdf`, Range: "bytes=0-15" })); expect(prisma.resume.create).toHaveBeenCalledOnce();
+  });
+
+  it("rejects type-confused, empty, truncated, oversized, and failed signature reads before persistence", async () => {
+    const register = (s3Key = `resumes/${ids.candidateA}/valid.pdf`) => request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key, fileName: "valid.pdf" });
+    const invalidPdfBodies = [[], [0x3c, 0x68, 0x74, 0x6d, 0x6c], [0x3c, 0x73, 0x76, 0x67], [0x4d, 0x5a], [0x50, 0x4b, 0x03, 0x04], [0x25, 0x50, 0x44]];
+    for (const bytes of invalidPdfBodies) {
+      vi.clearAllMocks(); current(ids.candidateA, Role.CANDIDATE); aws.get.mockResolvedValue(content(bytes));
+      expect((await register()).status).toBe(400); expect(prisma.resume.create).not.toHaveBeenCalled(); expect(prisma.candidateProfile.upsert).not.toHaveBeenCalled();
+    }
+    for (const bytes of [[0x50, 0x4b, 0x03, 0x04], [0x25, 0x50, 0x44, 0x46, 0x2d], [0x3c, 0x68, 0x74, 0x6d, 0x6c], [0x4d, 0x5a], []]) {
+      vi.clearAllMocks(); current(ids.candidateA, Role.CANDIDATE); aws.head.mockResolvedValue({ ContentLength: 1024, ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ServerSideEncryption: "aws:kms" }); aws.get.mockResolvedValue(content(bytes));
+      const expected = bytes[0] === 0x50 ? 201 : 400;
+      if (expected === 201) { vi.mocked(prisma.candidateProfile.upsert).mockResolvedValue({ id: "profile-a" } as never); vi.mocked(prisma.resume.create).mockResolvedValue({ id: "resume-a" } as never); }
+      expect((await register(`resumes/${ids.candidateA}/valid.docx`)).status).toBe(expected); if (expected === 400) expect(prisma.resume.create).not.toHaveBeenCalled();
+    }
+    for (const body of [content(Array.from({ length: 17 }, () => 0x25)), { Body: { async *[Symbol.asyncIterator]() { throw new Error("read failed"); } } }]) {
+      vi.clearAllMocks(); current(ids.candidateA, Role.CANDIDATE); aws.head.mockResolvedValue({ ContentLength: 1024, ContentType: "application/pdf", ServerSideEncryption: "aws:kms" }); aws.get.mockResolvedValue(body);
+      expect((await register()).status).toBe(422); expect(prisma.resume.create).not.toHaveBeenCalled(); expect(prisma.candidateProfile.upsert).not.toHaveBeenCalled();
+    }
   });
 
   it("fails closed for missing objects, provider failures, and every invalid stored metadata variant", async () => {
