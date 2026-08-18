@@ -250,6 +250,7 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
       !data.s3Key.startsWith(expectedPrefix) ||
       !keySuffix ||
       keySuffix.split("/").some((segment) => segment === "." || segment === "..") ||
+      /%2e/i.test(data.s3Key) ||
       /[\u0000-\u001f\u007f]/.test(data.s3Key)
     ) {
       res.status(400).json({ error: "Invalid s3Key — must be scoped to your user ID" });

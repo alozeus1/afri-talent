@@ -63,4 +63,42 @@ describe("file presign authorization", () => {
     const res = await request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key: `resumes/${ids.candidateA}/valid.pdf`, fileName: "valid.pdf" });
     expect(res.status).toBe(201); expect(aws.head).toHaveBeenCalledOnce(); expect(prisma.resume.create).toHaveBeenCalledOnce();
   });
+
+  it("fails closed for missing objects, provider failures, and every invalid stored metadata variant", async () => {
+    const register = (key = `resumes/${ids.candidateA}/valid.pdf`) => request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key: key, fileName: "valid.pdf" });
+    current(ids.candidateA, Role.CANDIDATE);
+    const failures = [
+      new Error("NoSuchKey bucket=test-private-uploads request=secret"), new Error("AccessDenied kms=secret"), new Error("timeout"),
+      { ContentLength: 0, ContentType: "application/pdf", ServerSideEncryption: "aws:kms" },
+      { ContentLength: 10 * 1024 * 1024 + 1, ContentType: "application/pdf", ServerSideEncryption: "aws:kms" },
+      { ContentLength: undefined, ContentType: "application/pdf", ServerSideEncryption: "aws:kms" },
+      { ContentLength: 1, ContentType: "text/html", ServerSideEncryption: "aws:kms" },
+      { ContentLength: 1, ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ServerSideEncryption: "aws:kms" },
+      { ContentLength: 1, ContentType: "application/pdf", ServerSideEncryption: "AES256" },
+      { ContentLength: 1, ContentType: "application/pdf" },
+    ];
+    for (const result of failures) {
+      vi.clearAllMocks(); aws.head.mockImplementationOnce(() => result instanceof Error ? Promise.reject(result) : Promise.resolve(result));
+      const res = await register();
+      expect([400, 422]).toContain(res.status); expect(res.text).not.toContain("test-private-uploads"); expect(res.text).not.toContain("secret");
+      expect(prisma.resume.create).not.toHaveBeenCalled(); expect(prisma.candidateProfile.upsert).not.toHaveBeenCalled();
+    }
+  });
+
+  it("rejects unsupported, encoded traversal, foreign, and inactive-account keys before HeadObject", async () => {
+    const register = (key: string) => request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key: key, fileName: "x.pdf" });
+    current(ids.candidateA, Role.CANDIDATE);
+    for (const key of [`resumes/${ids.candidateA}/x.exe`, `resumes/${ids.candidateA}/%2e%2e/${ids.candidateB}/x.pdf`, `resumes/${ids.candidateA}/./x.pdf`, `resumes/${ids.candidateB}/x.pdf`, `trust/candidates/${ids.candidateA}/x.pdf`]) {
+      const res = await register(key); expect(res.status).toBe(400); expect(aws.head).not.toHaveBeenCalled();
+    }
+    vi.clearAllMocks(); current(ids.candidateA, Role.CANDIDATE, "DELETED");
+    const inactive = await register(`resumes/${ids.candidateA}/valid.pdf`); expect(inactive.status).toBe(401); expect(aws.head).not.toHaveBeenCalled(); expect(prisma.resume.create).not.toHaveBeenCalled();
+  });
+
+  it("does not report success when persistence fails after verification", async () => {
+    current(ids.candidateA, Role.CANDIDATE); aws.head.mockResolvedValue({ ContentLength: 1, ContentType: "application/pdf", ServerSideEncryption: "aws:kms" });
+    vi.mocked(prisma.candidateProfile.upsert).mockRejectedValue(new Error("database detail"));
+    const res = await request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key: `resumes/${ids.candidateA}/valid.pdf`, fileName: "valid.pdf" });
+    expect(res.status).toBe(500); expect(res.text).not.toContain("database detail"); expect(prisma.resume.create).not.toHaveBeenCalled();
+  });
 });
