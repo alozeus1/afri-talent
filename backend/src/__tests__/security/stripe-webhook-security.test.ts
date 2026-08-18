@@ -27,6 +27,7 @@ vi.mock("../../lib/flutterwave.js", () => ({
 import express from "express";
 import request from "supertest";
 import Stripe from "stripe";
+import { Prisma } from "@prisma/client";
 
 const stripe = new Stripe(["sk", "test", "synthetic_webhook_security"].join("_"), { apiVersion: "2026-01-28.clover" });
 vi.mock("../../lib/stripe.js", () => ({
@@ -173,5 +174,91 @@ describe("POST /api/webhooks/stripe raw signature integrity", () => {
     expect(db.subscription.upsert).not.toHaveBeenCalled();
     expect(billing.syncBillingEntitlementState).not.toHaveBeenCalled();
     expect(billing.recordBillingEvent).not.toHaveBeenCalled();
+  });
+
+  it("acknowledges an exact duplicate without repeating a trusted checkout transition", async () => {
+    const payload = JSON.stringify({
+      id: "evt_synthetic_duplicate",
+      object: "event",
+      created: 1_700_000_000,
+      type: "checkout.session.completed",
+      data: { object: {
+        id: "cs_synthetic_duplicate",
+        customer: "cus_candidate_a",
+        subscription: "sub_candidate_a",
+        metadata: { userId: "candidate-a", plan: "BASIC" },
+      } },
+    });
+    db.subscription.findFirst.mockResolvedValueOnce({ id: "subscription-1" });
+
+    const first = await request(app).post("/api/webhooks/stripe")
+      .set("content-type", "application/json").set("stripe-signature", signedPayload(payload)).send(payload);
+    expect(first.status).toBe(200);
+
+    db.billingWebhookIdempotencyKey.create.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("duplicate", {
+        code: "P2002", clientVersion: "test", meta: { target: ["key"] },
+      }),
+    );
+    const duplicate = await request(app).post("/api/webhooks/stripe")
+      .set("content-type", "application/json").set("stripe-signature", signedPayload(payload)).send(payload);
+
+    expect(duplicate.status).toBe(200);
+    expect(duplicate.body).toEqual({ received: true, duplicate: true });
+    expect(db.subscription.upsert).toHaveBeenCalledOnce();
+    expect(billing.syncBillingEntitlementState).toHaveBeenCalledOnce();
+  });
+
+  it("does not treat an unrelated P2002 as a duplicate delivery", async () => {
+    const payload = JSON.stringify({
+      id: "evt_synthetic_unrelated_constraint",
+      object: "event",
+      created: 1_700_000_000,
+      type: "payment_method.attached",
+      data: { object: { id: "pm_synthetic", customer: "cus_synthetic" } },
+    });
+    db.billingWebhookIdempotencyKey.create.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("unrelated unique conflict", {
+        code: "P2002", clientVersion: "test", meta: { target: ["differentUniqueField"] },
+      }),
+    );
+
+    const response = await request(app).post("/api/webhooks/stripe")
+      .set("content-type", "application/json").set("stripe-signature", signedPayload(payload)).send(payload);
+
+    expect(response.status).toBe(500);
+    expect(response.body).not.toEqual({ received: true, duplicate: true });
+    expect(db.subscription.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("returns a retryable failure and releases the reservation when trusted checkout persistence fails", async () => {
+    const payload = JSON.stringify({
+      id: "evt_synthetic_retry",
+      object: "event",
+      created: 1_700_000_000,
+      type: "checkout.session.completed",
+      data: { object: {
+        id: "cs_synthetic_retry", customer: "cus_candidate_a", subscription: "sub_candidate_a",
+        metadata: { userId: "candidate-a", plan: "BASIC" },
+      } },
+    });
+    db.subscription.findFirst.mockResolvedValueOnce({ id: "subscription-1" });
+    db.subscription.upsert.mockRejectedValueOnce(new Error("synthetic persistence failure"));
+    db.billingWebhookIdempotencyKey.delete.mockResolvedValueOnce({ key: "STRIPE:evt_synthetic_retry" });
+
+    const failed = await request(app).post("/api/webhooks/stripe")
+      .set("content-type", "application/json").set("stripe-signature", signedPayload(payload)).send(payload);
+
+    expect(failed.status).toBe(500);
+    expect(db.billingWebhookIdempotencyKey.delete).toHaveBeenCalledOnce();
+    expect(billing.syncBillingEntitlementState).not.toHaveBeenCalled();
+
+    db.subscription.findFirst.mockResolvedValueOnce({ id: "subscription-1" });
+    const retry = await request(app).post("/api/webhooks/stripe")
+      .set("content-type", "application/json").set("stripe-signature", signedPayload(payload)).send(payload);
+    expect(retry.status).toBe(200);
+    expect(db.billingWebhookIdempotencyKey.create).toHaveBeenCalledTimes(2);
+    expect(db.subscription.upsert).toHaveBeenCalledTimes(2);
+    expect(billing.syncBillingEntitlementState).toHaveBeenCalledOnce();
   });
 });

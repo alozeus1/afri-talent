@@ -83,7 +83,14 @@ async function reserveEventId(provider: BillingProvider, eventId: string): Promi
       },
     });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    const target = error instanceof Prisma.PrismaClientKnownRequestError
+      ? error.meta?.target
+      : undefined;
+    const targetValues = Array.isArray(target) ? target.map(String) : [String(target ?? "")];
+    const isIdempotencyKeyConflict = targetValues.some((value) =>
+      value === "key" || value.toLowerCase().includes("billingwebhookidempotencykey_key"),
+    );
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" && isIdempotencyKeyConflict) {
       return false;
     }
     throw error;
@@ -110,11 +117,18 @@ async function reserveEventId(provider: BillingProvider, eventId: string): Promi
  */
 async function releaseEventId(provider: BillingProvider, eventId: string): Promise<void> {
   const key = `${provider}:${eventId}`;
-  await prisma.billingWebhookIdempotencyKey
-    .delete({ where: { key } })
-    .catch(() => undefined);
+  try {
+    await prisma.billingWebhookIdempotencyKey.delete({ where: { key } });
+  } catch {
+    // Preserve the processing failure; an operator can reconcile a stranded
+    // reservation without exposing provider or database details to Stripe.
+  }
   if (redisClient) {
-    await redisClient.del(`idempotency:${key}`).catch(() => undefined);
+    try {
+      await redisClient.del(`idempotency:${key}`);
+    } catch {
+      // Redis is a secondary cache; the database reservation is authoritative.
+    }
   }
 }
 
@@ -575,9 +589,11 @@ router.post("/stripe", async (req: Request, res: Response) => {
     return;
   }
 
-  // Idempotency guard
-  const reserved = await reserveEventId(BillingProvider.STRIPE, event.id);
-  if (!reserved) {
+  // A true return means this request created the durable reservation.
+  let reservationAcquired = false;
+  let processingCompleted = false;
+  const reservationCreated = await reserveEventId(BillingProvider.STRIPE, event.id);
+  if (!reservationCreated) {
     await recordBillingEvent({
       source: "STRIPE_WEBHOOK",
       eventId: event.id,
@@ -600,6 +616,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
     res.json({ received: true, duplicate: true });
     return;
   }
+  reservationAcquired = true;
 
   try {
     switch (event.type) {
@@ -1129,8 +1146,12 @@ router.post("/stripe", async (req: Request, res: Response) => {
         // Event types are allowlisted before idempotency reservation.
         }
 
+    processingCompleted = true;
     res.json({ received: true });
   } catch (error) {
+    if (reservationAcquired && !processingCompleted) {
+      await releaseEventId(BillingProvider.STRIPE, event.id).catch(() => undefined);
+    }
     console.error("[webhook] Handler error:", error);
     const failedAudit = await recordBillingEvent({
       source: "STRIPE_WEBHOOK",
@@ -1177,14 +1198,9 @@ router.post("/stripe", async (req: Request, res: Response) => {
         reason: "handler_error",
       },
     });
-    // Release the idempotency reservation so a manual Stripe redelivery can
-    // re-process this event (subscription upserts and audit writes are
-    // idempotent). We still return 200 to suppress automatic Stripe retries
-    // since state may be partially applied.
-    await releaseEventId(BillingProvider.STRIPE, event.id).catch(() => undefined);
-
-    // Return 200 to prevent Stripe from retrying (state may be partially applied)
-    res.json({ received: true, error: "Handler error — check server logs" });
+    // The reservation was released before fallible reporting so Stripe can
+    // safely retry the incomplete event.
+    res.status(500).json({ error: "Webhook processing failed" });
   }
 });
 
