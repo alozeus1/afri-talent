@@ -761,7 +761,7 @@ model RegionConfig {
 // ──────────────── Existing Models ────────────────
 
 model User {
-  savedJobs SavedJob[] @relation("UserSavedJobs")
+  savedJobs                SavedJob[]               @relation("UserSavedJobs")
   id                       String                   @id @default(uuid())
   email                    String                   @unique
   password                 String                   @default("")
@@ -940,7 +940,7 @@ model EmployerTalentPoolCandidate {
 }
 
 model Job {
-  savedBy SavedJob[] @relation("JobSavedBy")
+  savedBy            SavedJob[]     @relation("JobSavedBy")
   id                 String         @id @default(uuid())
   title              String
   slug               String         @unique
@@ -3326,7 +3326,7 @@ model GraphRun {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  events GraphRunEvent[]
+  events            GraphRunEvent[]
   callbackDecisions N8nCallbackDecision[]
 
   @@index([workflowType, createdAt(sort: Desc)])
@@ -3337,14 +3337,14 @@ model GraphRun {
 }
 
 model N8nCallbackDecision {
-  id          String   @id @default(uuid())
-  tokenDigest String   @unique @db.VarChar(64)
-  tokenJti    String?  @db.VarChar(64)
-  graphRunId  String   @db.VarChar(191)
-  action      String   @db.VarChar(32)
+  id          String    @id @default(uuid())
+  tokenDigest String    @unique @db.VarChar(64)
+  tokenJti    String?   @db.VarChar(64)
+  graphRunId  String    @db.VarChar(191)
+  action      String    @db.VarChar(32)
   completedAt DateTime?
-  createdAt   DateTime @default(now())
-  graphRun    GraphRun @relation(fields: [graphRunId], references: [graphRunId], onDelete: Restrict)
+  createdAt   DateTime  @default(now())
+  graphRun    GraphRun  @relation(fields: [graphRunId], references: [graphRunId], onDelete: Restrict)
 
   @@index([graphRunId, action])
   @@index([tokenJti])

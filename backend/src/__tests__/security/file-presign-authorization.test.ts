@@ -78,7 +78,7 @@ describe("file presign authorization", () => {
       if (expected === 201) { vi.mocked(prisma.candidateProfile.upsert).mockResolvedValue({ id: "profile-a" } as never); vi.mocked(prisma.resume.create).mockResolvedValue({ id: "resume-a" } as never); }
       expect((await register(`resumes/${ids.candidateA}/valid.docx`)).status).toBe(expected); if (expected === 400) expect(prisma.resume.create).not.toHaveBeenCalled();
     }
-    for (const body of [content(Array.from({ length: 17 }, () => 0x25)), { Body: { async *[Symbol.asyncIterator]() { throw new Error("read failed"); } } }]) {
+    for (const body of [content(Array.from({ length: 17 }, () => 0x25)), { Body: { async *[Symbol.asyncIterator]() { yield new Uint8Array(); throw new Error("read failed"); } } }]) {
       vi.clearAllMocks(); current(ids.candidateA, Role.CANDIDATE); aws.head.mockResolvedValue({ ContentLength: 1024, ContentType: "application/pdf", ServerSideEncryption: "aws:kms" }); aws.get.mockResolvedValue(body);
       expect((await register()).status).toBe(422); expect(prisma.resume.create).not.toHaveBeenCalled(); expect(prisma.candidateProfile.upsert).not.toHaveBeenCalled();
     }
