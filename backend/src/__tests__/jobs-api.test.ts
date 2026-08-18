@@ -113,6 +113,27 @@ function makeCandidateToken(id = "can123"): string {
     });
 }
 
+function mockCurrentAccount(input: { id: string; email: string; role: Role }): void {
+    (prisma.user.findUnique as any).mockImplementation((args: any) => {
+        const isAuthLookup =
+            args?.where?.id === input.id &&
+            args?.select?.deletedAt === true &&
+            args?.select?.accountRestrictionStatus === true;
+
+        if (isAuthLookup) {
+            return Promise.resolve({
+                id: input.id,
+                email: input.email,
+                role: input.role,
+                deletedAt: null,
+                accountRestrictionStatus: "ACTIVE",
+            });
+        }
+
+        return undefined;
+    });
+}
+
 const DUMMY_JOB = {
     id: "job123",
     title: "Frontend Engineer",
@@ -297,6 +318,7 @@ describe("Jobs API", () => {
 
         it("returns 403 for candidate (non-employer)", async () => {
             const token = makeCandidateToken();
+            mockCurrentAccount({ id: "can123", email: "candidate@test.com", role: Role.CANDIDATE });
             const res = await request(app).post("/api/jobs")
                 .set("Authorization", `Bearer ${token}`)
                 .send({ title: "New Job" });
@@ -306,6 +328,7 @@ describe("Jobs API", () => {
 
         it("returns 400 for missing required fields", async () => {
             const token = makeEmployerToken();
+            mockCurrentAccount({ id: "emp123", email: "employer@test.com", role: Role.EMPLOYER });
             const res = await request(app).post("/api/jobs")
                 .set("Authorization", `Bearer ${token}`)
                 .send({ title: "Only Title" }); // missing desc, location, etc.
@@ -316,6 +339,7 @@ describe("Jobs API", () => {
 
         it("creates job successfully on valid payload", async () => {
             const token = makeEmployerToken();
+            mockCurrentAccount({ id: "emp123", email: "employer@test.com", role: Role.EMPLOYER });
             (prisma.employer.findUnique as any).mockResolvedValueOnce({ id: "emp123", userId: "emp123" });
             (prisma.job.create as any).mockResolvedValueOnce({
                 id: "new_job_1",
@@ -348,6 +372,7 @@ describe("Jobs API", () => {
     describe("PUT /api/jobs/:id", () => {
         it("returns 404 if job not found during update", async () => {
             const token = makeEmployerToken();
+            mockCurrentAccount({ id: "emp123", email: "employer@test.com", role: Role.EMPLOYER });
             (prisma.employer.findUnique as any).mockResolvedValueOnce({ id: "emp123", userId: "emp123" });
             (prisma.job.findFirst as any).mockResolvedValueOnce(null);
 
@@ -360,6 +385,7 @@ describe("Jobs API", () => {
 
         it("returns 403 if job belongs to another employer", async () => {
             const token = makeEmployerToken("different_employer_id");
+            mockCurrentAccount({ id: "different_employer_id", email: "employer@test.com", role: Role.EMPLOYER });
             // Job belongs to "emp123"
             (prisma.employer.findUnique as any).mockResolvedValueOnce({ id: "emp999", userId: "different_employer_id" });
             (prisma.job.findFirst as any).mockResolvedValueOnce(null); // findFirst with correct employer returns null
@@ -373,6 +399,7 @@ describe("Jobs API", () => {
 
         it("updates job successfully", async () => {
             const token = makeEmployerToken("emp123");
+            mockCurrentAccount({ id: "emp123", email: "employer@test.com", role: Role.EMPLOYER });
             // Check ownership
             (prisma.employer.findUnique as any).mockResolvedValueOnce({ id: "emp123", userId: "emp123" });
             (prisma.job.findFirst as any).mockResolvedValueOnce({ ...DUMMY_JOB, employerId: "emp123" });
