@@ -130,6 +130,19 @@ router.post("/approval", async (req: Request, res: Response) => {
       return;
     }
   } catch (err) {
+    const target = (err as { code?: string; meta?: { target?: unknown } })?.meta?.target;
+    const callbackDigestConflict = (err as { code?: string })?.code === "P2002"
+      && (Array.isArray(target) ? target.includes("tokenDigest") : String(target ?? "").includes("tokenDigest"));
+    if (callbackDigestConflict) {
+      const existing = await prisma.n8nCallbackDecision.findUnique({ where: { tokenDigest } });
+      if (existing?.completedAt && existing.graphRunId === graphRunId && existing.action === action && existing.tokenJti === tokenJti) {
+        await consumeDecisionTokenOnce(graphRunId, DECISION_TOKEN_TTL_SECONDS).catch(() => undefined);
+        res.status(200).json({ status: "already_processed", graphRunId });
+        return;
+      }
+      res.status(409).json({ error: "Callback identity conflict" });
+      return;
+    }
     logger.error({ err: String(err), graph_run_id: graphRunId }, "[n8n] deny persist failed");
     res.status(500).json({ error: "Failed to record denial" });
     return;
