@@ -1,0 +1,177 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const db = vi.hoisted(() => ({
+  billingWebhookIdempotencyKey: { create: vi.fn(), delete: vi.fn() },
+  subscription: { findFirst: vi.fn(), upsert: vi.fn() },
+}));
+const billing = vi.hoisted(() => ({
+  recordBillingEvent: vi.fn(),
+  syncBillingEntitlementState: vi.fn(),
+  upsertBillingDiscrepancy: vi.fn(),
+}));
+const ops = vi.hoisted(() => ({ recordOpsEvent: vi.fn() }));
+const deadLetter = vi.hoisted(() => ({ pushDeadLetter: vi.fn() }));
+
+vi.mock("../../lib/prisma.js", () => ({ default: db }));
+vi.mock("../../lib/billing/index.js", () => billing);
+vi.mock("../../lib/notifications.js", () => ({ createUserNotification: vi.fn() }));
+vi.mock("../../lib/ops/events.js", () => ops);
+vi.mock("../../lib/ops/resilience.js", () => deadLetter);
+vi.mock("../../lib/redis.js", () => ({ redisClient: null }));
+vi.mock("../../lib/billing/region-resolver.js", () => ({ updateStripeCountry: vi.fn() }));
+vi.mock("../../lib/flutterwave.js", () => ({
+  getFlutterwaveSecretHash: vi.fn(),
+  verifyFlutterwaveTransaction: vi.fn(),
+}));
+
+import express from "express";
+import request from "supertest";
+import Stripe from "stripe";
+
+const stripe = new Stripe(["sk", "test", "synthetic_webhook_security"].join("_"), { apiVersion: "2026-01-28.clover" });
+vi.mock("../../lib/stripe.js", () => ({
+  getStripe: () => stripe,
+  getPlanFromPriceId: vi.fn(),
+  isStripeConfigured: () => true,
+}));
+
+import router from "../../routes/webhooks.js";
+
+const webhookSecret = ["whsec", "synthetic_stripe_webhook_security"].join("_");
+const app = express();
+app.use(express.raw({ type: "application/json", limit: "100kb" }));
+app.use("/api/webhooks", router);
+
+function signedPayload(payload: string, timestamp = Math.floor(Date.now() / 1000)): string {
+  return stripe.webhooks.generateTestHeaderString({
+    payload,
+    secret: webhookSecret,
+    timestamp,
+  });
+}
+
+describe("POST /api/webhooks/stripe raw signature integrity", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.STRIPE_WEBHOOK_SECRET = webhookSecret; // secret-scan:allow synthetic test value
+    db.billingWebhookIdempotencyKey.create.mockResolvedValue({ key: "STRIPE:evt_synthetic_1" });
+    db.subscription.findFirst.mockResolvedValue(null);
+    db.subscription.upsert.mockResolvedValue({ id: "subscription-1" });
+    billing.recordBillingEvent.mockResolvedValue({ id: "billing-event-1" });
+    deadLetter.pushDeadLetter.mockResolvedValue(undefined);
+  });
+
+  it("accepts a current SDK-signed raw payload", async () => {
+    const payload = JSON.stringify({
+      id: "evt_synthetic_1",
+      object: "event",
+      created: 1_700_000_000,
+      type: "payment_method.attached",
+      data: { object: { id: "pm_synthetic", customer: "cus_synthetic" } },
+    });
+
+    const response = await request(app)
+      .post("/api/webhooks/stripe")
+      .set("content-type", "application/json")
+      .set("stripe-signature", signedPayload(payload))
+      .send(payload);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ received: true });
+    expect(db.billingWebhookIdempotencyKey.create).toHaveBeenCalledOnce();
+    expect(billing.recordBillingEvent).not.toHaveBeenCalled();
+  });
+
+  it("rejects a one-byte-altered payload signed for different raw bytes", async () => {
+    const signed = JSON.stringify({
+      id: "evt_synthetic_2",
+      object: "event",
+      created: 1_700_000_000,
+      type: "test.synthetic_event",
+      data: { object: { id: "synthetic-object" } },
+    });
+    const altered = signed.replace("synthetic-object", "synthetic-Object");
+
+    const response = await request(app)
+      .post("/api/webhooks/stripe")
+      .set("content-type", "application/json")
+      .set("stripe-signature", signedPayload(signed))
+      .send(altered);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Invalid webhook signature" });
+    expect(db.billingWebhookIdempotencyKey.create).not.toHaveBeenCalled();
+    expect(billing.recordBillingEvent).not.toHaveBeenCalled();
+    expect(billing.syncBillingEntitlementState).not.toHaveBeenCalled();
+    expect(deadLetter.pushDeadLetter).not.toHaveBeenCalled();
+  });
+
+  it("rejects a validly signed timestamp far in the future", async () => {
+    const payload = JSON.stringify({
+      id: "evt_synthetic_future",
+      object: "event",
+      created: 1_700_000_000,
+      type: "test.synthetic_event",
+      data: { object: { id: "synthetic-object" } },
+    });
+
+    const response = await request(app)
+      .post("/api/webhooks/stripe")
+      .set("content-type", "application/json")
+      .set("stripe-signature", signedPayload(payload, Math.floor(Date.now() / 1000) + 3600))
+      .send(payload);
+
+    expect(response.status).toBe(400);
+    expect(db.billingWebhookIdempotencyKey.create).not.toHaveBeenCalled();
+    expect(billing.recordBillingEvent).not.toHaveBeenCalled();
+  });
+
+  it("acknowledges an authentic unsupported event without persistence or billing side effects", async () => {
+    const payload = JSON.stringify({
+      id: "evt_synthetic_unknown",
+      object: "event",
+      created: 1_700_000_000,
+      type: "future.provider.event",
+      data: { object: { id: "synthetic-object" } },
+    });
+
+    const response = await request(app)
+      .post("/api/webhooks/stripe")
+      .set("content-type", "application/json")
+      .set("stripe-signature", signedPayload(payload))
+      .send(payload);
+
+    expect(response.status).toBe(200);
+    expect(db.billingWebhookIdempotencyKey.create).not.toHaveBeenCalled();
+    expect(billing.recordBillingEvent).not.toHaveBeenCalled();
+    expect(billing.syncBillingEntitlementState).not.toHaveBeenCalled();
+  });
+
+  it("does not activate a user from checkout metadata without a matching stored Stripe customer", async () => {
+    const payload = JSON.stringify({
+      id: "evt_synthetic_forged_metadata",
+      object: "event",
+      created: 1_700_000_000,
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_synthetic",
+          customer: "cus_other_account",
+          subscription: "sub_other_account",
+          metadata: { userId: "candidate-a", plan: "BASIC" },
+        },
+      },
+    });
+
+    const response = await request(app)
+      .post("/api/webhooks/stripe")
+      .set("content-type", "application/json")
+      .set("stripe-signature", signedPayload(payload))
+      .send(payload);
+
+    expect(response.status).toBe(200);
+    expect(db.subscription.upsert).not.toHaveBeenCalled();
+    expect(billing.syncBillingEntitlementState).not.toHaveBeenCalled();
+    expect(billing.recordBillingEvent).not.toHaveBeenCalled();
+  });
+});

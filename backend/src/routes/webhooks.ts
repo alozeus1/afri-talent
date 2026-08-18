@@ -19,6 +19,36 @@ import {
 const router = Router();
 
 const WEBHOOK_IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;
+const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300;
+const STRIPE_SUPPORTED_EVENT_TYPES = new Set([
+  "checkout.session.completed",
+  "payment_method.attached",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.payment_failed",
+  "invoice.paid",
+  "invoice.payment_succeeded",
+  "charge.refunded",
+  "refund.created",
+  "refund.updated",
+]);
+
+function hasFreshStripeSignatureTimestamp(signature: unknown): boolean {
+  if (typeof signature !== "string") return false;
+
+  const timestamps = signature
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.startsWith("t="))
+    .map((part) => part.slice(2));
+
+  if (timestamps.length !== 1 || !/^\d+$/.test(timestamps[0])) return false;
+
+  const timestamp = Number(timestamps[0]);
+  if (!Number.isSafeInteger(timestamp)) return false;
+
+  return Math.abs(Math.floor(Date.now() / 1000) - timestamp) <= STRIPE_WEBHOOK_TOLERANCE_SECONDS;
+}
 
 function parseRawJsonBody(req: Request): Record<string, unknown> | null {
   if (!req.body) {
@@ -519,6 +549,32 @@ router.post("/stripe", async (req: Request, res: Response) => {
     return;
   }
 
+  // Stripe's SDK rejects timestamps that are too old, but a valid signature
+  // with a far-future timestamp must also fail closed to prevent delayed replay.
+  if (!hasFreshStripeSignatureTimestamp(sig)) {
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "warning",
+      durationMs: Date.now() - startedAt,
+      details: { reason: "stripe_signature_timestamp_out_of_range" },
+    });
+    res.status(400).json({ error: "Invalid webhook signature" });
+    return;
+  }
+
+  if (!STRIPE_SUPPORTED_EVENT_TYPES.has(event.type)) {
+    recordOpsEvent({
+      metricName: "billing_webhook_ignored",
+      category: "billing",
+      durationMs: Date.now() - startedAt,
+      details: { event_type: event.type },
+    });
+    res.json({ received: true, ignored: true });
+    return;
+  }
+
   // Idempotency guard
   const reserved = await reserveEventId(BillingProvider.STRIPE, event.id);
   if (!reserved) {
@@ -565,6 +621,30 @@ router.post("/stripe", async (req: Request, res: Response) => {
         const plan = session.metadata?.plan as SubscriptionPlan | undefined;
 
         if (userId && plan) {
+          const trustedSubscription = await prisma.subscription.findFirst({
+            where: {
+              userId,
+              billingProvider: BillingProvider.STRIPE,
+              OR: [
+                { stripeCustomerId: session.customer },
+                { providerCustomerId: session.customer },
+              ],
+            },
+            select: { id: true },
+          });
+
+          if (!trustedSubscription) {
+            recordOpsEvent({
+              metricName: "billing_webhook_rejected",
+              category: "billing",
+              outcome: "failure",
+              severity: "warning",
+              durationMs: Date.now() - startedAt,
+              details: { reason: "checkout_customer_binding_missing" },
+            });
+            break;
+          }
+
           const subscription = await prisma.subscription.upsert({
             where: { userId },
             create: {
@@ -1046,18 +1126,8 @@ router.post("/stripe", async (req: Request, res: Response) => {
       }
 
       default:
-        await recordBillingEvent({
-          source: "STRIPE_WEBHOOK",
-          eventId: event.id,
-          eventType: event.type,
-          outcome: BillingEventOutcome.RECEIVED,
-          rawPayload: event as unknown as Prisma.InputJsonValue,
-          occurredAt: new Date(event.created * 1000),
-          processedAt: new Date(),
-        });
-        // Unhandled event types are fine — log and acknowledge
-        console.info(`[webhook] Unhandled event type: ${event.type}`);
-    }
+        // Event types are allowlisted before idempotency reservation.
+        }
 
     res.json({ received: true });
   } catch (error) {
