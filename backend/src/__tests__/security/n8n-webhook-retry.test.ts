@@ -6,8 +6,10 @@ const db = vi.hoisted(() => ({
   graphRunEvent: { create: vi.fn() },
   $transaction: vi.fn(),
 }));
+const redis = vi.hoisted(() => ({ set: vi.fn() }));
 vi.mock("../../lib/prisma.js", () => ({ default: db }));
 vi.mock("../../lib/ops/events.js", () => ({ recordOpsEvent: vi.fn() }));
+vi.mock("../../lib/redis.js", () => ({ redisClient: redis }));
 
 import express from "express";
 import request from "supertest";
@@ -31,6 +33,7 @@ beforeEach(() => {
   db.n8nCallbackDecision.create.mockResolvedValue({ id: "callback-1" });
   db.n8nCallbackDecision.update.mockResolvedValue({ id: "callback-1", completedAt: new Date() });
   db.$transaction.mockImplementation(async (callback: (tx: typeof db) => unknown) => callback(db));
+  redis.set.mockResolvedValue("OK");
 });
 
 describe("n8n callback durable replay", () => {
@@ -84,5 +87,20 @@ describe("n8n callback durable replay", () => {
     expect([a.body.status, b.body.status].sort()).toEqual(["already_processed", "denied"]);
     expect(db.graphRun.updateMany).toHaveBeenCalledOnce();
     expect(db.graphRunEvent.create).toHaveBeenCalledOnce();
+  });
+
+  it("retries Redis finalization after a committed callback without repeating denial work", async () => {
+    const token = mintDecisionToken(graphRunId, "deny", secret, Math.floor(Date.now() / 1000));
+    const digest = createHash("sha256").update(token).digest("hex");
+    const jti = JSON.parse(Buffer.from(token.split(".")[0], "base64url").toString("utf8")).jti;
+    redis.set.mockRejectedValueOnce(new Error("redis unavailable"));
+    const first = await request(app).post("/api/webhooks/n8n/approval").send({ token });
+    expect(first.status).toBe(200);
+    db.n8nCallbackDecision.findUnique.mockResolvedValueOnce({ tokenDigest: digest, graphRunId, action: "deny", tokenJti: jti, completedAt: new Date() });
+    const retry = await request(app).post("/api/webhooks/n8n/approval").send({ token });
+    expect(retry.body.status).toBe("already_processed");
+    expect(db.graphRun.updateMany).toHaveBeenCalledOnce();
+    expect(db.graphRunEvent.create).toHaveBeenCalledOnce();
+    expect(redis.set).toHaveBeenCalledTimes(2);
   });
 });
