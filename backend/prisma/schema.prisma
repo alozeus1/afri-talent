@@ -3327,12 +3327,27 @@ model GraphRun {
   updatedAt DateTime @updatedAt
 
   events GraphRunEvent[]
+  callbackDecisions N8nCallbackDecision[]
 
   @@index([workflowType, createdAt(sort: Desc)])
   @@index([status])
   @@index([userId])
   @@index([applicationId])
   @@index([threadId])
+}
+
+model N8nCallbackDecision {
+  id          String   @id @default(uuid())
+  tokenDigest String   @unique @db.VarChar(64)
+  tokenJti    String?  @db.VarChar(64)
+  graphRunId  String   @db.VarChar(191)
+  action      String   @db.VarChar(32)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  graphRun    GraphRun @relation(fields: [graphRunId], references: [graphRunId], onDelete: Cascade)
+
+  @@index([graphRunId, action])
+  @@index([tokenJti])
 }
 
 model GraphRunEvent {

@@ -15,7 +15,7 @@
 // break a workflow (mirrors prismaTools.ts). Secrets come from env, never args.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import logger from "../logger.js";
 import { recordOpsEvent } from "../ops/events.js";
 import { redisClient } from "../redis.js";
@@ -129,6 +129,7 @@ interface DecisionTokenClaims {
   graphRunId: string;
   action: OneClickDecision;
   exp: number; // unix seconds
+  jti?: string;
 }
 
 /**
@@ -147,6 +148,7 @@ export function mintDecisionToken(
     graphRunId,
     action,
     exp: nowSeconds + DECISION_TOKEN_TTL_SECONDS,
+    jti: randomUUID(),
   };
   const body = base64url(JSON.stringify(claims));
   const sig = base64url(createHmac("sha256", secret).update(body).digest());
