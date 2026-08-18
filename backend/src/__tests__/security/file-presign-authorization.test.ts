@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const aws = vi.hoisted(() => { process.env.S3_UPLOADS_BUCKET = "test-private-uploads"; return { sign: vi.fn(), commands: [] as any[] }; });
-vi.mock("@aws-sdk/client-s3", () => ({ S3Client: class {}, PutObjectCommand: class { input: any; constructor(input: any) { this.input = input; aws.commands.push(input); } } }));
+const aws = vi.hoisted(() => { process.env.S3_UPLOADS_BUCKET = "test-private-uploads"; return { sign: vi.fn(), head: vi.fn(), commands: [] as any[] }; });
+vi.mock("@aws-sdk/client-s3", () => ({ S3Client: class { send = aws.head; }, PutObjectCommand: class { input: any; constructor(input: any) { this.input = input; aws.commands.push(input); } }, HeadObjectCommand: class { input: any; constructor(input: any) { this.input = input; aws.commands.push(input); } } }));
 vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl: aws.sign }));
 vi.mock("../../middleware/account-standing.js", () => ({ requireAccountStanding: () => (_q: unknown, _s: unknown, next: () => void) => next() }));
 vi.mock("../../lib/prisma.js", () => ({ default: {
@@ -20,7 +20,7 @@ const token = (id: string, role: Role) => signToken({ userId: id, role, email: `
 function current(id: string, role: Role, state = "ACTIVE") { (prisma.user.findUnique as any).mockImplementation((args: any) => args?.where?.id === id && args?.select?.deletedAt === true && args?.select?.accountRestrictionStatus === true ? Promise.resolve({ id, email: `${id}@example.test`, role, deletedAt: state === "DELETED" ? new Date() : null, accountRestrictionStatus: state }) : undefined); }
 const valid = { scope: "resume", contentType: "application/pdf", fileName: "resume.pdf", fileSizeBytes: 1024 };
 
-beforeEach(() => { vi.clearAllMocks(); aws.commands.length = 0; aws.sign.mockResolvedValue("https://signed.example.test/redacted"); });
+beforeEach(() => { vi.clearAllMocks(); aws.commands.length = 0; aws.sign.mockResolvedValue("https://signed.example.test/redacted"); aws.head.mockResolvedValue({ ContentLength: 1024, ContentType: "application/pdf", ServerSideEncryption: "aws:kms" }); });
 
 describe("file presign authorization", () => {
   it("denies anonymous and invalid roles before constructing or signing S3 requests", async () => {
@@ -53,5 +53,14 @@ describe("file presign authorization", () => {
     const register = (s3Key: string) => request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key, fileName: "resume.pdf", setActive: true });
     for (const key of [`resumes/${ids.candidateB}/foreign.pdf`, `trust/candidates/${ids.candidateA}/x.pdf`, `resumes/${ids.candidateA}/../${ids.candidateB}/x.pdf`]) expect((await register(key)).status).toBe(400);
     expect(prisma.candidateProfile.upsert).not.toHaveBeenCalled(); expect(prisma.resume.create).not.toHaveBeenCalled();
+  });
+
+  it("persists only after HeadObject verifies the exact candidate-owned object", async () => {
+    current(ids.candidateA, Role.CANDIDATE);
+    vi.mocked(prisma.candidateProfile.upsert).mockResolvedValue({ id: "profile-a" } as never);
+    vi.mocked(prisma.resume.create).mockResolvedValue({ id: "resume-a" } as never);
+    vi.mocked(prisma.candidateProfile.findUnique).mockResolvedValue(null as never);
+    const res = await request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key: `resumes/${ids.candidateA}/valid.pdf`, fileName: "valid.pdf" });
+    expect(res.status).toBe(201); expect(aws.head).toHaveBeenCalledOnce(); expect(prisma.resume.create).toHaveBeenCalledOnce();
   });
 });

@@ -8,8 +8,17 @@ import { refreshCandidateTrustProfile } from "../lib/trust/service.js";
 import logger from "../lib/logger.js";
 import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import { ACCOUNT_DELETION_WINDOW_DAYS } from "../lib/privacy/anonymize.js";
+import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 const router = Router();
+const RESUME_BUCKET = process.env.S3_UPLOADS_BUCKET;
+const RESUME_MAX_BYTES = 10 * 1024 * 1024;
+const RESUME_TYPES: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+let resumeS3: S3Client | null = null;
+function resumeStorage() { return resumeS3 ??= new S3Client({ region: process.env.AWS_REGION || "us-east-1" }); }
 
 const structuredWorkHistoryItemSchema = z.object({
   company: z.string().max(160).trim().optional().or(z.literal("")),
@@ -244,6 +253,28 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
       /[\u0000-\u001f\u007f]/.test(data.s3Key)
     ) {
       res.status(400).json({ error: "Invalid s3Key — must be scoped to your user ID" });
+      return;
+    }
+    if (!RESUME_BUCKET) {
+      res.status(503).json({ error: "Resume uploads are not configured" });
+      return;
+    }
+    const extension = Object.keys(RESUME_TYPES).find((value) => data.s3Key.toLowerCase().endsWith(value));
+    if (!extension) {
+      res.status(400).json({ error: "Invalid resume file type" });
+      return;
+    }
+    try {
+      const object = await resumeStorage().send(new HeadObjectCommand({ Bucket: RESUME_BUCKET, Key: data.s3Key }));
+      if (
+        !Number.isFinite(object.ContentLength) || !object.ContentLength || object.ContentLength > RESUME_MAX_BYTES ||
+        object.ContentType !== RESUME_TYPES[extension] || object.ServerSideEncryption !== "aws:kms"
+      ) {
+        res.status(400).json({ error: "Uploaded resume metadata is invalid" });
+        return;
+      }
+    } catch {
+      res.status(422).json({ error: "Upload has not completed or is unavailable" });
       return;
     }
 
