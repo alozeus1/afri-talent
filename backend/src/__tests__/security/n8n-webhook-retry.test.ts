@@ -26,6 +26,11 @@ beforeEach(() => {
   process.env.N8N_APPROVAL_HMAC_SECRET = secret;
   db.n8nCallbackDecision.findUnique.mockResolvedValue(null);
   db.graphRun.findUnique.mockResolvedValue({ graphRunId, workflowType: "test" });
+  db.graphRun.updateMany.mockResolvedValue({ count: 1 });
+  db.graphRunEvent.create.mockResolvedValue({ id: "event-1" });
+  db.n8nCallbackDecision.create.mockResolvedValue({ id: "callback-1" });
+  db.n8nCallbackDecision.update.mockResolvedValue({ id: "callback-1", completedAt: new Date() });
+  db.$transaction.mockImplementation(async (callback: (tx: typeof db) => unknown) => callback(db));
 });
 
 describe("n8n callback durable replay", () => {
@@ -49,5 +54,35 @@ describe("n8n callback durable replay", () => {
     expect(conflict.status).toBe(409);
     expect(db.graphRun.updateMany).not.toHaveBeenCalled();
     expect(db.graphRunEvent.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps the callback retryable when the transactional denial event fails", async () => {
+    const token = mintDecisionToken(graphRunId, "deny", secret, Math.floor(Date.now() / 1000));
+    db.graphRunEvent.create.mockRejectedValueOnce(new Error("event write failed"));
+    const failed = await request(app).post("/api/webhooks/n8n/approval").send({ token });
+    expect(failed.status).toBe(500);
+    expect(db.n8nCallbackDecision.update).not.toHaveBeenCalled();
+
+    const retry = await request(app).post("/api/webhooks/n8n/approval").send({ token });
+    expect(retry.status).toBe(200);
+    expect(retry.body.status).toBe("denied");
+    expect(db.graphRun.updateMany).toHaveBeenCalledTimes(2);
+    expect(db.graphRunEvent.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns one terminal result for controlled concurrent exact callbacks", async () => {
+    const token = mintDecisionToken(graphRunId, "deny", secret, Math.floor(Date.now() / 1000));
+    const digest = createHash("sha256").update(token).digest("hex");
+    const jti = JSON.parse(Buffer.from(token.split(".")[0], "base64url").toString("utf8")).jti;
+    let first = true;
+    db.$transaction.mockImplementation(async (callback: (tx: typeof db) => unknown) => {
+      if (first) { first = false; return callback(db); }
+      throw { code: "P2002", meta: { target: ["tokenDigest"] } };
+    });
+    db.n8nCallbackDecision.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce({ tokenDigest: digest, graphRunId, action: "deny", tokenJti: jti, completedAt: new Date() });
+    const [a, b] = await Promise.all([request(app).post("/api/webhooks/n8n/approval").send({ token }), request(app).post("/api/webhooks/n8n/approval").send({ token })]);
+    expect([a.body.status, b.body.status].sort()).toEqual(["already_processed", "denied"]);
+    expect(db.graphRun.updateMany).toHaveBeenCalledOnce();
+    expect(db.graphRunEvent.create).toHaveBeenCalledOnce();
   });
 });
