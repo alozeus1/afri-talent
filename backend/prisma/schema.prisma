@@ -3344,7 +3344,7 @@ model N8nCallbackDecision {
   action      String   @db.VarChar(32)
   completedAt DateTime?
   createdAt   DateTime @default(now())
-  graphRun    GraphRun @relation(fields: [graphRunId], references: [graphRunId], onDelete: Cascade)
+  graphRun    GraphRun @relation(fields: [graphRunId], references: [graphRunId], onDelete: Restrict)
 
   @@index([graphRunId, action])
   @@index([tokenJti])

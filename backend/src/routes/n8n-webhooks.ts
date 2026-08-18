@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Router, Request, Response } from "express";
+import { createHash } from "node:crypto";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
@@ -75,10 +76,23 @@ router.post("/approval", async (req: Request, res: Response) => {
   }
 
   const { graphRunId, action } = verified.claims;
+  const tokenJti = verified.claims.jti;
+  const tokenDigest = createHash("sha256").update(token).digest("hex");
 
   // The token only ever authorizes a deny. Defensive: reject anything else.
   if (action !== "deny") {
     res.status(403).json({ error: "This token cannot approve. Approve in the admin console." });
+    return;
+  }
+
+  const completed = await prisma.n8nCallbackDecision.findUnique({ where: { tokenDigest } });
+  if (completed?.completedAt) {
+    if (completed.graphRunId !== graphRunId || completed.action !== action || (completed.tokenJti && completed.tokenJti !== tokenJti)) {
+      res.status(409).json({ error: "Callback identity conflict" });
+      return;
+    }
+    await consumeDecisionTokenOnce(graphRunId, DECISION_TOKEN_TTL_SECONDS).catch(() => undefined);
+    res.status(200).json({ status: "already_processed", graphRunId });
     return;
   }
 
@@ -94,6 +108,7 @@ router.post("/approval", async (req: Request, res: Response) => {
     // later console/user approval can never drive the paused checkpoint into a
     // sensitive side effect (publish/send/verify) after an email deny.
     const transition = await prisma.$transaction(async (tx) => {
+      await tx.n8nCallbackDecision.create({ data: { tokenDigest, tokenJti, graphRunId, action } });
       const result = await tx.graphRun.updateMany({
         where: { graphRunId, approvalState: { not: "DENIED" } },
         data: { approvalState: "DENIED", status: "BLOCKED" },
@@ -107,6 +122,7 @@ router.post("/approval", async (req: Request, res: Response) => {
           details: { source: "n8n_email", reason },
         },
       });
+      await tx.n8nCallbackDecision.update({ where: { tokenDigest }, data: { completedAt: new Date() } });
       return result;
     });
     if (transition.count === 0) {

@@ -11,4 +11,4 @@ CREATE TABLE "N8nCallbackDecision" (
 CREATE UNIQUE INDEX "N8nCallbackDecision_tokenDigest_key" ON "N8nCallbackDecision"("tokenDigest");
 CREATE INDEX "N8nCallbackDecision_graphRunId_action_idx" ON "N8nCallbackDecision"("graphRunId", "action");
 CREATE INDEX "N8nCallbackDecision_tokenJti_idx" ON "N8nCallbackDecision"("tokenJti");
-ALTER TABLE "N8nCallbackDecision" ADD CONSTRAINT "N8nCallbackDecision_graphRunId_fkey" FOREIGN KEY ("graphRunId") REFERENCES "GraphRun"("graphRunId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "N8nCallbackDecision" ADD CONSTRAINT "N8nCallbackDecision_graphRunId_fkey" FOREIGN KEY ("graphRunId") REFERENCES "GraphRun"("graphRunId") ON DELETE RESTRICT ON UPDATE CASCADE;
