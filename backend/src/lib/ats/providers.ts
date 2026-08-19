@@ -452,7 +452,9 @@ export function verifyAtsWebhookSignature(params: {
     .update(params.rawBody)
     .digest("hex");
 
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(computed));
+  const provided = Buffer.from(signature, "utf8");
+  const expected = Buffer.from(computed, "utf8");
+  return provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
 }
 
 export function normalizeAtsWebhookPayload(params: {

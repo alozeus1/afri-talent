@@ -9,6 +9,7 @@ import {
   JobStatus,
   Prisma,
 } from "@prisma/client";
+import { timingSafeEqual } from "node:crypto";
 import prisma from "../prisma.js";
 import { decryptString } from "../secure-string.js";
 import { createUserNotification } from "../notifications.js";
@@ -1271,27 +1272,36 @@ export async function processAtsWebhook(params: {
     throw new Error("ATS webhook connection not found");
   }
 
+  // A URL may remain configured at the provider after an employer disables an
+  // integration. Disabled connections are not an unauthenticated compatibility
+  // mode: reject before parsing, persisting, syncing, or notifying.
+  if (!connection.webhookSyncEnabled) {
+    throw new Error("ATS webhook connection is disabled");
+  }
+
   const webhookSecret = decryptString(connection.encryptedWebhookSecret);
-  if (connection.webhookSyncEnabled) {
-    if (!webhookSecret) {
-      throw new Error("Webhook secret is not configured");
-    }
+  if (!webhookSecret) {
+    throw new Error("Webhook secret is not configured");
+  }
 
-    const headerSecret = Array.isArray(params.headers["x-afritalent-ats-secret"])
-      ? params.headers["x-afritalent-ats-secret"][0]
-      : params.headers["x-afritalent-ats-secret"];
-    const queryToken = params.queryToken ?? null;
-    const greenhouseVerified = verifyAtsWebhookSignature({
-      provider: connection.provider,
-      secret: webhookSecret,
-      rawBody: params.rawBody,
-      headers: params.headers,
-    });
-    const sharedSecretVerified = webhookSecret === headerSecret || webhookSecret === queryToken;
+  const greenhouseVerified = verifyAtsWebhookSignature({
+    provider: connection.provider,
+    secret: webhookSecret,
+    rawBody: params.rawBody,
+    headers: params.headers,
+  });
 
-    if (!greenhouseVerified && !sharedSecretVerified) {
-      throw new Error("Webhook signature verification failed");
-    }
+  const rawHeaderSecret = params.headers["x-afritalent-ats-secret"];
+  const headerSecret = Array.isArray(rawHeaderSecret) ? rawHeaderSecret[0] : rawHeaderSecret;
+  const sharedSecretVerified = typeof headerSecret === "string"
+    && Buffer.byteLength(headerSecret) === Buffer.byteLength(webhookSecret)
+    && timingSafeEqual(Buffer.from(headerSecret), Buffer.from(webhookSecret));
+
+  // Greenhouse signs the raw body. Lever/Workable integrations currently use
+  // the configured connection secret header; a URL query token is never an
+  // authentication channel because it leaks into provider and proxy logs.
+  if (!(connection.provider === "GREENHOUSE" ? greenhouseVerified : sharedSecretVerified)) {
+    throw new Error("Webhook signature verification failed");
   }
 
   const normalized = normalizeAtsWebhookPayload({

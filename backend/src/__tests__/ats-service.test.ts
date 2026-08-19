@@ -115,4 +115,19 @@ describe("ATS integration orchestration", () => {
 
     expect(valid).toBe(true);
   });
+
+  it("rejects malformed Greenhouse signatures without throwing", () => {
+    expect(() => verifyAtsWebhookSignature({
+      provider: "GREENHOUSE",
+      secret: "super-secret",
+      rawBody: "{}",
+      headers: { signature: "sha256 too-short" },
+    })).not.toThrow();
+    expect(verifyAtsWebhookSignature({
+      provider: "GREENHOUSE",
+      secret: "super-secret",
+      rawBody: "{}",
+      headers: { signature: "sha256 too-short" },
+    })).toBe(false);
+  });
 });
