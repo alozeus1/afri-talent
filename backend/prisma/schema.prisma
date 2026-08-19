@@ -2221,19 +2221,24 @@ model BotSubscription {
 }
 
 model Subscription {
-  id                     String             @id @default(uuid())
-  userId                 String             @unique
-  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan                   SubscriptionPlan   @default(FREE)
-  status                 SubscriptionStatus @default(INACTIVE)
-  billingProvider        BillingProvider?
-  providerCustomerId     String?            @db.VarChar(255)
-  providerSubscriptionId String?            @db.VarChar(255)
-  stripeCustomerId       String?            @db.VarChar(255)
-  stripeSubId            String?            @db.VarChar(255)
-  currentPeriodEnd       DateTime?
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
+  id                        String             @id @default(uuid())
+  userId                    String             @unique
+  user                      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                      SubscriptionPlan   @default(FREE)
+  status                    SubscriptionStatus @default(INACTIVE)
+  billingProvider           BillingProvider?
+  providerCustomerId        String?            @db.VarChar(255)
+  providerSubscriptionId    String?            @db.VarChar(255)
+  stripeCustomerId          String?            @db.VarChar(255)
+  stripeSubId               String?            @db.VarChar(255)
+  currentPeriodEnd          DateTime?
+  // Stripe event delivery is not ordered. These nullable markers are set only
+  // by accepted lifecycle transitions; legacy subscriptions remain unmarked.
+  stripeLifecycleOccurredAt DateTime?
+  stripeLifecyclePriority   Int?
+  stripeLifecycleEventId    String?            @db.VarChar(255)
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
 
   billingEvents         BillingEventAudit[]
   billingDiscrepancies  BillingDiscrepancy[]
@@ -2246,6 +2251,7 @@ model Subscription {
   @@index([providerSubscriptionId])
   @@index([stripeCustomerId])
   @@index([stripeSubId])
+  @@index([stripeSubId, stripeLifecycleOccurredAt])
 }
 
 model BillingEntitlementState {
