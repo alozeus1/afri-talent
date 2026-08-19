@@ -334,6 +334,78 @@ describe("POST /api/webhooks/stripe raw signature integrity", () => {
     expect(activePredicate).toContainEqual({ stripeLifecycleOccurredAt: new Date(1_700_000_200 * 1000), stripeLifecyclePriority: { lt: 10 } });
   });
 
+  it("applies a same-timestamp cancellation after active, then blocks a later stale activation", async () => {
+    const active = JSON.stringify({ id: "evt_active_first", object: "event", created: 1_700_000_200, type: "invoice.paid", data: { object: { id: "in_active", subscription: "sub_candidate_a" } } });
+    const cancelled = JSON.stringify({ id: "evt_cancelled_second", object: "event", created: 1_700_000_200, type: "customer.subscription.deleted", data: { object: { id: "sub_candidate_a" } } });
+    const staleActive = JSON.stringify({ id: "evt_active_stale", object: "event", created: 1_700_000_199, type: "invoice.payment_succeeded", data: { object: { id: "in_stale", subscription: "sub_candidate_a" } } });
+    db.subscription.findFirst.mockResolvedValue({ id: "subscription-1", userId: "candidate-a", plan: "BASIC" });
+    db.subscription.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+
+    for (const payload of [active, cancelled, staleActive]) {
+      await request(app).post("/api/webhooks/stripe").set("content-type", "application/json")
+        .set("stripe-signature", signedPayload(payload)).send(payload);
+    }
+
+    expect(db.subscription.updateMany.mock.calls[0][0].data).toMatchObject({ status: "ACTIVE", stripeLifecyclePriority: 10 });
+    expect(db.subscription.updateMany.mock.calls[1][0].data).toMatchObject({ status: "CANCELLED", plan: "FREE", stripeLifecyclePriority: 30 });
+    expect(billing.syncBillingEntitlementState).toHaveBeenCalledTimes(2);
+    expect(notifications.createUserNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not compare or mutate an exact replay of the accepted newest event", async () => {
+    const payload = JSON.stringify({ id: "evt_newest_replay", object: "event", created: 1_700_000_200, type: "customer.subscription.deleted", data: { object: { id: "sub_candidate_a" } } });
+    db.subscription.findFirst.mockResolvedValue({ id: "subscription-1", userId: "candidate-a" });
+    db.billingWebhookIdempotencyKey.create.mockResolvedValueOnce({ key: "STRIPE:evt_newest_replay" }).mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("duplicate", { code: "P2002", clientVersion: "test", meta: { target: ["key"] } }),
+    );
+
+    await request(app).post("/api/webhooks/stripe").set("content-type", "application/json").set("stripe-signature", signedPayload(payload)).send(payload);
+    const replay = await request(app).post("/api/webhooks/stripe").set("content-type", "application/json").set("stripe-signature", signedPayload(payload)).send(payload);
+
+    expect(replay.body).toEqual({ received: true, duplicate: true });
+    expect(db.subscription.updateMany).toHaveBeenCalledOnce();
+    expect(billing.syncBillingEntitlementState).toHaveBeenCalledOnce();
+    expect(notifications.createUserNotification).toHaveBeenCalledOnce();
+    expect(db.billingWebhookIdempotencyKey.delete).not.toHaveBeenCalled();
+  });
+
+  it("keeps lifecycle markers and entitlement owners isolated by Stripe subscription", async () => {
+    const subscriptionA = JSON.stringify({ id: "evt_sub_a", object: "event", created: 1_700_000_200, type: "customer.subscription.deleted", data: { object: { id: "sub_a" } } });
+    const subscriptionB = JSON.stringify({ id: "evt_sub_b", object: "event", created: 1_700_000_100, type: "invoice.payment_failed", data: { object: { id: "in_b", subscription: "sub_b" } } });
+    db.subscription.findFirst.mockImplementation(async ({ where }: { where: { stripeSubId?: string } }) =>
+      where.stripeSubId === "sub_a"
+        ? { id: "subscription-a", userId: "candidate-a", plan: "BASIC" }
+        : { id: "subscription-b", userId: "candidate-b", plan: "PROFESSIONAL" },
+    );
+
+    for (const payload of [subscriptionA, subscriptionB]) {
+      await request(app).post("/api/webhooks/stripe").set("content-type", "application/json")
+        .set("stripe-signature", signedPayload(payload)).send(payload);
+    }
+
+    expect(db.subscription.updateMany.mock.calls.map((call) => call[0].where.id)).toEqual(["subscription-a", "subscription-b"]);
+    expect(billing.syncBillingEntitlementState).toHaveBeenCalledWith("candidate-a", "webhook_subscription_deleted");
+    expect(billing.syncBillingEntitlementState).toHaveBeenCalledWith("candidate-b", "webhook_invoice_payment_failed");
+  });
+
+  it("binds lifecycle markers during a trusted checkout baseline and ignores an older subscription event", async () => {
+    const checkout = JSON.stringify({ id: "evt_checkout_baseline", object: "event", created: 1_700_000_200, type: "checkout.session.completed", data: { object: { id: "cs_baseline", customer: "cus_candidate_a", subscription: "sub_candidate_a", metadata: { userId: "candidate-a", plan: "BASIC" } } } });
+    const staleFailure = JSON.stringify({ id: "evt_checkout_stale_failure", object: "event", created: 1_700_000_100, type: "invoice.payment_failed", data: { object: { id: "in_old", subscription: "sub_candidate_a" } } });
+    db.subscription.findFirst.mockResolvedValue({ id: "subscription-1", userId: "candidate-a", plan: "BASIC" });
+    db.subscription.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+
+    for (const payload of [checkout, staleFailure]) {
+      await request(app).post("/api/webhooks/stripe").set("content-type", "application/json")
+        .set("stripe-signature", signedPayload(payload)).send(payload);
+    }
+
+    expect(db.subscription.updateMany.mock.calls[0][0].data).toMatchObject({
+      stripeSubId: "sub_candidate_a", stripeLifecyclePriority: 10, stripeLifecycleEventId: "evt_checkout_baseline",
+    });
+    expect(billing.syncBillingEntitlementState).toHaveBeenCalledOnce();
+    expect(notifications.createUserNotification).toHaveBeenCalledOnce();
+  });
+
   it("does not treat an unrelated P2002 as a duplicate delivery", async () => {
     const payload = JSON.stringify({
       id: "evt_synthetic_unrelated_constraint",
