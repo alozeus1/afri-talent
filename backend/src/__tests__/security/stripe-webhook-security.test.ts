@@ -2,19 +2,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   billingWebhookIdempotencyKey: { create: vi.fn(), delete: vi.fn() },
-  subscription: { findFirst: vi.fn(), upsert: vi.fn() },
+  subscription: { findFirst: vi.fn(), updateMany: vi.fn() },
+  billingDiscrepancy: { updateMany: vi.fn() },
+  $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(db)),
 }));
 const billing = vi.hoisted(() => ({
   recordBillingEvent: vi.fn(),
   syncBillingEntitlementState: vi.fn(),
   upsertBillingDiscrepancy: vi.fn(),
 }));
+const notifications = vi.hoisted(() => ({ createUserNotification: vi.fn() }));
 const ops = vi.hoisted(() => ({ recordOpsEvent: vi.fn() }));
 const deadLetter = vi.hoisted(() => ({ pushDeadLetter: vi.fn() }));
 
 vi.mock("../../lib/prisma.js", () => ({ default: db }));
 vi.mock("../../lib/billing/index.js", () => billing);
-vi.mock("../../lib/notifications.js", () => ({ createUserNotification: vi.fn() }));
+vi.mock("../../lib/notifications.js", () => notifications);
 vi.mock("../../lib/ops/events.js", () => ops);
 vi.mock("../../lib/ops/resilience.js", () => deadLetter);
 vi.mock("../../lib/redis.js", () => ({ redisClient: null }));
@@ -57,7 +60,7 @@ describe("POST /api/webhooks/stripe raw signature integrity", () => {
     process.env.STRIPE_WEBHOOK_SECRET = webhookSecret; // secret-scan:allow synthetic test value
     db.billingWebhookIdempotencyKey.create.mockResolvedValue({ key: "STRIPE:evt_synthetic_1" });
     db.subscription.findFirst.mockResolvedValue(null);
-    db.subscription.upsert.mockResolvedValue({ id: "subscription-1" });
+    db.subscription.updateMany.mockResolvedValue({ count: 1 });
     billing.recordBillingEvent.mockResolvedValue({ id: "billing-event-1" });
     deadLetter.pushDeadLetter.mockResolvedValue(undefined);
   });
@@ -171,7 +174,7 @@ describe("POST /api/webhooks/stripe raw signature integrity", () => {
       .send(payload);
 
     expect(response.status).toBe(200);
-    expect(db.subscription.upsert).not.toHaveBeenCalled();
+    expect(db.subscription.updateMany).not.toHaveBeenCalled();
     expect(billing.syncBillingEntitlementState).not.toHaveBeenCalled();
     expect(billing.recordBillingEvent).not.toHaveBeenCalled();
   });
@@ -205,7 +208,7 @@ describe("POST /api/webhooks/stripe raw signature integrity", () => {
 
     expect(duplicate.status).toBe(200);
     expect(duplicate.body).toEqual({ received: true, duplicate: true });
-    expect(db.subscription.upsert).toHaveBeenCalledOnce();
+    expect(db.subscription.updateMany).toHaveBeenCalledOnce();
     expect(billing.syncBillingEntitlementState).toHaveBeenCalledOnce();
   });
 
@@ -253,11 +256,82 @@ describe("POST /api/webhooks/stripe raw signature integrity", () => {
     expect([winner.body, duplicate.body]).toContainEqual({ received: true });
     expect([winner.body, duplicate.body]).toContainEqual({ received: true, duplicate: true });
     expect(db.billingWebhookIdempotencyKey.create).toHaveBeenCalledTimes(2);
-    expect(db.subscription.upsert).toHaveBeenCalledOnce();
+    expect(db.subscription.updateMany).toHaveBeenCalledOnce();
     expect(billing.syncBillingEntitlementState).toHaveBeenCalledOnce();
     expect(db.billingWebhookIdempotencyKey.delete).not.toHaveBeenCalled();
     expect(deadLetter.pushDeadLetter).not.toHaveBeenCalled();
     expect(billing.upsertBillingDiscrepancy).not.toHaveBeenCalled();
+  });
+
+  it("ignores an older payment failure after a newer paid transition", async () => {
+    const paid = JSON.stringify({
+      id: "evt_paid_newer", object: "event", created: 1_700_000_200, type: "invoice.paid",
+      data: { object: { id: "in_paid", customer: "cus_candidate_a", subscription: "sub_candidate_a" } },
+    });
+    const staleFailure = JSON.stringify({
+      id: "evt_failed_older", object: "event", created: 1_700_000_100, type: "invoice.payment_failed",
+      data: { object: { id: "in_failed", customer: "cus_candidate_a", subscription: "sub_candidate_a" } },
+    });
+    db.subscription.findFirst.mockResolvedValue({ id: "subscription-1", userId: "candidate-a", plan: "BASIC" });
+    db.subscription.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+
+    const first = await request(app).post("/api/webhooks/stripe").set("content-type", "application/json")
+      .set("stripe-signature", signedPayload(paid)).send(paid);
+    const second = await request(app).post("/api/webhooks/stripe").set("content-type", "application/json")
+      .set("stripe-signature", signedPayload(staleFailure)).send(staleFailure);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(db.billingWebhookIdempotencyKey.create).toHaveBeenCalledTimes(2);
+    expect(billing.syncBillingEntitlementState).toHaveBeenCalledOnce();
+    expect(notifications.createUserNotification).not.toHaveBeenCalled();
+    expect(db.subscription.updateMany).toHaveBeenCalledTimes(2);
+    expect(db.subscription.updateMany.mock.calls[1][0].data.status).toBe("PAST_DUE");
+  });
+
+  it("does not restore access when an older paid event follows a newer payment failure", async () => {
+    const failed = JSON.stringify({
+      id: "evt_failed_newer", object: "event", created: 1_700_000_200, type: "invoice.payment_failed",
+      data: { object: { id: "in_failed", customer: "cus_candidate_a", subscription: "sub_candidate_a" } },
+    });
+    const stalePaid = JSON.stringify({
+      id: "evt_paid_older", object: "event", created: 1_700_000_100, type: "invoice.payment_succeeded",
+      data: { object: { id: "in_paid", customer: "cus_candidate_a", subscription: "sub_candidate_a" } },
+    });
+    db.subscription.findFirst.mockResolvedValue({ id: "subscription-1", userId: "candidate-a", plan: "BASIC" });
+    db.subscription.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+
+    await request(app).post("/api/webhooks/stripe").set("content-type", "application/json")
+      .set("stripe-signature", signedPayload(failed)).send(failed);
+    await request(app).post("/api/webhooks/stripe").set("content-type", "application/json")
+      .set("stripe-signature", signedPayload(stalePaid)).send(stalePaid);
+
+    expect(billing.syncBillingEntitlementState).toHaveBeenCalledOnce();
+    expect(notifications.createUserNotification).toHaveBeenCalledOnce();
+    expect(db.subscription.updateMany).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps cancellation over an equal-timestamp active event", async () => {
+    const cancelled = JSON.stringify({
+      id: "evt_cancelled_same_time", object: "event", created: 1_700_000_200, type: "customer.subscription.deleted",
+      data: { object: { id: "sub_candidate_a" } },
+    });
+    const active = JSON.stringify({
+      id: "evt_active_same_time", object: "event", created: 1_700_000_200, type: "invoice.paid",
+      data: { object: { id: "in_paid", customer: "cus_candidate_a", subscription: "sub_candidate_a" } },
+    });
+    db.subscription.findFirst.mockResolvedValue({ id: "subscription-1", userId: "candidate-a", plan: "BASIC" });
+    db.subscription.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+
+    await request(app).post("/api/webhooks/stripe").set("content-type", "application/json")
+      .set("stripe-signature", signedPayload(cancelled)).send(cancelled);
+    await request(app).post("/api/webhooks/stripe").set("content-type", "application/json")
+      .set("stripe-signature", signedPayload(active)).send(active);
+
+    expect(billing.syncBillingEntitlementState).toHaveBeenCalledOnce();
+    expect(notifications.createUserNotification).toHaveBeenCalledOnce();
+    const activePredicate = db.subscription.updateMany.mock.calls[1][0].where.OR;
+    expect(activePredicate).toContainEqual({ stripeLifecycleOccurredAt: new Date(1_700_000_200 * 1000), stripeLifecyclePriority: { lt: 10 } });
   });
 
   it("does not treat an unrelated P2002 as a duplicate delivery", async () => {
@@ -294,7 +368,7 @@ describe("POST /api/webhooks/stripe raw signature integrity", () => {
       } },
     });
     db.subscription.findFirst.mockResolvedValueOnce({ id: "subscription-1" });
-    db.subscription.upsert.mockRejectedValueOnce(new Error("synthetic persistence failure"));
+    db.subscription.updateMany.mockRejectedValueOnce(new Error("synthetic persistence failure"));
     db.billingWebhookIdempotencyKey.delete.mockResolvedValueOnce({ key: "STRIPE:evt_synthetic_retry" });
 
     const failed = await request(app).post("/api/webhooks/stripe")
@@ -309,7 +383,7 @@ describe("POST /api/webhooks/stripe raw signature integrity", () => {
       .set("content-type", "application/json").set("stripe-signature", signedPayload(payload)).send(payload);
     expect(retry.status).toBe(200);
     expect(db.billingWebhookIdempotencyKey.create).toHaveBeenCalledTimes(2);
-    expect(db.subscription.upsert).toHaveBeenCalledTimes(2);
+    expect(db.subscription.updateMany).toHaveBeenCalledTimes(2);
     expect(billing.syncBillingEntitlementState).toHaveBeenCalledOnce();
   });
 });

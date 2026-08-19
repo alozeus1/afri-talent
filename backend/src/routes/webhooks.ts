@@ -32,6 +32,85 @@ const STRIPE_SUPPORTED_EVENT_TYPES = new Set([
   "refund.created",
   "refund.updated",
 ]);
+const STRIPE_LIFECYCLE_EVENT_TYPES = new Set([
+  "checkout.session.completed",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.payment_failed",
+  "invoice.paid",
+  "invoice.payment_succeeded",
+]);
+
+const STRIPE_LIFECYCLE_PRIORITY: Record<SubscriptionStatus, number> = {
+  [SubscriptionStatus.ACTIVE]: 10,
+  [SubscriptionStatus.PAST_DUE]: 20,
+  [SubscriptionStatus.INACTIVE]: 20,
+  [SubscriptionStatus.CANCELLED]: 30,
+};
+
+type LifecycleApplyResult =
+  | { applied: true; subscriptionId: string }
+  | { applied: false; reason: "stale" | "same_or_lower_priority" };
+
+function getStripeLifecyclePriority(eventType: string, status: SubscriptionStatus): number {
+  if (!STRIPE_LIFECYCLE_EVENT_TYPES.has(eventType)) {
+    throw new Error(`Stripe event ${eventType} is not a subscription lifecycle event`);
+  }
+  return STRIPE_LIFECYCLE_PRIORITY[status];
+}
+
+/**
+ * Atomically compare and apply a Stripe subscription transition. Exact event
+ * identity is reserved separately; this guard orders distinct events for the
+ * same subscription. Event IDs only break a true timestamp-and-priority tie,
+ * never establish provider chronology.
+ */
+async function applyStripeLifecycleTransition(input: {
+  subscriptionId: string;
+  eventId: string;
+  eventType: string;
+  occurredAt: Date;
+  status: SubscriptionStatus;
+  data: Prisma.SubscriptionUpdateManyMutationInput;
+}): Promise<LifecycleApplyResult> {
+  const priority = getStripeLifecyclePriority(input.eventType, input.status);
+
+  return prisma.$transaction(async (tx) => {
+    const result = await tx.subscription.updateMany({
+      where: {
+        id: input.subscriptionId,
+        OR: [
+          { stripeLifecycleOccurredAt: null },
+          { stripeLifecycleOccurredAt: { lt: input.occurredAt } },
+          {
+            stripeLifecycleOccurredAt: input.occurredAt,
+            stripeLifecyclePriority: { lt: priority },
+          },
+          {
+            stripeLifecycleOccurredAt: input.occurredAt,
+            stripeLifecyclePriority: priority,
+            OR: [
+              { stripeLifecycleEventId: null },
+              { stripeLifecycleEventId: { lt: input.eventId } },
+            ],
+          },
+        ],
+      },
+      data: {
+        ...input.data,
+        stripeLifecycleOccurredAt: input.occurredAt,
+        stripeLifecyclePriority: priority,
+        stripeLifecycleEventId: input.eventId,
+      },
+    });
+
+    if (result.count === 1) {
+      return { applied: true, subscriptionId: input.subscriptionId };
+    }
+
+    return { applied: false, reason: "stale" };
+  });
+}
 
 function hasFreshStripeSignatureTimestamp(signature: unknown): boolean {
   if (typeof signature !== "string") return false;
@@ -662,19 +741,13 @@ router.post("/stripe", async (req: Request, res: Response) => {
             break;
           }
 
-          const subscription = await prisma.subscription.upsert({
-            where: { userId },
-            create: {
-              userId,
-              billingProvider: BillingProvider.STRIPE,
-              providerCustomerId: session.customer,
-              providerSubscriptionId: session.subscription,
-              stripeCustomerId: session.customer,
-              stripeSubId: session.subscription,
-              plan,
-              status: "ACTIVE",
-            },
-            update: {
+          const lifecycle = await applyStripeLifecycleTransition({
+            subscriptionId: trustedSubscription.id,
+            eventId: event.id,
+            eventType: event.type,
+            occurredAt: new Date(event.created * 1000),
+            status: SubscriptionStatus.ACTIVE,
+            data: {
               billingProvider: BillingProvider.STRIPE,
               providerCustomerId: session.customer,
               providerSubscriptionId: session.subscription,
@@ -684,6 +757,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
               status: "ACTIVE",
             },
           });
+          if (!lifecycle.applied) break;
 
           const taxId = session.customer_details?.tax_ids?.[0];
           if (taxId?.type || taxId?.value || session.customer_details?.address?.country) {
@@ -711,7 +785,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
           await syncBillingEntitlementState(userId, "webhook_checkout_completed");
           await recordBillingEvent({
             userId,
-            subscriptionId: subscription.id,
+            subscriptionId: lifecycle.subscriptionId,
             source: "STRIPE_WEBHOOK",
             eventId: event.id,
             eventType: event.type,
@@ -811,16 +885,22 @@ router.post("/stripe", async (req: Request, res: Response) => {
           select: { userId: true, id: true },
         });
 
-        await prisma.subscription.updateMany({
-          where: { stripeSubId: sub.id },
+        if (!existing) break;
+        const lifecycle = await applyStripeLifecycleTransition({
+          subscriptionId: existing.id,
+          eventId: event.id,
+          eventType: event.type,
+          occurredAt: new Date(event.created * 1000),
+          status,
           data: {
             ...(plan && { plan }),
             status,
             ...(currentPeriodEnd && { currentPeriodEnd }),
           },
         });
+        if (!lifecycle.applied) break;
 
-        if (existing?.userId) {
+        if (existing.userId) {
           await syncBillingEntitlementState(existing.userId, "webhook_subscription_updated");
           await recordBillingEvent({
             userId: existing.userId,
@@ -857,15 +937,21 @@ router.post("/stripe", async (req: Request, res: Response) => {
           where: { stripeSubId: sub.id },
           select: { userId: true, id: true },
         });
-        await prisma.subscription.updateMany({
-          where: { stripeSubId: sub.id },
+        if (!existing) break;
+        const lifecycle = await applyStripeLifecycleTransition({
+          subscriptionId: existing.id,
+          eventId: event.id,
+          eventType: event.type,
+          occurredAt: new Date(event.created * 1000),
+          status: SubscriptionStatus.CANCELLED,
           data: {
             status: "CANCELLED",
             plan: "FREE",
           },
         });
+        if (!lifecycle.applied) break;
 
-        if (existing?.userId) {
+        if (existing.userId) {
           await syncBillingEntitlementState(existing.userId, "webhook_subscription_deleted");
           await recordBillingEvent({
             userId: existing.userId,
@@ -908,12 +994,18 @@ router.post("/stripe", async (req: Request, res: Response) => {
           where: { stripeSubId: invoice.subscription },
           select: { userId: true, id: true, plan: true },
         });
-        await prisma.subscription.updateMany({
-          where: { stripeSubId: invoice.subscription },
+        if (!existing) break;
+        const lifecycle = await applyStripeLifecycleTransition({
+          subscriptionId: existing.id,
+          eventId: event.id,
+          eventType: event.type,
+          occurredAt: new Date(event.created * 1000),
+          status: SubscriptionStatus.PAST_DUE,
           data: { status: "PAST_DUE" },
         });
+        if (!lifecycle.applied) break;
 
-        if (existing?.userId) {
+        if (existing.userId) {
           await syncBillingEntitlementState(existing.userId, "webhook_invoice_payment_failed");
           const auditEvent = await recordBillingEvent({
             userId: existing.userId,
@@ -997,12 +1089,18 @@ router.post("/stripe", async (req: Request, res: Response) => {
             select: { userId: true, id: true, plan: true },
           });
 
-          await prisma.subscription.updateMany({
-            where: { stripeSubId: invoice.subscription },
+          if (!existing) break;
+          const lifecycle = await applyStripeLifecycleTransition({
+            subscriptionId: existing.id,
+            eventId: event.id,
+            eventType: event.type,
+            occurredAt: new Date(event.created * 1000),
+            status: SubscriptionStatus.ACTIVE,
             data: { status: "ACTIVE" },
           });
+          if (!lifecycle.applied) break;
 
-          if (existing?.userId) {
+          if (existing.userId) {
             await syncBillingEntitlementState(existing.userId, "webhook_invoice_paid");
             const auditEvent = await recordBillingEvent({
               userId: existing.userId,
