@@ -209,6 +209,57 @@ describe("POST /api/webhooks/stripe raw signature integrity", () => {
     expect(billing.syncBillingEntitlementState).toHaveBeenCalledOnce();
   });
 
+  it("processes one of two concurrent deliveries and acknowledges the other as a duplicate", async () => {
+    const payload = JSON.stringify({
+      id: "evt_synthetic_concurrent_duplicate",
+      object: "event",
+      created: 1_700_000_000,
+      type: "checkout.session.completed",
+      data: { object: {
+        id: "cs_synthetic_concurrent_duplicate",
+        customer: "cus_candidate_a",
+        subscription: "sub_candidate_a",
+        metadata: { userId: "candidate-a", plan: "BASIC" },
+      } },
+    });
+    const expectedKeyConflict = new Prisma.PrismaClientKnownRequestError("duplicate", {
+      code: "P2002", clientVersion: "test", meta: { target: ["key"] },
+    });
+    let releaseFirstReservation: (() => void) | undefined;
+    let firstReservationReached: (() => void) | undefined;
+    const firstReservation = new Promise<void>((resolve) => { firstReservationReached = resolve; });
+    const allowFirstReservation = new Promise<void>((resolve) => { releaseFirstReservation = resolve; });
+
+    db.subscription.findFirst.mockResolvedValue({ id: "subscription-1" });
+    db.billingWebhookIdempotencyKey.create
+      .mockImplementationOnce(async () => {
+        firstReservationReached?.();
+        await allowFirstReservation;
+        return { key: "STRIPE:evt_synthetic_concurrent_duplicate" };
+      })
+      .mockRejectedValueOnce(expectedKeyConflict);
+
+    const winnerPromise = request(app).post("/api/webhooks/stripe")
+      .set("content-type", "application/json").set("stripe-signature", signedPayload(payload)).send(payload)
+      .then((response) => response);
+    await firstReservation;
+    const duplicatePromise = request(app).post("/api/webhooks/stripe")
+      .set("content-type", "application/json").set("stripe-signature", signedPayload(payload)).send(payload)
+      .then((response) => response);
+    releaseFirstReservation?.();
+
+    const [winner, duplicate] = await Promise.all([winnerPromise, duplicatePromise]);
+
+    expect([winner.body, duplicate.body]).toContainEqual({ received: true });
+    expect([winner.body, duplicate.body]).toContainEqual({ received: true, duplicate: true });
+    expect(db.billingWebhookIdempotencyKey.create).toHaveBeenCalledTimes(2);
+    expect(db.subscription.upsert).toHaveBeenCalledOnce();
+    expect(billing.syncBillingEntitlementState).toHaveBeenCalledOnce();
+    expect(db.billingWebhookIdempotencyKey.delete).not.toHaveBeenCalled();
+    expect(deadLetter.pushDeadLetter).not.toHaveBeenCalled();
+    expect(billing.upsertBillingDiscrepancy).not.toHaveBeenCalled();
+  });
+
   it("does not treat an unrelated P2002 as a duplicate delivery", async () => {
     const payload = JSON.stringify({
       id: "evt_synthetic_unrelated_constraint",
