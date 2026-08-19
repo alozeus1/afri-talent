@@ -521,35 +521,55 @@ router.post("/flutterwave", async (req: Request, res: Response) => {
 
     if (event === "subscription.cancelled") {
       const customer = (data.customer ?? {}) as Record<string, unknown>;
-      const email = typeof customer.email === "string" ? customer.email : null;
-      if (email) {
-        const user = await prisma.user.findUnique({
-          where: { email },
-          select: { id: true },
+      const providerCustomerId = customer.id === undefined || customer.id === null
+        ? null
+        : String(customer.id);
+
+      // The payload email is diagnostic-only: a signed event must still bind
+      // to the customer ID recorded during our verified checkout flow. This
+      // prevents a provider payload (or a future integration mistake) from
+      // selecting an AfriTalent account by a mutable email address.
+      if (providerCustomerId) {
+        const subscription = await prisma.subscription.findFirst({
+          where: {
+            billingProvider: BillingProvider.FLUTTERWAVE,
+            providerCustomerId,
+          },
+          select: { id: true, userId: true },
         });
 
-        if (user?.id) {
-          const subscription = await prisma.subscription.update({
-            where: { userId: user.id },
+        if (subscription) {
+          // Re-check the binding in the write predicate. A concurrent billing
+          // update that changes or removes it must not receive entitlement or
+          // audit side effects for this cancellation event.
+          const update = await prisma.subscription.updateMany({
+            where: {
+              id: subscription.id,
+              billingProvider: BillingProvider.FLUTTERWAVE,
+              providerCustomerId,
+            },
             data: {
               status: SubscriptionStatus.CANCELLED,
-              billingProvider: BillingProvider.FLUTTERWAVE,
+              plan: SubscriptionPlan.FREE,
             },
-          }).catch(() => null);
-
-          await syncBillingEntitlementState(user.id, "flutterwave_subscription_cancelled");
-          await recordBillingEvent({
-            userId: user.id,
-            subscriptionId: subscription?.id ?? null,
-            source: "FLUTTERWAVE_WEBHOOK",
-            eventId: rawEventId,
-            eventType: event,
-            outcome: BillingEventOutcome.PROCESSED,
-            status: SubscriptionStatus.CANCELLED,
-            reasonCode: "flutterwave_subscription_cancelled",
-            rawPayload: payload as Prisma.InputJsonValue,
-            processedAt: new Date(),
           });
+
+          if (update.count === 1) {
+            await syncBillingEntitlementState(subscription.userId, "flutterwave_subscription_cancelled");
+            await recordBillingEvent({
+              userId: subscription.userId,
+              subscriptionId: subscription.id,
+              source: "FLUTTERWAVE_WEBHOOK",
+              eventId: rawEventId,
+              eventType: event,
+              outcome: BillingEventOutcome.PROCESSED,
+              plan: SubscriptionPlan.FREE,
+              status: SubscriptionStatus.CANCELLED,
+              reasonCode: "flutterwave_subscription_cancelled",
+              rawPayload: payload as Prisma.InputJsonValue,
+              processedAt: new Date(),
+            });
+          }
         }
       }
     }

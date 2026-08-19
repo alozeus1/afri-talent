@@ -8,7 +8,10 @@ vi.mock("../lib/prisma.js", () => ({
         subscription: { upsert: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findFirst: vi.fn() },
         userBillingProfile: { upsert: vi.fn() },
         billingEventAudit: { findFirst: vi.fn() },
-        billingWebhookIdempotencyKey: { create: vi.fn().mockResolvedValue({ id: "idempotency-1" }) },
+        billingWebhookIdempotencyKey: {
+            create: vi.fn().mockResolvedValue({ id: "idempotency-1" }),
+            delete: vi.fn().mockResolvedValue(undefined),
+        },
         $queryRaw: vi.fn().mockResolvedValue([]),
         $disconnect: vi.fn().mockResolvedValue(undefined),
     },
@@ -24,9 +27,23 @@ vi.mock("../lib/flutterwave.js", async (importOriginal) => {
     };
 });
 
+// Keep entitlement and audit delivery outside this route test. Their call
+// counts are security-relevant: an unauthorised or zero-row cancellation must
+// not create any post-commit billing effects.
+vi.mock("../lib/billing/index.js", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("../lib/billing/index.js")>();
+    return {
+        ...actual,
+        syncBillingEntitlementState: vi.fn(),
+        recordBillingEvent: vi.fn(),
+    };
+});
+
 import request from "supertest";
 import app from "../app.js";
 import { validateRuntimeEnv } from "../config/env.js";
+import prisma from "../lib/prisma.js";
+import { recordBillingEvent, syncBillingEntitlementState } from "../lib/billing/index.js";
 
 const SECRET_HASH = "test-flw-secret-hash";
 
@@ -96,6 +113,124 @@ describe("POST /api/webhooks/flutterwave — signature enforcement (H1)", () => 
 
         expect(res.status).toBe(202);
         expect(res.body).toEqual({ received: true, ignored: true });
+    });
+});
+
+describe("POST /api/webhooks/flutterwave — cancellation ownership (H1)", () => {
+    const originalEnv = { ...process.env };
+    const prismaMock = prisma as unknown as {
+        user: { findUnique: ReturnType<typeof vi.fn> };
+        subscription: {
+            findFirst: ReturnType<typeof vi.fn>;
+            update: ReturnType<typeof vi.fn>;
+            updateMany: ReturnType<typeof vi.fn>;
+        };
+        billingWebhookIdempotencyKey: { create: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> };
+    };
+
+    const signedCancellation = (overrides: Record<string, unknown> = {}) => request(app)
+        .post("/api/webhooks/flutterwave")
+        .set("Content-Type", "application/json")
+        .set("verif-hash", SECRET_HASH)
+        .send({
+            event: "subscription.cancelled",
+            data: {
+                id: 9001,
+                customer: { id: "flw-customer-trusted", email: "victim@example.test" },
+                ...overrides,
+            },
+        });
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        process.env.FLUTTERWAVE_SECRET_HASH = SECRET_HASH;
+        prismaMock.billingWebhookIdempotencyKey.create.mockResolvedValue({ id: "idempotency-1" });
+        prismaMock.billingWebhookIdempotencyKey.delete.mockResolvedValue(undefined);
+        prismaMock.subscription.findFirst.mockResolvedValue(null);
+        prismaMock.subscription.updateMany.mockResolvedValue({ count: 0 });
+    });
+
+    afterEach(() => {
+        process.env = { ...originalEnv };
+    });
+
+    it("does not let a body email select a foreign subscription", async () => {
+        // A forged email must never be queried as an ownership selector. The
+        // only accepted binding is the stored Flutterwave provider customer ID.
+        prismaMock.user.findUnique.mockResolvedValue({ id: "victim-user" });
+
+        const res = await signedCancellation();
+
+        expect(res.status).toBe(200);
+        expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+        expect(prismaMock.subscription.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
+                billingProvider: "FLUTTERWAVE",
+                providerCustomerId: "flw-customer-trusted",
+            }),
+        }));
+        expect(prismaMock.subscription.update).not.toHaveBeenCalled();
+        expect(prismaMock.subscription.updateMany).not.toHaveBeenCalled();
+        expect(syncBillingEntitlementState).not.toHaveBeenCalled();
+        expect(recordBillingEvent).not.toHaveBeenCalled();
+    });
+
+    it("applies cancellation only to the matching persisted provider binding", async () => {
+        prismaMock.subscription.findFirst.mockResolvedValue({ id: "sub-1", userId: "owner-1" });
+        prismaMock.subscription.updateMany.mockResolvedValue({ count: 1 });
+
+        const res = await signedCancellation({
+            customer: { id: "flw-customer-trusted", email: "attacker@example.test" },
+        });
+
+        expect(res.status).toBe(200);
+        expect(prismaMock.subscription.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
+                id: "sub-1",
+                billingProvider: "FLUTTERWAVE",
+                providerCustomerId: "flw-customer-trusted",
+            }),
+        }));
+        expect(syncBillingEntitlementState).toHaveBeenCalledWith("owner-1", "flutterwave_subscription_cancelled");
+        expect(recordBillingEvent).toHaveBeenCalledWith(expect.objectContaining({
+            userId: "owner-1",
+            subscriptionId: "sub-1",
+            outcome: "PROCESSED",
+        }));
+    });
+
+    it("does not synchronize or audit a cancellation when the conditional write affects zero rows", async () => {
+        prismaMock.subscription.findFirst.mockResolvedValue({ id: "sub-1", userId: "owner-1" });
+        prismaMock.subscription.updateMany.mockResolvedValue({ count: 0 });
+
+        const res = await signedCancellation();
+
+        expect(res.status).toBe(200);
+        expect(syncBillingEntitlementState).not.toHaveBeenCalled();
+        expect(recordBillingEvent).not.toHaveBeenCalled();
+    });
+
+    it("ignores missing or mismatched provider bindings without using body-controlled identifiers", async () => {
+        const missingBinding = await signedCancellation({
+            customer: { email: "victim@example.test" },
+            userId: "victim-user",
+            employerId: "foreign-employer",
+            subscriptionId: "foreign-subscription",
+        });
+        expect(missingBinding.status).toBe(200);
+        expect(prismaMock.subscription.findFirst).not.toHaveBeenCalled();
+
+        vi.clearAllMocks();
+        prismaMock.billingWebhookIdempotencyKey.create.mockResolvedValue({ id: "idempotency-2" });
+        prismaMock.subscription.findFirst.mockResolvedValue(null);
+        const mismatchedBinding = await signedCancellation({
+            id: 9002,
+            customer: { id: "flw-customer-foreign", email: "victim@example.test" },
+        });
+        expect(mismatchedBinding.status).toBe(200);
+        expect(prismaMock.subscription.updateMany).not.toHaveBeenCalled();
+        expect(syncBillingEntitlementState).not.toHaveBeenCalled();
+        expect(recordBillingEvent).not.toHaveBeenCalled();
     });
 });
 
