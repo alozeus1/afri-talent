@@ -1,7 +1,7 @@
 # AfriTalent security gauntlet status
 
 - Current branch and HEAD: `security/resume-scanner-final-verification` at
-  `c859d23` (update after the accompanying ledger commit).
+  `bfbdfa5` (update after the accompanying ledger commit).
 - Completed gates: account authority and BOLA foundations; upload ownership;
   n8n and Stripe webhook hardening; Flutterwave/ATS ownership hardening;
   external CV containment; resume quarantine and scanner callback control plane.
@@ -23,10 +23,12 @@
   `terraform validate` passes with an isolated provider data directory.
 - Verified finding: disabled local email delivery logged rendered email text,
   including verification URLs. Fixed in `beb3229` with a retained regression.
-- Open repository-local work: finish full Docker image build/scan, SBOM,
-  browser smoke against an isolated runtime, and resolve or formally design
-  remediation for Trivy's existing Terraform HIGH/CRITICAL findings (public
-  edge resources and unrestricted egress). Do not suppress these findings.
+- Open repository-local work: SBOM and browser smoke against an isolated
+  runtime, plus a reviewed remediation design for Trivy's existing Terraform
+  HIGH/CRITICAL findings (public edge resources and unrestricted egress). The
+  Node 22 image rebuild succeeded and removed stale build-lock metadata, but
+  current Debian Chromium and bundled npm components still have Trivy HIGH/
+  CRITICAL findings; do not suppress them.
 - External/shared prerequisites: a privileged platform-owned RDS proxy role
   ARN and approved non-applying Terraform plan; no shared action has occurred.
 - Last successful commands: backend full Vitest `106 passed, 1 skipped` /
