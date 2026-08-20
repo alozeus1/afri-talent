@@ -309,8 +309,9 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
       res.status(400).json({ error: "Invalid resume file type" });
       return;
     }
+    let object: { ContentLength?: number; ContentType?: string; ServerSideEncryption?: string; VersionId?: string };
     try {
-      const object = await resumeStorage().send(new HeadObjectCommand({ Bucket: RESUME_BUCKET, Key: data.s3Key }));
+      object = await resumeStorage().send(new HeadObjectCommand({ Bucket: RESUME_BUCKET, Key: data.s3Key }));
       if (
         !Number.isFinite(object.ContentLength) || !object.ContentLength || object.ContentLength <= 0 || object.ContentLength > RESUME_MAX_BYTES ||
         object.ContentType !== RESUME_TYPES[extension] || object.ServerSideEncryption !== "aws:kms"
@@ -358,7 +359,17 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
         isActive: false,
         securityStatus: "PENDING_SCAN",
       }});
-      await tx.resumeScanJob.create({ data: { resumeId: created.id, bucket: RESUME_BUCKET, objectKey: created.s3Key } });
+      await tx.resumeScanJob.create({
+        data: {
+          resumeId: created.id,
+          bucket: RESUME_BUCKET,
+          objectKey: created.s3Key,
+          // VersionId is returned by S3 only when bucket versioning is enabled.
+          // Persist it when available so a scanner callback cannot be rebound
+          // to a replacement object at the same key.
+          objectVersion: object.VersionId ?? null,
+        },
+      });
       return created;
     });
 
