@@ -107,7 +107,7 @@ async function loadCandidateContext(userId: string) {
       where: { userId },
       include: {
         resumes: {
-          where: { isActive: true },
+          where: { isActive: true, securityStatus: "CLEAN" },
           take: 1,
           orderBy: { uploadedAt: "desc" },
         },

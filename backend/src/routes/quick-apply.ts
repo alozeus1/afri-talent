@@ -56,7 +56,7 @@ router.post(
       where: { userId: req.user!.userId },
       include: {
         resumes: {
-          where: { isActive: true },
+          where: { isActive: true, securityStatus: "CLEAN" },
           take: 1,
         },
       },
@@ -173,7 +173,7 @@ router.get("/eligible/:jobId", authenticate, authorize(Role.CANDIDATE), async (r
       where: { userId: req.user!.userId },
       include: {
         resumes: {
-          where: { isActive: true },
+          where: { isActive: true, securityStatus: "CLEAN" },
           take: 1,
         },
       },

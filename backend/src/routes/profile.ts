@@ -348,20 +348,15 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
       select: { id: true },
     });
 
-    // If setActive, deactivate all other resumes first
-    if (data.setActive) {
-      await prisma.resume.updateMany({
-        where: { profileId: profile.id, isActive: true },
-        data: { isActive: false },
-      });
-    }
-
+    // A successful upload is only structurally verified here. Do not replace a
+    // clean active resume until an approved malware scanner has recorded CLEAN.
     const resume = await prisma.resume.create({
       data: {
         profileId: profile.id,
         s3Key: data.s3Key,
         fileName: data.fileName,
-        isActive: data.setActive,
+        isActive: false,
+        securityStatus: "PENDING_SCAN",
       },
     });
 

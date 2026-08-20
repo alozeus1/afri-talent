@@ -61,8 +61,10 @@ describe("file presign authorization", () => {
     vi.mocked(prisma.candidateProfile.upsert).mockResolvedValue({ id: "profile-a" } as never);
     vi.mocked(prisma.resume.create).mockResolvedValue({ id: "resume-a" } as never);
     vi.mocked(prisma.candidateProfile.findUnique).mockResolvedValue(null as never);
-    const res = await request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key: `resumes/${ids.candidateA}/valid.pdf`, fileName: "valid.pdf" });
+    const res = await request(app).post("/api/profile/resumes").set("Authorization", `Bearer ${token(ids.candidateA, Role.CANDIDATE)}`).send({ s3Key: `resumes/${ids.candidateA}/valid.pdf`, fileName: "valid.pdf", setActive: true });
     expect(res.status).toBe(201); expect(aws.head).toHaveBeenCalledOnce(); expect(aws.get).toHaveBeenCalledOnce(); expect(aws.commands[1]).toEqual(expect.objectContaining({ Bucket: "test-private-uploads", Key: `resumes/${ids.candidateA}/valid.pdf`, Range: "bytes=0-15" })); expect(prisma.resume.create).toHaveBeenCalledOnce();
+    expect(prisma.resume.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ isActive: false, securityStatus: "PENDING_SCAN" }) }));
+    expect(prisma.resume.updateMany).not.toHaveBeenCalled();
   });
 
   it("rejects type-confused, empty, truncated, oversized, and failed signature reads before persistence", async () => {

@@ -1489,16 +1489,29 @@ model TrustCaseAction {
 }
 
 model Resume {
-  id         String           @id @default(uuid())
-  profileId  String
-  profile    CandidateProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  s3Key      String           @db.VarChar(500)
-  fileName   String           @db.VarChar(255)
-  isActive   Boolean          @default(false)
-  uploadedAt DateTime         @default(now())
+  id               String               @id @default(uuid())
+  profileId        String
+  profile          CandidateProfile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  s3Key            String               @db.VarChar(500)
+  fileName         String               @db.VarChar(255)
+  isActive         Boolean              @default(false)
+  securityStatus   ResumeSecurityStatus @default(PENDING_SCAN)
+  scanCompletedAt  DateTime?
+  quarantineReason String?              @db.VarChar(100)
+  uploadedAt       DateTime             @default(now())
 
   @@index([profileId])
   @@index([profileId, isActive])
+  @@index([profileId, securityStatus, isActive])
+}
+
+// Files remain unavailable to candidates, employers, and automation until a
+// trusted scanner records CLEAN. PENDING_SCAN is intentionally fail-closed.
+enum ResumeSecurityStatus {
+  PENDING_SCAN
+  CLEAN
+  QUARANTINED
+  REJECTED
 }
 
 enum CandidateAutomationLevel {

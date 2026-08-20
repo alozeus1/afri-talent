@@ -217,7 +217,7 @@ function buildTalentResult(params: {
         };
       };
       resumes: {
-        where: { isActive: true };
+        where: { isActive: true; securityStatus: "CLEAN" };
       };
     };
   }>;
@@ -590,7 +590,7 @@ router.get("/compare", async (req: Request, res: Response) => {
           },
         },
         resumes: {
-          where: { isActive: true },
+          where: { isActive: true, securityStatus: "CLEAN" },
         },
       },
     });
@@ -802,7 +802,7 @@ router.get("/", async (req: Request, res: Response) => {
             },
           },
           resumes: {
-            where: { isActive: true },
+            where: { isActive: true, securityStatus: "CLEAN" },
           },
         },
         orderBy: { updatedAt: "desc" },
@@ -880,7 +880,7 @@ router.get("/:userId", async (req: Request, res: Response) => {
           },
         },
         resumes: {
-          where: { isActive: true },
+          where: { isActive: true, securityStatus: "CLEAN" },
         },
       },
     });
