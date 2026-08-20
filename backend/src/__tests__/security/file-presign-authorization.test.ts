@@ -6,7 +6,7 @@ vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl: aws.sign }));
 vi.mock("../../middleware/account-standing.js", () => ({ requireAccountStanding: () => (_q: unknown, _s: unknown, next: () => void) => next() }));
 vi.mock("../../lib/prisma.js", () => ({ default: {
   user: { findUnique: vi.fn() }, candidateProfile: { upsert: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
-  resume: { create: vi.fn(), updateMany: vi.fn(), findMany: vi.fn() }, $queryRaw: vi.fn().mockResolvedValue([]), $disconnect: vi.fn(),
+  resume: { create: vi.fn(), updateMany: vi.fn(), findMany: vi.fn() }, resumeScanJob: { create: vi.fn() }, $transaction: vi.fn(async (fn: any) => fn({ resume: { create: (...args: any[]) => (prisma as any).resume.create(...args) }, resumeScanJob: { create: (...args: any[]) => (prisma as any).resumeScanJob.create(...args) } })), $queryRaw: vi.fn().mockResolvedValue([]), $disconnect: vi.fn(),
 } }));
 
 import request from "supertest";
