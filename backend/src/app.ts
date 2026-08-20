@@ -6,7 +6,7 @@ import pinoHttpModule from "pino-http";
 const pinoHttp = pinoHttpModule as unknown as typeof import("pino-http").default;
 import { Role } from "@prisma/client";
 import prisma from "./lib/prisma.js";
-import logger from "./lib/logger.js";
+import logger, { httpLoggerConfig } from "./lib/logger.js";
 import { initSentry, setupExpressErrorHandler, captureMessage } from "./lib/sentry.js";
 import { redisHealthStatus, isRedisRequired } from "./lib/redis.js";
 import { buildDegradedState } from "./lib/platform/health.js";
@@ -127,7 +127,7 @@ app.use(requestIdMiddleware);
 
 // Structured logging with Pino (suppress in tests to keep output clean)
 if (!isTest) {
-  app.use(pinoHttp({ logger }));
+  app.use(pinoHttp(httpLoggerConfig as Parameters<typeof pinoHttp>[0]));
 }
 
 // Security: Helmet headers
