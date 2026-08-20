@@ -350,14 +350,16 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
 
     // A successful upload is only structurally verified here. Do not replace a
     // clean active resume until an approved malware scanner has recorded CLEAN.
-    const resume = await prisma.resume.create({
-      data: {
+    const resume = await prisma.$transaction(async (tx) => {
+      const created = await tx.resume.create({ data: {
         profileId: profile.id,
         s3Key: data.s3Key,
         fileName: data.fileName,
         isActive: false,
         securityStatus: "PENDING_SCAN",
-      },
+      }});
+      await tx.resumeScanJob.create({ data: { resumeId: created.id, bucket: RESUME_BUCKET, objectKey: created.s3Key } });
+      return created;
     });
 
     const refreshedProfile = await prisma.candidateProfile.findUnique({

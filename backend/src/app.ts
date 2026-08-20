@@ -127,7 +127,7 @@ app.use(requestIdMiddleware);
 
 // Structured logging with Pino (suppress in tests to keep output clean)
 if (!isTest) {
-  app.use(pinoHttp(httpLoggerConfig as Parameters<typeof pinoHttp>[0]));
+  app.use(pinoHttp(httpLoggerConfig as unknown as Parameters<typeof pinoHttp>[0]));
 }
 
 // Security: Helmet headers

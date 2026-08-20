@@ -1,6 +1,6 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Router, Request, Response } from "express";
-import { BillingDiscrepancyType, BillingEventOutcome, BillingProvider, Prisma, SubscriptionPlan, SubscriptionStatus } from "@prisma/client";
+import { BillingDiscrepancyType, BillingEventOutcome, BillingProvider, Prisma, ResumeScanJobStatus, ResumeScanResult, ResumeSecurityStatus, SubscriptionPlan, SubscriptionStatus } from "@prisma/client";
 import { getStripe, getPlanFromPriceId, isStripeConfigured } from "../lib/stripe.js";
 import prisma from "../lib/prisma.js";
 import { updateStripeCountry } from "../lib/billing/region-resolver.js";
@@ -17,6 +17,32 @@ import {
 } from "../lib/billing/index.js";
 
 const router = Router();
+const RESUME_SCANNER_TOLERANCE_SECONDS = 300;
+
+router.post("/resume-scanner", async (req: Request, res: Response) => {
+  const secret = process.env.RESUME_SCANNER_WEBHOOK_SECRET;
+  const timestamp = req.header("x-afritalent-scan-timestamp");
+  const signature = req.header("x-afritalent-scan-signature");
+  const deliveryId = req.header("x-afritalent-scan-delivery-id");
+  const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from("");
+  if (!secret || !timestamp || !deliveryId || !/^v1=[a-f0-9]{64}$/.test(signature ?? "") || !/^\d+$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > RESUME_SCANNER_TOLERANCE_SECONDS) return res.status(401).json({ error: "Invalid scanner signature" });
+  const expected = createHmac("sha256", secret).update(`${timestamp}.`).update(raw).digest("hex");
+  if (!timingSafeEqual(Buffer.from((signature ?? "").slice(3)), Buffer.from(expected))) return res.status(401).json({ error: "Invalid scanner signature" });
+  let payload: { jobId:string; resumeId:string; bucket:string; objectKey:string; objectVersion?:string|null; result: ResumeScanResult };
+  try { payload = JSON.parse(raw.toString("utf8")); } catch { return res.status(400).json({ error: "Invalid scanner payload" }); }
+  try {
+    const outcome = await prisma.$transaction(async (tx) => {
+      const job = await tx.resumeScanJob.findUnique({ where: { id: payload.jobId }, include: { resume: true } });
+      if (!job || job.resumeId !== payload.resumeId || job.bucket !== payload.bucket || job.objectKey !== payload.objectKey || job.objectVersion !== (payload.objectVersion ?? null)) throw new Error("Scanner resource mismatch");
+      if (job.resultDeliveryId) return job.resultDeliveryId === deliveryId && job.result === payload.result ? "duplicate" : "conflict";
+      const status = payload.result === "CLEAN" ? ResumeSecurityStatus.CLEAN : payload.result === "REJECTED" ? ResumeSecurityStatus.REJECTED : payload.result === "QUARANTINED" ? ResumeSecurityStatus.QUARANTINED : ResumeSecurityStatus.PENDING_SCAN;
+      await tx.resumeScanJob.update({ where:{id:job.id}, data:{ status: payload.result === "ERROR" ? ResumeScanJobStatus.FAILED : ResumeScanJobStatus.COMPLETED, result: payload.result, resultDeliveryId: deliveryId, completedAt:new Date() }});
+      await tx.resume.update({ where:{id:job.resumeId}, data:{securityStatus:status, scanCompletedAt:new Date(), isActive: status === ResumeSecurityStatus.CLEAN }});
+      return "processed";
+    });
+    return outcome === "conflict" ? res.status(409).json({error:"Conflicting scan delivery"}) : res.json({received:true, duplicate:outcome==="duplicate"});
+  } catch { return res.status(409).json({ error: "Scanner result rejected" }); }
+});
 
 const WEBHOOK_IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;
 const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300;
