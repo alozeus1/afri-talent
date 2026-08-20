@@ -1,9 +1,9 @@
 # AfriTalent security gauntlet status
 
-- Current branch and HEAD: `security/afritalent-security-gauntlet` at `2ed3688` (pending ATS replay commit).
+- Current branch and HEAD: `security/afritalent-security-gauntlet` at `d780e4e`.
 - Completed gates: account authority, BOLA foundations, upload ownership and
   signature checks, n8n callback integrity, and the full Stripe webhook gate.
-- Current phase: external CV URL containment and remaining ATS replay checks.
+- Current phase: integrated webhook, resume-quarantine, and application-security verification.
 - Verified finding: a signed `subscription.cancelled` payload could select an
   account by `customer.email` and synchronize after a missed update.
 - Fixed: cancellation now resolves only a persisted Flutterwave customer
@@ -15,6 +15,13 @@
 - ATS replay hardening: missing provider delivery IDs now receive a durable
   SHA-256 raw-body fingerprint; only the expected event-identity uniqueness
   conflict is acknowledged as a duplicate.
+- Flutterwave charge ownership now also requires a persisted checkout record;
+  signed payload email cannot become an account selector.
+- Resume uploads are recorded as `PENDING_SCAN`; only `CLEAN` resumes are
+  selected by protected local consumers. The additive migration is
+  `20260819120000_add_resume_security_quarantine`.
+- Trust reports now conceal foreign application/message targets before write;
+  the per-account report limiter is 10/hour outside tests.
 - Verified external CV finding: allowed-domain matching accepted suffix lookalikes.
   New application CV URLs now require credential-free HTTPS and match allowlist
   domains only at DNS-label boundaries; external URLs remain unverified links.
@@ -25,6 +32,5 @@
   to documented Flutterwave event identity/transaction verification; no
   unauthenticated timestamp will be used as a freshness signal.
 - Last successful commands: `npx vitest run src/__tests__/webhooks-flutterwave.test.ts --no-file-parallelism`; `npm run typecheck`.
-- Exact automatic resume step: add ATS retry and cross-connection nested
-  application-link regressions, then complete the remaining Flutterwave
-  idempotency/retry/concurrency and resume-quarantine gates.
+- Exact automatic resume step: complete migration replay plus scanner callback
+  authorization; then run consolidated backend/frontend/platform verification.
