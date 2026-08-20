@@ -1,4 +1,5 @@
 import { validatePriceCatalogEnv } from "../lib/billing/provider-catalog.js";
+import { validateResumeScannerConfiguration } from "../lib/resume-scanner/config.js";
 
 const VALID_NODE_ENVS = new Set(["development", "test", "production", "staging"]);
 
@@ -53,6 +54,8 @@ export function validateRuntimeEnv(): void {
     if (process.env.N8N_APPROVAL_WEBHOOK_URL?.trim()) {
       requireEnv("N8N_APPROVAL_HMAC_SECRET");
     }
+
+    validateResumeScannerConfiguration();
 
     // M5 — if provider price catalogs are configured, they must be
     // well-formed (valid JSON, PLAN:REGION:INTERVAL:CURRENCY keys, non-empty

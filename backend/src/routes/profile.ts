@@ -10,6 +10,7 @@ import { dispatch as dispatchNotification } from "../lib/notifications/dispatche
 import { ACCOUNT_DELETION_WINDOW_DAYS } from "../lib/privacy/anonymize.js";
 import { GetObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { CONTROL_CHARACTER_FIELDS } from "../middleware/security.js";
+import { getResumeScannerConfiguration } from "../lib/resume-scanner/config.js";
 
 const router = Router();
 const RESUME_BUCKET = process.env.S3_UPLOADS_BUCKET;
@@ -281,6 +282,10 @@ router.get("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Requ
 // This endpoint records the metadata in the DB.
 router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response) => {
   try {
+    if (!getResumeScannerConfiguration().registrationEnabled) {
+      res.status(503).json({ error: "Resume scanning is temporarily unavailable" });
+      return;
+    }
     const data = resumeMetadataSchema.parse(req.body);
 
     // Ensure the s3Key is scoped to this user to prevent cross-user tampering
