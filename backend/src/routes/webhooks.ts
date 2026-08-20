@@ -50,7 +50,8 @@ router.post("/resume-scanner", async (req: Request, res: Response) => {
   const signature = req.header("x-afritalent-scan-signature");
   const deliveryId = req.header("x-afritalent-scan-delivery-id");
   const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from("");
-  if (!secret || !timestamp || !deliveryId || !/^v1=[a-f0-9]{64}$/.test(signature ?? "") || !/^\d+$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > RESUME_SCANNER_TOLERANCE_SECONDS) return res.status(401).json({ error: "Invalid scanner signature" });
+  const timestampValue = timestamp && /^\d+$/.test(timestamp) ? Number(timestamp) : NaN;
+  if (!secret || !timestamp || !deliveryId || !/^v1=[a-f0-9]{64}$/.test(signature ?? "") || !Number.isSafeInteger(timestampValue) || Math.abs(Date.now() / 1000 - timestampValue) > RESUME_SCANNER_TOLERANCE_SECONDS) return res.status(401).json({ error: "Invalid scanner signature" });
   const expected = createHmac("sha256", secret).update(`${timestamp}.`).update(raw).digest("hex");
   if (!timingSafeEqual(Buffer.from((signature ?? "").slice(3)), Buffer.from(expected))) return res.status(401).json({ error: "Invalid scanner signature" });
   let payload: ResumeScannerPayload;
