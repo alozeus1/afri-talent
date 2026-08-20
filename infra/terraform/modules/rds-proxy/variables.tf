@@ -33,9 +33,14 @@ variable "master_user_secret_arn" {
   type        = string
 }
 
-variable "secret_kms_key_arn" {
-  description = "ARN of the KMS key encrypting the master user secret. Required so the proxy role can decrypt."
+variable "proxy_role_arn" {
+  description = "Pre-provisioned IAM role ARN assumed by RDS Proxy. This module never creates or modifies IAM roles or inline policies."
   type        = string
+
+  validation {
+    condition     = can(regex("^arn:[^:]+:iam::[0-9]{12}:role/.+", var.proxy_role_arn))
+    error_message = "proxy_role_arn must be an IAM role ARN provisioned by the privileged platform/IAM path."
+  }
 }
 
 variable "idle_client_timeout" {

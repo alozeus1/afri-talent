@@ -92,7 +92,7 @@ module "rds_proxy" {
   sg_rds_proxy_id           = module.vpc.sg_rds_proxy_id
   aurora_cluster_identifier = module.aurora.aurora_cluster_identifier
   master_user_secret_arn    = module.aurora.aurora_master_user_secret_arn
-  secret_kms_key_arn        = module.aurora.aurora_kms_key_arn
+  proxy_role_arn            = var.rds_proxy_role_arn
 }
 
 # ── Backup + DR (Wave 8 §9.3) ────────────────────────────────────────────────

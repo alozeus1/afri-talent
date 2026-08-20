@@ -14,6 +14,6 @@ output "rds_proxy_name" {
 }
 
 output "rds_proxy_role_arn" {
-  description = "ARN of the IAM role the proxy uses to read the master secret."
-  value       = aws_iam_role.proxy.arn
+  description = "ARN of the externally managed IAM role used by the proxy."
+  value       = var.proxy_role_arn
 }
