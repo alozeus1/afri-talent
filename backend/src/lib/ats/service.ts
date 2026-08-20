@@ -10,6 +10,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 import prisma from "../prisma.js";
 import { decryptString } from "../secure-string.js";
 import { createUserNotification } from "../notifications.js";
@@ -1309,6 +1310,11 @@ export async function processAtsWebhook(params: {
     headers: params.headers,
     body: params.body,
   });
+  // Providers do not all supply a delivery identifier. Persist a deterministic
+  // raw-body fingerprint in that case so authenticated redeliveries cannot
+  // repeat downstream imports, notifications, or application updates.
+  const eventKey = normalized.eventKey
+    ?? `sha256:${createHash("sha256").update(`${connection.provider}\n${params.rawBody}`).digest("hex")}`;
 
   let webhookEvent;
   try {
@@ -1317,7 +1323,7 @@ export async function processAtsWebhook(params: {
         connectionId: connection.id,
         provider: connection.provider,
         eventType: normalized.eventType,
-        eventKey: normalized.eventKey,
+        eventKey,
         status: ATSWebhookEventStatus.RECEIVED,
         httpHeaders: params.headers as Prisma.InputJsonValue,
         payload: params.body as Prisma.InputJsonValue,
@@ -1327,7 +1333,12 @@ export async function processAtsWebhook(params: {
       },
     });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    const target = error instanceof Prisma.PrismaClientKnownRequestError ? error.meta?.target : undefined;
+    const targets = Array.isArray(target) ? target.map(String) : [String(target ?? "")];
+    const isEventIdentityConflict = targets.some((value) =>
+      value.includes("connectionId") || value.includes("eventKey") || value.includes("ATSWebhookEvent_connectionId_eventKey"),
+    );
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" && isEventIdentityConflict) {
       return {
         duplicate: true,
         eventType: normalized.eventType,

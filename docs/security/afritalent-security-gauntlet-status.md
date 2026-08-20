@@ -1,6 +1,6 @@
 # AfriTalent security gauntlet status
 
-- Current branch and HEAD: `security/afritalent-security-gauntlet` at `ced166c`.
+- Current branch and HEAD: `security/afritalent-security-gauntlet` at `2ed3688` (pending ATS replay commit).
 - Completed gates: account authority, BOLA foundations, upload ownership and
   signature checks, n8n callback integrity, and the full Stripe webhook gate.
 - Current phase: external CV URL containment and remaining ATS replay checks.
@@ -12,6 +12,9 @@
   generic query tokens could authenticate requests; malformed Greenhouse HMACs
   could throw. Disabled connections now fail before persistence, query tokens
   are rejected, and comparisons fail closed.
+- ATS replay hardening: missing provider delivery IDs now receive a durable
+  SHA-256 raw-body fingerprint; only the expected event-identity uniqueness
+  conflict is acknowledged as a duplicate.
 - Verified external CV finding: allowed-domain matching accepted suffix lookalikes.
   New application CV URLs now require credential-free HTTPS and match allowlist
   domains only at DNS-label boundaries; external URLs remain unverified links.
@@ -22,6 +25,6 @@
   to documented Flutterwave event identity/transaction verification; no
   unauthenticated timestamp will be used as a freshness signal.
 - Last successful commands: `npx vitest run src/__tests__/webhooks-flutterwave.test.ts --no-file-parallelism`; `npm run typecheck`.
-- Exact automatic resume step: add ATS replay and cross-connection nested
+- Exact automatic resume step: add ATS retry and cross-connection nested
   application-link regressions, then complete the remaining Flutterwave
   idempotency/retry/concurrency and resume-quarantine gates.
