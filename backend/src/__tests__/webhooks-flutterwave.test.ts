@@ -40,10 +40,12 @@ vi.mock("../lib/billing/index.js", async (importOriginal) => {
 });
 
 import request from "supertest";
+import { Prisma } from "@prisma/client";
 import app from "../app.js";
 import { validateRuntimeEnv } from "../config/env.js";
 import prisma from "../lib/prisma.js";
 import { recordBillingEvent, syncBillingEntitlementState } from "../lib/billing/index.js";
+import { verifyFlutterwaveTransaction } from "../lib/flutterwave.js";
 
 const SECRET_HASH = "test-flw-secret-hash";
 
@@ -231,6 +233,78 @@ describe("POST /api/webhooks/flutterwave — cancellation ownership (H1)", () =>
         expect(prismaMock.subscription.updateMany).not.toHaveBeenCalled();
         expect(syncBillingEntitlementState).not.toHaveBeenCalled();
         expect(recordBillingEvent).not.toHaveBeenCalled();
+    });
+});
+
+describe("POST /api/webhooks/flutterwave — charge ownership and retries (H1)", () => {
+    const originalEnv = { ...process.env };
+    const prismaMock = prisma as unknown as {
+        user: { findUnique: ReturnType<typeof vi.fn> };
+        billingEventAudit: { findFirst: ReturnType<typeof vi.fn> };
+        billingWebhookIdempotencyKey: { create: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> };
+    };
+    const verifyTransaction = verifyFlutterwaveTransaction as ReturnType<typeof vi.fn>;
+
+    const signedCharge = () => request(app)
+        .post("/api/webhooks/flutterwave")
+        .set("Content-Type", "application/json")
+        .set("verif-hash", SECRET_HASH)
+        .send({
+            event: "charge.completed",
+            data: {
+                id: 9911,
+                tx_ref: "flw-charge-without-checkout",
+                customer: { email: "victim@example.test" },
+            },
+        });
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        process.env.FLUTTERWAVE_SECRET_HASH = SECRET_HASH;
+        prismaMock.billingWebhookIdempotencyKey.create.mockResolvedValue({ id: "idempotency-charge" });
+        prismaMock.billingWebhookIdempotencyKey.delete.mockResolvedValue(undefined);
+        prismaMock.billingEventAudit.findFirst.mockResolvedValue(null);
+        verifyTransaction.mockResolvedValue({
+            id: 9911,
+            tx_ref: "flw-charge-without-checkout",
+            amount: 50,
+            currency: "NGN",
+            status: "successful",
+            customer: { id: 77, email: "victim@example.test" },
+        });
+    });
+
+    afterEach(() => {
+        process.env = { ...originalEnv };
+    });
+
+    it("does not let a signed charge payload email select a user without a persisted checkout reference", async () => {
+        prismaMock.user.findUnique.mockResolvedValue({ id: "victim-user" });
+
+        const response = await signedCharge();
+
+        expect(response.status).toBe(202);
+        expect(response.body).toEqual({ received: true, ignored: true });
+        expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+        expect(syncBillingEntitlementState).not.toHaveBeenCalled();
+    });
+
+    it("acknowledges an exact reserved replay without repeating ownership or entitlement work", async () => {
+        prismaMock.billingWebhookIdempotencyKey.create
+            .mockResolvedValueOnce({ id: "idempotency-charge" })
+            .mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError("duplicate", {
+                code: "P2002", clientVersion: "test", meta: { target: ["key"] },
+            }));
+
+        const first = await signedCharge();
+        const replay = await signedCharge();
+
+        expect(first.status).toBe(202);
+        expect(replay.status).toBe(200);
+        expect(replay.body).toEqual({ received: true, duplicate: true });
+        expect(prismaMock.billingEventAudit.findFirst).toHaveBeenCalledOnce();
+        expect(verifyTransaction).toHaveBeenCalledOnce();
+        expect(syncBillingEntitlementState).not.toHaveBeenCalled();
     });
 });
 

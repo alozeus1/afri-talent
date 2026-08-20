@@ -391,16 +391,11 @@ router.post("/flutterwave", async (req: Request, res: Response) => {
           })
         : null;
       const checkoutMetadata = (checkoutEvent?.metadata ?? {}) as Record<string, unknown>;
-      const customer = (data.customer ?? {}) as Record<string, unknown>;
-      const customerEmail = typeof customer.email === "string" ? customer.email : undefined;
-      const user = checkoutEvent?.userId
-        ? { id: checkoutEvent.userId }
-        : customerEmail
-          ? await prisma.user.findUnique({
-              where: { email: customerEmail },
-              select: { id: true },
-            })
-          : null;
+      // The webhook body is not an ownership source, even after its shared
+      // secret has verified. Only our persisted checkout reference may select
+      // the account that receives an entitlement transition. The provider's
+      // verified response can still supply diagnostic metadata below.
+      const user = checkoutEvent?.userId ? { id: checkoutEvent.userId } : null;
 
       if (!user?.id) {
         await recordBillingEvent({
@@ -484,6 +479,9 @@ router.post("/flutterwave", async (req: Request, res: Response) => {
         }
 
         const card = (verified.card ?? {}) as Record<string, unknown>;
+        const customerEmail = typeof verified.customer?.email === "string"
+          ? verified.customer.email
+          : undefined;
         await activateFlutterwaveSubscription({
           userId: user.id,
           plan,
