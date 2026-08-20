@@ -72,7 +72,7 @@ router.get(
       const plan = entitlements.plan;
 
       const templates = await prisma.resumeTemplate.findMany({
-        where: { isActive: true, securityStatus: "CLEAN" },
+        where: { isActive: true },
         orderBy: { sortOrder: "asc" },
         include: {
           files: {

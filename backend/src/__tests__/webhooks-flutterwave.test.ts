@@ -55,7 +55,7 @@ describe("POST /api/webhooks/flutterwave — signature enforcement (H1)", () => 
     beforeEach(() => {
         vi.clearAllMocks();
         process.env.FLUTTERWAVE_SECRET_HASH = SECRET_HASH;
-        vi.mocked(recordBillingEvent).mockResolvedValue(undefined);
+        vi.mocked(recordBillingEvent).mockResolvedValue({} as never);
         vi.mocked(syncBillingEntitlementState).mockResolvedValue(undefined as never);
     });
 
