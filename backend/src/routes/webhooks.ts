@@ -35,9 +35,13 @@ router.post("/resume-scanner", async (req: Request, res: Response) => {
       const job = await tx.resumeScanJob.findUnique({ where: { id: payload.jobId }, include: { resume: true } });
       if (!job || job.resumeId !== payload.resumeId || job.bucket !== payload.bucket || job.objectKey !== payload.objectKey || job.objectVersion !== (payload.objectVersion ?? null)) throw new Error("Scanner resource mismatch");
       if (job.resultDeliveryId) return job.resultDeliveryId === deliveryId && job.result === payload.result ? "duplicate" : "conflict";
+      if (job.status === ResumeScanJobStatus.COMPLETED || job.status === ResumeScanJobStatus.EXHAUSTED) return "conflict";
       const status = payload.result === "CLEAN" ? ResumeSecurityStatus.CLEAN : payload.result === "REJECTED" ? ResumeSecurityStatus.REJECTED : payload.result === "QUARANTINED" ? ResumeSecurityStatus.QUARANTINED : ResumeSecurityStatus.PENDING_SCAN;
-      await tx.resumeScanJob.update({ where:{id:job.id}, data:{ status: payload.result === "ERROR" ? ResumeScanJobStatus.FAILED : ResumeScanJobStatus.COMPLETED, result: payload.result, resultDeliveryId: deliveryId, completedAt:new Date() }});
+      const attempts = job.attemptCount + 1;
+      const jobStatus = payload.result === "ERROR" ? (attempts >= job.maxAttempts ? ResumeScanJobStatus.EXHAUSTED : ResumeScanJobStatus.FAILED) : ResumeScanJobStatus.COMPLETED;
+      await tx.resumeScanJob.update({ where:{id:job.id}, data:{ status: jobStatus, attemptCount: attempts, result: payload.result, resultDeliveryId: deliveryId, completedAt:new Date() }});
       await tx.resume.update({ where:{id:job.resumeId}, data:{securityStatus:status, scanCompletedAt:new Date(), isActive: status === ResumeSecurityStatus.CLEAN }});
+      await tx.auditLog.create({ data: { action: "SYSTEM_CONFIGURATION_CHANGED", targetType: "RESUME_SCAN", targetId: job.resumeId, status: "SUCCESS", metadata: { result: payload.result, jobId: job.id, deliveryId } } });
       return "processed";
     });
     return outcome === "conflict" ? res.status(409).json({error:"Conflicting scan delivery"}) : res.json({received:true, duplicate:outcome==="duplicate"});
