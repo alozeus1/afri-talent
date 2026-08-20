@@ -129,6 +129,7 @@ jobs:
         env:
           RUN_DATABASE_INTEGRATION_TESTS: "1"
           DATABASE_URL: postgresql://afritalent:afritalent_test@127.0.0.1:5432/afritalent_stripe_entitlement_test_ci # secret-scan:allow disposable CI service credentials
+          STRIPE_SECRET_KEY: sk_test_ci_entitlement_ordering # secret-scan:allow synthetic CI test value
 
   backend-build:
     name: Backend Build
