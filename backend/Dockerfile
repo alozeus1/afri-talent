@@ -1,5 +1,5 @@
 # Backend Dockerfile - Production (Debian/Prisma OpenSSL compatible)
-FROM node:20-bookworm-slim AS base
+FROM node:22-bookworm-slim AS base
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates openssl curl \
@@ -30,7 +30,11 @@ RUN mkdir -p /tmp/prisma-cli \
   && mkdir -p node_modules/.bin node_modules/@prisma \
   && cp -R /tmp/prisma-cli/prisma node_modules/prisma \
   && cp -R /tmp/prisma-cli/@prisma/. node_modules/@prisma \
-  && ln -sf ../prisma/build/index.js node_modules/.bin/prisma
+  && ln -sf ../prisma/build/index.js node_modules/.bin/prisma \
+  # npm's internal lockfile retains the complete build-time graph after prune.
+  # It is not needed at runtime and causes image scanners to report removed
+  # development-only packages as shipped dependencies.
+  && rm -f node_modules/.package-lock.json
 
 # Production image
 FROM base AS runner
