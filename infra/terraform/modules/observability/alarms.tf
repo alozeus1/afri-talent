@@ -26,12 +26,63 @@
 
 # ── SNS topic for SLO alerts ─────────────────────────────────────────────────
 
+# Customer-managed encryption keeps alarm payloads under the same account
+# lifecycle controls as the rest of the security plane. The policy grants the
+# SNS service only the data-key/decrypt operations needed to encrypt this
+# topic, constrained to the account and regional SNS endpoint.
+data "aws_caller_identity" "observability" {}
+
+data "aws_iam_policy_document" "slo_alerts_kms" {
+  statement {
+    sid       = "EnableAccountRootAdministration"
+    effect    = "Allow"
+    actions   = ["kms:*"]
+    resources = ["*"]
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.observability.account_id}:root"]
+    }
+  }
+
+  statement {
+    sid       = "AllowSnsTopicEncryption"
+    effect    = "Allow"
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey*"]
+    resources = ["*"]
+    principals {
+      type        = "Service"
+      identifiers = ["sns.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.observability.account_id]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["sns.${data.aws_region.current.name}.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_kms_key" "slo_alerts" {
+  description             = "Encrypts AfriTalent SLO alert SNS messages"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.slo_alerts_kms.json
+  tags                    = merge(var.tags, { Name = "${local.name_prefix}-slo-alerts" })
+}
+
+resource "aws_kms_alias" "slo_alerts" {
+  name          = "alias/${local.name_prefix}-slo-alerts"
+  target_key_id = aws_kms_key.slo_alerts.key_id
+}
+
 resource "aws_sns_topic" "slo_alerts" {
   name = "${local.name_prefix}-slo-alerts"
 
-  # KMS-encrypted at rest. The AWS-managed `alias/aws/sns` key is fine
-  # here — the topic does not carry payloads from outside AWS.
-  kms_master_key_id = "alias/aws/sns"
+  kms_master_key_id = aws_kms_key.slo_alerts.arn
 
   tags = merge(var.tags, { Name = "${local.name_prefix}-slo-alerts" })
 }

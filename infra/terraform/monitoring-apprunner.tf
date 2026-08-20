@@ -1,5 +1,50 @@
 data "aws_caller_identity" "current" {}
 
+data "aws_iam_policy_document" "ops_alerts_kms" {
+  count = var.enable_ops_monitoring ? 1 : 0
+
+  statement {
+    sid       = "EnableAccountRootAdministration"
+    effect    = "Allow"
+    actions   = ["kms:*"]
+    resources = ["*"]
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+  }
+
+  statement {
+    sid       = "AllowSnsTopicEncryption"
+    effect    = "Allow"
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey*"]
+    resources = ["*"]
+    principals {
+      type        = "Service"
+      identifiers = ["sns.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["sns.${var.aws_region}.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_kms_key" "ops_alerts" {
+  count                   = var.enable_ops_monitoring ? 1 : 0
+  description             = "Encrypts AfriTalent operations alert SNS messages"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.ops_alerts_kms[0].json
+  tags                    = local.tags
+}
+
 locals {
   backend_apprunner_service_name  = var.apprunner_backend_service_name != "" ? var.apprunner_backend_service_name : "${local.name_prefix}-appr-backend-managed"
   frontend_apprunner_service_name = var.apprunner_frontend_service_name != "" ? var.apprunner_frontend_service_name : "${local.name_prefix}-appr-frontend-managed"
@@ -241,12 +286,14 @@ locals {
 resource "aws_sns_topic" "ops_critical" {
   count = var.enable_ops_monitoring ? 1 : 0
   name  = "${local.name_prefix}-ops-critical"
+  kms_master_key_id = aws_kms_key.ops_alerts[0].arn
   tags  = local.tags
 }
 
 resource "aws_sns_topic" "ops_warning" {
   count = var.enable_ops_monitoring ? 1 : 0
   name  = "${local.name_prefix}-ops-warning"
+  kms_master_key_id = aws_kms_key.ops_alerts[0].arn
   tags  = local.tags
 }
 
