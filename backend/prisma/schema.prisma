@@ -1507,25 +1507,43 @@ model Resume {
 }
 
 model ResumeScanJob {
-  id               String              @id @default(uuid())
+  id               String               @id @default(uuid())
   resumeId         String
-  resume           Resume              @relation(fields: [resumeId], references: [id], onDelete: Cascade)
-  status           ResumeScanJobStatus @default(PENDING)
-  bucket           String              @db.VarChar(255)
-  objectKey        String              @db.VarChar(500)
-  objectVersion    String?             @db.VarChar(255)
-  attemptCount     Int                 @default(0)
-  maxAttempts      Int                 @default(3)
+  resume           Resume               @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  status           ResumeScanJobStatus  @default(PENDING)
+  bucket           String               @db.VarChar(255)
+  objectKey        String               @db.VarChar(500)
+  objectVersion    String?              @db.VarChar(255)
+  attemptCount     Int                  @default(0)
+  maxAttempts      Int                  @default(3)
   result           ResumeScanResult?
-  resultDeliveryId String?             @unique @db.VarChar(255)
-  errorCode        String?             @db.VarChar(100)
-  requestedAt      DateTime            @default(now())
+  resultDeliveryId String?              @unique @db.VarChar(255)
+  deliveries       ResumeScanDelivery[]
+  errorCode        String?              @db.VarChar(100)
+  requestedAt      DateTime             @default(now())
   startedAt        DateTime?
   completedAt      DateTime?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
   @@index([resumeId, status])
   @@index([status, attemptCount])
+}
+
+// Each authenticated callback is durably reserved before it can change a
+// resume.  Keeping callback identity separate from the latest job result lets
+// a retryable scanner ERROR remain replay-safe without allowing a second
+// delivery to apply a conflicting result.
+model ResumeScanDelivery {
+  id          String           @id @default(uuid())
+  jobId       String
+  job         ResumeScanJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  deliveryId  String           @unique @db.VarChar(255)
+  payloadHash String           @db.Char(64)
+  result      ResumeScanResult
+  createdAt   DateTime         @default(now())
+
+  @@index([jobId, createdAt])
 }
 
 // Files remain unavailable to candidates, employers, and automation until a
