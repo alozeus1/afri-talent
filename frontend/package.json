@@ -29,7 +29,7 @@
     "date-fns": "^4.1.0",
     "framer-motion": "^12.42.2",
     "lucide-react": "^1.14.0",
-    "next": "^16.2.12",
+    "next": "^16.3.1",
     "radix-ui": "^1.6.7",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -64,6 +64,24 @@
     "handlebars": "4.7.9",
     "picomatch@<2.3.2": "2.3.2",
     "picomatch@>=4.0.0 <4.0.4": "4.0.4",
-    "postcss": "8.5.14"
+    "postcss": "^8.5.18",
+    "fast-uri": "^3.1.5",
+    "hono": "^4.13.3",
+    "ip-address": "^10.3.1",
+    "js-yaml": "^4.3.1",
+    "nanoid": "^3.3.18",
+    "sharp": "^0.35.0",
+    "minimatch@3.1.5": {
+      "brace-expansion": "1.1.18"
+    },
+    "minimatch@9.0.9": {
+      "brace-expansion": "2.1.4"
+    },
+    "minimatch@10.2.4": {
+      "brace-expansion": "5.0.9"
+    },
+    "minimatch@10.2.5": {
+      "brace-expansion": "5.0.9"
+    }
   }
 }

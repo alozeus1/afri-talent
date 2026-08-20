@@ -596,6 +596,7 @@ describe("Phase 1/2 quality integration suite", () => {
     stripeApiMock.webhooks.constructEvent.mockReturnValueOnce({
       id: "evt_checkout_ok_1",
       type: "checkout.session.completed",
+      created: Math.floor(Date.now() / 1000),
       data: {
         object: {
           customer: "cus_123",
@@ -607,20 +608,18 @@ describe("Phase 1/2 quality integration suite", () => {
         },
       },
     });
+    prismaMock.subscription.findFirst.mockResolvedValueOnce({ id: "sub-1" });
+    prismaMock.subscription.updateMany.mockResolvedValueOnce({ count: 1 });
 
     const valid = await request(app)
       .post("/api/webhooks/stripe")
-      .set("stripe-signature", "valid-signature")
+      .set("stripe-signature", `t=${Math.floor(Date.now() / 1000)},v1=test`)
       .set("Content-Type", "application/json")
       .send({ test: true });
 
     expect(valid.status).toBe(200);
     expect(valid.body.received).toBe(true);
-    expect(prismaMock.subscription.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { userId: "candidate-1" },
-      }),
-    );
+    expect(prismaMock.subscription.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: "sub-1" }) }));
     expect(createUserNotificationMock).toHaveBeenCalled();
   });
 
@@ -637,7 +636,7 @@ describe("Phase 1/2 quality integration suite", () => {
     stripeApiMock.webhooks.constructEvent.mockReturnValueOnce({
       id: "evt_checkout_duplicate_1",
       type: "checkout.session.completed",
-      created: 1_714_000_000,
+      created: Math.floor(Date.now() / 1000),
       data: {
         object: {
           customer: "cus_123",
@@ -652,7 +651,7 @@ describe("Phase 1/2 quality integration suite", () => {
 
     const res = await request(app)
       .post("/api/webhooks/stripe")
-      .set("stripe-signature", "valid-signature")
+      .set("stripe-signature", `t=${Math.floor(Date.now() / 1000)},v1=test`)
       .set("Content-Type", "application/json")
       .send({ test: true });
 

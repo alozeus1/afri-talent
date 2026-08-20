@@ -46,9 +46,10 @@ import prisma from "../../lib/prisma.js";
 import router from "../../routes/webhooks.js";
 
 const databaseUrl = process.env.DATABASE_URL ?? "";
-if (process.env.RUN_DATABASE_INTEGRATION_TESTS !== "1" || !/^postgresql:\/\/[^@]+@(?:127\.0\.0\.1|localhost):\d+\/afritalent_stripe_entitlement_test_/i.test(databaseUrl)) {
-  throw new Error("stripe entitlement integration test requires a loopback afritalent_stripe_entitlement_test database");
-}
+const requested = process.env.RUN_DATABASE_INTEGRATION_TESTS === "1";
+const safeDatabase = /^postgresql:\/\/[^@]+@(?:127\.0\.0\.1|localhost):\d+\/afritalent_stripe_entitlement_test_/i.test(databaseUrl);
+if (requested && !safeDatabase) throw new Error("stripe entitlement integration test requires a loopback afritalent_stripe_entitlement_test database");
+const describeIntegration = requested ? describe : describe.skip;
 
 const stripe = new Stripe("sk_test_synthetic_entitlement_ordering", { apiVersion: "2026-01-28.clover" }); // secret-scan:allow synthetic test value
 const secret = "whsec_synthetic_entitlement_ordering"; // secret-scan:allow synthetic test value
@@ -63,7 +64,7 @@ function send(payload: object) {
     .set("stripe-signature", stripe.webhooks.generateTestHeaderString({ payload: raw, secret, timestamp: Math.floor(Date.now() / 1000) })).send(raw);
 }
 
-describe("Stripe entitlement ordering with PostgreSQL", () => {
+describeIntegration("Stripe entitlement ordering with PostgreSQL", () => {
   beforeAll(async () => {
     process.env.STRIPE_WEBHOOK_SECRET = secret;
     await prisma.user.create({ data: { id, email: "entitlement-ordering@example.test", password: "test-only", name: "Entitlement Ordering", role: "CANDIDATE" } });

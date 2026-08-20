@@ -46,7 +46,6 @@
     "jsonwebtoken": "^9.0.3",
     "mammoth": "^1.12.0",
     "multer": "^2.1.1",
-    "nanoid": "^5.1.16",
     "otplib": "^13.4.0",
     "pdf-parse": "^1.1.1",
     "pino": "^10.3.0",
@@ -66,8 +65,8 @@
     "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.6",
-    "@types/express-serve-static-core": "5.0.7",
     "@types/express-rate-limit": "^6.0.2",
+    "@types/express-serve-static-core": "5.0.7",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/multer": "^2.1.0",
     "@types/node": "^20.11.30",
@@ -80,6 +79,7 @@
     "@types/xml2js": "^0.4.14",
     "eslint": "^9.39.1",
     "globals": "^16.4.0",
+    "nanoid": "^5.1.16",
     "prisma": "5.22.0",
     "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
@@ -99,6 +99,7 @@
       "brace-expansion": "5.0.9"
     },
     "path-to-regexp": "8.4.2",
-    "undici": "7.29.0"
+    "undici": "7.29.0",
+    "nanoid": "^5.1.16"
   }
 }

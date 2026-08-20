@@ -89,7 +89,7 @@ test.describe("Resumes", () => {
     expect(Array.isArray(body)).toBe(true);
   });
 
-  test("POST /api/profile/resumes with valid s3Key registers resume", async ({
+  test("POST /api/profile/resumes fails closed when upload verification is unavailable", async ({
     request,
   }) => {
     await loginAs(request, TEST_CANDIDATE);
@@ -109,10 +109,11 @@ test.describe("Resumes", () => {
         setActive: true,
       },
     });
-    expect(res.ok()).toBe(true);
+    // CI intentionally has no S3 upload bucket or object. Resume registration
+    // must reject that condition rather than creating an unscanned record.
+    expect(res.status()).toBe(503);
     const body = await res.json();
-    expect(body.s3Key).toBe(s3Key);
-    expect(body.isActive).toBe(true);
+    expect(body.error).toMatch(/not configured/i);
   });
 
   test("POST /api/profile/resumes rejects s3Key for different user", async ({
