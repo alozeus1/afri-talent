@@ -163,7 +163,7 @@ export async function runAutoApplyCycle(): Promise<void> {
       const profile = await prisma.candidateProfile.findUnique({
         where: { userId: alert.userId },
         include: {
-          resumes: { where: { isActive: true }, take: 1 },
+          resumes: { where: { isActive: true, securityStatus: "CLEAN" }, take: 1 },
         },
       });
 

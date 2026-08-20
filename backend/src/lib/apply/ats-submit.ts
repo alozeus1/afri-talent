@@ -71,7 +71,7 @@ function splitName(full: string | null | undefined): { firstName: string; lastNa
 
 async function loadActiveResume(userId: string): Promise<{ fileName: string; bytes: Buffer } | null> {
   const resume = await prisma.resume.findFirst({
-    where: { profile: { userId }, isActive: true },
+    where: { profile: { userId }, isActive: true, securityStatus: "CLEAN" },
     orderBy: { uploadedAt: "desc" },
     select: { s3Key: true, fileName: true },
   });

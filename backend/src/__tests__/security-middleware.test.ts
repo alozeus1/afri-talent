@@ -63,6 +63,7 @@ describe("authenticated AI rate-limit keys", () => {
     } as unknown as Request;
 
     expect(getAuthenticatedRateLimitKey(req, "skills")).toBe("skills:user:user-123");
+    expect(getAuthenticatedRateLimitKey(req, "trust-reports")).toBe("trust-reports:user:user-123");
   });
 
   it("does not fall back to per-IP keying when auth has not populated req.user", () => {

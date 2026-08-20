@@ -35,6 +35,7 @@ import {
   maybeCreateAtsApplicationLink,
   syncApplicationStatusToAts,
 } from "../lib/ats/service.js";
+import { isSafeExternalHttpsUrl } from "../lib/security/external-url.js";
 
 const router = Router();
 
@@ -44,16 +45,7 @@ const ALLOWED_CV_DOMAINS = process.env.ALLOWED_CV_DOMAINS
   : [];
 
 function validateCvUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:") return false;
-    if (ALLOWED_CV_DOMAINS.length > 0) {
-      return ALLOWED_CV_DOMAINS.some((domain) => parsed.hostname.endsWith(domain));
-    }
-    return true;
-  } catch {
-    return false;
-  }
+  return isSafeExternalHttpsUrl(url, ALLOWED_CV_DOMAINS);
 }
 
 const applySchema = z.object({

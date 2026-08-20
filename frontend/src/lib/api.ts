@@ -3047,6 +3047,9 @@ export interface ResumeFile {
   s3Key: string;
   fileName: string;
   isActive: boolean;
+  securityStatus: "PENDING_SCAN" | "CLEAN" | "QUARANTINED" | "REJECTED";
+  scanCompletedAt?: string | null;
+  quarantineReason?: string | null;
   uploadedAt: string;
 }
 

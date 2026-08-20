@@ -65,7 +65,7 @@ export function startApplyBatchWorker(): Worker | null {
 
         const profile = await prisma.candidateProfile.findUnique({
           where: { userId: candidateId },
-          include: { resumes: { where: { isActive: true }, take: 1 } },
+          include: { resumes: { where: { isActive: true, securityStatus: "CLEAN" }, take: 1 } },
         });
         const user = await prisma.user.findUnique({ where: { id: candidateId }, select: { name: true } });
         const companyName = target.employerId

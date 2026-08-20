@@ -71,7 +71,7 @@ export default function ResumesPage() {
         fileName: sanitizedName,
         setActive: true,
       });
-      setSuccessMessage(`Resume "${sanitizedName}" registered and set as active!`);
+      setSuccessMessage(`Resume "${sanitizedName}" is quarantined pending a security scan. It cannot be used until cleared.`);
       setFileName("");
       await fetchResumes();
     } catch (err) {
@@ -167,6 +167,14 @@ export default function ResumesPage() {
   }
 
   const activeResume = resumes.find((r) => r.isActive);
+  const resumeSecurityLabel = (resume: ResumeFile) => {
+    switch (resume.securityStatus) {
+      case "CLEAN": return "Security cleared";
+      case "QUARANTINED": return "Quarantined";
+      case "REJECTED": return "Rejected";
+      default: return "Security scan pending";
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -225,7 +233,7 @@ export default function ResumesPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <p>No active resume set</p>
-              <p className="text-sm mt-1">Upload your resume to enable Quick Apply</p>
+              <p className="text-sm mt-1">Upload a resume, then wait for its security scan to clear before using Quick Apply</p>
             </div>
           )}
         </CardContent>
@@ -404,11 +412,14 @@ export default function ResumesPage() {
                       <p className="text-sm text-gray-500">
                         Uploaded {new Date(resume.uploadedAt).toLocaleDateString()}
                       </p>
+                      <p className="text-sm text-amber-700">{resumeSecurityLabel(resume)}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     {resume.isActive ? (
                       <Badge variant="success">Active</Badge>
+                    ) : resume.securityStatus !== "CLEAN" ? (
+                      <Badge variant="warning">{resumeSecurityLabel(resume)}</Badge>
                     ) : (
                       <Button
                         variant="outline"

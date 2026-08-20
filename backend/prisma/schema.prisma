@@ -761,7 +761,7 @@ model RegionConfig {
 // ──────────────── Existing Models ────────────────
 
 model User {
-  savedJobs SavedJob[] @relation("UserSavedJobs")
+  savedJobs                SavedJob[]               @relation("UserSavedJobs")
   id                       String                   @id @default(uuid())
   email                    String                   @unique
   password                 String                   @default("")
@@ -940,7 +940,7 @@ model EmployerTalentPoolCandidate {
 }
 
 model Job {
-  savedBy SavedJob[] @relation("JobSavedBy")
+  savedBy            SavedJob[]     @relation("JobSavedBy")
   id                 String         @id @default(uuid())
   title              String
   slug               String         @unique
@@ -1489,16 +1489,67 @@ model TrustCaseAction {
 }
 
 model Resume {
-  id         String           @id @default(uuid())
-  profileId  String
-  profile    CandidateProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  s3Key      String           @db.VarChar(500)
-  fileName   String           @db.VarChar(255)
-  isActive   Boolean          @default(false)
-  uploadedAt DateTime         @default(now())
+  id               String               @id @default(uuid())
+  profileId        String
+  profile          CandidateProfile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  s3Key            String               @db.VarChar(500)
+  fileName         String               @db.VarChar(255)
+  isActive         Boolean              @default(false)
+  securityStatus   ResumeSecurityStatus @default(PENDING_SCAN)
+  scanCompletedAt  DateTime?
+  quarantineReason String?              @db.VarChar(100)
+  scanJobs         ResumeScanJob[]
+  uploadedAt       DateTime             @default(now())
 
   @@index([profileId])
   @@index([profileId, isActive])
+  @@index([profileId, securityStatus, isActive])
+}
+
+model ResumeScanJob {
+  id               String              @id @default(uuid())
+  resumeId         String
+  resume           Resume              @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  status           ResumeScanJobStatus @default(PENDING)
+  bucket           String              @db.VarChar(255)
+  objectKey        String              @db.VarChar(500)
+  objectVersion    String?             @db.VarChar(255)
+  attemptCount     Int                 @default(0)
+  maxAttempts      Int                 @default(3)
+  result           ResumeScanResult?
+  resultDeliveryId String?             @unique @db.VarChar(255)
+  errorCode        String?             @db.VarChar(100)
+  requestedAt      DateTime            @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  @@index([resumeId, status])
+  @@index([status, attemptCount])
+}
+
+// Files remain unavailable to candidates, employers, and automation until a
+// trusted scanner records CLEAN. PENDING_SCAN is intentionally fail-closed.
+enum ResumeSecurityStatus {
+  PENDING_SCAN
+  CLEAN
+  QUARANTINED
+  REJECTED
+}
+
+enum ResumeScanJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXHAUSTED
+}
+
+enum ResumeScanResult {
+  CLEAN
+  REJECTED
+  QUARANTINED
+  ERROR
 }
 
 enum CandidateAutomationLevel {
@@ -2221,19 +2272,24 @@ model BotSubscription {
 }
 
 model Subscription {
-  id                     String             @id @default(uuid())
-  userId                 String             @unique
-  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan                   SubscriptionPlan   @default(FREE)
-  status                 SubscriptionStatus @default(INACTIVE)
-  billingProvider        BillingProvider?
-  providerCustomerId     String?            @db.VarChar(255)
-  providerSubscriptionId String?            @db.VarChar(255)
-  stripeCustomerId       String?            @db.VarChar(255)
-  stripeSubId            String?            @db.VarChar(255)
-  currentPeriodEnd       DateTime?
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
+  id                        String             @id @default(uuid())
+  userId                    String             @unique
+  user                      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                      SubscriptionPlan   @default(FREE)
+  status                    SubscriptionStatus @default(INACTIVE)
+  billingProvider           BillingProvider?
+  providerCustomerId        String?            @db.VarChar(255)
+  providerSubscriptionId    String?            @db.VarChar(255)
+  stripeCustomerId          String?            @db.VarChar(255)
+  stripeSubId               String?            @db.VarChar(255)
+  currentPeriodEnd          DateTime?
+  // Stripe event delivery is not ordered. These nullable markers are set only
+  // by accepted lifecycle transitions; legacy subscriptions remain unmarked.
+  stripeLifecycleOccurredAt DateTime?
+  stripeLifecyclePriority   Int?
+  stripeLifecycleEventId    String?            @db.VarChar(255)
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
 
   billingEvents         BillingEventAudit[]
   billingDiscrepancies  BillingDiscrepancy[]
@@ -2246,6 +2302,7 @@ model Subscription {
   @@index([providerSubscriptionId])
   @@index([stripeCustomerId])
   @@index([stripeSubId])
+  @@index([stripeSubId, stripeLifecycleOccurredAt])
 }
 
 model BillingEntitlementState {
@@ -3326,13 +3383,28 @@ model GraphRun {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  events GraphRunEvent[]
+  events            GraphRunEvent[]
+  callbackDecisions N8nCallbackDecision[]
 
   @@index([workflowType, createdAt(sort: Desc)])
   @@index([status])
   @@index([userId])
   @@index([applicationId])
   @@index([threadId])
+}
+
+model N8nCallbackDecision {
+  id          String    @id @default(uuid())
+  tokenDigest String    @unique @db.VarChar(64)
+  tokenJti    String?   @db.VarChar(64)
+  graphRunId  String    @db.VarChar(191)
+  action      String    @db.VarChar(32)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  graphRun    GraphRun  @relation(fields: [graphRunId], references: [graphRunId], onDelete: Restrict)
+
+  @@index([graphRunId, action])
+  @@index([tokenJti])
 }
 
 model GraphRunEvent {

@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
 // Mock AI Persistence
 vi.mock("../lib/ai/persistence.js", () => ({
@@ -56,9 +56,44 @@ function makeCandidateToken(id = "user123"): string {
     });
 }
 
+function mockOptionalAuthAccount(input: {
+    id: string;
+    email: string;
+    role: Role;
+    deletedAt?: Date | null;
+    accountRestrictionStatus?: "ACTIVE" | "SUSPENDED";
+} | null, expectedUserId: string): void {
+    (prisma.user.findUnique as any).mockImplementation((args: any) => {
+        const isAuthLookup =
+            args?.where?.id === expectedUserId &&
+            args?.select?.deletedAt === true &&
+            args?.select?.accountRestrictionStatus === true;
+
+        if (isAuthLookup) {
+            return Promise.resolve(input);
+        }
+
+        if (input && args?.where?.id === input.id && args?.include?.employer === true) {
+            return Promise.resolve({
+                ...input,
+                name: "John Doe",
+                emailVerified: true,
+                avatarUrl: null,
+                employer: null,
+            });
+        }
+
+        return undefined;
+    });
+}
+
 describe("Auth API", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+    });
+
+    afterEach(() => {
+        (prisma.user.findUnique as any).mockReset();
     });
 
     describe("POST /api/auth/register", () => {
@@ -189,31 +224,74 @@ describe("Auth API", () => {
             expect(typeof res.body.csrfToken).toBe("string");
         });
 
-        it("returns 404 if user no longer exists", async () => {
-            // Return null, then the endpoint hits an invalid code path (in real life)
-            // but the route actually returns 404
-            (prisma.user.findUnique as any).mockResolvedValueOnce(null);
+        it("returns an anonymous payload when the token account no longer exists", async () => {
+            mockOptionalAuthAccount(null, "deleted_user");
             const token = makeCandidateToken("deleted_user");
 
             const res = await request(app).get("/api/auth/me").set("Authorization", `Bearer ${token}`);
-            expect(res.status).toBe(404);
-            expect(res.body.error).toBe("User not found");
+            expect(res.status).toBe(200);
+            expect(res.body).toMatchObject({ authenticated: false, user: null });
         });
 
-        it("returns 200 with user data", async () => {
-            (prisma.user.findUnique as any).mockResolvedValueOnce({
+        it("returns current database account data instead of stale token claims", async () => {
+            mockOptionalAuthAccount({
                 id: "user123",
                 email: "candidate@test.com",
                 role: Role.CANDIDATE,
-                name: "John Doe",
-            });
-            const token = makeCandidateToken("user123");
+                deletedAt: null,
+                accountRestrictionStatus: "ACTIVE",
+            }, "user123");
+            const token = signToken({ userId: "user123", email: "stale@example.test", role: Role.EMPLOYER });
 
             const res = await request(app).get("/api/auth/me").set("Authorization", `Bearer ${token}`);
             expect(res.status).toBe(200);
             expect(res.body.authenticated).toBe(true);
             expect(res.body.user.id).toBe("user123");
             expect(res.body.user.email).toBe("candidate@test.com");
+            expect(res.body.user.role).toBe(Role.CANDIDATE);
+        });
+
+        it("returns an anonymous payload for a deleted account", async () => {
+            mockOptionalAuthAccount({
+                id: "deleted_user",
+                email: "deleted@example.test",
+                role: Role.CANDIDATE,
+                deletedAt: new Date(),
+                accountRestrictionStatus: "ACTIVE",
+            }, "deleted_user");
+
+            const res = await request(app)
+                .get("/api/auth/me")
+                .set("Authorization", `Bearer ${makeCandidateToken("deleted_user")}`);
+
+            expect(res.status).toBe(200);
+            expect(res.body).toMatchObject({ authenticated: false, user: null });
+        });
+
+        it("returns an anonymous payload for a suspended account", async () => {
+            mockOptionalAuthAccount({
+                id: "suspended_user",
+                email: "suspended@example.test",
+                role: Role.CANDIDATE,
+                deletedAt: null,
+                accountRestrictionStatus: "SUSPENDED",
+            }, "suspended_user");
+
+            const res = await request(app)
+                .get("/api/auth/me")
+                .set("Authorization", `Bearer ${makeCandidateToken("suspended_user")}`);
+
+            expect(res.status).toBe(200);
+            expect(res.body).toMatchObject({ authenticated: false, user: null });
+        });
+
+        it("returns an anonymous payload for a malformed token", async () => {
+            const res = await request(app)
+                .get("/api/auth/me")
+                .set("Authorization", "Bearer not-a-valid-token");
+
+            expect(res.status).toBe(200);
+            expect(res.body).toMatchObject({ authenticated: false, user: null });
         });
     });
 });

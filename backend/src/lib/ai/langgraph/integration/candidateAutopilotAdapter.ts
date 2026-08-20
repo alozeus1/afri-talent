@@ -67,7 +67,7 @@ export async function buildAutopilotGateDeps(candidateId: string): Promise<Autop
     getProfileCompleteness: async (cid) => {
       const profile = await prisma.candidateProfile.findUnique({
         where: { userId: cid },
-        include: { resumes: { where: { isActive: true }, take: 1 } },
+        include: { resumes: { where: { isActive: true, securityStatus: "CLEAN" }, take: 1 } },
       });
       return profileCompletenessFrom(profile);
     },

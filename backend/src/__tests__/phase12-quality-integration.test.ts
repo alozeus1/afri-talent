@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { Prisma, Role, SubscriptionPlan } from "@prisma/client";
 import { signToken } from "../lib/jwt.js";
@@ -227,6 +227,36 @@ function makeToken(
   return signToken({ userId, role, email });
 }
 
+type UserLookupHandler = {
+  matches: (args: any) => boolean;
+  value: unknown;
+};
+
+function mockCurrentAccount(
+  input: { id: string; email: string; role: Role },
+  routeLookups: UserLookupHandler[] = [],
+): void {
+  prismaMock.user.findUnique.mockImplementation((args: any) => {
+    const isAuthLookup =
+      args?.where?.id === input.id &&
+      args?.select?.deletedAt === true &&
+      args?.select?.accountRestrictionStatus === true;
+
+    if (isAuthLookup) {
+      return Promise.resolve({
+        id: input.id,
+        email: input.email,
+        role: input.role,
+        deletedAt: null,
+        accountRestrictionStatus: "ACTIVE",
+      });
+    }
+
+    const routeLookup = routeLookups.find(({ matches }) => matches(args));
+    return routeLookup ? Promise.resolve(routeLookup.value) : undefined;
+  });
+}
+
 describe("Phase 1/2 quality integration suite", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -350,6 +380,10 @@ describe("Phase 1/2 quality integration suite", () => {
     prismaMock.user.update.mockResolvedValue({});
   });
 
+  afterEach(() => {
+    prismaMock.user.findUnique.mockReset();
+  });
+
   it("only advertises Google OAuth when both client id and secret exist", async () => {
     const prevGoogle = process.env.GOOGLE_CLIENT_ID;
     const prevGoogleSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -431,6 +465,8 @@ describe("Phase 1/2 quality integration suite", () => {
 
   it("rejects billing-country tampering attempts with invalid payload", async () => {
     const token = makeToken(Role.CANDIDATE, "candidate-1", "candidate@example.com");
+    mockCurrentAccount({ id: "candidate-1", email: "candidate@example.com", role: Role.CANDIDATE });
+
     const res = await request(app)
       .post("/api/pricing/billing-country")
       .set("Authorization", `Bearer ${token}`)
@@ -442,13 +478,18 @@ describe("Phase 1/2 quality integration suite", () => {
 
   it("sends and verifies email verification tokens", async () => {
     const token = makeToken(Role.CANDIDATE, "candidate-1", "candidate@example.com");
-
-    prismaMock.user.findUnique.mockResolvedValueOnce({
-      id: "candidate-1",
-      email: "candidate@example.com",
-      name: "Candidate",
-      emailVerified: false,
-    });
+    mockCurrentAccount(
+      { id: "candidate-1", email: "candidate@example.com", role: Role.CANDIDATE },
+      [{
+        matches: (args) => args?.where?.id === "candidate-1" && !args?.select && !args?.include,
+        value: {
+          id: "candidate-1",
+          email: "candidate@example.com",
+          name: "Candidate",
+          emailVerified: false,
+        },
+      }],
+    );
 
     const sendRes = await request(app)
       .post("/api/auth/email/send-verification")
@@ -480,11 +521,16 @@ describe("Phase 1/2 quality integration suite", () => {
 
   it("blocks checkout for unverified users, then creates a checkout session for verified users", async () => {
     const token = makeToken(Role.CANDIDATE, "candidate-1", "candidate@example.com");
-
-    prismaMock.user.findUnique.mockResolvedValueOnce({
-      emailVerified: false,
-      email: "candidate@example.com",
-    });
+    mockCurrentAccount(
+      { id: "candidate-1", email: "candidate@example.com", role: Role.CANDIDATE },
+      [{
+        matches: (args) =>
+          args?.where?.id === "candidate-1" &&
+          args?.select?.emailVerified === true &&
+          args?.select?.email === true,
+        value: { emailVerified: false, email: "candidate@example.com" },
+      }],
+    );
 
     const blocked = await request(app)
       .post("/api/billing/checkout")
@@ -495,15 +541,25 @@ describe("Phase 1/2 quality integration suite", () => {
     expect(blocked.body.code).toBe("EMAIL_VERIFICATION_REQUIRED");
 
     isStripeConfiguredMock.mockReturnValue(true);
-    prismaMock.user.findUnique
-      .mockResolvedValueOnce({
-        emailVerified: true,
-        email: "candidate@example.com",
-      })
-      .mockResolvedValueOnce({
-        email: "candidate@example.com",
-        name: "Candidate One",
-      });
+    mockCurrentAccount(
+      { id: "candidate-1", email: "candidate@example.com", role: Role.CANDIDATE },
+      [
+        {
+          matches: (args) =>
+            args?.where?.id === "candidate-1" &&
+            args?.select?.emailVerified === true &&
+            args?.select?.email === true,
+          value: { emailVerified: true, email: "candidate@example.com" },
+        },
+        {
+          matches: (args) =>
+            args?.where?.id === "candidate-1" &&
+            args?.select?.email === true &&
+            args?.select?.name === true,
+          value: { email: "candidate@example.com", name: "Candidate One" },
+        },
+      ],
+    );
 
     const ok = await request(app)
       .post("/api/billing/checkout")
@@ -652,6 +708,8 @@ describe("Phase 1/2 quality integration suite", () => {
     prismaMock.resource.count.mockResolvedValueOnce(23);
 
     const token = makeToken(Role.ADMIN, "admin-1", "admin@example.com");
+    mockCurrentAccount({ id: "admin-1", email: "admin@example.com", role: Role.ADMIN });
+
     const res = await request(app)
       .get("/api/admin/stats")
       .set("Authorization", `Bearer ${token}`);

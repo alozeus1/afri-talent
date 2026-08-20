@@ -8,8 +8,57 @@ import { refreshCandidateTrustProfile } from "../lib/trust/service.js";
 import logger from "../lib/logger.js";
 import { dispatch as dispatchNotification } from "../lib/notifications/dispatcher.js";
 import { ACCOUNT_DELETION_WINDOW_DAYS } from "../lib/privacy/anonymize.js";
+import { GetObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CONTROL_CHARACTER_FIELDS } from "../middleware/security.js";
 
 const router = Router();
+const RESUME_BUCKET = process.env.S3_UPLOADS_BUCKET;
+const RESUME_MAX_BYTES = 10 * 1024 * 1024;
+const RESUME_TYPES: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+const RESUME_SIGNATURE_BYTES = 16;
+let resumeS3: S3Client | null = null;
+function resumeStorage() { return resumeS3 ??= new S3Client({ region: process.env.AWS_REGION || "us-east-1" }); }
+
+async function readResumeSignature(key: string): Promise<Uint8Array> {
+  const response = await resumeStorage().send(new GetObjectCommand({
+    Bucket: RESUME_BUCKET,
+    Key: key,
+    Range: `bytes=0-${RESUME_SIGNATURE_BYTES - 1}`,
+  }));
+  const body = response.Body as AsyncIterable<Uint8Array> & { destroy?: () => void } | undefined;
+  if (!body || !body[Symbol.asyncIterator]) throw new Error("Missing upload content");
+
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    for await (const chunk of body) {
+      length += chunk.length;
+      if (length > RESUME_SIGNATURE_BYTES) throw new Error("Upload signature range exceeded");
+      chunks.push(chunk);
+    }
+  } finally {
+    body.destroy?.();
+  }
+  const signature = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    signature.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return signature;
+}
+
+function hasExpectedResumeSignature(extension: string, bytes: Uint8Array): boolean {
+  if (extension === ".pdf") return bytes.length >= 5 && Buffer.from(bytes.subarray(0, 5)).toString("ascii") === "%PDF-";
+  return bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && (
+    (bytes[2] === 0x03 && bytes[3] === 0x04) ||
+    (bytes[2] === 0x05 && bytes[3] === 0x06) ||
+    (bytes[2] === 0x07 && bytes[3] === 0x08)
+  );
+}
 
 const structuredWorkHistoryItemSchema = z.object({
   company: z.string().max(160).trim().optional().or(z.literal("")),
@@ -236,8 +285,53 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
 
     // Ensure the s3Key is scoped to this user to prevent cross-user tampering
     const expectedPrefix = `resumes/${req.user!.userId}/`;
-    if (!data.s3Key.startsWith(expectedPrefix)) {
+    const keySuffix = data.s3Key.slice(expectedPrefix.length);
+    if (
+      !data.s3Key.startsWith(expectedPrefix) ||
+      !keySuffix ||
+      (res.locals[CONTROL_CHARACTER_FIELDS] as Set<string> | undefined)?.has("s3Key") ||
+      keySuffix.split("/").some((segment) => segment === "." || segment === "..") ||
+      /%2e/i.test(data.s3Key) ||
+      Array.from(data.s3Key).some((character) => {
+        const codePoint = character.codePointAt(0)!;
+        return codePoint <= 0x1f || codePoint === 0x7f;
+      })
+    ) {
       res.status(400).json({ error: "Invalid s3Key — must be scoped to your user ID" });
+      return;
+    }
+    if (!RESUME_BUCKET) {
+      res.status(503).json({ error: "Resume uploads are not configured" });
+      return;
+    }
+    const extension = Object.keys(RESUME_TYPES).find((value) => data.s3Key.toLowerCase().endsWith(value));
+    if (!extension) {
+      res.status(400).json({ error: "Invalid resume file type" });
+      return;
+    }
+    try {
+      const object = await resumeStorage().send(new HeadObjectCommand({ Bucket: RESUME_BUCKET, Key: data.s3Key }));
+      if (
+        !Number.isFinite(object.ContentLength) || !object.ContentLength || object.ContentLength <= 0 || object.ContentLength > RESUME_MAX_BYTES ||
+        object.ContentType !== RESUME_TYPES[extension] || object.ServerSideEncryption !== "aws:kms"
+      ) {
+        res.status(400).json({ error: "Uploaded resume metadata is invalid" });
+        return;
+      }
+    } catch {
+      res.status(422).json({ error: "Upload has not completed or is unavailable" });
+      return;
+    }
+
+    let signature: Uint8Array;
+    try {
+      signature = await readResumeSignature(data.s3Key);
+    } catch {
+      res.status(422).json({ error: "Upload content could not be verified" });
+      return;
+    }
+    if (!hasExpectedResumeSignature(extension, signature)) {
+      res.status(400).json({ error: "Uploaded resume content is invalid" });
       return;
     }
 
@@ -254,21 +348,18 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
       select: { id: true },
     });
 
-    // If setActive, deactivate all other resumes first
-    if (data.setActive) {
-      await prisma.resume.updateMany({
-        where: { profileId: profile.id, isActive: true },
-        data: { isActive: false },
-      });
-    }
-
-    const resume = await prisma.resume.create({
-      data: {
+    // A successful upload is only structurally verified here. Do not replace a
+    // clean active resume until an approved malware scanner has recorded CLEAN.
+    const resume = await prisma.$transaction(async (tx) => {
+      const created = await tx.resume.create({ data: {
         profileId: profile.id,
         s3Key: data.s3Key,
         fileName: data.fileName,
-        isActive: data.setActive,
-      },
+        isActive: false,
+        securityStatus: "PENDING_SCAN",
+      }});
+      await tx.resumeScanJob.create({ data: { resumeId: created.id, bucket: RESUME_BUCKET, objectKey: created.s3Key } });
+      return created;
     });
 
     const refreshedProfile = await prisma.candidateProfile.findUnique({

@@ -52,7 +52,21 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    req.user = payload;
+    // JWT claims are a session snapshot, not an authorization source of
+    // truth. Rehydrate the account on every protected request so a role
+    // downgrade or account deletion takes effect immediately instead of when
+    // the (up-to-seven-day) token expires.
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { id: true, email: true, role: true, deletedAt: true, accountRestrictionStatus: true },
+    });
+
+    if (!user || user.deletedAt || user.accountRestrictionStatus === "SUSPENDED") {
+      res.status(401).json({ error: "Account is no longer active" });
+      return;
+    }
+
+    req.user = { ...payload, email: user.email, role: user.role };
     req.rawToken = token;
     next();
   } catch {
@@ -73,7 +87,17 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
       next();
       return;
     }
-    req.user = payload;
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { id: true, email: true, role: true, deletedAt: true, accountRestrictionStatus: true },
+    });
+    if (!user || user.deletedAt || user.accountRestrictionStatus === "SUSPENDED") {
+      next();
+      return;
+    }
+
+    req.user = { ...payload, email: user.email, role: user.role };
     req.rawToken = token;
   } catch {
     // Intentionally ignore bad tokens for optional auth paths.
