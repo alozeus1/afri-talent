@@ -1498,11 +1498,34 @@ model Resume {
   securityStatus   ResumeSecurityStatus @default(PENDING_SCAN)
   scanCompletedAt  DateTime?
   quarantineReason String?              @db.VarChar(100)
+  scanJobs         ResumeScanJob[]
   uploadedAt       DateTime             @default(now())
 
   @@index([profileId])
   @@index([profileId, isActive])
   @@index([profileId, securityStatus, isActive])
+}
+
+model ResumeScanJob {
+  id               String              @id @default(uuid())
+  resumeId         String
+  resume           Resume              @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  status           ResumeScanJobStatus @default(PENDING)
+  bucket           String              @db.VarChar(255)
+  objectKey        String              @db.VarChar(500)
+  objectVersion    String?             @db.VarChar(255)
+  attemptCount     Int                 @default(0)
+  maxAttempts      Int                 @default(3)
+  result           ResumeScanResult?
+  resultDeliveryId String?             @unique @db.VarChar(255)
+  errorCode        String?             @db.VarChar(100)
+  requestedAt      DateTime            @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  @@index([resumeId, status])
+  @@index([status, attemptCount])
 }
 
 // Files remain unavailable to candidates, employers, and automation until a
@@ -1512,6 +1535,21 @@ enum ResumeSecurityStatus {
   CLEAN
   QUARANTINED
   REJECTED
+}
+
+enum ResumeScanJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXHAUSTED
+}
+
+enum ResumeScanResult {
+  CLEAN
+  REJECTED
+  QUARANTINED
+  ERROR
 }
 
 enum CandidateAutomationLevel {
