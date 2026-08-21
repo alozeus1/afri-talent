@@ -41,14 +41,8 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Workstream B — chromium for server-side resume PDF export
-# (lib/pdf/html-to-pdf.ts; rendering runs with JS disabled + network blocked).
-# fonts-liberation/fonts-dejavu give the templates metric-compatible
-# Arial/Helvetica/Times substitutes so PDFs match the in-browser preview.
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends chromium fonts-liberation fonts-dejavu-core \
-  && rm -rf /var/lib/apt/lists/*
-ENV CHROMIUM_PATH=/usr/bin/chromium
+# Chromium is deliberately not installed in the application runtime. PDF
+# rendering is delegated to the isolated internal renderer service.
 
 # §2.5 build provenance — injected by deploy.yml. Surfaced in /api/health
 # (verbose admin view) and as the Sentry release tag.

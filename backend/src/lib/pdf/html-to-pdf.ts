@@ -1,153 +1,129 @@
-// Server-side HTML → PDF rendering for resume exports (Workstream B).
+// Internal PDF renderer client.
 //
-// Uses puppeteer-core against a system chromium (installed in the backend
-// Docker image; CHROMIUM_PATH overrides the default /usr/bin/chromium).
-//
-// SECURITY: the filled template HTML embeds candidate-controlled resume
-// content which template-filler does NOT escape. The page is therefore
-// rendered with JavaScript disabled and ALL network requests blocked —
-// the renderer is a pure layout engine here, nothing in the document can
-// execute or exfiltrate. Chromium runs with --no-sandbox because the
-// container itself is the isolation boundary (no user namespaces on
-// Fargate); with JS disabled the renderer never executes untrusted code.
-//
-// Availability: when no chromium binary exists (local dev without the
-// image), isPdfRendererAvailable() returns false and the route responds
-// 503 — same graceful pattern as other optional infrastructure.
+// PDF rendering is intentionally outside the application process. The backend
+// sends only generated HTML to a configured private renderer and authenticates
+// the exact request body with a short-lived HMAC. Candidate input never selects
+// a renderer URL and the renderer never receives a URL to fetch.
 
-import { existsSync } from "node:fs";
-import type { Browser } from "puppeteer-core";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import logger from "../logger.js";
 
-const DEFAULT_CHROMIUM_PATHS = [
-  "/usr/bin/chromium",
-  "/usr/bin/chromium-browser",
-  "/usr/bin/google-chrome",
-];
+const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_HTML_BYTES = 1_000_000;
+const MAX_PDF_BYTES = 10_000_000;
+const TIMESTAMP_TOLERANCE_SECONDS = 300;
 
-const RENDER_TIMEOUT_MS = 30_000;
-const MAX_CONCURRENT_RENDERS = 2;
+type RendererConfig = {
+  endpoint: URL;
+  secret: string;
+};
 
-let browser: Browser | null = null;
-let launching: Promise<Browser> | null = null;
-let activeRenders = 0;
-const waiters: Array<() => void> = [];
+function allowedRendererHosts(): Set<string> {
+  return new Set(
+    (process.env.PDF_RENDERER_ALLOWED_HOSTS ?? "")
+      .split(",")
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+function getRendererConfig(): RendererConfig | null {
+  const rawUrl = process.env.PDF_RENDERER_URL?.trim();
+  const secret = process.env.PDF_RENDERER_SHARED_SECRET?.trim();
+  if (!rawUrl || !secret || secret.length < 32) return null;
+
+  try {
+    const endpoint = new URL(rawUrl);
+    const allowedHosts = allowedRendererHosts();
+    if (
+      (endpoint.protocol !== "http:" && endpoint.protocol !== "https:") ||
+      endpoint.username ||
+      endpoint.password ||
+      endpoint.pathname !== "/render" ||
+      endpoint.search ||
+      endpoint.hash ||
+      !allowedHosts.has(endpoint.hostname.toLowerCase())
+    ) {
+      return null;
+    }
+    return { endpoint, secret };
+  } catch {
+    return null;
+  }
+}
+
+function signature(secret: string, timestamp: string, body: string): string {
+  return createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
+}
+
+function isPdfResponse(response: Response): boolean {
+  const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+  return contentType === "application/pdf";
+}
 
 export function resolveChromiumPath(): string | null {
-  const fromEnv = process.env.CHROMIUM_PATH?.trim();
-  if (fromEnv) {
-    return existsSync(fromEnv) ? fromEnv : null;
-  }
-  return DEFAULT_CHROMIUM_PATHS.find((p) => existsSync(p)) ?? null;
+  // Kept as a compatibility export for callers/tests: Chromium is never used
+  // by the backend runtime after renderer isolation.
+  return null;
 }
 
 export function isPdfRendererAvailable(): boolean {
-  return resolveChromiumPath() !== null;
-}
-
-async function getBrowser(): Promise<Browser> {
-  if (browser?.connected) {
-    return browser;
-  }
-  if (launching) {
-    return launching;
-  }
-
-  const executablePath = resolveChromiumPath();
-  if (!executablePath) {
-    throw new Error("No chromium executable available for PDF rendering");
-  }
-
-  launching = (async () => {
-    const { launch } = await import("puppeteer-core");
-    const instance = await launch({
-      executablePath,
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-first-run",
-        "--no-zygote",
-        "--disable-extensions",
-      ],
-    });
-    instance.on("disconnected", () => {
-      if (browser === instance) {
-        browser = null;
-      }
-    });
-    browser = instance;
-    return instance;
-  })();
-
-  try {
-    return await launching;
-  } finally {
-    launching = null;
-  }
-}
-
-async function acquireSlot(): Promise<void> {
-  if (activeRenders < MAX_CONCURRENT_RENDERS) {
-    activeRenders += 1;
-    return;
-  }
-  await new Promise<void>((resolve) => waiters.push(resolve));
-  activeRenders += 1;
-}
-
-function releaseSlot(): void {
-  activeRenders -= 1;
-  const next = waiters.shift();
-  if (next) next();
+  return getRendererConfig() !== null;
 }
 
 export async function renderHtmlToPdf(html: string): Promise<Buffer> {
-  await acquireSlot();
+  const config = getRendererConfig();
+  if (!config) throw new Error("PDF renderer is not configured safely");
+  if (Buffer.byteLength(html, "utf8") > MAX_HTML_BYTES) {
+    throw new Error("PDF renderer input exceeds the configured limit");
+  }
+
+  const body = JSON.stringify({ html });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   try {
-    const instance = await getBrowser();
-    const page = await instance.newPage();
-    try {
-      // Untrusted-content hardening: no script execution, no network.
-      await page.setJavaScriptEnabled(false);
-      await page.setRequestInterception(true);
-      page.on("request", (request) => {
-        void request.abort();
-      });
+    const response = await fetch(config.endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-afritalent-pdf-timestamp": timestamp,
+        "x-afritalent-pdf-signature": `v1=${signature(config.secret, timestamp, body)}`,
+      },
+      body,
+      signal: controller.signal,
+    });
 
-      await page.setContent(html, {
-        waitUntil: "domcontentloaded",
-        timeout: RENDER_TIMEOUT_MS,
-      });
-
-      const pdf = await page.pdf({
-        format: "a4",
-        printBackground: true,
-        margin: { top: "12mm", bottom: "12mm", left: "12mm", right: "12mm" },
-        timeout: RENDER_TIMEOUT_MS,
-      });
-
-      return Buffer.from(pdf);
-    } finally {
-      await page.close().catch(() => undefined);
+    if (!response.ok || !isPdfResponse(response)) {
+      throw new Error(`PDF renderer rejected request (${response.status})`);
     }
+
+    const pdf = Buffer.from(await response.arrayBuffer());
+    if (pdf.length === 0 || pdf.length > MAX_PDF_BYTES || !pdf.subarray(0, 5).equals(Buffer.from("%PDF-"))) {
+      throw new Error("PDF renderer returned an invalid document");
+    }
+    return pdf;
   } catch (error) {
     logger.error(
-      { err: error instanceof Error ? error.message : String(error) },
-      "[pdf] HTML render failed",
+      { err: error instanceof Error ? error.message : "renderer request failed" },
+      "[pdf] internal renderer request failed",
     );
     throw error;
   } finally {
-    releaseSlot();
+    clearTimeout(timeout);
   }
 }
 
-// Test/shutdown hook.
 export async function closePdfRenderer(): Promise<void> {
-  if (browser) {
-    await browser.close().catch(() => undefined);
-    browser = null;
-  }
+  // Renderer is remote; no local browser lifecycle exists.
 }
+
+// Exported for tests only; no request handler accepts caller-provided hosts.
+export const pdfRendererSecurityLimits = {
+  REQUEST_TIMEOUT_MS,
+  MAX_HTML_BYTES,
+  MAX_PDF_BYTES,
+  TIMESTAMP_TOLERANCE_SECONDS,
+  timingSafeEqual,
+};
