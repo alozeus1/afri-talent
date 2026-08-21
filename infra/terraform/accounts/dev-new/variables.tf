@@ -32,6 +32,16 @@ variable "name_prefix" {
   default     = "afritalent-dev"
 }
 
+variable "rds_proxy_role_arn" {
+  type        = string
+  description = "IAM role ARN pre-provisioned by the privileged platform path for the RDS Proxy. Required to prevent restricted application deployments from mutating IAM policies."
+
+  validation {
+    condition     = can(regex("^arn:[^:]+:iam::[0-9]{12}:role/.+", var.rds_proxy_role_arn))
+    error_message = "rds_proxy_role_arn must be an IAM role ARN supplied by the approved platform/IAM workflow."
+  }
+}
+
 variable "ssm_path_prefix" {
   type        = string
   description = "SSM parameter path prefix without leading or trailing slash (e.g. afritalent/dev). Modules inject leading/trailing slashes as needed."
@@ -248,6 +258,18 @@ variable "image_tag" {
   type        = string
   description = "Tag of the ECR images to deploy via the ECS task definition. CI usually overrides via aws ecs register-task-definition; default 'latest' suffices for first apply."
   default     = "latest"
+}
+
+variable "image_digest_frontend" {
+  type        = string
+  description = "Immutable frontend OCI digest supplied by the image build workflow."
+  default     = ""
+}
+
+variable "image_digest_backend" {
+  type        = string
+  description = "Immutable backend OCI digest supplied by the image build workflow."
+  default     = ""
 }
 
 # ── Tfstate bootstrap ARNs (for the OIDC role policy) ────────────────────────

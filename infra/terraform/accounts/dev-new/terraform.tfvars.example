@@ -9,6 +9,10 @@ name_prefix    = "afritalent-dev"
 ssm_path_prefix = "afritalent/dev"
 owner_tag       = "platform"
 
+# Required. Provision this role through the privileged platform/IAM workflow;
+# the restricted application deployment role must not create inline IAM policy.
+# rds_proxy_role_arn = "arn:aws:iam::123456789012:role/afritalent-dev-rds-proxy"
+
 # Set to your domain when ready. Empty = CloudFront default domain only.
 # Example: domain_name = "dev.afritalent.com"
 domain_name = ""

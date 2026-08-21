@@ -10,9 +10,9 @@ terraform {
 # ECR v2 — separate from the App Runner-era `modules/ecr/` so the migration to
 # the new account (108188564905) can run in parallel with the legacy stack.
 #
-# Two repositories, MUTABLE tags (we use `latest` + git SHA), scan on push,
-# lifecycle policy keeping last 10 untagged + last 30 tagged images, optional
-# KMS encryption.
+# Release images use immutable Git-SHA tags, scan on push, and retain a bounded
+# history. Deployers must resolve the tagged release to a digest before ECS
+# registration; `latest` is intentionally not a release contract.
 #
 
 locals {
@@ -56,8 +56,8 @@ resource "aws_ecr_repository" "this" {
   for_each = local.repos
 
   name                 = each.value
-  image_tag_mutability = "MUTABLE"
-  force_delete         = var.force_delete
+  image_tag_mutability = "IMMUTABLE"
+  force_delete         = false
 
   image_scanning_configuration {
     scan_on_push = true

@@ -10,6 +10,7 @@ import { dispatch as dispatchNotification } from "../lib/notifications/dispatche
 import { ACCOUNT_DELETION_WINDOW_DAYS } from "../lib/privacy/anonymize.js";
 import { GetObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { CONTROL_CHARACTER_FIELDS } from "../middleware/security.js";
+import { getResumeScannerConfiguration } from "../lib/resume-scanner/config.js";
 
 const router = Router();
 const RESUME_BUCKET = process.env.S3_UPLOADS_BUCKET;
@@ -281,6 +282,10 @@ router.get("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Requ
 // This endpoint records the metadata in the DB.
 router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Request, res: Response) => {
   try {
+    if (!getResumeScannerConfiguration().registrationEnabled) {
+      res.status(503).json({ error: "Resume scanning is temporarily unavailable" });
+      return;
+    }
     const data = resumeMetadataSchema.parse(req.body);
 
     // Ensure the s3Key is scoped to this user to prevent cross-user tampering
@@ -309,8 +314,9 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
       res.status(400).json({ error: "Invalid resume file type" });
       return;
     }
+    let object: { ContentLength?: number; ContentType?: string; ServerSideEncryption?: string; VersionId?: string };
     try {
-      const object = await resumeStorage().send(new HeadObjectCommand({ Bucket: RESUME_BUCKET, Key: data.s3Key }));
+      object = await resumeStorage().send(new HeadObjectCommand({ Bucket: RESUME_BUCKET, Key: data.s3Key }));
       if (
         !Number.isFinite(object.ContentLength) || !object.ContentLength || object.ContentLength <= 0 || object.ContentLength > RESUME_MAX_BYTES ||
         object.ContentType !== RESUME_TYPES[extension] || object.ServerSideEncryption !== "aws:kms"
@@ -358,7 +364,17 @@ router.post("/resumes", authenticate, authorize(Role.CANDIDATE), async (req: Req
         isActive: false,
         securityStatus: "PENDING_SCAN",
       }});
-      await tx.resumeScanJob.create({ data: { resumeId: created.id, bucket: RESUME_BUCKET, objectKey: created.s3Key } });
+      await tx.resumeScanJob.create({
+        data: {
+          resumeId: created.id,
+          bucket: RESUME_BUCKET,
+          objectKey: created.s3Key,
+          // VersionId is returned by S3 only when bucket versioning is enabled.
+          // Persist it when available so a scanner callback cannot be rebound
+          // to a replacement object at the same key.
+          objectVersion: object.VersionId ?? null,
+        },
+      });
       return created;
     });
 

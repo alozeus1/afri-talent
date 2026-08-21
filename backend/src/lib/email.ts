@@ -36,7 +36,13 @@ async function sendEmail(opts: SendEmailOptions): Promise<void> {
       { to: opts.to, subject: opts.subject },
       "[email] SES_FROM_EMAIL not configured — email NOT sent (set SES_FROM_EMAIL + AWS credentials to enable delivery)",
     );
-    logger.debug({ text: opts.text }, "[email] body");
+    // Email bodies routinely include password-reset and verification URLs.
+    // Never log rendered content, even when delivery is intentionally
+    // disabled in a local environment.
+    logger.debug(
+      { template: opts.templateName ?? "generic", recipientDomain },
+      "[email] delivery skipped; body redacted",
+    );
     recordOpsEvent({
       metricName: "notification_delivery_skipped",
       category: "notifications",

@@ -1,8 +1,8 @@
 # Backend Dockerfile - Production (Debian/Prisma OpenSSL compatible)
-FROM node:20-bookworm-slim AS base
+FROM node:22-bookworm-slim AS base
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates openssl curl \
+  && apt-get install -y --no-install-recommends ca-certificates openssl \
   && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies and build
@@ -30,21 +30,19 @@ RUN mkdir -p /tmp/prisma-cli \
   && mkdir -p node_modules/.bin node_modules/@prisma \
   && cp -R /tmp/prisma-cli/prisma node_modules/prisma \
   && cp -R /tmp/prisma-cli/@prisma/. node_modules/@prisma \
-  && ln -sf ../prisma/build/index.js node_modules/.bin/prisma
+  && ln -sf ../prisma/build/index.js node_modules/.bin/prisma \
+  # npm's internal lockfile retains the complete build-time graph after prune.
+  # It is not needed at runtime and causes image scanners to report removed
+  # development-only packages as shipped dependencies.
+  && rm -f node_modules/.package-lock.json
 
 # Production image
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Workstream B — chromium for server-side resume PDF export
-# (lib/pdf/html-to-pdf.ts; rendering runs with JS disabled + network blocked).
-# fonts-liberation/fonts-dejavu give the templates metric-compatible
-# Arial/Helvetica/Times substitutes so PDFs match the in-browser preview.
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends chromium fonts-liberation fonts-dejavu-core \
-  && rm -rf /var/lib/apt/lists/*
-ENV CHROMIUM_PATH=/usr/bin/chromium
+# Chromium is deliberately not installed in the application runtime. PDF
+# rendering is delegated to the isolated internal renderer service.
 
 # §2.5 build provenance — injected by deploy.yml. Surfaced in /api/health
 # (verbose admin view) and as the Sentry release tag.
@@ -66,12 +64,15 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/docker ./docker
 
-RUN chmod +x ./docker/entrypoint.sh
+# Runtime migrations invoke the copied Prisma CLI directly, so the global npm
+# client (and its unrelated transitive CLI tree) is not shipped in production.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+  && chmod +x ./docker/entrypoint.sh
 RUN chown -R expressjs:nodejs /app
 USER expressjs
 
 EXPOSE 4000
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 CMD curl -fsS http://localhost:4000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 CMD node -e 'fetch("http://127.0.0.1:4000/health").then((r) => { if (!r.ok) process.exit(1); }).catch(() => process.exit(1))'
 
 CMD ["./docker/entrypoint.sh"]

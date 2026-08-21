@@ -326,6 +326,9 @@ describe("validateRuntimeEnv — Flutterwave webhook secret fail-fast", () => {
         // tests isolate the Flutterwave secret behavior rather than tripping on them.
         process.env.ANTHROPIC_API_KEY = "sk-ant-test";
         process.env.SENTRY_DSN = "https://test@sentry.example.com/1";
+        // Production must make resume scanning explicit. Disabled is the safe
+        // maintenance mode: it blocks registration rather than exposing files.
+        process.env.RESUME_SCANNER_MODE = "disabled";
     }
 
     it("throws in production when Flutterwave is enabled but FLUTTERWAVE_SECRET_HASH is unset", () => {

@@ -10,7 +10,6 @@ terraform {
 
 locals {
   proxy_name = "${var.name_prefix}-rds-proxy"
-  role_name  = "${var.name_prefix}-rds-proxy-role"
 
   base_tags = merge(
     var.tags,
@@ -22,69 +21,17 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
-# IAM role assumed by the RDS Proxy service to read the master secret.
-# ---------------------------------------------------------------------------
-
-data "aws_iam_policy_document" "trust" {
-  statement {
-    effect  = "Allow"
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["rds.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "proxy" {
-  name               = local.role_name
-  assume_role_policy = data.aws_iam_policy_document.trust.json
-  description        = "Allows ${local.proxy_name} to fetch the Aurora master credentials secret"
-  tags = merge(local.base_tags, {
-    Name = local.role_name
-  })
-}
-
-data "aws_iam_policy_document" "secret_access" {
-  statement {
-    sid    = "ReadMasterSecret"
-    effect = "Allow"
-    actions = [
-      "secretsmanager:GetSecretValue",
-      "secretsmanager:DescribeSecret",
-    ]
-    resources = [var.master_user_secret_arn]
-  }
-
-  statement {
-    sid    = "DecryptSecretKms"
-    effect = "Allow"
-    actions = [
-      "kms:Decrypt",
-    ]
-    resources = [var.secret_kms_key_arn]
-    condition {
-      test     = "StringEquals"
-      variable = "kms:ViaService"
-      values   = ["secretsmanager.us-east-1.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role_policy" "proxy_secret" {
-  name   = "${local.role_name}-secret-access"
-  role   = aws_iam_role.proxy.id
-  policy = data.aws_iam_policy_document.secret_access.json
-}
-
-# ---------------------------------------------------------------------------
 # RDS Proxy
 # ---------------------------------------------------------------------------
 
 resource "aws_db_proxy" "proxy" {
-  name                   = local.proxy_name
-  engine_family          = "POSTGRESQL"
-  role_arn               = aws_iam_role.proxy.arn
+  name          = local.proxy_name
+  engine_family = "POSTGRESQL"
+  # IAM ownership is deliberately outside this module. The restricted
+  # application deployment role is denied iam:PutRolePolicy, so it must only
+  # consume a platform-provisioned RDS Proxy role with least-privilege access
+  # to the selected secret and KMS key.
+  role_arn               = var.proxy_role_arn
   vpc_subnet_ids         = var.private_subnet_ids
   vpc_security_group_ids = [var.sg_rds_proxy_id]
   require_tls            = var.require_tls

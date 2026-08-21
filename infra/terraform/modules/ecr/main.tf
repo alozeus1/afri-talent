@@ -1,8 +1,8 @@
 resource "aws_ecr_repository" "frontend" {
   count                = var.create ? 1 : 0
   name                 = "${var.name_prefix}-frontend"
-  image_tag_mutability = "MUTABLE"
-  force_delete         = true
+  image_tag_mutability = "IMMUTABLE"
+  force_delete         = false
 
   image_scanning_configuration {
     scan_on_push = true
@@ -12,8 +12,8 @@ resource "aws_ecr_repository" "frontend" {
 resource "aws_ecr_repository" "backend" {
   count                = var.create ? 1 : 0
   name                 = "${var.name_prefix}-backend"
-  image_tag_mutability = "MUTABLE"
-  force_delete         = true
+  image_tag_mutability = "IMMUTABLE"
+  force_delete         = false
 
   image_scanning_configuration {
     scan_on_push = true

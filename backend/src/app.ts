@@ -10,6 +10,7 @@ import logger, { httpLoggerConfig } from "./lib/logger.js";
 import { initSentry, setupExpressErrorHandler, captureMessage } from "./lib/sentry.js";
 import { redisHealthStatus, isRedisRequired } from "./lib/redis.js";
 import { buildDegradedState } from "./lib/platform/health.js";
+import { getResumeScannerConfiguration } from "./lib/resume-scanner/config.js";
 import { isAnyBillingProviderConfigured } from "./lib/billing/index.js";
 import { authenticate, optionalAuth } from "./middleware/auth.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
@@ -351,6 +352,7 @@ app.get("/api/health", optionalAuth, healthHandler);
 const readyHandler = async (_req: express.Request, res: express.Response) => {
   // Skip DB check in test environment
   if (isTest) {
+    const scanner = getResumeScannerConfiguration();
     res.json({
       status: "ready",
       ...serviceMetadata,
@@ -358,6 +360,7 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
         database: "skipped-in-test",
         redis: "skipped-in-test",
         billing: "skipped-in-test",
+        resumeScanner: scanner.readinessReason === "configured" ? "configured" : scanner.readinessReason,
       },
       degraded: false,
       timestamp: new Date().toISOString(),
@@ -368,6 +371,7 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
     await prisma.$queryRaw`SELECT 1`;
     const redis = await redisHealthStatus();
     const billing = isAnyBillingProviderConfigured() ? "configured" : "not_configured";
+    const scanner = getResumeScannerConfiguration();
 
     // §2.4 — when REDIS_REQUIRED=true, a non-connected Redis means not-ready.
     if (isRedisRequired() && redis !== "connected") {
@@ -386,6 +390,18 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
       return;
     }
 
+    if (scanner.readinessReason !== "configured" && scanner.readinessReason !== "disabled") {
+      res.status(503).json({
+        status: "not_ready",
+        ...serviceMetadata,
+        checks: { database: "ok", redis, billing, resumeScanner: scanner.readinessReason },
+        degraded: true,
+        reason: "resume_scanner_not_configured",
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
     res.json({
       status: "ready",
       ...serviceMetadata,
@@ -393,6 +409,7 @@ const readyHandler = async (_req: express.Request, res: express.Response) => {
         database: "ok",
         redis,
         billing,
+        resumeScanner: scanner.readinessReason === "disabled" ? "disabled" : "configured",
       },
       degraded: buildDegradedState({ redis, billing }),
       timestamp: new Date().toISOString(),

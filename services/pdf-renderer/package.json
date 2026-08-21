@@ -1,0 +1,13 @@
+{
+  "name": "afritalent-pdf-renderer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "25.1.0"
+  }
+}

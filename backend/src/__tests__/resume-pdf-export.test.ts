@@ -150,7 +150,7 @@ describe("POST /api/skills/resume-templates/:id/export-pdf", () => {
         expect(res.body.code).toBe("FEATURE_DISABLED");
     });
 
-    it("returns 503 PDF_RENDERER_UNAVAILABLE when chromium is missing", async () => {
+    it("returns 503 PDF_RENDERER_UNAVAILABLE when the internal renderer is unavailable", async () => {
         hoisted.pdfState.available = false;
 
         const res = await exportPdf();

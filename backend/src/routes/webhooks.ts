@@ -18,6 +18,31 @@ import {
 
 const router = Router();
 const RESUME_SCANNER_TOLERANCE_SECONDS = 300;
+const RESUME_SCANNER_RESULTS = new Set<ResumeScanResult>(Object.values(ResumeScanResult));
+
+type ResumeScannerPayload = {
+  jobId: string;
+  resumeId: string;
+  bucket: string;
+  objectKey: string;
+  objectVersion?: string | null;
+  result: ResumeScanResult;
+  errorCode?: string | null;
+};
+
+function isResumeScannerPayload(value: unknown): value is ResumeScannerPayload {
+  if (!value || typeof value !== "object") return false;
+  const payload = value as Record<string, unknown>;
+  return ["jobId", "resumeId", "bucket", "objectKey"].every((key) => typeof payload[key] === "string" && payload[key].length > 0)
+    && (payload.objectVersion === undefined || payload.objectVersion === null || typeof payload.objectVersion === "string")
+    && typeof payload.result === "string"
+    && RESUME_SCANNER_RESULTS.has(payload.result as ResumeScanResult)
+    && (payload.errorCode === undefined || payload.errorCode === null || (typeof payload.errorCode === "string" && /^[A-Z0-9_-]{1,100}$/.test(payload.errorCode)));
+}
+
+function scannerDeliveryMatches(delivery: { jobId: string; payloadHash: string; result: ResumeScanResult }, payload: ResumeScannerPayload, payloadHash: string): boolean {
+  return delivery.jobId === payload.jobId && delivery.payloadHash === payloadHash && delivery.result === payload.result;
+}
 
 router.post("/resume-scanner", async (req: Request, res: Response) => {
   const secret = process.env.RESUME_SCANNER_WEBHOOK_SECRET;
@@ -25,27 +50,67 @@ router.post("/resume-scanner", async (req: Request, res: Response) => {
   const signature = req.header("x-afritalent-scan-signature");
   const deliveryId = req.header("x-afritalent-scan-delivery-id");
   const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from("");
-  if (!secret || !timestamp || !deliveryId || !/^v1=[a-f0-9]{64}$/.test(signature ?? "") || !/^\d+$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > RESUME_SCANNER_TOLERANCE_SECONDS) return res.status(401).json({ error: "Invalid scanner signature" });
+  const timestampValue = timestamp && /^\d+$/.test(timestamp) ? Number(timestamp) : NaN;
+  if (!secret || !timestamp || !deliveryId || !/^v1=[a-f0-9]{64}$/.test(signature ?? "") || !Number.isSafeInteger(timestampValue) || Math.abs(Date.now() / 1000 - timestampValue) > RESUME_SCANNER_TOLERANCE_SECONDS) return res.status(401).json({ error: "Invalid scanner signature" });
   const expected = createHmac("sha256", secret).update(`${timestamp}.`).update(raw).digest("hex");
   if (!timingSafeEqual(Buffer.from((signature ?? "").slice(3)), Buffer.from(expected))) return res.status(401).json({ error: "Invalid scanner signature" });
-  let payload: { jobId:string; resumeId:string; bucket:string; objectKey:string; objectVersion?:string|null; result: ResumeScanResult };
-  try { payload = JSON.parse(raw.toString("utf8")); } catch { return res.status(400).json({ error: "Invalid scanner payload" }); }
+  let payload: ResumeScannerPayload;
+  try {
+    const parsed: unknown = JSON.parse(raw.toString("utf8"));
+    if (!isResumeScannerPayload(parsed)) return res.status(400).json({ error: "Invalid scanner payload" });
+    payload = parsed;
+  } catch { return res.status(400).json({ error: "Invalid scanner payload" }); }
+  const payloadHash = createHash("sha256").update(raw).digest("hex");
+
+  const existing = await prisma.resumeScanDelivery.findUnique({ where: { deliveryId } });
+  if (existing) {
+    return scannerDeliveryMatches(existing, payload, payloadHash)
+      ? res.json({ received: true, duplicate: true })
+      : res.status(409).json({ error: "Conflicting scan delivery" });
+  }
+
   try {
     const outcome = await prisma.$transaction(async (tx) => {
       const job = await tx.resumeScanJob.findUnique({ where: { id: payload.jobId }, include: { resume: true } });
       if (!job || job.resumeId !== payload.resumeId || job.bucket !== payload.bucket || job.objectKey !== payload.objectKey || job.objectVersion !== (payload.objectVersion ?? null)) throw new Error("Scanner resource mismatch");
-      if (job.resultDeliveryId) return job.resultDeliveryId === deliveryId && job.result === payload.result ? "duplicate" : "conflict";
       if (job.status === ResumeScanJobStatus.COMPLETED || job.status === ResumeScanJobStatus.EXHAUSTED) return "conflict";
-      const status = payload.result === "CLEAN" ? ResumeSecurityStatus.CLEAN : payload.result === "REJECTED" ? ResumeSecurityStatus.REJECTED : payload.result === "QUARANTINED" ? ResumeSecurityStatus.QUARANTINED : ResumeSecurityStatus.PENDING_SCAN;
+      await tx.resumeScanDelivery.create({ data: { jobId: job.id, deliveryId, payloadHash, result: payload.result } });
       const attempts = job.attemptCount + 1;
       const jobStatus = payload.result === "ERROR" ? (attempts >= job.maxAttempts ? ResumeScanJobStatus.EXHAUSTED : ResumeScanJobStatus.FAILED) : ResumeScanJobStatus.COMPLETED;
-      await tx.resumeScanJob.update({ where:{id:job.id}, data:{ status: jobStatus, attemptCount: attempts, result: payload.result, resultDeliveryId: deliveryId, completedAt:new Date() }});
-      await tx.resume.update({ where:{id:job.resumeId}, data:{securityStatus:status, scanCompletedAt:new Date(), isActive: status === ResumeSecurityStatus.CLEAN }});
+      const transition = await tx.resumeScanJob.updateMany({
+        where: { id: job.id, status: { in: [ResumeScanJobStatus.PENDING, ResumeScanJobStatus.FAILED] } },
+        data: {
+          status: jobStatus,
+          attemptCount: attempts,
+          result: payload.result,
+          resultDeliveryId: payload.result === ResumeScanResult.ERROR ? null : deliveryId,
+          errorCode: payload.result === ResumeScanResult.ERROR ? payload.errorCode ?? "SCANNER_ERROR" : null,
+          startedAt: job.startedAt ?? new Date(),
+          completedAt: jobStatus === ResumeScanJobStatus.COMPLETED || jobStatus === ResumeScanJobStatus.EXHAUSTED ? new Date() : null,
+        },
+      });
+      if (transition.count !== 1) throw new Error("Scanner transition conflict");
+      if (payload.result !== ResumeScanResult.ERROR) {
+        const status = payload.result === ResumeScanResult.CLEAN
+          ? ResumeSecurityStatus.CLEAN
+          : payload.result === ResumeScanResult.REJECTED
+            ? ResumeSecurityStatus.REJECTED
+            : ResumeSecurityStatus.QUARANTINED;
+        await tx.resume.update({ where:{id:job.resumeId}, data:{securityStatus:status, scanCompletedAt:new Date(), isActive: status === ResumeSecurityStatus.CLEAN }});
+      }
       await tx.auditLog.create({ data: { action: "SYSTEM_CONFIGURATION_CHANGED", targetType: "RESUME_SCAN", targetId: job.resumeId, status: "SUCCESS", metadata: { result: payload.result, jobId: job.id, deliveryId } } });
       return "processed";
     });
-    return outcome === "conflict" ? res.status(409).json({error:"Conflicting scan delivery"}) : res.json({received:true, duplicate:outcome==="duplicate"});
-  } catch { return res.status(409).json({ error: "Scanner result rejected" }); }
+    return outcome === "conflict" ? res.status(409).json({error:"Conflicting scan delivery"}) : res.json({received:true, duplicate:false});
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" && Array.isArray(error.meta?.target) && error.meta.target.includes("deliveryId")) {
+      const raced = await prisma.resumeScanDelivery.findUnique({ where: { deliveryId } });
+      if (raced && scannerDeliveryMatches(raced, payload, payloadHash)) return res.json({ received: true, duplicate: true });
+      return res.status(409).json({ error: "Conflicting scan delivery" });
+    }
+    if (error instanceof Error && /resource mismatch|transition conflict/i.test(error.message)) return res.status(409).json({ error: "Scanner result rejected" });
+    return res.status(500).json({ error: "Scanner result could not be persisted" });
+  }
 });
 
 const WEBHOOK_IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;

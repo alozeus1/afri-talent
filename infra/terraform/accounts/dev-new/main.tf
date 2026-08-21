@@ -92,7 +92,7 @@ module "rds_proxy" {
   sg_rds_proxy_id           = module.vpc.sg_rds_proxy_id
   aurora_cluster_identifier = module.aurora.aurora_cluster_identifier
   master_user_secret_arn    = module.aurora.aurora_master_user_secret_arn
-  secret_kms_key_arn        = module.aurora.aurora_kms_key_arn
+  proxy_role_arn            = var.rds_proxy_role_arn
 }
 
 # ── Backup + DR (Wave 8 §9.3) ────────────────────────────────────────────────
@@ -242,6 +242,8 @@ module "ecs_fargate" {
   ecr_repo_url_frontend     = module.ecr.ecr_repo_url_frontend
   ecr_repo_url_backend      = module.ecr.ecr_repo_url_backend
   image_tag                 = var.image_tag
+  image_digest_frontend     = var.image_digest_frontend
+  image_digest_backend      = var.image_digest_backend
   desired_count             = var.ecs_desired_count
   fargate_base              = var.ecs_fargate_base
   fargate_spot_weight       = var.ecs_fargate_spot_weight

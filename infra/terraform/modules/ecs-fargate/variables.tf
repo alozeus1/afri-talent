@@ -55,6 +55,28 @@ variable "image_tag" {
   default     = "latest"
 }
 
+variable "image_digest_frontend" {
+  description = "Immutable sha256 digest for the frontend release image. When set, it supersedes image_tag."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.image_digest_frontend == "" || can(regex("^sha256:[a-f0-9]{64}$", var.image_digest_frontend))
+    error_message = "image_digest_frontend must be an OCI sha256 digest."
+  }
+}
+
+variable "image_digest_backend" {
+  description = "Immutable sha256 digest for the backend release image. When set, it supersedes image_tag."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.image_digest_backend == "" || can(regex("^sha256:[a-f0-9]{64}$", var.image_digest_backend))
+    error_message = "image_digest_backend must be an OCI sha256 digest."
+  }
+}
+
 variable "desired_count" {
   description = "Desired task count per service (frontend and backend each)."
   type        = number
