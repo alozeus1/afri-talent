@@ -79,3 +79,37 @@
 - Exact automatic resume step: obtain the three architecture approvals above,
   implement the selected renderer/egress design in a follow-up branch, rebuild
   and rescan the exact runtime images, then run a read-only Terraform plan.
+
+## Approved-boundary implementation update
+
+- Main backend PDF rendering now uses only an authenticated, allowlisted
+  internal renderer URL with a 32+ character HMAC secret, exact-body request
+  signature, 30-second timeout, 1 MB HTML cap, and 10 MB PDF cap. Chromium and
+  `puppeteer-core` were removed from the main backend image. The focused client
+  and export tests pass; the full backend suite now passes `107 files / 842
+  tests` with `2 files / 4 tests` explicitly skipped.
+- `services/pdf-renderer` is a dedicated non-root internal renderer. A local
+  synthetic HMAC request produced a PDF and an invalid request returned 401.
+  Its Terraform module defines private networking, no public IP, read-only root
+  filesystem, dropped capabilities, bounded CPU/memory/ephemeral storage,
+  concurrency, input/output, timeout, logs and immutable image digest input.
+  Fargate lacks a portable custom seccomp/no-new-privileges control; Chromium's
+  required `--no-sandbox` is a documented residual risk, not a remediation.
+- Exact built-image Trivy results: backend `45` HIGH/CRITICAL findings and
+  `0` Chromium findings; isolated renderer `78` HIGH/CRITICAL findings and
+  `22` Chromium/chromium-common findings. The renderer still contains
+  `CVE-2026-76033`, `76036`–`76041`, `76043`–`76045`, and `76047`, all with no
+  fixed Debian version reported. Production PDF export must remain disabled
+  without a time-limited exception and independently scanned patched renderer.
+- ECR repositories now use immutable tags and cannot be force-deleted.
+  Deployment no longer pushes `latest`; it resolves pushed SHA tags to OCI
+  digests and passes the digests to ECS task definitions. Production Terraform
+  now also requires the externally managed RDS proxy role ARN; application
+  Terraform owns no proxy-role mutation.
+- Terraform format, isolated validation and actionlint pass. A shared read-only
+  plan is still blocked by the missing approved proxy-role ARN and shared plan
+  credentials; no plan, apply, migration, deployment or IAM mutation was run.
+- Outstanding external approval: select and fund the renderer/browser patch
+  strategy and its temporary CVE exception (if any), approve authenticated
+  egress proxy/network route design, provide the platform-managed proxy role
+  ARN and scanner/renderer secret ARNs, then authorize a read-only shared plan.
