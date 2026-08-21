@@ -36,6 +36,10 @@
   The frontend runtime image has no HIGH/CRITICAL findings. The backend runtime
   image has 91 Debian 12 HIGH/CRITICAL findings, dominated by Chromium and
   chromium-common `151.0.7922.137-1~deb12u1`, with no Debian fixed version.
+  The final exact-image scan includes Chromium CVEs `CVE-2026-76033`,
+  `CVE-2026-76036` through `CVE-2026-76041`, `CVE-2026-76043` through
+  `CVE-2026-76045`, and `CVE-2026-76047`; affected supporting Debian packages
+  likewise reported no fixed version in the selected distribution.
   Runtime npm/npx were removed; no application npm findings remain. Node 24
   and Node 22/trixie experiments did not provide a safe patched replacement.
 - Terraform evidence: fmt and isolated-backend validate passed; TFLint passed;
