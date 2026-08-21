@@ -1,7 +1,7 @@
 # AfriTalent security gauntlet status
 
-- Current branch and HEAD: `security/resume-scanner-final-verification` at
-  `bfbdfa5` (update after the accompanying ledger commit).
+- Current branch: `security/resume-scanner-final-verification`. Latest
+  functional code commit before this final evidence ledger is `f9e5154`.
 - Completed gates: account authority and BOLA foundations; upload ownership;
   n8n and Stripe webhook hardening; Flutterwave/ATS ownership hardening;
   external CV containment; resume quarantine and scanner callback control plane.
@@ -23,18 +23,55 @@
   `terraform validate` passes with an isolated provider data directory.
 - Verified finding: disabled local email delivery logged rendered email text,
   including verification URLs. Fixed in `beb3229` with a retained regression.
-- Open repository-local work: SBOM and browser smoke against an isolated
-  runtime, plus a reviewed remediation design for Trivy's existing Terraform
-  HIGH/CRITICAL findings (public edge resources and unrestricted egress). The
-  Node 22 image rebuild succeeded and removed stale build-lock metadata, but
-  current Debian Chromium and bundled npm components still have Trivy HIGH/
-  CRITICAL findings; do not suppress them.
-- External/shared prerequisites: a privileged platform-owned RDS proxy role
-  ARN and approved non-applying Terraform plan; no shared action has occurred.
-- Last successful commands: backend full Vitest `106 passed, 1 skipped` /
-  `836 passed, 2 skipped`; scanner PostgreSQL integration `3 passed`; frontend
-  unit tests `31 suites, 142 tests`; Prisma validate/generate; backend and
-  frontend builds; both production dependency audits clean; Gitleaks clean.
-- Exact automatic resume step: run/reconcile container/SBOM/browser gates, then
-  address Terraform Trivy HIGH/CRITICAL findings with reviewed, non-applying
-  repository changes before final branch push and review.
+- Completed final local evidence: an isolated PostgreSQL-backed browser runtime
+  passed Playwright API `16/16` and desktop `8/8`; Prisma
+  format/validate/generate passed; backend full Vitest passed `107 files, 839
+  tests` with `2 files/5 tests` explicitly skipped; frontend Jest passed `31
+  suites, 142 tests`; both application builds and production dependency audits
+  passed. Backend lint has 60 existing warnings and frontend lint has 71;
+  neither has errors.
+- Supply-chain evidence: reproducible CycloneDX SBOMs were generated from both
+  frozen production dependency trees (backend 382 components, frontend 568)
+  and from the exact final images (backend 11,792 components, frontend 265).
+  The frontend runtime image has no HIGH/CRITICAL findings. The backend runtime
+  image has 91 Debian 12 HIGH/CRITICAL findings, dominated by Chromium and
+  chromium-common `151.0.7922.137-1~deb12u1`, with no Debian fixed version.
+  Runtime npm/npx were removed; no application npm findings remain. Node 24
+  and Node 22/trixie experiments did not provide a safe patched replacement.
+- Terraform evidence: fmt and isolated-backend validate passed; TFLint passed;
+  actionlint passed. Checkov found 160 policy findings and Trivy found public
+  edge, HTTP-listener, mutable-ECR, unrestricted-egress, public-subnet and
+  legacy module findings. Unambiguous repository fixes completed: encrypted
+  operations SNS topics, externally managed RDS-proxy role input, and invalid
+  ALB header dropping. Public edge/TLS and egress confinement require an
+  approved architecture/certificate/egress-control decision; do not weaken
+  application availability with arbitrary CIDR rules. No non-applying plan is
+  trustworthy until an approved privileged proxy-role ARN is supplied.
+- Scanner operational readiness: callback mode requires an explicit mode and
+  a 32+ character secret in production/staging; disabled mode blocks new
+  registration with 503 and leaves all resumes non-downloadable. The worker
+  contract, version-pinned read scope, HMAC callback, backoff/DLQ, monitoring,
+  historical backlog and incident pause are documented in
+  `docs/ops/resume-scanner-worker-runbook.md`. A production worker remains an
+  external deployment prerequisite.
+- Security scans: Gitleaks is clean for `origin/main..HEAD`; Semgrep has one
+  reviewed JSON-LD `dangerouslySetInnerHTML` finding protected by the existing
+  escaping serializer and browser regression. Trivy filesystem and Checkov
+  remain non-green for the explicit runtime/IaC architecture issues above; no
+  ignore rules were added.
+- Release decision: HOLD — architecture/shared authorization is required before
+  review approval. Recommended image remediation is a separately maintained,
+  scanned PDF/browser renderer (or a Lambda browser boundary); temporarily
+  disable server-side PDF rendering only if product owners approve. Recommended
+  egress remediation is centralized NAT plus egress firewall or authenticated
+  proxy/domain-aware control; preserve public edge only with approved TLS/WAF
+  configuration. Retain the Aurora cluster and use an externally provisioned
+  proxy role; never apply or destroy from this branch.
+- External/shared prerequisites: approved proxy-role ARN and read-only plan
+  credentials; a platform choice for browser/PDF execution; an egress-control
+  architecture plus public-edge certificate/WAF review; deployed scanner worker
+  identity/secret injection; isolated preview/runtime validation. No shared
+  action has occurred.
+- Exact automatic resume step: obtain the three architecture approvals above,
+  implement the selected renderer/egress design in a follow-up branch, rebuild
+  and rescan the exact runtime images, then run a read-only Terraform plan.
