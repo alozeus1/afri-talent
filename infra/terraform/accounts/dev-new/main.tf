@@ -242,6 +242,8 @@ module "ecs_fargate" {
   ecr_repo_url_frontend     = module.ecr.ecr_repo_url_frontend
   ecr_repo_url_backend      = module.ecr.ecr_repo_url_backend
   image_tag                 = var.image_tag
+  image_digest_frontend     = var.image_digest_frontend
+  image_digest_backend      = var.image_digest_backend
   desired_count             = var.ecs_desired_count
   fargate_base              = var.ecs_fargate_base
   fargate_spot_weight       = var.ecs_fargate_spot_weight

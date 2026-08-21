@@ -16,6 +16,8 @@ locals {
   cluster_name       = var.name_prefix
   frontend_name      = "${var.name_prefix}-frontend"
   backend_name       = "${var.name_prefix}-backend"
+  frontend_image     = length(trimspace(var.image_digest_frontend)) > 0 ? "${var.ecr_repo_url_frontend}@${var.image_digest_frontend}" : "${var.ecr_repo_url_frontend}:${var.image_tag}"
+  backend_image      = length(trimspace(var.image_digest_backend)) > 0 ? "${var.ecr_repo_url_backend}@${var.image_digest_backend}" : "${var.ecr_repo_url_backend}:${var.image_tag}"
   frontend_log_group = "/aws/ecs/${local.frontend_name}"
   backend_log_group  = "/aws/ecs/${local.backend_name}"
   use_cloudwatch_kms = length(trimspace(var.cloudwatch_kms_key_arn)) > 0
@@ -265,7 +267,7 @@ resource "aws_ecs_task_definition" "frontend" {
   container_definitions = jsonencode([
     {
       name         = "frontend"
-      image        = "${var.ecr_repo_url_frontend}:${var.image_tag}"
+      image        = local.frontend_image
       essential    = true
       portMappings = [{ containerPort = 3000, protocol = "tcp" }]
       environment  = local.frontend_env_list
@@ -294,7 +296,7 @@ resource "aws_ecs_task_definition" "backend" {
   container_definitions = jsonencode([
     {
       name         = "backend"
-      image        = "${var.ecr_repo_url_backend}:${var.image_tag}"
+      image        = local.backend_image
       essential    = true
       portMappings = [{ containerPort = 3001, protocol = "tcp" }]
       environment  = local.backend_env_list

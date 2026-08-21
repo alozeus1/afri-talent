@@ -143,6 +143,9 @@ jobs:
   push-images:
     name: Build & Push Images
     needs: [build]
+    outputs:
+      backend_image_digest: ${{ steps.backend-image.outputs.digest }}
+      frontend_image_digest: ${{ steps.frontend-image.outputs.digest }}
     runs-on: ${{ fromJSON(vars.ACTIONS_RUNNER_LABELS_JSON != '' && vars.ACTIONS_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     steps:
       - uses: actions/checkout@v7
@@ -181,6 +184,7 @@ jobs:
           echo "::notice::Build provenance — release=${APP_RELEASE} sha=${{ github.sha }} ts=${BUILD_TIMESTAMP}"
 
       - name: Build & push backend image
+        id: backend-image
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           REPO: afritalent-dev-backend
@@ -197,10 +201,14 @@ jobs:
             --build-arg APP_RELEASE="$APP_RELEASE" \
             --build-arg BUILD_TIMESTAMP="$BUILD_TIMESTAMP" \
             -t "$IMAGE:$SHA_TAG" \
-            -t "$IMAGE:latest" \
             ./backend
+          DIGEST="$(docker buildx imagetools inspect "$IMAGE:$SHA_TAG" --format '{{.Manifest.Digest}}')"
+          test -n "$DIGEST"
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "::notice::Backend immutable image: $IMAGE@$DIGEST"
 
       - name: Build & push frontend image
+        id: frontend-image
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           REPO: afritalent-dev-frontend
@@ -233,8 +241,11 @@ jobs:
             --build-arg APP_RELEASE="${{ steps.provenance.outputs.app_release }}" \
             --build-arg BUILD_TIMESTAMP="${{ steps.provenance.outputs.build_timestamp }}" \
             -t "$IMAGE:$SHA_TAG" \
-            -t "$IMAGE:latest" \
             ./frontend
+          DIGEST="$(docker buildx imagetools inspect "$IMAGE:$SHA_TAG" --format '{{.Manifest.Digest}}')"
+          test -n "$DIGEST"
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "::notice::Frontend immutable image: $IMAGE@$DIGEST"
 
   # ---------------------------------------------------------------------------
   # 4. Apply Terraform for the new-account stack.
@@ -292,6 +303,8 @@ jobs:
       - name: Terraform apply
         env:
           TF_VAR_image_tag: ${{ github.sha }}
+          TF_VAR_image_digest_backend: ${{ needs.push-images.outputs.backend_image_digest }}
+          TF_VAR_image_digest_frontend: ${{ needs.push-images.outputs.frontend_image_digest }}
           TF_VAR_lambda_artifact_dir: ${{ github.workspace }}/infra/terraform/accounts/dev-new/lambda-packages
         run: terraform apply -auto-approve -input=false
 

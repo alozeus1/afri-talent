@@ -260,6 +260,18 @@ variable "image_tag" {
   default     = "latest"
 }
 
+variable "image_digest_frontend" {
+  type        = string
+  description = "Immutable frontend OCI digest supplied by the image build workflow."
+  default     = ""
+}
+
+variable "image_digest_backend" {
+  type        = string
+  description = "Immutable backend OCI digest supplied by the image build workflow."
+  default     = ""
+}
+
 # ── Tfstate bootstrap ARNs (for the OIDC role policy) ────────────────────────
 
 variable "tfstate_bucket_arn" {
