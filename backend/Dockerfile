@@ -70,7 +70,10 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/docker ./docker
 
-RUN chmod +x ./docker/entrypoint.sh
+# Runtime migrations invoke the copied Prisma CLI directly, so the global npm
+# client (and its unrelated transitive CLI tree) is not shipped in production.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+  && chmod +x ./docker/entrypoint.sh
 RUN chown -R expressjs:nodejs /app
 USER expressjs
 

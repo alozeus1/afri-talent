@@ -76,6 +76,11 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# The standalone Next runtime starts with `node server.js`; it never invokes
+# npm or npx. Remove the base image's package-manager tree so its transitive
+# CLI dependencies are not unnecessarily shipped in the public runtime image.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 USER nextjs
 
 EXPOSE 3000
