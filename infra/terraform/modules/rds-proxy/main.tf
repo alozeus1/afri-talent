@@ -25,8 +25,8 @@ locals {
 # ---------------------------------------------------------------------------
 
 resource "aws_db_proxy" "proxy" {
-  name                   = local.proxy_name
-  engine_family          = "POSTGRESQL"
+  name          = local.proxy_name
+  engine_family = "POSTGRESQL"
   # IAM ownership is deliberately outside this module. The restricted
   # application deployment role is denied iam:PutRolePolicy, so it must only
   # consume a platform-provisioned RDS Proxy role with least-privilege access

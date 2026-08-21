@@ -284,17 +284,17 @@ locals {
 }
 
 resource "aws_sns_topic" "ops_critical" {
-  count = var.enable_ops_monitoring ? 1 : 0
-  name  = "${local.name_prefix}-ops-critical"
+  count             = var.enable_ops_monitoring ? 1 : 0
+  name              = "${local.name_prefix}-ops-critical"
   kms_master_key_id = aws_kms_key.ops_alerts[0].arn
-  tags  = local.tags
+  tags              = local.tags
 }
 
 resource "aws_sns_topic" "ops_warning" {
-  count = var.enable_ops_monitoring ? 1 : 0
-  name  = "${local.name_prefix}-ops-warning"
+  count             = var.enable_ops_monitoring ? 1 : 0
+  name              = "${local.name_prefix}-ops-warning"
   kms_master_key_id = aws_kms_key.ops_alerts[0].arn
-  tags  = local.tags
+  tags              = local.tags
 }
 
 resource "aws_sns_topic_subscription" "ops_critical_email" {

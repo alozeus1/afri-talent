@@ -4,6 +4,9 @@ resource "aws_lb" "app" {
   subnets            = var.public_subnet_ids
   security_groups    = [var.alb_sg_id]
   idle_timeout       = 60
+  # Drop malformed request headers at the public edge before they can reach
+  # application targets or be interpreted differently by downstream layers.
+  drop_invalid_header_fields = true
 
   tags = {
     Name = "${var.name_prefix}-alb"
