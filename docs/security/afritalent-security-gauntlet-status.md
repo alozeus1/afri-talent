@@ -1,7 +1,8 @@
 # AfriTalent security gauntlet status
 
-- Current branch: `security/resume-scanner-final-verification`. Latest
-  functional code commit before this final evidence ledger is `f9e5154`.
+- Current branch: `security/resume-scanner-final-verification`. The latest
+  implementation checkpoint is `1f5da09`; this ledger is updated with the
+  final review-preparation evidence in the associated follow-up commit.
 - Completed gates: account authority and BOLA foundations; upload ownership;
   n8n and Stripe webhook hardening; Flutterwave/ATS ownership hardening;
   external CV containment; resume quarantine and scanner callback control plane.
@@ -34,14 +35,15 @@
   frozen production dependency trees (backend 382 components, frontend 568)
   and from the exact final images (backend 11,792 components, frontend 265).
   The frontend runtime image has no HIGH/CRITICAL findings. The backend runtime
-  image has 91 Debian 12 HIGH/CRITICAL findings, dominated by Chromium and
-  chromium-common `151.0.7922.137-1~deb12u1`, with no Debian fixed version.
-  The final exact-image scan includes Chromium CVEs `CVE-2026-76033`,
-  `CVE-2026-76036` through `CVE-2026-76041`, `CVE-2026-76043` through
-  `CVE-2026-76045`, and `CVE-2026-76047`; affected supporting Debian packages
-  likewise reported no fixed version in the selected distribution.
-  Runtime npm/npx were removed; no application npm findings remain. Node 24
-  and Node 22/trixie experiments did not provide a safe patched replacement.
+  main backend image originally had 91 Debian 12 HIGH/CRITICAL findings,
+  dominated by Chromium. Chromium and `puppeteer-core` were removed from that
+  image. A subsequent healthcheck cleanup removed curl and its transitive
+  runtime closure, reducing the exact main-image scan from 45 to 32 findings;
+  Chromium findings are zero. The full package-by-package CVE disposition is
+  in `docs/security/backend-runtime-cve-disposition.md`. Runtime npm/npx were
+  removed; no application npm findings remain. No remaining base-image finding
+  has a Trivy-reported compatible Debian fixed version, and no exception is
+  approved.
 - Terraform evidence: fmt and isolated-backend validate passed; TFLint passed;
   actionlint passed. Checkov found 160 policy findings and Trivy found public
   edge, HTTP-listener, mutable-ECR, unrestricted-egress, public-subnet and
@@ -63,22 +65,23 @@
   escaping serializer and browser regression. Trivy filesystem and Checkov
   remain non-green for the explicit runtime/IaC architecture issues above; no
   ignore rules were added.
-- Release decision: HOLD — architecture/shared authorization is required before
-  review approval. Recommended image remediation is a separately maintained,
-  scanned PDF/browser renderer (or a Lambda browser boundary); temporarily
-  disable server-side PDF rendering only if product owners approve. Recommended
-  egress remediation is centralized NAT plus egress firewall or authenticated
-  proxy/domain-aware control; preserve public edge only with approved TLS/WAF
-  configuration. Retain the Aurora cluster and use an externally provisioned
-  proxy role; never apply or destroy from this branch.
+- Release decision: HOLD — infrastructure authorization and runtime services
+  are required before review approval. `RESUME_PDF_EXPORT_ENABLED` stays false;
+  the renderer remains deployed nowhere and is not a Chromium exception.
+  `RESUME_SCANNER_MODE=callback` remains prohibited until the separately
+  deployed worker and its secret/least-privilege controls are operational.
+  The platform handoff and read-only-plan acceptance criteria are in
+  `docs/ops/platform-security-handoff.md`. Retain the Aurora cluster and use
+  an externally provisioned proxy role; never apply or destroy from this branch.
 - External/shared prerequisites: approved proxy-role ARN and read-only plan
   credentials; a platform choice for browser/PDF execution; an egress-control
   architecture plus public-edge certificate/WAF review; deployed scanner worker
   identity/secret injection; isolated preview/runtime validation. No shared
   action has occurred.
-- Exact automatic resume step: obtain the three architecture approvals above,
-  implement the selected renderer/egress design in a follow-up branch, rebuild
-  and rescan the exact runtime images, then run a read-only Terraform plan.
+- Exact automatic resume step: platform supplies the approved proxy-role and
+  secret ARNs plus read-only plan authority; security then reviews a plan
+  against the criteria in `platform-security-handoff.md`. Do not enable PDF
+  export or scanner callback mode before their independent runtime gates pass.
 
 ## Approved-boundary implementation update
 
