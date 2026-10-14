@@ -31,6 +31,7 @@ import {
   refreshCandidateTrustProfile,
 } from "../lib/trust/service.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
+import { isFreeMode } from "../lib/billing/free-mode.js";
 import {
   maybeCreateAtsApplicationLink,
   syncApplicationStatusToAts,
@@ -362,11 +363,12 @@ router.get("/job/:jobId", authenticate, authorize(Role.EMPLOYER), async (req: Re
       orderBy: { createdAt: "desc" },
     });
 
-    const subscription = await prisma.subscription.findUnique({
+    const subscription = isFreeMode() ? null : await prisma.subscription.findUnique({
       where: { userId: req.user!.userId },
       select: { plan: true, status: true },
     }).catch(() => null);
     const canViewFullCandidates =
+      isFreeMode() ||
       subscription?.status === SubscriptionStatus.ACTIVE &&
       (subscription.plan === SubscriptionPlan.EMPLOYER_BASIC || subscription.plan === SubscriptionPlan.EMPLOYER_PREMIUM);
 

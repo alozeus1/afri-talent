@@ -4,6 +4,8 @@ import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { authenticate } from "../middleware/auth.js";
 import { buildChatContext } from "../lib/ai/chat-context.js";
+import { getUserEntitlements } from "../lib/billing/entitlements.js";
+import { freeModeChatDailyLimit, isFreeMode } from "../lib/billing/free-mode.js";
 
 const router = Router();
 
@@ -76,9 +78,24 @@ async function hasValidConsent(userId: string): Promise<boolean> {
   return consent.privacyNotice && consent.termsOfUse && consent.dataStorage && !consent.revokedAt;
 }
 
+const LIMIT_REACHED_PAID_COPY = "Daily message limit reached. Upgrade to Professional for more.";
+const LIMIT_REACHED_FREE_MODE_COPY = "Daily message limit reached. Resets at midnight UTC.";
+
+function limitReachedMessage(): string {
+  return isFreeMode() ? LIMIT_REACHED_FREE_MODE_COPY : LIMIT_REACHED_PAID_COPY;
+}
+
+async function resolveDailyLimit(userId: string): Promise<number> {
+  if (isFreeMode()) return freeModeChatDailyLimit();
+  // ACTIVE-only plan resolution (non-active statuses fall back to FREE).
+  const entitlements = await getUserEntitlements(userId);
+  const paidChatPlan =
+    entitlements.plan === "PROFESSIONAL" || entitlements.plan === "BASIC";
+  return entitlements.chatAccess && paidChatPlan ? RATE_LIMIT_PRO : RATE_LIMIT_FREE;
+}
+
 async function checkRateLimit(userId: string): Promise<{ allowed: boolean; remaining: number }> {
-  const sub = await prisma.subscription.findUnique({ where: { userId }, select: { plan: true } });
-  const limit = sub?.plan === "PROFESSIONAL" ? RATE_LIMIT_PRO : RATE_LIMIT_FREE;
+  const limit = await resolveDailyLimit(userId);
 
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
@@ -144,7 +161,7 @@ router.post("/message", authenticate, async (req: Request, res: Response) => {
     // Rate limit
     const { allowed, remaining } = await checkRateLimit(userId);
     if (!allowed) {
-      res.status(429).json({ error: "Daily message limit reached. Upgrade to Professional for more." });
+      res.status(429).json({ error: limitReachedMessage() });
       return;
     }
 

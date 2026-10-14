@@ -43,6 +43,8 @@ services:
       FRONTEND_URL: http://localhost:3000
       PORT: 4000
       MOCK_AI: ${MOCK_AI:-1}
+      # Free launch: every user fully entitled at read time (see backend/.env.example).
+      FREE_MODE: ${FREE_MODE:-true}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       DISABLE_SCHEDULER: ${DISABLE_SCHEDULER:-1}
       INTERNAL_FETCH_SECRET: ${INTERNAL_FETCH_SECRET:-local-internal-fetch-secret-0123456789}

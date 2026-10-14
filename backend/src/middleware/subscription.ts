@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma.js";
 import { SubscriptionPlan, SubscriptionStatus } from "@prisma/client";
+import { isFreeMode } from "../lib/billing/free-mode.js";
 
 const PLAN_RANK: Record<SubscriptionPlan, number> = {
   FREE: 0,
@@ -19,6 +20,13 @@ export function requirePlan(minimumPlan: SubscriptionPlan) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (!req.user) {
       res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    // Free launch: every authenticated user is fully entitled. Role scoping
+    // (authorize) and rate limiters still apply on each route.
+    if (isFreeMode()) {
+      next();
       return;
     }
 

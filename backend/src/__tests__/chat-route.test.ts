@@ -9,6 +9,8 @@ const { db, createMock } = vi.hoisted(() => {
   const db = {
     chatConsent: { findUnique: vi.fn() },
     subscription: { findUnique: vi.fn() },
+    planEntitlement: { findUnique: vi.fn().mockResolvedValue(null) },
+    user: { findUnique: vi.fn().mockResolvedValue({ role: "CANDIDATE" }) },
     chatConversation: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() },
     chatMessage: { count: vi.fn(), findMany: vi.fn(), create: vi.fn() },
     $transaction: vi.fn(),
@@ -173,5 +175,63 @@ describe("buildChatMessages", () => {
     expect(out[0]).toEqual({ role: "user", content: "u1" });
     expect(out[out.length - 1].role).toBe("user");
     expect(out[out.length - 1].content.endsWith("new")).toBe(true);
+  });
+});
+
+describe("POST /api/chat/message — daily limit", () => {
+  beforeEach(() => {
+    process.env.MOCK_AI = "1";
+  });
+
+  it("FREE_MODE uses FREE_MODE_CHAT_DAILY_LIMIT with neutral copy", async () => {
+    process.env.FREE_MODE = "true";
+    db.chatMessage.count.mockResolvedValue(50);
+
+    const res = await request(app)
+      .post("/api/chat/message")
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ message: "hello", conversationId: CONV_ID });
+
+    expect(res.status).toBe(429);
+    expect(res.body.error).toBe("Daily message limit reached. Resets at midnight UTC.");
+  });
+
+  it("FREE_MODE allows messages under the free-mode cap", async () => {
+    process.env.FREE_MODE = "true";
+    db.chatMessage.count.mockResolvedValue(10);
+
+    const res = await request(app)
+      .post("/api/chat/message")
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ message: "hello", conversationId: CONV_ID });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("flag off: non-active PROFESSIONAL gets the free limit and upgrade copy", async () => {
+    delete process.env.FREE_MODE;
+    db.subscription.findUnique.mockResolvedValue({ plan: "PROFESSIONAL", status: "CANCELLED" });
+    db.chatMessage.count.mockResolvedValue(10);
+
+    const res = await request(app)
+      .post("/api/chat/message")
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ message: "hello", conversationId: CONV_ID });
+
+    expect(res.status).toBe(429);
+    expect(res.body.error).toMatch(/Upgrade to Professional/);
+  });
+
+  it("flag off: ACTIVE BASIC (chatAccess) gets the paid limit", async () => {
+    delete process.env.FREE_MODE;
+    db.subscription.findUnique.mockResolvedValue({ plan: "BASIC", status: "ACTIVE" });
+    db.chatMessage.count.mockResolvedValue(10);
+
+    const res = await request(app)
+      .post("/api/chat/message")
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ message: "hello", conversationId: CONV_ID });
+
+    expect(res.status).toBe(200);
   });
 });

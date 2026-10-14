@@ -4,6 +4,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import logger from "../lib/logger.js";
+import { isFreeMode } from "../lib/billing/free-mode.js";
 import {
   EMPLOYER_ONBOARDING_STEPS,
   buildEmployerOnboardingChecklist,
@@ -114,6 +115,7 @@ function analyticsPropertyString(value: Prisma.JsonValue | null | undefined, key
 }
 
 function premiumBrandingEnabled(subscription: { plan: SubscriptionPlan; status: SubscriptionStatus } | null) {
+  if (isFreeMode()) return true;
   return subscription?.plan === SubscriptionPlan.EMPLOYER_PREMIUM && subscription.status === SubscriptionStatus.ACTIVE;
 }
 

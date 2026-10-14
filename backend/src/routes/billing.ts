@@ -14,6 +14,7 @@ import {
   resolveCheckoutProvider,
 } from "../lib/billing/index.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
+import { isFreeMode, topTierPlanForRole } from "../lib/billing/free-mode.js";
 import { createFlutterwaveCheckout, isFlutterwaveConfigured, verifyFlutterwaveTransaction } from "../lib/flutterwave.js";
 
 const router = Router();
@@ -37,6 +38,25 @@ function buildFlutterwaveTxRef(userId: string, plan: SubscriptionPlan, interval:
 // POST /api/billing/checkout — create Stripe checkout session
 router.post("/checkout", authenticate, requireVerifiedEmail(), async (req: Request, res: Response) => {
   const startedAt = Date.now();
+  // Free launch: no new paid checkouts. /verify-checkout, /portal and webhooks
+  // stay live so in-flight and existing paid subscriptions can be managed.
+  if (isFreeMode()) {
+    recordOpsEvent({
+      metricName: "billing_checkout_blocked",
+      category: "billing",
+      outcome: "held",
+      severity: "info",
+      durationMs: Date.now() - startedAt,
+      details: {
+        reason: "billing_paused",
+      },
+    });
+    res.status(409).json({
+      error: "billing_paused",
+      message: "AfriTalent is free for everyone right now — no payment needed.",
+    });
+    return;
+  }
   try {
     const { plan, interval } = checkoutSchema.parse(req.body);
     const safety = await validateCheckoutSafety(req.user!.userId);
@@ -567,9 +587,12 @@ router.get("/status", authenticate, async (req: Request, res: Response) => {
       },
     });
 
+    const freeMode = isFreeMode();
     res.json({
       plan: subscription?.plan ?? SubscriptionPlan.FREE,
       status: subscription?.status ?? "INACTIVE",
+      freeMode,
+      effectivePlan: freeMode ? topTierPlanForRole(req.user!.role) : (subscription?.plan ?? SubscriptionPlan.FREE),
       currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
       billingProvider: subscription?.billingProvider ?? null,
       hasCustomer: !!(subscription?.stripeCustomerId || subscription?.providerCustomerId),

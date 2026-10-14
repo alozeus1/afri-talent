@@ -1,4 +1,5 @@
 import { EmployerVerificationLevel, JobStatus, SubscriptionPlan } from "@prisma/client";
+import { isFreeMode } from "../billing/free-mode.js";
 
 export const EMPLOYER_ONBOARDING_STEPS = [
   "company_setup",
@@ -190,7 +191,16 @@ export function employerUpgradeJourney(input: {
   publishedJobs: number;
   qualifiedApplicants: number;
   candidateFiltersDone: boolean;
-}) {
+}): { targetPlan: SubscriptionPlan | null; headline: string; body: string; ctaLabel: string } {
+  if (isFreeMode()) {
+    return {
+      targetPlan: null,
+      headline: "Everything is unlocked",
+      body: "AfriTalent is free for employers during launch — talent search, analytics and verified filters included.",
+      ctaLabel: "",
+    };
+  }
+
   if (input.plan === SubscriptionPlan.EMPLOYER_PREMIUM) {
     return {
       targetPlan: null,
@@ -266,6 +276,8 @@ export function timeToFirstQualifiedApplicantHours(input: {
 }
 
 export function isPlanSelectionDone(plan: SubscriptionPlan | null | undefined, selectedPlan: SubscriptionPlan | null | undefined): boolean {
+  // Free launch: there is no plan to choose, so the step never blocks activation.
+  if (isFreeMode()) return true;
   return Boolean(
     selectedPlan ||
     (plan && plan !== SubscriptionPlan.FREE && plan !== SubscriptionPlan.EMPLOYER_FREE),
