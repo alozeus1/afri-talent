@@ -102,6 +102,12 @@ router.put("/:id", authenticate, async (req, res) => {
       data: parsed.data,
     });
 
+    // Alerts disabled: drop this search's unsent alerts so they don't linger
+    // in the dispatch queue (JobAlert.searchId has no FK).
+    if (parsed.data.alertEnabled === false) {
+      await prisma.jobAlert.deleteMany({ where: { searchId: id, sentAt: null } });
+    }
+
     res.json({ savedSearch: updated });
   } catch (error) {
     res.status(500).json({ error: "Failed to update saved search" });
@@ -122,7 +128,11 @@ router.delete("/:id", authenticate, async (req, res) => {
       return res.status(404).json({ error: "Saved search not found" });
     }
 
-    await prisma.savedSearch.delete({ where: { id } });
+    // JobAlert.searchId has no FK, so remove the unsent alerts explicitly.
+    await prisma.$transaction([
+      prisma.jobAlert.deleteMany({ where: { searchId: id, sentAt: null } }),
+      prisma.savedSearch.delete({ where: { id } }),
+    ]);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Failed to delete saved search" });

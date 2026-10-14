@@ -3,7 +3,8 @@
 // Consumes one task per (batchId, jobId) emitted by routes/autopilot.ts when
 // APPLY_QUEUES_ENABLED. Recreates the per-job slice of the old in-process
 // processBatch loop: validate job, dedup, generate cover letter, create
-// Application, increment AutoApplyBatch.jobsApplied / jobsFailed. On every
+// Application, increment AutoApplyBatch.jobsApplied / jobsFailed. Every job
+// passes the shared apply guard (lib/apply/submit-guard.ts) first. On every
 // finish, recomputes the parent batch's terminal status.
 //
 // BullMQ retries failed jobs (3 attempts, exp backoff) — the worker therefore
@@ -16,6 +17,13 @@ import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { generateQuickCoverLetter } from "../lib/ai/cover-letter.js";
 import { recomputeAutoApplyBatchStatus } from "../lib/apply/batch-rollup.js";
+import {
+  SubmitGuardError,
+  assertCanSubmitApplication,
+  assessSubmissionRisk,
+  recordSubmissionTrust,
+  riskFieldsFor,
+} from "../lib/apply/submit-guard.js";
 import { isApplyQueuesEnabled, type ApplyBatchJobData } from "../lib/queues/apply-queues.js";
 
 let worker: Worker | null = null;
@@ -39,29 +47,23 @@ export function startApplyBatchWorker(): Worker | null {
     async (job) => {
       const { batchId, candidateId, jobId, customMessage } = job.data;
       try {
-        const target = await prisma.job.findUnique({ where: { id: jobId } });
-        if (!target || target.status !== "PUBLISHED") {
+        // Shared guard: job published + not expired, dedupe (keeps retries
+        // idempotent: an existing row means a prior attempt landed or the
+        // candidate already applied), apply caps, daily cap, verified email
+        // and account standing. Guard rejections count as failed, no retry.
+        let guard;
+        try {
+          guard = await assertCanSubmitApplication({ userId: candidateId, jobId });
+        } catch (guardErr) {
+          if (!(guardErr instanceof SubmitGuardError)) throw guardErr;
+          logger.info({ batchId, jobId, code: guardErr.code }, "[apply-batch-worker] skipped by apply guard");
           await prisma.autoApplyBatch.update({
             where: { id: batchId },
             data: { jobsFailed: { increment: 1 } },
           });
           return;
         }
-
-        const existing = await prisma.application.findFirst({
-          where: { jobId, candidateId },
-          select: { id: true },
-        });
-        if (existing) {
-          // Idempotent: either a prior attempt landed or the candidate had
-          // already applied. Count as failed (existing-application case) and
-          // move on — no double-create.
-          await prisma.autoApplyBatch.update({
-            where: { id: batchId },
-            data: { jobsFailed: { increment: 1 } },
-          });
-          return;
-        }
+        const target = guard.job;
 
         const profile = await prisma.candidateProfile.findUnique({
           where: { userId: candidateId },
@@ -88,7 +90,8 @@ export function startApplyBatchWorker(): Worker | null {
             : target.description,
         });
 
-        await prisma.application.create({
+        const risk = assessSubmissionRisk(guard, cl.coverLetter);
+        const created = await prisma.application.create({
           data: {
             jobId,
             candidateId,
@@ -96,8 +99,10 @@ export function startApplyBatchWorker(): Worker | null {
             coverLetter: cl.coverLetter,
             notes: `[Batch Application via queue] Cover letter source: ${cl.source}`,
             status: "PENDING",
+            ...riskFieldsFor(risk),
           },
         });
+        await recordSubmissionTrust({ userId: candidateId, job: target, applicationId: created.id, risk });
 
         await prisma.autoApplyBatch.update({
           where: { id: batchId },

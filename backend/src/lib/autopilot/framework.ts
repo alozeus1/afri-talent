@@ -302,7 +302,9 @@ export async function ensureCandidateAutopilotProfile(userId: string): Promise<C
       userId,
       enabled: entitlements.autopilot,
       automationLevel: entitlements.autopilot ? CandidateAutomationLevel.AUTONOMOUS : CandidateAutomationLevel.ASSISTED,
-      autoApplyEnabled: entitlements.autopilot,
+      // Auto-apply submits employer-visible applications, so it is always an
+      // explicit opt-in (settings toggle). Existing rows are not changed.
+      autoApplyEnabled: false,
       followUpCadenceDays: DEFAULT_FOLLOW_UP_CADENCE,
       resumeBuilderEnabled: hasResumeBuilderAccess(entitlements.plan),
       followUpEnabled: entitlements.autopilot,

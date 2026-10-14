@@ -5,6 +5,14 @@ import logger from "../lib/logger.js";
 import { authenticate, authorize, requireVerifiedEmail } from "../middleware/auth.js";
 import { ApplicationStatus, JobStatus, Role } from "@prisma/client";
 import { generateQuickCoverLetter } from "../lib/ai/cover-letter.js";
+import { requireAccountStanding } from "../middleware/account-standing.js";
+import {
+  SubmitGuardError,
+  assertCanSubmitApplication,
+  assessSubmissionRisk,
+  recordSubmissionTrust,
+  riskFieldsFor,
+} from "../lib/apply/submit-guard.js";
 
 const router = Router();
 
@@ -23,33 +31,16 @@ router.post(
   "/",
   authenticate,
   authorize(Role.CANDIDATE),
+  requireAccountStanding(),
   requireVerifiedEmail({ roles: [Role.CANDIDATE] }),
   async (req: Request, res: Response) => {
   try {
     const data = quickApplySchema.parse(req.body);
 
-    // Check job exists and is published
-    const job = await prisma.job.findUnique({
-      where: { id: data.jobId },
-    });
-
-    if (!job || job.status !== JobStatus.PUBLISHED) {
-      res.status(404).json({ error: "Job not found or not available" });
-      return;
-    }
-
-    // Check if already applied
-    const existingApplication = await prisma.application.findFirst({
-      where: {
-        jobId: data.jobId,
-        candidateId: req.user!.userId,
-      },
-    });
-
-    if (existingApplication) {
-      res.status(400).json({ error: "Already applied" });
-      return;
-    }
+    // Shared guard: job published + not expired, dedupe, apply caps, daily
+    // cap, verified email and account standing. Runs before any AI spend.
+    const guard = await assertCanSubmitApplication({ userId: req.user!.userId, jobId: data.jobId });
+    const job = guard.job;
 
     // Pull candidate profile data
     const profile = await prisma.candidateProfile.findUnique({
@@ -98,13 +89,16 @@ router.post(
         : undefined;
     }
 
+    const risk = assessSubmissionRisk(guard, coverLetter);
     const application = await prisma.application.create({
       data: {
         jobId: data.jobId,
         candidateId: req.user!.userId,
         cvUrl,
         coverLetter,
+        notes: "[Quick Apply]",
         status: ApplicationStatus.PENDING,
+        ...riskFieldsFor(risk),
       },
       include: {
         job: {
@@ -112,9 +106,19 @@ router.post(
         },
       },
     });
+    await recordSubmissionTrust({
+      userId: req.user!.userId,
+      job,
+      applicationId: application.id,
+      risk,
+    });
 
-    res.status(201).json(application);
+    res.status(201).json({ ...application, heldForReview: risk.heldForReview });
   } catch (error) {
+    if (error instanceof SubmitGuardError) {
+      res.status(error.httpStatus).json(error.toJSON());
+      return;
+    }
     if (error instanceof z.ZodError) {
       const consentIssue = error.issues.find(
         (i) => Array.isArray(i.path) && i.path.includes("confirm")

@@ -24,6 +24,16 @@ import {
   SubscriptionPlan,
 } from "@prisma/client";
 import { generateQuickCoverLetter } from "../lib/ai/cover-letter.js";
+import {
+  SubmitGuardError,
+  assertCanSubmitApplication,
+  assessSubmissionRisk,
+  countAutomatedAppliesToday,
+  getAutopilotDailyApplyCap,
+  recordSubmissionTrust,
+  riskFieldsFor,
+} from "../lib/apply/submit-guard.js";
+import { requireAccountStanding } from "../middleware/account-standing.js";
 import { getApplyQueue } from "../lib/queues/apply-queues.js";
 import { getUserEntitlements } from "../lib/billing/entitlements.js";
 import { isGraphEnabled } from "../lib/ai/langgraph/index.js";
@@ -49,8 +59,12 @@ const applySchema = z.object({
   confirm: z.literal(true, "Consent required: set confirm=true to submit."),
 });
 
+// Max jobs per batch request. Each job is one LLM call and one
+// employer-visible application, so keep this small.
+const MAX_BATCH_JOBS = 10;
+
 const batchApplySchema = z.object({
-  jobIds: z.array(z.string()).min(1).max(50),
+  jobIds: z.array(z.string()).min(1).max(MAX_BATCH_JOBS),
   customMessage: z.string().max(2000).optional(),
   /**
    * Same explicit-consent contract as single apply: a batch is never queued
@@ -607,6 +621,7 @@ router.post(
   "/apply",
   authenticate,
   authorize(Role.CANDIDATE),
+  requireAccountStanding(),
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.user!.userId;
     const parsed = applySchema.safeParse(req.body);
@@ -636,19 +651,10 @@ router.post(
         return;
       }
 
-      const job = await prisma.job.findUnique({ where: { id: jobId } });
-      if (!job || job.status !== "PUBLISHED") {
-        res.status(404).json({ error: "Job not found or not available" });
-        return;
-      }
-
-      const existingApp = await prisma.application.findFirst({
-        where: { jobId, candidateId: userId },
-      });
-      if (existingApp) {
-        res.status(400).json({ error: "Already applied to this job" });
-        return;
-      }
+      // Shared guard: job published + not expired, dedupe, apply caps,
+      // daily cap, verified email, account standing. Runs before AI spend.
+      const guard = await assertCanSubmitApplication({ userId, jobId });
+      const job = guard.job;
 
       const activeResume = profile.resumes[0] ?? null;
       const companyName =
@@ -667,6 +673,7 @@ router.post(
         jobDescription: job.description,
       });
 
+      const risk = assessSubmissionRisk(guard, clResult.coverLetter);
       const application = await prisma.application.create({
         data: {
           jobId,
@@ -675,6 +682,7 @@ router.post(
           coverLetter: clResult.coverLetter,
           notes: `[AI-Assisted Application] Cover letter source: ${clResult.source}`,
           status: "PENDING",
+          ...riskFieldsFor(risk),
         },
         include: {
           job: {
@@ -691,6 +699,8 @@ router.post(
           },
         },
       });
+
+      await recordSubmissionTrust({ userId, job, applicationId: application.id, risk });
 
       const resumeVersion = await buildResumeVersion({
         user,
@@ -778,6 +788,10 @@ router.post(
         message: "Application submitted with AI-generated cover letter and autonomous task pack",
       });
     } catch (err) {
+      if (err instanceof SubmitGuardError) {
+        res.status(err.httpStatus).json(err.toJSON());
+        return;
+      }
       logger.error({ jobId, err }, "[autopilot] on-demand apply failed");
       res.status(500).json({ error: "Failed to generate application" });
     }
@@ -789,6 +803,7 @@ router.post(
   "/batch",
   authenticate,
   authorize(Role.CANDIDATE),
+  requireAccountStanding(),
   async (req: Request, res: Response): Promise<void> => {
     const userId = req.user!.userId;
     const parsed = batchApplySchema.safeParse(req.body);
@@ -798,9 +813,36 @@ router.post(
       return;
     }
 
-    const { jobIds, customMessage } = parsed.data;
+    const jobIds = Array.from(new Set(parsed.data.jobIds));
+    const { customMessage } = parsed.data;
 
     try {
+      // Verified email is required before anything is queued; each job is
+      // re-checked by the shared guard when it is processed.
+      const actor = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { emailVerified: true, email: true },
+      });
+      if (!actor?.emailVerified) {
+        res.status(403).json({
+          error: "Email verification required for this action.",
+          code: "EMAIL_VERIFICATION_REQUIRED",
+        });
+        return;
+      }
+
+      // Per-user daily cap on automated applications.
+      const dailyCap = getAutopilotDailyApplyCap();
+      const usedToday = await countAutomatedAppliesToday(userId);
+      if (usedToday + jobIds.length > dailyCap) {
+        res.status(429).json({
+          error: `This batch would exceed your daily limit of ${dailyCap} assisted applications (${Math.max(0, dailyCap - usedToday)} left today).`,
+          code: "DAILY_APPLY_CAP",
+          remainingToday: Math.max(0, dailyCap - usedToday),
+        });
+        return;
+      }
+
       const batch = await prisma.autoApplyBatch.create({
         data: {
           candidateId: userId,
@@ -893,25 +935,19 @@ async function processBatch(
 
     for (const jobId of jobIds) {
       try {
-        const job = await prisma.job.findUnique({ where: { id: jobId } });
-        if (!job || job.status !== "PUBLISHED") {
+        let guard;
+        try {
+          guard = await assertCanSubmitApplication({ userId, jobId });
+        } catch (guardErr) {
+          if (!(guardErr instanceof SubmitGuardError)) throw guardErr;
+          logger.info({ batchId, jobId, code: guardErr.code }, "[autopilot] batch job skipped by apply guard");
           await prisma.autoApplyBatch.update({
             where: { id: batchId },
             data: { jobsFailed: { increment: 1 } },
           });
           continue;
         }
-
-        const existing = await prisma.application.findFirst({
-          where: { jobId, candidateId: userId },
-        });
-        if (existing) {
-          await prisma.autoApplyBatch.update({
-            where: { id: batchId },
-            data: { jobsFailed: { increment: 1 } },
-          });
-          continue;
-        }
+        const job = guard.job;
 
         const companyName =
           job.employerId
@@ -931,7 +967,8 @@ async function processBatch(
             : job.description,
         });
 
-        await prisma.application.create({
+        const risk = assessSubmissionRisk(guard, clResult.coverLetter);
+        const created = await prisma.application.create({
           data: {
             jobId,
             candidateId: userId,
@@ -939,8 +976,10 @@ async function processBatch(
             coverLetter: clResult.coverLetter,
             notes: `[Batch Application] Cover letter source: ${clResult.source}`,
             status: "PENDING",
+            ...riskFieldsFor(risk),
           },
         });
+        await recordSubmissionTrust({ userId, job, applicationId: created.id, risk });
 
         await prisma.autoApplyBatch.update({
           where: { id: batchId },

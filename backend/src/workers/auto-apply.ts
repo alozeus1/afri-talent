@@ -1,7 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Auto-Apply Pipeline — Proactive AI agent that generates apply packs
 //
-// For Professional-tier users who opt in, this worker:
+// OFF by default: does nothing unless AUTO_APPLY_ENABLED=1.
+// Eligibility is explicit opt-in only (CandidateAutopilotProfile.
+// autoApplyEnabled === true). It is never derived from plan or free mode.
+// For opted-in users, this worker:
 //   1. Picks up high-scoring JobAlerts (score >= threshold)
 //   2. Generates tailored resume + cover letter via AI
 //   3. Creates an "AI-prepared" application (pending user review)
@@ -17,7 +20,13 @@ import logger from "../lib/logger.js";
 import { generateQuickCoverLetter } from "../lib/ai/cover-letter.js";
 import { isGraphEnabled } from "../lib/ai/langgraph/index.js";
 import { evaluateAutopilotGate } from "../lib/ai/langgraph/integration/candidateAutopilotAdapter.js";
-import { checkApplyCaps } from "../lib/apply/caps.js";
+import {
+  SubmitGuardError,
+  assertCanSubmitApplication,
+  assessSubmissionRisk,
+  recordSubmissionTrust,
+  riskFieldsFor,
+} from "../lib/apply/submit-guard.js";
 
 const AUTO_APPLY_SCORE_THRESHOLD = parseInt(process.env.AUTO_APPLY_SCORE_THRESHOLD || "75", 10);
 const MAX_AUTO_APPLIES_PER_CYCLE = parseInt(process.env.MAX_AUTO_APPLIES_PER_CYCLE || "20", 10);
@@ -31,7 +40,16 @@ const AI_DISABLED = process.env.AI_DISABLED === "1";
 
 export { AUTO_APPLY_INTERVAL_MS };
 
+/** Env kill switch. Default off: the worker does nothing unless AUTO_APPLY_ENABLED=1. */
+export function isAutoApplyEnabled(): boolean {
+  return process.env.AUTO_APPLY_ENABLED === "1";
+}
+
 export async function runAutoApplyCycle(): Promise<void> {
+  if (!isAutoApplyEnabled()) {
+    logger.debug("[auto-apply] disabled (AUTO_APPLY_ENABLED != 1), skipping");
+    return;
+  }
   if (AI_DISABLED) {
     logger.debug("[auto-apply] AI disabled, skipping");
     return;
@@ -41,16 +59,11 @@ export async function runAutoApplyCycle(): Promise<void> {
   let skipped = 0;
   let errors = 0;
 
-  // Find professional-tier users who have opted into auto-apply
-  // (subscription plan = PROFESSIONAL and status = ACTIVE)
-  const eligibleUsers = await prisma.subscription.findMany({
-    where: {
-      plan: "PROFESSIONAL",
-      status: "ACTIVE",
-    },
-    select: {
-      userId: true,
-    },
+  // Explicit opt-in only: users who turned auto-apply on in their autopilot
+  // settings. Read regardless of the LangGraph flag, never from plan/free mode.
+  const eligibleUsers = await prisma.candidateAutopilotProfile.findMany({
+    where: { autoApplyEnabled: true },
+    select: { userId: true },
   });
 
   const eligibleUserIds = new Set(eligibleUsers.map((u) => u.userId));
@@ -66,6 +79,7 @@ export async function runAutoApplyCycle(): Promise<void> {
       matchScore: { gte: AUTO_APPLY_SCORE_THRESHOLD },
       sentAt: { not: null }, // only process alerts that have been notified
       clickedAt: null, // user hasn't manually acted on it
+      job: { status: "PUBLISHED", isExpired: false },
     },
     include: {
       user: { select: { id: true, name: true, email: true } },
@@ -116,26 +130,18 @@ export async function runAutoApplyCycle(): Promise<void> {
         }
       }
 
-      // Skip if already applied
-      const existingApp = await prisma.application.findFirst({
-        where: {
-          jobId: alert.jobId,
-          candidateId: alert.userId,
-        },
-      });
-      if (existingApp) {
-        skipped++;
-        continue;
-      }
-
-      // Employer-trust guardrails — the same caps the manual apply path
-      // enforces: max 1 application per job per 60 days, max 3 distinct jobs
-      // per employer per 30 days. Prevents AI volume from spamming employers.
-      const capResult = await checkApplyCaps(prisma, alert.userId, alert.jobId);
-      if (!capResult.ok) {
+      // Shared apply guard — the same checks the manual apply path enforces:
+      // job published + not expired, dedupe, apply caps (1 per job / 60d,
+      // 3 jobs per employer / 30d), daily cap, verified email, account
+      // standing. Runs before any AI spend.
+      let guard;
+      try {
+        guard = await assertCanSubmitApplication({ userId: alert.userId, jobId: alert.jobId });
+      } catch (guardErr) {
+        if (!(guardErr instanceof SubmitGuardError)) throw guardErr;
         logger.debug(
-          { userId: alert.userId.slice(0, 8), code: capResult.code },
-          "[auto-apply] apply cap reached — skipping alert",
+          { userId: alert.userId.slice(0, 8), code: guardErr.code },
+          "[auto-apply] apply guard rejected — skipping alert",
         );
         skipped++;
         continue;
@@ -188,7 +194,8 @@ export async function runAutoApplyCycle(): Promise<void> {
       });
 
       // Create application in PENDING status (user reviews before finalizing)
-      await prisma.application.create({
+      const risk = assessSubmissionRisk(guard, clResult.coverLetter);
+      const created = await prisma.application.create({
         data: {
           jobId: alert.jobId,
           candidateId: alert.userId,
@@ -196,8 +203,10 @@ export async function runAutoApplyCycle(): Promise<void> {
           coverLetter: clResult.coverLetter,
           notes: `[AI Auto-Applied] Match score: ${alert.matchScore}%. Cover letter source: ${clResult.source}. Review and confirm to finalize.`,
           status: "PENDING",
+          ...riskFieldsFor(risk),
         },
       });
+      await recordSubmissionTrust({ userId: alert.userId, job: guard.job, applicationId: created.id, risk });
 
       // Notify user that an apply pack is ready
       await prisma.notification.create({

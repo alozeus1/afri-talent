@@ -6,6 +6,14 @@
 //
 // Respects alert frequency (INSTANT, DAILY, WEEKLY) from the associated
 // SavedSearch if one exists.
+//
+// Orphaned alerts (saved search deleted or alerts disabled) are deleted so
+// they can never fill the oldest-first batch and starve other users.
+// Job-match emails honour NotificationPreference: no email when
+// savedSearchAlerts=false, and at most maxNotificationsPerWeek emails with at
+// least minimumHoursBetweenNotifications between them (in-app notifications
+// are still created). Emailed notifications carry metadata.emailSent=true,
+// which is what the frequency caps count.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import prisma from "../lib/prisma.js";
@@ -37,9 +45,80 @@ function isSearchDeliveryDue(search: {
   return true;
 }
 
+// Schema defaults for NotificationPreference, used when a user has no row.
+const DEFAULT_MAX_NOTIFICATIONS_PER_WEEK = 6;
+const DEFAULT_MIN_HOURS_BETWEEN_NOTIFICATIONS = 18;
+
+type EmailPrefs = {
+  savedSearchAlerts: boolean;
+  maxNotificationsPerWeek: number;
+  minimumHoursBetweenNotifications: number;
+};
+
+/**
+ * Delete unsent alerts whose saved search no longer exists or has alerts
+ * disabled. JobAlert.searchId has no FK, so these would otherwise stay
+ * unsent forever and occupy the head of the dispatch queue.
+ */
+export async function purgeOrphanedAlerts(): Promise<number> {
+  const rows = await prisma.jobAlert.findMany({
+    where: { sentAt: null, searchId: { not: null } },
+    select: { searchId: true },
+    distinct: ["searchId"],
+  });
+  const searchIds = rows
+    .map((row) => row.searchId)
+    .filter((id): id is string => Boolean(id));
+  if (searchIds.length === 0) return 0;
+
+  const live = await prisma.savedSearch.findMany({
+    where: { id: { in: searchIds }, alertEnabled: true },
+    select: { id: true },
+  });
+  const liveIds = new Set(live.map((search) => search.id));
+  const orphanSearchIds = searchIds.filter((id) => !liveIds.has(id));
+  if (orphanSearchIds.length === 0) return 0;
+
+  const { count } = await prisma.jobAlert.deleteMany({
+    where: { sentAt: null, searchId: { in: orphanSearchIds } },
+  });
+  return count;
+}
+
+/** Whether a job-match email may be sent now under the user's preferences. */
+export async function canSendJobMatchEmail(userId: string, prefs: EmailPrefs | undefined): Promise<boolean> {
+  if (prefs && prefs.savedSearchAlerts === false) return false;
+  const maxPerWeek = prefs?.maxNotificationsPerWeek ?? DEFAULT_MAX_NOTIFICATIONS_PER_WEEK;
+  const minHours = prefs?.minimumHoursBetweenNotifications ?? DEFAULT_MIN_HOURS_BETWEEN_NOTIFICATIONS;
+  if (maxPerWeek <= 0) return false;
+
+  const recentEmails = await prisma.notification.findMany({
+    where: {
+      userId,
+      type: "JOB_MATCH",
+      createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+      metadata: { path: ["emailSent"], equals: true },
+    },
+    select: { createdAt: true },
+    orderBy: { createdAt: "desc" },
+    take: maxPerWeek,
+  });
+
+  if (recentEmails.length >= maxPerWeek) return false;
+  if (recentEmails[0] && hoursSince(recentEmails[0].createdAt) < minHours) return false;
+  return true;
+}
+
 export async function runAlertDispatchCycle(): Promise<void> {
   let sent = 0;
   let errors = 0;
+
+  try {
+    const purged = await purgeOrphanedAlerts();
+    if (purged > 0) logger.info({ purged }, "[alert-sender] deleted orphaned alerts");
+  } catch (err) {
+    logger.warn({ err }, "[alert-sender] orphan purge failed (non-fatal)");
+  }
 
   // Fetch unsent alerts with user and job data
   const pendingAlerts = await prisma.jobAlert.findMany({
@@ -96,6 +175,32 @@ export async function runAlertDispatchCycle(): Promise<void> {
     : [];
   const searchMap = new Map(searches.map((search) => [search.id, search]));
 
+  // Any orphan that slipped in after the purge (race with a delete/disable)
+  // is deleted here rather than left at the head of the queue.
+  const orphanAlertIds = pendingAlerts
+    .filter((alert) => {
+      if (!alert.searchId) return false;
+      const search = searchMap.get(alert.searchId);
+      return !search || !search.alertEnabled;
+    })
+    .map((alert) => alert.id);
+  if (orphanAlertIds.length > 0) {
+    await prisma.jobAlert
+      .deleteMany({ where: { id: { in: orphanAlertIds }, sentAt: null } })
+      .catch((err) => logger.warn({ err }, "[alert-sender] orphan delete failed (non-fatal)"));
+  }
+
+  const prefRows = await prisma.notificationPreference.findMany({
+    where: { userId: { in: Array.from(new Set(pendingAlerts.map((alert) => alert.userId))) } },
+    select: {
+      userId: true,
+      savedSearchAlerts: true,
+      maxNotificationsPerWeek: true,
+      minimumHoursBetweenNotifications: true,
+    },
+  });
+  const prefsByUser = new Map<string, EmailPrefs>(prefRows.map((row) => [row.userId, row]));
+
   // Group alerts by user for batched notifications
   const alertsByUser = new Map<
     string,
@@ -148,6 +253,7 @@ export async function runAlertDispatchCycle(): Promise<void> {
       }
 
       const user = userAlerts[0].user;
+      const emailAllowed = await canSendJobMatchEmail(userId, prefsByUser.get(userId));
 
       if (eligibleAlerts.length === 1) {
         // Single alert: send individual notification + email
@@ -165,10 +271,11 @@ export async function runAlertDispatchCycle(): Promise<void> {
             jobId: alert.job.id,
             jobSlug: alert.job.slug,
             matchScore: alert.matchScore,
+            emailSent: emailAllowed,
           },
         });
 
-        await jobMatchEmail({
+        if (emailAllowed) await jobMatchEmail({
           to: user.email,
           candidateName: user.name,
           jobTitle: alert.job.title,
@@ -197,6 +304,7 @@ export async function runAlertDispatchCycle(): Promise<void> {
           metadata: {
             alertCount: eligibleAlerts.length,
             topJobIds: topJobs.map((a) => a.job.id),
+            emailSent: emailAllowed,
           },
         });
 
@@ -205,7 +313,7 @@ export async function runAlertDispatchCycle(): Promise<void> {
         const topCompany =
           topAlert.job.employer?.companyName ?? topAlert.job.sourceName ?? "Unknown Company";
 
-        await jobMatchEmail({
+        if (emailAllowed) await jobMatchEmail({
           to: user.email,
           candidateName: user.name,
           jobTitle: `${topAlert.job.title} (+${eligibleAlerts.length - 1} more)`,
