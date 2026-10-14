@@ -72,7 +72,8 @@ router.get("/threads", authenticate, async (req: Request, res: Response) => {
     const userId = req.user!.userId;
     const { page = "1", limit = "20" } = req.query;
     const take = Math.min(parseInt(limit as string) || 20, 50);
-    const skip = (parseInt(page as string) - 1) * take;
+    const pageNum = Math.max(parseInt(String(page), 10) || 1, 1);
+    const skip = (pageNum - 1) * take;
 
     const threads = await prisma.messageThread.findMany({
       where: {
@@ -122,7 +123,7 @@ router.get("/threads", authenticate, async (req: Request, res: Response) => {
     res.json({
       threads: formatted,
       pagination: {
-        page: parseInt(page as string),
+        page: pageNum,
         limit: take,
         total,
         totalPages: Math.ceil(total / take),
@@ -141,7 +142,8 @@ router.get("/threads/:id", authenticate, async (req: Request, res: Response) => 
     const { id } = req.params;
     const { page = "1", limit = "50" } = req.query;
     const take = Math.min(parseInt(limit as string) || 50, 100);
-    const skip = (parseInt(page as string) - 1) * take;
+    const pageNum = Math.max(parseInt(String(page), 10) || 1, 1);
+    const skip = (pageNum - 1) * take;
 
     const thread = await prisma.messageThread.findFirst({
       where: {
@@ -194,7 +196,7 @@ router.get("/threads/:id", authenticate, async (req: Request, res: Response) => 
       },
       messages,
       pagination: {
-        page: parseInt(page as string),
+        page: pageNum,
         limit: take,
         total: totalMessages,
         totalPages: Math.ceil(totalMessages / take),

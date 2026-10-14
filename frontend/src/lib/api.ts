@@ -254,6 +254,21 @@ export const jobs = {
 
   myJobs: (token?: string) =>
     fetchAPI<Job[]>("/api/jobs/employer/my-jobs", { token }),
+
+  // Employer: edit an owned job. `status: "DRAFT"` closes (unpublishes) it;
+  // `status: "PUBLISHED"` reopens it (subject to trust/moderation checks).
+  update: (id: string, data: Partial<CreateJobData> & { status?: "DRAFT" | "PUBLISHED" }) =>
+    fetchAPI<Job & { closed?: boolean; moderationRequired?: boolean }>(`/api/jobs/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  // Employer: delete an owned job. Jobs with applications are closed instead
+  // and the response carries `closed: true`.
+  remove: (id: string) =>
+    fetchAPI<{ message: string; closed?: boolean }>(`/api/jobs/${id}`, {
+      method: "DELETE",
+    }),
 };
 
 // Onboarding — free "first look" instant matches

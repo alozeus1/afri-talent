@@ -21,6 +21,7 @@ import { TrustExplainerModal, type TrustExplainerItem } from "@/components/trust
 import { TrustStatusBanner } from "@/components/trust/trust-status-banner";
 import { TrustSupportCard } from "@/components/trust/trust-support-card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { MessageCandidateButton } from "@/components/employer/message-candidate-button";
 
 const TALENT_STAGES = ["SOURCED", "REVIEWING", "PRIORITY", "CONTACTED"];
 
@@ -799,17 +800,19 @@ export default function TalentMarketplacePage() {
                               )}
                             </div>
 
-                            <div className="flex gap-2">
-                              <Link href={`/candidate/${candidate.user.id}`} className="flex-1">
+                            <div className="flex flex-wrap gap-2">
+                              <Link href={localizePath(`/employer/talent/${candidate.user.id}`, locale)} className="flex-1">
                                 <Button variant="outline" size="sm" className="w-full">
                                   View Profile
                                 </Button>
                               </Link>
-                              <Link href="/messages" className="flex-1">
-                                <Button size="sm" className="w-full">
-                                  Message
-                                </Button>
-                              </Link>
+                              <div className="flex-1">
+                                <MessageCandidateButton
+                                  candidateUserId={candidate.user.id}
+                                  candidateName={candidate.user.name}
+                                  className="w-full"
+                                />
+                              </div>
                             </div>
                           </div>
                         </CardContent>

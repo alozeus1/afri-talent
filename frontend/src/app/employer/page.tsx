@@ -38,6 +38,8 @@ export default function EmployerDashboard() {
   const [trustDashboard, setTrustDashboard] = useState<EmployerTrustDashboard | null>(null);
   const [analytics, setAnalytics] = useState<EmployerAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [jobActionError, setJobActionError] = useState<string | null>(null);
 
   const [selectedTab, setSelectedTab] = useState("Overview");
   const tabItems = ["Overview", "Jobs"];
@@ -68,6 +70,21 @@ export default function EmployerDashboard() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [user]);
+
+  // Close (unpublish) or reopen a job. Reopening re-runs trust checks, so the
+  // returned status may be PENDING_REVIEW rather than PUBLISHED.
+  const setJobOpen = async (jobId: string, open: boolean) => {
+    setStatusUpdatingId(jobId);
+    setJobActionError(null);
+    try {
+      const updated = await jobs.update(jobId, { status: open ? "PUBLISHED" : "DRAFT" });
+      setMyJobs((prev) => prev.map((job) => (job.id === jobId ? { ...job, status: updated.status } : job)));
+    } catch (err) {
+      setJobActionError(err instanceof Error ? err.message : "Failed to update job status");
+    } finally {
+      setStatusUpdatingId(null);
+    }
+  };
 
   if (isLoading || !user) {
     return (
@@ -133,6 +150,11 @@ export default function EmployerDashboard() {
             <Link href={localizePath("/employer/analytics", locale)}>
               <Button className="w-full border-white/20 text-white hover:bg-white/10 hover:text-white" variant="outline">
                 View hiring ROI
+              </Button>
+            </Link>
+            <Link href={localizePath("/employer/integrations", locale)}>
+              <Button className="w-full border-white/20 text-white hover:bg-white/10 hover:text-white" variant="outline">
+                ATS integrations
               </Button>
             </Link>
           </div>
@@ -340,6 +362,9 @@ export default function EmployerDashboard() {
               </div>
             ) : (
               <div className="space-y-4">
+                {jobActionError && (
+                  <p role="alert" className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{jobActionError}</p>
+                )}
                 {myJobs.map((job) => (
                   <div
                     key={job.id}
@@ -372,10 +397,31 @@ export default function EmployerDashboard() {
                       )}
                     </div>
                     <div className="flex flex-wrap gap-3">
-                      {job.status === "PUBLISHED" && (
+                      {(job.status === "PUBLISHED" || (job._count?.applications ?? 0) > 0) && (
                         <Link href={localizePath(`/employer/jobs/${job.id}/applications`, locale)}>
                           <Button variant="outline">View applications</Button>
                         </Link>
+                      )}
+                      <Link href={localizePath(`/employer/jobs/${job.id}/edit`, locale)}>
+                        <Button variant="outline">Edit</Button>
+                      </Link>
+                      {job.status === "PUBLISHED" && (
+                        <Button
+                          variant="outline"
+                          disabled={statusUpdatingId === job.id}
+                          onClick={() => void setJobOpen(job.id, false)}
+                        >
+                          {statusUpdatingId === job.id ? "Closing..." : "Close job"}
+                        </Button>
+                      )}
+                      {job.status === "DRAFT" && (
+                        <Button
+                          variant="outline"
+                          disabled={statusUpdatingId === job.id}
+                          onClick={() => void setJobOpen(job.id, true)}
+                        >
+                          {statusUpdatingId === job.id ? "Reopening..." : "Reopen job"}
+                        </Button>
                       )}
                       <Link href={localizePath("/employer/analytics", locale)}>
                         <Button variant="outline">View ROI</Button>

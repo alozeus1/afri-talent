@@ -126,7 +126,7 @@ router.post(
           reason: "duplicate_application",
         },
       });
-      res.status(400).json({ error: "You have already applied to this job" });
+      res.status(409).json({ error: "You have already applied to this job" });
       return;
     }
 
@@ -273,6 +273,12 @@ router.post(
         },
       });
       res.status(400).json({ error: "Validation failed", details: error.issues });
+      return;
+    }
+    // Concurrent duplicate submits race past the pre-check and hit the
+    // @@unique([jobId, candidateId]) constraint.
+    if ((error as { code?: string }).code === "P2002") {
+      res.status(409).json({ error: "You have already applied to this job" });
       return;
     }
     console.error("Apply error:", error);

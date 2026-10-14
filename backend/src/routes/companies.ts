@@ -7,10 +7,15 @@ import { z } from "zod";
 import { authenticate, authorize } from "../middleware/auth.js";
 import prisma from "../lib/prisma.js";
 import { employerBadgeLabel } from "../lib/trust/risk.js";
+import { helpfulVoteLimiter } from "../middleware/security.js";
 
 const router = Router();
 
 // Validation schemas
+const ModerateReviewSchema = z.object({
+  approved: z.boolean(),
+});
+
 const CompanyReviewSchema = z.object({
   overallRating: z.number().int().min(1).max(5),
   cultureRating: z.number().int().min(1).max(5).optional(),
@@ -349,14 +354,21 @@ router.post("/:id/reviews", authenticate, authorize("CANDIDATE"), async (req, re
 });
 
 // POST /api/companies/:id/reviews/:reviewId/helpful - Mark review as helpful
-router.post("/:id/reviews/:reviewId/helpful", authenticate, async (req, res) => {
-  const { reviewId } = req.params;
+router.post("/:id/reviews/:reviewId/helpful", authenticate, helpfulVoteLimiter, async (req, res) => {
+  const { id: companyId, reviewId } = req.params;
 
   try {
-    await prisma.companyReview.update({
-      where: { id: reviewId },
+    // Scope to the company in the URL and to approved reviews only; updateMany
+    // returns count 0 (instead of throwing P2025) when nothing matches.
+    const result = await prisma.companyReview.updateMany({
+      where: { id: reviewId, companyId, isApproved: true },
       data: { helpfulCount: { increment: 1 } },
     });
+
+    if (result.count === 0) {
+      res.status(404).json({ error: "Review not found" });
+      return;
+    }
 
     res.json({ success: true });
   } catch (error) {
@@ -367,21 +379,28 @@ router.post("/:id/reviews/:reviewId/helpful", authenticate, async (req, res) => 
 // Admin: Approve/reject review
 router.patch("/:id/reviews/:reviewId/moderate", authenticate, authorize("ADMIN"), async (req, res) => {
   const { reviewId } = req.params;
-  const { approved } = req.body;
+  const parsed = ModerateReviewSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Validation failed", details: parsed.error.issues });
+    return;
+  }
 
   try {
     const review = await prisma.companyReview.update({
       where: { id: reviewId },
-      data: { isApproved: approved === true },
+      data: { isApproved: parsed.data.approved },
     });
 
-    // Update company rating aggregate if approved
-    if (approved) {
-      await updateCompanyRatings(review.companyId);
-    }
+    // Recompute on both approve and reject so un-approving a review removes
+    // it from the aggregate.
+    await updateCompanyRatings(review.companyId);
 
     res.json({ review });
   } catch (error) {
+    if ((error as { code?: string }).code === "P2025") {
+      res.status(404).json({ error: "Review not found" });
+      return;
+    }
     res.status(500).json({ error: "Failed to moderate review" });
   }
 });
@@ -392,7 +411,10 @@ async function updateCompanyRatings(companyId: string) {
     where: { companyId, isApproved: true },
   });
 
-  if (reviews.length === 0) return;
+  if (reviews.length === 0) {
+    await prisma.companyRatingAggregate.deleteMany({ where: { companyId } });
+    return;
+  }
 
   const avg = (arr: (number | null)[]) => {
     const valid = arr.filter((v): v is number => v !== null);

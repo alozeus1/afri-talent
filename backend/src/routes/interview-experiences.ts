@@ -7,6 +7,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { Role } from "@prisma/client";
+import { helpfulVoteLimiter } from "../middleware/security.js";
 
 const router = Router();
 
@@ -230,23 +231,20 @@ router.post("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, r
 });
 
 // POST /api/interview-experiences/:id/helpful — increment helpful count
-router.post("/:id/helpful", authenticate, async (req: Request, res: Response) => {
+router.post("/:id/helpful", authenticate, helpfulVoteLimiter, async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
-    const experience = await prisma.interviewExperience.findUnique({
-      where: { id },
+    // Approved experiences only; count 0 means missing or unapproved.
+    const result = await prisma.interviewExperience.updateMany({
+      where: { id, isApproved: true },
+      data: { helpfulCount: { increment: 1 } },
     });
 
-    if (!experience || !experience.isApproved) {
+    if (result.count === 0) {
       res.status(404).json({ error: "Interview experience not found" });
       return;
     }
-
-    await prisma.interviewExperience.update({
-      where: { id },
-      data: { helpfulCount: { increment: 1 } },
-    });
 
     res.json({ success: true });
   } catch (error) {

@@ -4,12 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { Job } from "@/lib/api";
+import { jobs } from "@/lib/api";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 const jobTypes = ["Full-time", "Part-time", "Contract", "Freelance", "Internship"];
 const seniorityLevels = ["Junior", "Mid-level", "Senior", "Lead", "Executive"];
@@ -19,6 +18,7 @@ export default function EditJobPage() {
   const params = useParams();
   const jobId = params.id as string;
   const { user, isLoading } = useAuth();
+  const locale = useLocale();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -45,16 +45,13 @@ export default function EditJobPage() {
 
   const loadJob = useCallback(async () => {
     try {
-      // Use the id to fetch the job — jobs.get accepts a slug,
-      // so we try fetching by id directly via fetchAPI pattern
-      const res = await fetch(`${API_URL}/api/jobs/${jobId}`, {
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!res.ok) {
-        throw new Error("Failed to load job");
+      // GET /api/jobs/:slug is the public slug route, so resolve the job by id
+      // from the employer's own job list (also enforces ownership).
+      const myJobs = await jobs.myJobs();
+      const job = myJobs.find((candidate) => candidate.id === jobId);
+      if (!job) {
+        throw new Error("Job not found");
       }
-      const job: Job = await res.json();
       setFormData({
         title: job.title || "",
         description: job.description || "",
@@ -97,19 +94,9 @@ export default function EditJobPage() {
         tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()) : undefined,
       };
 
-      const res = await fetch(`${API_URL}/api/jobs/${jobId}`, {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      await jobs.update(jobId, body);
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: "Failed to update job" }));
-        throw new Error(data.error || "Failed to update job");
-      }
-
-      router.push("/employer");
+      router.push(localizePath("/employer", locale));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update job");
     } finally {
@@ -120,18 +107,9 @@ export default function EditJobPage() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const res = await fetch(`${API_URL}/api/jobs/${jobId}`, {
-        method: "DELETE",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
+      await jobs.remove(jobId);
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: "Failed to delete job" }));
-        throw new Error(data.error || "Failed to delete job");
-      }
-
-      router.push("/employer");
+      router.push(localizePath("/employer", locale));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete job");
       setShowDeleteModal(false);
@@ -171,7 +149,7 @@ export default function EditJobPage() {
             <CardContent className="p-6">
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Delete Job</h3>
               <p className="text-gray-600 mb-6">
-                Are you sure you want to delete this job? This action cannot be undone.
+                Are you sure you want to delete this job? This action cannot be undone. Jobs that already have applicants are closed instead, so candidates keep their application history.
                 All associated applications will also be affected.
               </p>
               <div className="flex gap-3">

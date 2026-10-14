@@ -343,6 +343,24 @@ export const generateLimiter = rateLimit({
   },
 });
 
+// "Helpful" vote limiter — per user, 30 votes per hour across company reviews
+// and interview experiences. Caps helpfulCount inflation until a per-user
+// vote dedupe table exists.
+export const helpfulVoteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: isTestEnv ? 1000 : 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request): string => getAuthenticatedRateLimitKey(req, "helpful"),
+  message: {
+    error: "rate_limit_exceeded",
+    message: "Too many helpful votes. Please try again later.",
+  },
+  handler: (_req, res, _next, options) => {
+    res.status(429).json(options.message);
+  },
+});
+
 // Orchestrator rate limiter — per user, 10 requests per minute
 // This is more restrictive than the general limiter due to Claude API costs
 export const orchestratorLimiter = rateLimit({

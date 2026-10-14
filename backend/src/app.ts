@@ -181,7 +181,9 @@ app.use(cors({
     if (isAllowedOrigin(origin)) {
       callback(null, true);
     } else {
-      callback(new Error("Not allowed by CORS"));
+      // Tag with 403 so the global handler and Sentry's default filter
+      // (status >= 500 only) treat this as a client error, not a crash.
+      callback(Object.assign(new Error("Not allowed by CORS"), { status: 403 }));
     }
   },
   credentials: true,
@@ -244,6 +246,13 @@ app.use(
   "/api/orchestrator",
   express.json({ limit: "250kb" })
 );
+
+// Long-text AI endpoints: job-extract accepts up to 30k chars of posting text
+// and resume-builder accepts up to 50k chars of resume text (see their Zod
+// schemas), which exceed the global 10 KB cap. Path-scoped parsers run first;
+// body-parser skips re-parsing once req.body is populated.
+app.use("/api/job-extract", express.json({ limit: "100kb" }));
+app.use("/api/skills/resume-builder", express.json({ limit: "100kb" }));
 
 // Body parsing with size limits (all other routes)
 app.use(express.json({ limit: "10kb" }));
@@ -550,8 +559,38 @@ app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });
 });
 
+// Client-error messages returned by the global handler. Parser/CORS messages
+// are never echoed back (they leak implementation detail).
+const CLIENT_ERROR_MESSAGES: Record<number, string> = {
+  400: "Invalid request body",
+  403: "Forbidden",
+  413: "Request body too large",
+  415: "Unsupported media type",
+};
+
 // Global error handler
 app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const errWithStatus = err as Error & { status?: unknown; statusCode?: unknown };
+  const rawStatus = errWithStatus.status ?? errWithStatus.statusCode;
+  const status = err.message === "Not allowed by CORS"
+    ? 403
+    : typeof rawStatus === "number" ? rawStatus : Number(rawStatus);
+
+  if (Number.isInteger(status) && status >= 400 && status < 500) {
+    logger.warn({
+      err: { message: err.message, type: (err as { type?: unknown }).type },
+      status,
+      requestId: req.requestId,
+      method: req.method,
+      url: req.url,
+    }, "Client error");
+    res.status(status).json({
+      error: CLIENT_ERROR_MESSAGES[status] ?? "Bad request",
+      requestId: req.requestId,
+    });
+    return;
+  }
+
   logger.error({
     err,
     requestId: req.requestId,

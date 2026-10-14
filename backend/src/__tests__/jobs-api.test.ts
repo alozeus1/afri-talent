@@ -381,7 +381,7 @@ describe("Jobs API", () => {
 
             const res = await request(app).put("/api/jobs/job123")
                 .set("Authorization", `Bearer ${token}`)
-                .send({ title: "Updated Title", description: "Updated Dev", location: "Lagos", type: "CONTRACT", seniority: "JUNIOR", status: "DRAFT" });
+                .send({ title: "Updated Title", description: "Updated Dev", location: "Lagos", type: "CONTRACT", seniority: "JUNIOR" });
 
             expect(res.status).toBe(200);
             expect(res.body.title).toBe("Updated Title");
