@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
 import { PremiumGate } from "@/components/ui/premium-gate";
+import { PlanBadge } from "@/components/ui/plan-badge";
+import { FREE_MODE } from "@/lib/free-mode";
 import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
 import { reviewResumeInput } from "@/lib/early-tester-content";
 import { StepIndicator } from "@/components/resume-builder/step-indicator";
@@ -201,7 +203,10 @@ export default function ResumeBuilderPage() {
     };
   }, [user]);
 
-  const isProfessional = billingStatus?.plan === "PROFESSIONAL";
+  const isProfessional =
+    FREE_MODE ||
+    billingStatus?.plan === "PROFESSIONAL" ||
+    billingStatus?.effectivePlan === "PROFESSIONAL";
 
   const skillsArray = useMemo(
     () =>
@@ -400,7 +405,7 @@ export default function ResumeBuilderPage() {
               Build an ATS-friendly resume draft from truthful profile, project, and work details.
             </p>
           </div>
-          <Badge variant="info">Premium</Badge>
+          <PlanBadge />
         </div>
 
         {error && (
@@ -585,7 +590,7 @@ export default function ResumeBuilderPage() {
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 print:hidden">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-semibold">Premium template bundle</p>
+                  <p className="font-semibold">{FREE_MODE ? "Template bundle" : "Premium template bundle"}</p>
                   <p className="mt-1">
                     Preview ATS-ready layouts and download templates included with your plan.
                   </p>

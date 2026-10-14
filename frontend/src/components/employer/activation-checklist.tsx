@@ -9,6 +9,7 @@ import {
   EmployerOnboardingStep,
 } from "@/lib/api";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { FREE_MODE } from "@/lib/free-mode";
 
 const stepLabels: Record<EmployerOnboardingStep, string> = {
   company_setup: "Company setup",
@@ -38,6 +39,12 @@ export function EmployerActivationChecklist({
   subtitle = "Guide your team from setup to first qualified shortlist without losing trust or momentum.",
 }: EmployerActivationChecklistProps) {
   const locale = useLocale();
+  // Free launch: no plan to choose, so the plan step is hidden.
+  const visibleChecklist = FREE_MODE
+    ? checklist.filter((item) => item.key !== "subscription_choice")
+    : checklist;
+  const focusStep: EmployerOnboardingStep =
+    FREE_MODE && currentStep === "subscription_choice" ? "trust_completion" : currentStep;
 
   return (
     <Card className="border-emerald-200 bg-white shadow-sm">
@@ -52,7 +59,7 @@ export function EmployerActivationChecklist({
           </div>
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
             <p className="font-semibold">{completionPct}% complete</p>
-            <p className="mt-1 text-emerald-800">Current focus: {stepLabels[currentStep]}</p>
+            <p className="mt-1 text-emerald-800">Current focus: {stepLabels[focusStep]}</p>
           </div>
         </div>
         <div className="mt-5 h-3 w-full overflow-hidden rounded-full bg-emerald-100">
@@ -64,7 +71,7 @@ export function EmployerActivationChecklist({
       </CardHeader>
       <CardContent>
         <div className="grid gap-3 md:grid-cols-2">
-          {checklist.map((item, index) => (
+          {visibleChecklist.map((item, index) => (
             <div
               key={item.key}
               className={`rounded-2xl border px-4 py-4 ${

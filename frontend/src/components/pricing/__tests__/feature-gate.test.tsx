@@ -89,3 +89,33 @@ describe("UpgradeCta", () => {
     expect(screen.queryByTestId("upgrade-cta-Chat")).not.toBeInTheDocument();
   });
 });
+
+describe("FeatureGate in free mode", () => {
+  function loadFreeModeGate() {
+    let mod: typeof import("../feature-gate") | undefined;
+    jest.isolateModules(() => {
+      jest.doMock("@/lib/free-mode", () => ({ FREE_MODE: true }));
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      mod = require("../feature-gate");
+    });
+    jest.dontMock("@/lib/free-mode");
+    return mod!;
+  }
+
+  it("grants every plan access to every feature", () => {
+    const { hasAccess: freeHasAccess } = loadFreeModeGate();
+    expect(freeHasAccess("FREE", "PROFESSIONAL")).toBe(true);
+    expect(freeHasAccess("EMPLOYER_FREE", "EMPLOYER_PREMIUM")).toBe(true);
+  });
+
+  it("renders children instead of the upgrade CTA", () => {
+    const { FeatureGate: FreeFeatureGate } = loadFreeModeGate();
+    render(
+      <FreeFeatureGate feature="Learning Labs" requiredPlan="PROFESSIONAL" currentPlan="FREE">
+        <div>Labs UI</div>
+      </FreeFeatureGate>,
+    );
+    expect(screen.getByText("Labs UI")).toBeInTheDocument();
+    expect(screen.queryByText(/Upgrade to/)).not.toBeInTheDocument();
+  });
+});

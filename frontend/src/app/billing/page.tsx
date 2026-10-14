@@ -2,7 +2,10 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { FREE_MODE } from "@/lib/free-mode";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 import { billing, pricing, BillingStatus, PricingData, RegionalPriceInfo } from "@/lib/api";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +65,16 @@ const PLAN_META: Record<string, { name: string; features: string[]; popular?: bo
   },
 };
 
+function hasManageablePaidPlan(status: BillingStatus | null): boolean {
+  return (
+    !!status &&
+    status.status === "ACTIVE" &&
+    status.plan !== "FREE" &&
+    status.plan !== "EMPLOYER_FREE" &&
+    status.hasPortal
+  );
+}
+
 function getPrice(prices: RegionalPriceInfo[], plan: string, interval: Interval): RegionalPriceInfo | undefined {
   return prices.find((p) => p.plan === plan && p.interval === interval);
 }
@@ -96,6 +109,18 @@ export default function BillingPage() {
     fetchData();
   }, [fetchData]);
 
+  const router = useRouter();
+  const locale = useLocale();
+  const showFreeModePortal = FREE_MODE && hasManageablePaidPlan(status);
+
+  // Free launch: nothing to buy. Only people with an existing paid
+  // subscription stay here (to manage or cancel it); everyone else goes to
+  // the "free for everyone" page.
+  useEffect(() => {
+    if (!FREE_MODE || isLoading || loading || showFreeModePortal) return;
+    router.replace(localizePath("/pricing", locale));
+  }, [isLoading, loading, showFreeModePortal, router, locale]);
+
   const handleCheckout = async (plan: string) => {
     setActionLoading(plan);
     try {
@@ -120,6 +145,30 @@ export default function BillingPage() {
     return (
       <div className="flex justify-center py-24">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      </div>
+    );
+  }
+
+  if (FREE_MODE) {
+    if (!showFreeModePortal) {
+      return (
+        <div className="flex justify-center py-24">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+        </div>
+      );
+    }
+    return (
+      <div className="mx-auto max-w-xl px-4 py-16" data-testid="billing-free-mode">
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
+            <p className="text-gray-700 dark:text-gray-300">
+              AfriTalent is now free for everyone. You can manage or cancel your existing subscription here.
+            </p>
+            <Button onClick={handlePortal} disabled={actionLoading === "portal"}>
+              {actionLoading === "portal" ? "Opening..." : "Manage subscription"}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

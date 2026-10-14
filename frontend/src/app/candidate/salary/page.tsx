@@ -7,6 +7,7 @@ import { skills, SalaryBenchmarkRow } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PlanBadge } from "@/components/ui/plan-badge";
 import { LoadingState } from "@/components/ui/loading-state";
 
 interface NegotiationResult {
@@ -102,7 +103,7 @@ export default function SalaryPage() {
               Get market-aware negotiation scripts for African and global markets
             </p>
           </div>
-          <Badge variant="info">Premium</Badge>
+          <PlanBadge />
         </div>
 
         {error && (

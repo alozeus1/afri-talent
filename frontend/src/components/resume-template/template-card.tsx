@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ResumeTemplate } from "@/lib/api";
 import { Lock, Download, Eye, FileDown } from "lucide-react";
+import { FREE_MODE } from "@/lib/free-mode";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { useRouter } from "next/navigation";
 
 interface TemplateCardProps {
   template: ResumeTemplate;
@@ -32,6 +35,11 @@ export function TemplateCard({
   const htmlFile = template.files.find((f) => f.format === "HTML");
   const pdfFile = template.files.find((f) => f.format === "PDF");
   const primaryFile = htmlFile || pdfFile || template.files[0];
+  const router = useRouter();
+  const locale = useLocale();
+  // Free launch: templates are never shown as locked.
+  const isLocked = !FREE_MODE && template.isLocked;
+  const isProfessional = FREE_MODE || userPlan === "PROFESSIONAL";
 
   return (
     <Card className="group flex flex-col overflow-hidden transition-shadow hover:shadow-md">
@@ -50,7 +58,7 @@ export function TemplateCard({
             <Eye className="h-10 w-10" />
           </div>
         )}
-        {template.isLocked && (
+        {isLocked && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
             <div className="rounded-full bg-white/90 p-3 dark:bg-gray-900/90">
               <Lock className="h-6 w-6 text-gray-700 dark:text-gray-200" />
@@ -90,14 +98,12 @@ export function TemplateCard({
 
         {/* Actions */}
         <div className="mt-auto flex flex-col gap-2 pt-2">
-          {template.isLocked ? (
+          {isLocked ? (
             <Button
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => {
-                window.location.href = "/pricing";
-              }}
+              onClick={() => router.push(localizePath("/pricing", locale))}
             >
               <Lock className="mr-1 h-3.5 w-3.5" />
               Unlock with {template.minPlan}
@@ -116,7 +122,7 @@ export function TemplateCard({
                 <Download className="mr-1 h-3.5 w-3.5" />
                 {isDownloading ? "Downloading..." : "Download blank"}
               </Button>
-              {userPlan === "PROFESSIONAL" && onFill && (
+              {isProfessional && onFill && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -127,7 +133,7 @@ export function TemplateCard({
                   {isFilling ? "Filling..." : "Use with my data"}
                 </Button>
               )}
-              {userPlan === "PROFESSIONAL" && onExportPdf && (
+              {isProfessional && onExportPdf && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -143,7 +149,7 @@ export function TemplateCard({
           )}
         </div>
 
-        {!template.isLocked && !canDownload && (
+        {!isLocked && !canDownload && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
             Monthly download limit reached
           </p>

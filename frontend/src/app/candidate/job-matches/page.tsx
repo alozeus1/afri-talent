@@ -7,10 +7,13 @@ import { useAuth } from "@/lib/auth-context";
 import { skills, JobMatch } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PlanBadge } from "@/components/ui/plan-badge";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
+import { FREE_MODE } from "@/lib/free-mode";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 
 const scoreVariant = (score: number): "success" | "info" | "warning" | "danger" | "default" => {
   if (score >= 80) return "success";
@@ -35,6 +38,7 @@ const qualityVariant = (label?: string): "success" | "info" | "warning" | "defau
 export default function JobMatchesPage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const locale = useLocale();
 
   const [matches, setMatches] = useState<JobMatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,7 +99,9 @@ export default function JobMatchesPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">AI Job Matches</h1>
             <p className="text-sm text-gray-500 mt-1 dark:text-gray-400">
-              Available on the Professional plan — unlocks personalized match scoring, skill-gap analysis, and saved match history.
+              {FREE_MODE
+                ? "Personalized match scoring, skill-gap analysis, and saved match history."
+                : "Available on the Professional plan — unlocks personalized match scoring, skill-gap analysis, and saved match history."}
             </p>
             <div className="flex items-center gap-2 flex-wrap mt-2">
               <button
@@ -113,7 +119,7 @@ export default function JobMatchesPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="info">Premium</Badge>
+            <PlanBadge />
             <Button
               onClick={handleReEmbed}
               disabled={embedding}
@@ -139,9 +145,9 @@ export default function JobMatchesPage() {
           >
             <p className="font-medium">{error.title}</p>
             <p className="mt-0.5">{error.description}</p>
-            {error.tone === "warning" && (
+            {error.tone === "warning" && !FREE_MODE && (
               <Link
-                href="/pricing"
+                href={localizePath("/pricing", locale)}
                 className="mt-2 inline-block rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
               >
                 See plans & upgrade →

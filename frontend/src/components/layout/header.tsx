@@ -8,6 +8,7 @@ import { notifications as notificationsApi, messages as messagesApi } from "@/li
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { FREE_MODE } from "@/lib/free-mode";
 import { useNetworkProfile } from "@/lib/network-profile";
 
 // The Blog link only appears once at least one weekly digest is published, so
@@ -202,7 +203,7 @@ export function Header() {
                 </Link>
               )}
               <Link href={href("/pricing")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
-                {t("nav.pricing")}
+                {FREE_MODE ? t("nav.freeForEveryone") : t("nav.pricing")}
               </Link>
               <Link href={href("/trust")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
                 Trust
@@ -326,7 +327,7 @@ export function Header() {
                 { href: "/interviews", label: t("nav.interviews") },
                 { href: "/learning", label: t("nav.learn") },
                 ...(showBlogLink ? [{ href: "/blog", label: "Blog" }] : []),
-                { href: "/pricing", label: t("nav.pricing") },
+                { href: "/pricing", label: FREE_MODE ? t("nav.freeForEveryone") : t("nav.pricing") },
                 { href: "/trust", label: "Trust" },
               ].map((item) => (
                 <Link

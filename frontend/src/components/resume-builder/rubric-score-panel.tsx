@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { PlanBadge } from "@/components/ui/plan-badge";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ATSScoreDisplay } from "@/components/ui/ats-score-display";
@@ -37,7 +37,7 @@ export function RubricScorePanel({
               Optionally paste a job description for a targeted, weighted score.
             </p>
           </div>
-          <Badge variant="info">Premium</Badge>
+          <PlanBadge />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

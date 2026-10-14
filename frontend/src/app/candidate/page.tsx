@@ -22,6 +22,8 @@ import {
 import { candidateRetentionEvents } from "@/lib/analytics";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PlanBadge } from "@/components/ui/plan-badge";
+import { FREE_MODE } from "@/lib/free-mode";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
 import { PushOptInCard } from "@/components/notifications/push-opt-in";
@@ -611,14 +613,16 @@ export default function CandidateDashboard() {
             </CardContent>
           </Card>
         </Link>
-        <Link href={localizePath("/billing", locale)}>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="p-4 text-center">
-              <span className="text-2xl mb-1 block">💳</span>
-              <span className="text-sm font-medium text-gray-900">Billing</span>
-            </CardContent>
-          </Card>
-        </Link>
+        {!FREE_MODE && (
+          <Link href={localizePath("/billing", locale)}>
+            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <CardContent className="p-4 text-center">
+                <span className="text-2xl mb-1 block">💳</span>
+                <span className="text-sm font-medium text-gray-900">Billing</span>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
         <Link href={localizePath("/candidate/trust", locale)}>
           <Card className="hover:shadow-md transition-shadow cursor-pointer border-blue-200 bg-blue-50/40">
             <CardContent className="p-4 text-center">
@@ -649,7 +653,7 @@ export default function CandidateDashboard() {
             >
               <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm flex items-center gap-2">
                 {item.label}
-                {item.badge && <Badge variant="info">{item.badge}</Badge>}
+                {item.badge && <PlanBadge label={item.badge} />}
               </p>
               <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{item.desc}</p>
             </Link>
@@ -862,8 +866,12 @@ export default function CandidateDashboard() {
             {/* Subscription Status */}
             <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
               <CardContent className="p-6">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Subscription</h3>
-                {billingStatus ? (
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{FREE_MODE ? "Plan" : "Subscription"}</h3>
+                {FREE_MODE ? (
+                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400" data-testid="free-plan-note">
+                    Free plan — all features unlocked
+                  </p>
+                ) : billingStatus ? (
                   <>
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant={billingStatus.plan === "FREE" ? "default" : "success"}>

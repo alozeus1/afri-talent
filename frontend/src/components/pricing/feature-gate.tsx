@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { pricingEvents } from "@/lib/analytics";
+import { FREE_MODE } from "@/lib/free-mode";
 
 interface FeatureGateProps {
   feature: string;
@@ -22,6 +23,8 @@ const PLAN_RANK: Record<string, number> = {
 };
 
 function hasAccess(currentPlan: string, requiredPlan: string): boolean {
+  // Free launch: every feature is unlocked for everyone.
+  if (FREE_MODE) return true;
   return (PLAN_RANK[currentPlan] ?? 0) >= (PLAN_RANK[requiredPlan] ?? 0);
 }
 

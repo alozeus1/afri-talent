@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { FREE_MODE } from "@/lib/free-mode";
+import { MESSAGES } from "@/lib/i18n/messages";
 
 const socialLinks = [
   {
@@ -82,8 +84,8 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/billing" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
-                  Pricing
+                <Link href="/pricing" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                  {FREE_MODE ? MESSAGES.en["nav.freeForEveryone"] : MESSAGES.en["nav.pricing"]}
                 </Link>
               </li>
             </ul>

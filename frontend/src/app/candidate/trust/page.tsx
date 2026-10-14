@@ -23,6 +23,7 @@ import { TrustSupportCard } from "@/components/trust/trust-support-card";
 import { uploadVerificationFile } from "@/lib/trust-files";
 import { humanizeTrustValue } from "@/lib/trust-labels";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { FREE_MODE } from "@/lib/free-mode";
 
 const candidateArtifactTypes = [
   { value: "IDENTITY_DOCUMENT", label: "Identity document" },
@@ -155,7 +156,9 @@ export default function CandidateTrustPage() {
       return {
         tone: "warning" as const,
         title: "Your trust profile is still building",
-        body: "Verification is optional at first, but stronger evidence helps employers feel safer shortlisting you and unlocks premium verified-candidate filters.",
+        body: FREE_MODE
+          ? "Verification is optional at first, but stronger evidence helps employers feel safer shortlisting you and makes you eligible for verified-candidate filters."
+          : "Verification is optional at first, but stronger evidence helps employers feel safer shortlisting you and unlocks premium verified-candidate filters.",
       };
     }
 
@@ -436,7 +439,9 @@ export default function CandidateTrustPage() {
                 {" "}linked profile signal{linkedSignalCount === 1 ? "" : "s"}.
               </p>
               <p className="mt-3 text-sm text-gray-600">
-                Employers may pay for premium filters, but they only see verified-candidate badges when your evidence actually clears AfriTalent trust checks.
+                {FREE_MODE
+                  ? "Employers can filter for verified candidates, but they only see verified-candidate badges when your evidence actually clears AfriTalent trust checks."
+                  : "Employers may pay for premium filters, but they only see verified-candidate badges when your evidence actually clears AfriTalent trust checks."}
               </p>
             </div>
 

@@ -7,6 +7,7 @@ import { mockInterviews } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PlanBadge } from "@/components/ui/plan-badge";
 import { LoadingState } from "@/components/ui/loading-state";
 import { trackEvent } from "@/lib/analytics";
 import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
@@ -173,7 +174,7 @@ export default function InterviewPrepPage() {
               Practice with role-specific questions, structured feedback, and starter interview insights.
             </p>
           </div>
-          <Badge variant="info">Premium</Badge>
+          <PlanBadge />
         </div>
 
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">

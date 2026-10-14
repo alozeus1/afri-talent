@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 import { profile, ApiError } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ const DELETION_WINDOW_DAYS = 30;
 
 export default function CandidateSettingsPage() {
   const router = useRouter();
+  const locale = useLocale();
   const { user, isLoading } = useAuth();
 
   // Data export state
@@ -32,9 +34,9 @@ export default function CandidateSettingsPage() {
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "CANDIDATE")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
 
   const handleExport = async () => {
     setExporting(true);

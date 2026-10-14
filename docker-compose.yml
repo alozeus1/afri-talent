@@ -73,6 +73,8 @@ services:
         # Inlined at build time; used by the browser on the host.
         NEXT_PUBLIC_API_URL: http://localhost:4000
         NEXT_PUBLIC_BACKEND_URL: http://localhost:4000
+        # Free launch UI (no paywalls/upgrade CTAs). Pair with backend FREE_MODE.
+        NEXT_PUBLIC_FREE_MODE: ${NEXT_PUBLIC_FREE_MODE:-true}
     container_name: afritalent-frontend
     environment:
       NODE_ENV: production

@@ -7,6 +7,7 @@ import { skills } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PlanBadge } from "@/components/ui/plan-badge";
 import { LoadingState } from "@/components/ui/loading-state";
 
 interface GapResult {
@@ -73,7 +74,7 @@ export default function CareerGapPage() {
               Turn employment gaps into a strength with AI-powered framing
             </p>
           </div>
-          <Badge variant="info">Premium</Badge>
+          <PlanBadge />
         </div>
 
         {error && (

@@ -7,6 +7,7 @@ import { TrustExplainerModal } from "@/components/trust/trust-explainer-modal";
 import { TrustStatusBanner } from "@/components/trust/trust-status-banner";
 import { TrustSupportCard } from "@/components/trust/trust-support-card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { FREE_MODE } from "@/lib/free-mode";
 
 const employerBadgeItems = [
   {
@@ -29,7 +30,9 @@ const employerBadgeItems = [
   },
   {
     title: "Premium trusted employer",
-    description: "This is the highest employer trust tier. It requires real verification and good standing. Paying alone does not grant it.",
+    description: FREE_MODE
+      ? "This is the highest employer trust tier. It requires real verification and good standing."
+      : "This is the highest employer trust tier. It requires real verification and good standing. Paying alone does not grant it.",
     statusLabel: "Highest trust tier",
     statusVariant: "success" as const,
   },
@@ -92,7 +95,9 @@ const moderationItems = [
 const safetyTips = [
   "Never pay application, processing, equipment, visa, or training fees to get a job on AfriTalent.",
   "Treat urgent requests to move immediately to WhatsApp, Telegram, or private email as a warning sign.",
-  "Trusted badges and verified skill markers are backed by checks. Free and paid plans do not create those badges by themselves.",
+  FREE_MODE
+    ? "Trusted badges and verified skill markers are backed by checks, never by payment."
+    : "Trusted badges and verified skill markers are backed by checks. Free and paid plans do not create those badges by themselves.",
   "If salary ranges feel unrealistically high, the company identity is unclear, or the application path looks off-platform, report it.",
 ];
 
@@ -131,7 +136,11 @@ export default function TrustCenterPage() {
       <TrustStatusBanner
         tone="info"
         title="Badges are earned, not bought"
-        body="Paid plans can unlock reach or filters, but no employer or candidate badge is shown unless AfriTalent has real supporting checks behind it."
+        body={
+          FREE_MODE
+            ? "No employer or candidate badge is shown unless AfriTalent has real supporting checks behind it."
+            : "Paid plans can unlock reach or filters, but no employer or candidate badge is shown unless AfriTalent has real supporting checks behind it."
+        }
         actions={
           <Link href={localizePath("/employer/trust", locale)}>
             <Button size="sm" variant="outline">Employer verification</Button>
@@ -181,16 +190,22 @@ export default function TrustCenterPage() {
               title="How candidate trust markers work"
               description="Candidate trust signals are explainable, evidence-based, and designed to help employers understand what is actually verified."
               items={candidateBadgeItems}
-              footer="Employers may pay for premium filters, but those filters only surface candidates whose signals really passed trust checks."
+              footer={
+                FREE_MODE
+                  ? "Employers can filter for verified candidates, but those filters only surface candidates whose signals really passed trust checks."
+                  : "Employers may pay for premium filters, but those filters only surface candidates whose signals really passed trust checks."
+              }
             />
           </CardContent>
         </Card>
 
         <Card className="border-slate-200">
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Free vs paid vs verified</h2>
+            <h2 className="text-xl font-semibold text-gray-900">{FREE_MODE ? "Free vs verified" : "Free vs paid vs verified"}</h2>
             <p className="text-sm leading-6 text-gray-600">
-              Pricing and trust are connected in UX, but they are not the same thing.
+              {FREE_MODE
+                ? "AfriTalent is free for everyone. Trust is earned through checks, not bought."
+                : "Pricing and trust are connected in UX, but they are not the same thing."}
             </p>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-6 text-gray-600">
@@ -198,13 +213,19 @@ export default function TrustCenterPage() {
               <p className="font-semibold text-gray-900">Free</p>
               <p className="mt-1">Users can join, complete basics, and begin building trust signals.</p>
             </div>
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <p className="font-semibold text-gray-900">Paid</p>
-              <p className="mt-1">Paid features can unlock visibility, workflow tools, or premium filters.</p>
-            </div>
+            {!FREE_MODE && (
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <p className="font-semibold text-gray-900">Paid</p>
+                <p className="mt-1">Paid features can unlock visibility, workflow tools, or premium filters.</p>
+              </div>
+            )}
             <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
               <p className="font-semibold text-gray-900">Verified</p>
-              <p className="mt-1">Verified badges require evidence, checks, or review outcomes. Payment never substitutes for verification.</p>
+              <p className="mt-1">
+                {FREE_MODE
+                  ? "Verified badges require evidence, checks, or review outcomes."
+                  : "Verified badges require evidence, checks, or review outcomes. Payment never substitutes for verification."}
+              </p>
             </div>
           </CardContent>
         </Card>

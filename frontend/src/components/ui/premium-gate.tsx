@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { FREE_MODE } from "@/lib/free-mode";
+import { localizePath, useLocale } from "@/lib/i18n/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -20,6 +22,9 @@ export function PremiumGate({
   benefits = ["Personalized AI assistance", "Saved history", "Higher workflow limits"],
 }: PremiumGateProps) {
   const router = useRouter();
+  const locale = useLocale();
+  // Free launch: nothing is gated, so the paywall never renders.
+  if (FREE_MODE) return null;
   const priceCopy = price ? ` for ${price}` : "";
   return (
     <Card className="border-2 border-dashed border-blue-200 bg-blue-50/40">
@@ -37,7 +42,7 @@ export function PremiumGate({
             ))}
           </ul>
         </div>
-        <Button onClick={() => router.push("/pricing")} className="mt-2">
+        <Button onClick={() => router.push(localizePath("/pricing", locale))} className="mt-2">
           View pricing
         </Button>
       </CardContent>

@@ -21,6 +21,7 @@ import { TrustExplainerModal, type TrustExplainerItem } from "@/components/trust
 import { TrustStatusBanner } from "@/components/trust/trust-status-banner";
 import { TrustSupportCard } from "@/components/trust/trust-support-card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { FREE_MODE } from "@/lib/free-mode";
 import { MessageCandidateButton } from "@/components/employer/message-candidate-button";
 
 const TALENT_STAGES = ["SOURCED", "REVIEWING", "PRIORITY", "CONTACTED"];
@@ -335,7 +336,11 @@ export default function TalentMarketplacePage() {
           </Link>
           <TrustExplainerModal
             title="How verified candidate filters work"
-            description="Premium filters help you narrow the market, but candidates only qualify for these filters when they have real approved signals behind them."
+            description={
+              FREE_MODE
+                ? "Verified filters help you narrow the market, but candidates only qualify for these filters when they have real approved signals behind them."
+                : "Premium filters help you narrow the market, but candidates only qualify for these filters when they have real approved signals behind them."
+            }
             items={[
               {
                 title: "Verified candidates",
@@ -438,7 +443,9 @@ export default function TalentMarketplacePage() {
                     checked: verifiedOnly,
                     onChange: (checked: boolean) => setVerifiedOnly(checked),
                     title: "Show verified candidates only",
-                    body: "Premium employers can filter for candidates with stronger verification and authenticity signals.",
+                    body: FREE_MODE
+                      ? "Employers can filter for verified candidates with stronger verification and authenticity signals."
+                      : "Premium employers can filter for candidates with stronger verification and authenticity signals.",
                   },
                   {
                     checked: verifiedSkillsOnly,

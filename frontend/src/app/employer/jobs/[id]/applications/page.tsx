@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { FREE_MODE } from "@/lib/free-mode";
 
 const statusVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
   PENDING: "warning",
@@ -128,7 +129,7 @@ export default function JobApplicationsPage() {
             </div>
           ) : (
             <div>
-              {candidateAccessLocked && (
+              {candidateAccessLocked && !FREE_MODE && (
                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
                   Applications are being counted, but full candidate profiles, resumes, and contact details unlock with an active employer subscription.
                   <Link href={localizePath("/billing", locale)} className="ml-1 font-semibold text-amber-950 underline">

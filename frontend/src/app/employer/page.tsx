@@ -20,6 +20,7 @@ import { TrustBadge } from "@/components/trust/trust-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { FREE_MODE } from "@/lib/free-mode";
 
 const statusVariants: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700",
@@ -277,31 +278,33 @@ export default function EmployerDashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="border-slate-200 bg-slate-950 text-white">
-                <CardHeader>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                    Upgrade journey
-                  </p>
-                  <h2 className="mt-2 text-lg font-semibold">{onboarding.upgradeJourney.headline}</h2>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-slate-300">{onboarding.upgradeJourney.body}</p>
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <Link href={localizePath("/billing", locale)}>
-                      <Button size="sm">{onboarding.upgradeJourney.ctaLabel}</Button>
-                    </Link>
-                    <Link href={localizePath("/employer/talent", locale)}>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-white/20 text-white hover:bg-white/10 hover:text-white"
-                      >
-                        Search talent
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
+              {!FREE_MODE && (
+                <Card className="border-slate-200 bg-slate-950 text-white">
+                  <CardHeader>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+                      Upgrade journey
+                    </p>
+                    <h2 className="mt-2 text-lg font-semibold">{onboarding.upgradeJourney.headline}</h2>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-slate-300">{onboarding.upgradeJourney.body}</p>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Link href={localizePath("/billing", locale)}>
+                        <Button size="sm">{onboarding.upgradeJourney.ctaLabel}</Button>
+                      </Link>
+                      <Link href={localizePath("/employer/talent", locale)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-white/20 text-white hover:bg-white/10 hover:text-white"
+                        >
+                          Search talent
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {analytics && (
                 <Card className="border-blue-200 bg-blue-50/70">

@@ -8,6 +8,7 @@ import { templates, type ResumeTemplate, type TemplateListResponse } from "@/lib
 import { TemplateCard } from "@/components/resume-template/template-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { LoadingState } from "@/components/ui/loading-state";
+import { FREE_MODE } from "@/lib/free-mode";
 
 export default function ResumeTemplatesPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -98,7 +99,7 @@ export default function ResumeTemplatesPage() {
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">Resume templates</p>
-          <h1 className="mt-1 text-3xl font-bold text-gray-900">Premium ATS-ready templates</h1>
+          <h1 className="mt-1 text-3xl font-bold text-gray-900">{FREE_MODE ? "ATS-ready templates" : "Premium ATS-ready templates"}</h1>
           <p className="mt-2 max-w-2xl text-sm text-gray-600">
             Preview professional resume layouts and download the formats included with your plan.
           </p>

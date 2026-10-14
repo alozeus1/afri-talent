@@ -1,3 +1,5 @@
+import { FREE_MODE } from "@/lib/free-mode";
+
 /**
  * Friendly-error mapper.
  *
@@ -40,12 +42,18 @@ const KNOWN_CODES: Record<string, FriendlyError> = {
       "Complete your profile and upload an active resume before applying through AfriTalent.",
     tone: "info",
   },
-  QUOTA_EXCEEDED: {
-    title: "You have hit your plan limit",
-    description:
-      "Upgrade your plan or wait until tomorrow — your daily allowance resets at 00:00 UTC.",
-    tone: "warning",
-  },
+  QUOTA_EXCEEDED: FREE_MODE
+    ? {
+        title: "Daily limit reached",
+        description: "Your allowance resets at 00:00 UTC.",
+        tone: "warning",
+      }
+    : {
+        title: "You have hit your plan limit",
+        description:
+          "Upgrade your plan or wait until tomorrow — your daily allowance resets at 00:00 UTC.",
+        tone: "warning",
+      },
   DUPLICATE_APPLICATION: {
     title: "Already applied",
     description: "You have already submitted an application to this role.",

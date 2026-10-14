@@ -9,6 +9,7 @@ import type { SearchJobResult } from "@/lib/api/orchestratorTypes";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PlanBadge } from "@/components/ui/plan-badge";
 import { LoadingState } from "@/components/ui/loading-state";
 import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
 import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
@@ -138,7 +139,7 @@ function CoverLetterPageContent() {
               Generate an editable draft from your profile, resume, and a selected job without inventing experience.
             </p>
           </div>
-          <Badge variant="info">Premium</Badge>
+          <PlanBadge />
         </div>
 
         {error && (

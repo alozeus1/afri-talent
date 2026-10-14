@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { filterCoursesByQuery, filterFallbackLessons } from "@/lib/learning-search";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,7 +17,8 @@ import {
 } from "@/lib/early-tester-content";
 import { trackEvent } from "@/lib/analytics";
 import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
-import { useT } from "@/lib/i18n/client";
+import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { FREE_MODE } from "@/lib/free-mode";
 import { Lock, PlayCircle, Sparkles, Star } from "lucide-react";
 
 const difficultyVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
@@ -157,6 +158,8 @@ function isEarlyLesson(course: LearningResourceItem): course is EarlyLearningLes
 
 function LearningPageContent() {
   const t = useT();
+  const router = useRouter();
+  const locale = useLocale();
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
@@ -353,7 +356,7 @@ function LearningPageContent() {
   const displayedCourses = query.trim() && !usingFallbackContent
     ? filterCoursesByQuery(courses, query)
     : courses;
-  const currentPlan = billingStatus?.plan ?? "FREE";
+  const currentPlan = FREE_MODE ? "PROFESSIONAL" : (billingStatus?.effectivePlan ?? billingStatus?.plan ?? "FREE");
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -556,7 +559,7 @@ function LearningPageContent() {
                     Beginner, intermediate, and advanced labs are reserved for professional plan candidates.
                   </p>
                 </div>
-                <Button type="button" onClick={() => { window.location.href = "/billing"; }}>
+                <Button type="button" onClick={() => router.push(localizePath("/billing", locale))}>
                   Upgrade to unlock labs
                 </Button>
               </CardContent>
@@ -566,7 +569,7 @@ function LearningPageContent() {
           <div className="space-y-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Premium Learning Labs</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{FREE_MODE ? "Learning Labs" : "Premium Learning Labs"}</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   Structured practice across cloud, AI, cybersecurity, DevOps, frontend, backend, Python, YAML,
                   Terraform, and containerization.

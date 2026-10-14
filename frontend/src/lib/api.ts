@@ -1801,6 +1801,10 @@ export interface BillingStatus {
   billingProvider: "STRIPE" | "FLUTTERWAVE" | "PAYPAL" | null;
   hasCustomer: boolean;
   hasPortal: boolean;
+  /** Present when the backend runs with FREE_MODE: every user is top tier. */
+  freeMode?: boolean;
+  /** Plan used for access checks (top tier in free mode); `plan` stays the real subscription. */
+  effectivePlan?: BillingStatus["plan"];
 }
 
 export interface BillingEntitlementState {

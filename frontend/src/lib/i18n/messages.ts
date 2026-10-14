@@ -7,6 +7,7 @@ export type MessageKey =
   | "nav.interviews"
   | "nav.learn"
   | "nav.pricing"
+  | "nav.freeForEveryone"
   | "nav.dashboard"
   | "nav.login"
   | "nav.getStarted"
@@ -107,6 +108,7 @@ export type MessageKey =
   | "home.hero.remoteFirstRoles"
   | "home.hero.visaSupported"
   | "home.hero.seeTrustModel"
+  | "home.hero.freeForEveryone"
   | "home.why.tagline"
   | "home.why.heading"
   | "home.why.subtitle"
@@ -224,6 +226,7 @@ export const MESSAGES: Record<SupportedLocale, LocaleDictionary> = {
     "nav.interviews": "Interviews",
     "nav.learn": "Learn",
     "nav.pricing": "Pricing",
+    "nav.freeForEveryone": "Free for everyone",
     "nav.dashboard": "Dashboard",
     "nav.login": "Login",
     "nav.getStarted": "Get Started",
@@ -324,6 +327,7 @@ export const MESSAGES: Record<SupportedLocale, LocaleDictionary> = {
     "home.hero.remoteFirstRoles": "Remote-first roles",
     "home.hero.visaSupported": "Visa-supported opportunities",
     "home.hero.seeTrustModel": "See trust model",
+    "home.hero.freeForEveryone": "Free for everyone — candidates and employers. No card required.",
     "home.why.tagline": "Why AfriTalent feels different",
     "home.why.heading": "A premium hiring experience built around signal, not noise.",
     "home.why.subtitle": "Underneath the interface, AfriTalent is shaping trust, workflow, and verified data into a tighter hiring operating model.",
@@ -438,6 +442,7 @@ export const MESSAGES: Record<SupportedLocale, LocaleDictionary> = {
     "nav.interviews": "Entrevistas",
     "nav.learn": "Aprender",
     "nav.pricing": "Precios",
+    "nav.freeForEveryone": "Gratis para todos",
     "nav.dashboard": "Panel",
     "nav.login": "Iniciar sesión",
     "nav.getStarted": "Comenzar",
@@ -538,6 +543,7 @@ export const MESSAGES: Record<SupportedLocale, LocaleDictionary> = {
     "home.hero.remoteFirstRoles": "Empleos prioritariamente remotos",
     "home.hero.visaSupported": "Oportunidades con patrocinio de visa",
     "home.hero.seeTrustModel": "Ver modelo de confianza",
+    "home.hero.freeForEveryone": "Gratis para todos: candidatos y empleadores. Sin tarjeta.",
     "home.why.tagline": "Por qué AfriTalent se siente diferente",
     "home.why.heading": "Una experiencia de contratación premium basada en señales, no en ruido.",
     "home.why.subtitle": "AfriTalent da forma a la confianza, el flujo de trabajo y los datos verificados en un modelo operativo de contratación más sólido.",
@@ -652,6 +658,7 @@ export const MESSAGES: Record<SupportedLocale, LocaleDictionary> = {
     "nav.interviews": "Entretiens",
     "nav.learn": "Apprendre",
     "nav.pricing": "Tarifs",
+    "nav.freeForEveryone": "Gratuit pour tous",
     "nav.dashboard": "Tableau de bord",
     "nav.login": "Connexion",
     "nav.getStarted": "Commencer",
@@ -752,6 +759,7 @@ export const MESSAGES: Record<SupportedLocale, LocaleDictionary> = {
     "home.hero.remoteFirstRoles": "Emplois prioritairement à distance",
     "home.hero.visaSupported": "Opportunités avec visa sponsorisé",
     "home.hero.seeTrustModel": "Voir le modèle de confiance",
+    "home.hero.freeForEveryone": "Gratuit pour tous — candidats et employeurs. Sans carte bancaire.",
     "home.why.tagline": "Pourquoi AfriTalent se démarque",
     "home.why.heading": "Une expérience de recrutement premium axée sur le signal, pas sur le bruit.",
     "home.why.subtitle": "AfriTalent façonne la confiance, le flux de travail et les données vérifiées en un modèle opérationnel de recrutement plus solide.",
@@ -866,6 +874,7 @@ export const MESSAGES: Record<SupportedLocale, LocaleDictionary> = {
     "nav.interviews": "Entrevistas",
     "nav.learn": "Aprender",
     "nav.pricing": "Preços",
+    "nav.freeForEveryone": "Grátis para todos",
     "nav.dashboard": "Painel",
     "nav.login": "Entrar",
     "nav.getStarted": "Começar",
@@ -966,6 +975,7 @@ export const MESSAGES: Record<SupportedLocale, LocaleDictionary> = {
     "home.hero.remoteFirstRoles": "Vagas prioritariamente remotas",
     "home.hero.visaSupported": "Oportunidades com visto patrocinado",
     "home.hero.seeTrustModel": "Ver modelo de confiança",
+    "home.hero.freeForEveryone": "Grátis para todos — candidatos e empregadores. Sem cartão.",
     "home.why.tagline": "Por que AfriTalent é diferente",
     "home.why.heading": "Uma experiência de contratação premium baseada em sinal, não em ruído.",
     "home.why.subtitle": "AfriTalent molda confiança, fluxo de trabalho e dados verificados em um modelo operacional de contratação mais sólido.",
@@ -1080,6 +1090,7 @@ export const MESSAGES: Record<SupportedLocale, LocaleDictionary> = {
     "nav.interviews": "المقابلات",
     "nav.learn": "التعلم",
     "nav.pricing": "الأسعار",
+    "nav.freeForEveryone": "مجاني للجميع",
     "nav.dashboard": "لوحة التحكم",
     "nav.login": "تسجيل الدخول",
     "nav.getStarted": "ابدأ الآن",
@@ -1180,6 +1191,7 @@ export const MESSAGES: Record<SupportedLocale, LocaleDictionary> = {
     "home.hero.remoteFirstRoles": "وظائف عن بُعد بالأولوية",
     "home.hero.visaSupported": "فرص بكفالة تأشيرة",
     "home.hero.seeTrustModel": "اطّلع على نموذج الثقة",
+    "home.hero.freeForEveryone": "مجاني للجميع — للمرشحين وأصحاب العمل. لا حاجة إلى بطاقة.",
     "home.why.tagline": "لماذا تبدو AfriTalent مختلفة",
     "home.why.heading": "تجربة توظيف متميزة تعتمد على الإشارة، لا على الضوضاء.",
     "home.why.subtitle": "تشكّل AfriTalent الثقة وسير العمل والبيانات الموثّقة في نموذج تشغيلي للتوظيف أكثر قوة.",

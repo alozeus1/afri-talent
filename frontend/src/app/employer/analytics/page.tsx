@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { FREE_MODE } from "@/lib/free-mode";
 
 const statusVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
   PENDING: "warning",
@@ -125,7 +126,7 @@ export default function EmployerAnalyticsPage() {
               See what turns trust into qualified applicants
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200 sm:text-base">
-              Track the full path from visibility to shortlist so you can improve job quality, verification strength, and paid-plan ROI with real signals.
+              Track the full path from visibility to shortlist so you can improve job quality, verification strength{FREE_MODE ? "" : ", and paid-plan ROI"} with real signals.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -134,9 +135,11 @@ export default function EmployerAnalyticsPage() {
                 Guided onboarding
               </Button>
             </Link>
-            <Link href={localizePath("/billing", locale)}>
-              <Button>Compare plans</Button>
-            </Link>
+            {!FREE_MODE && (
+              <Link href={localizePath("/billing", locale)}>
+                <Button>Compare plans</Button>
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -234,7 +237,7 @@ export default function EmployerAnalyticsPage() {
                 </CardContent>
               </Card>
 
-              {roi && (
+              {roi && !FREE_MODE && (
                 <Card className="border-slate-200 bg-slate-950 text-white">
                   <CardHeader>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
@@ -414,14 +417,18 @@ export default function EmployerAnalyticsPage() {
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">Premium dashboard branding</p>
+                      <p className="text-sm font-semibold text-gray-900">{FREE_MODE ? "Dashboard branding" : "Premium dashboard branding"}</p>
                       <p className="mt-1 text-sm text-gray-600">
-                        Active Employer Premium companies can apply their logo and colors across their AfriTalent employer surfaces.
+                        {FREE_MODE
+                          ? "Apply your logo and colors across your AfriTalent employer surfaces."
+                          : "Active Employer Premium companies can apply their logo and colors across their AfriTalent employer surfaces."}
                       </p>
                     </div>
-                    <Badge variant={branding?.premiumBrandingEnabled ? "success" : "warning"}>
-                      {branding?.premiumBrandingEnabled ? "Premium active" : "Premium required"}
-                    </Badge>
+                    {!FREE_MODE && (
+                      <Badge variant={branding?.premiumBrandingEnabled ? "success" : "warning"}>
+                        {branding?.premiumBrandingEnabled ? "Premium active" : "Premium required"}
+                      </Badge>
+                    )}
                   </div>
                   <div className="mt-4 grid gap-4 md:grid-cols-3">
                     <Input
@@ -446,7 +453,7 @@ export default function EmployerAnalyticsPage() {
                       onChange={(e) => setBrandingForm({ ...brandingForm, accentColor: e.target.value })}
                     />
                   </div>
-                  {!branding?.premiumBrandingEnabled && (
+                  {!branding?.premiumBrandingEnabled && !FREE_MODE && (
                     <Link href={localizePath("/billing", locale)} className="mt-3 inline-flex text-sm font-medium text-emerald-700 hover:text-emerald-800">
                       Upgrade to unlock custom dashboard branding
                     </Link>

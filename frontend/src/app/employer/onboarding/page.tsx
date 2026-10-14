@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { employerOnboardingEvents } from "@/lib/analytics";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { FREE_MODE } from "@/lib/free-mode";
 import { EmployerActivationChecklist } from "@/components/employer/activation-checklist";
 import { EmployerMilestones } from "@/components/employer/activation-milestones";
 import { TrustBadge } from "@/components/trust/trust-badge";
@@ -60,6 +61,15 @@ const onboardingSteps: Array<{
     subtitle: "Finish the last credibility steps that improve apply quality and moderation speed.",
   },
 ];
+
+// Free launch: there is no plan to choose, so the subscription step is skipped.
+const visibleSteps = FREE_MODE
+  ? onboardingSteps.filter((step) => step.key !== "subscription_choice")
+  : onboardingSteps;
+
+function visibleStep(step: EmployerOnboardingStep): EmployerOnboardingStep {
+  return FREE_MODE && step === "subscription_choice" ? "trust_completion" : step;
+}
 
 function parseEmailList(value: string): string[] {
   return value
@@ -110,11 +120,11 @@ export default function EmployerOnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const activeIndex = onboardingSteps.findIndex((step) => step.key === activeStep);
+  const activeIndex = visibleSteps.findIndex((step) => step.key === activeStep);
 
   const hydrateState = (data: EmployerOnboarding) => {
     setOnboarding(data);
-    setActiveStep(data.currentStep);
+    setActiveStep(visibleStep(data.currentStep));
     setCompanyForm({
       companyName: data.company.companyName || "",
       website: data.company.website || "",
@@ -193,7 +203,7 @@ export default function EmployerOnboardingPage() {
         ...refreshed,
         currentStep: nextStep || activeStep,
       });
-      setActiveStep(nextStep || activeStep);
+      setActiveStep(visibleStep(nextStep || activeStep));
       setSuccess("Progress saved.");
 
       employerOnboardingEvents.stepCompleted({
@@ -223,12 +233,12 @@ export default function EmployerOnboardingPage() {
   };
 
   const goNext = async () => {
-    const next = onboardingSteps[activeIndex + 1];
+    const next = visibleSteps[activeIndex + 1];
     if (!next) return;
     await saveProgress(next.key);
   };
 
-  const currentStepMeta = onboardingSteps[activeIndex] || onboardingSteps[0];
+  const currentStepMeta = visibleSteps[activeIndex] || visibleSteps[0];
 
   if (isLoading || !user) {
     return (
@@ -289,7 +299,7 @@ export default function EmployerOnboardingPage() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="mb-6 grid gap-2 md:grid-cols-3 xl:grid-cols-7">
-                    {onboardingSteps.map((step, index) => (
+                    {visibleSteps.map((step, index) => (
                       <button
                         key={step.key}
                         type="button"
@@ -534,7 +544,7 @@ export default function EmployerOnboardingPage() {
                     </div>
                   )}
 
-                  {activeStep === "subscription_choice" && (
+                  {activeStep === "subscription_choice" && !FREE_MODE && (
                     <div className="space-y-5">
                       <div className="grid gap-4 lg:grid-cols-3">
                         {[
@@ -647,7 +657,7 @@ export default function EmployerOnboardingPage() {
                         type="button"
                         variant="outline"
                         disabled={activeIndex === 0 || saving}
-                        onClick={() => setActiveStep(onboardingSteps[Math.max(activeIndex - 1, 0)].key)}
+                        onClick={() => setActiveStep(visibleSteps[Math.max(activeIndex - 1, 0)].key)}
                       >
                         Previous step
                       </Button>
@@ -666,8 +676,8 @@ export default function EmployerOnboardingPage() {
                           <Button variant="outline">Open job composer</Button>
                         </Link>
                       )}
-                      <Button type="button" disabled={saving || activeIndex === onboardingSteps.length - 1} onClick={goNext}>
-                        {activeIndex === onboardingSteps.length - 1 ? "All set" : "Save and continue"}
+                      <Button type="button" disabled={saving || activeIndex === visibleSteps.length - 1} onClick={goNext}>
+                        {activeIndex === visibleSteps.length - 1 ? "All set" : "Save and continue"}
                       </Button>
                     </div>
                   </div>

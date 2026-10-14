@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { skills, CareerAdviceResult } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PlanBadge } from "@/components/ui/plan-badge";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -82,7 +83,7 @@ export default function CareerAdvisorPage() {
               AI-powered skill gap analysis and career path recommendations
             </p>
           </div>
-          <Badge variant="info">Premium</Badge>
+          <PlanBadge />
         </div>
 
         {/* Run new analysis */}

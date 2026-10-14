@@ -7,7 +7,8 @@ import { MarketPulse } from "@/components/home/market-pulse";
 import { SuccessStories } from "@/components/home/success-stories";
 import { Button } from "@/components/ui/button";
 import { Globe, Plane, ShieldCheck, Sparkles } from "lucide-react";
-import { useT } from "@/lib/i18n/client";
+import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { FREE_MODE } from "@/lib/free-mode";
 
 const featureIcons = [Globe, Plane, ShieldCheck, Sparkles];
 const featureTones = [
@@ -29,6 +30,7 @@ const sourceLabels = [
 
 export function HomePageContent() {
   const t = useT();
+  const locale = useLocale();
 
   const productSignals = [
     { titleKey: "home.feature.remoteTitle" as const, descKey: "home.feature.remoteDesc" as const, tone: featureTones[0], Icon: featureIcons[0] },
@@ -78,6 +80,18 @@ export function HomePageContent() {
                     </Button>
                   </Link>
                 </div>
+
+                {FREE_MODE && (
+                  <Link
+                    href={localizePath("/pricing", locale)}
+                    prefetch={false}
+                    data-testid="free-for-everyone-pill"
+                    className="mt-6 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/40 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50 transition-colors"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    {t("home.hero.freeForEveryone")}
+                  </Link>
+                )}
 
                 <div className="mt-8 flex flex-wrap gap-3 text-sm font-medium text-zinc-600 dark:text-zinc-400">
                   <Link href="/jobs?filter=remote" prefetch={false} className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
