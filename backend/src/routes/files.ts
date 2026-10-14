@@ -31,7 +31,7 @@ const presignSchema = z.object({
 
 let s3Client: S3Client | null = null;
 
-function getS3Client(): S3Client {
+export function getS3Client(): S3Client {
   if (!s3Client) {
     s3Client = new S3Client({ region: REGION });
   }

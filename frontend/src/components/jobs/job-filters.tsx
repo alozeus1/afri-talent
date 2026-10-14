@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Check } from "lucide-react";
+import { JOB_FIELDS, WORKPLACE_TYPES } from "@/lib/job-options";
 
 interface JobFiltersProps {
   search: string;
@@ -30,34 +31,8 @@ interface JobFiltersProps {
 
 const jobTypes = ["Full-time", "Part-time", "Contract", "Freelance", "Internship"];
 const seniorityLevels = ["Junior", "Mid-level", "Senior", "Lead", "Executive"];
-const jobFields = [
-  "Technology",
-  "Healthcare",
-  "Finance",
-  "Accounting",
-  "Sales",
-  "Marketing",
-  "Customer Support",
-  "Operations",
-  "Human Resources",
-  "Legal",
-  "Education",
-  "Design",
-  "Product",
-  "Data",
-  "Cybersecurity",
-  "Engineering Non-Software",
-  "Skilled Trades",
-  "Logistics",
-  "Hospitality",
-  "Nonprofit",
-  "Executive",
-];
-const workplaceTypes = [
-  { label: "Remote", value: "REMOTE" },
-  { label: "Hybrid", value: "HYBRID" },
-  { label: "Onsite", value: "ONSITE" },
-];
+const jobFields = JOB_FIELDS;
+const workplaceTypes = WORKPLACE_TYPES;
 
 export function JobFilters({
   search,

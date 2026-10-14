@@ -2,10 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { applications, Job, quickApply, QuickApplyEligibility } from "@/lib/api";
+import { ApiError, applications, Job, quickApply, QuickApplyEligibility, QuickApplyPreview } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+
+const COVER_LETTER_MAX = 5000;
+
+function isAlreadyApplied(err: unknown): boolean {
+  if (err instanceof ApiError && (err.status === 409 || err.code === "ALREADY_APPLIED")) return true;
+  return err instanceof Error && err.message.toLowerCase().includes("already applied");
+}
 
 interface QuickApplyModalProps {
   job: Job;
@@ -21,6 +29,10 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
   const [error, setError] = useState<FriendlyError | null>(null);
   const [success, setSuccess] = useState(false);
   const [consented, setConsented] = useState(false);
+  const [preview, setPreview] = useState<QuickApplyPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [coverLetter, setCoverLetter] = useState("");
+  const locale = useLocale();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
@@ -42,19 +54,48 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
       setSuccess(false);
       setEligibility(null);
       setConsented(false);
+      setPreview(null);
+      setCoverLetter("");
 
+      let cancelled = false;
       quickApply
         .checkEligibility(job.id)
-        .then((data) => {
+        .then(async (data) => {
+          if (cancelled) return;
           setEligibility(data);
+          if (!data.eligible) return;
+          // Draft the letter up front so the candidate reviews exactly what
+          // the employer will receive before consenting.
+          setPreviewLoading(true);
+          try {
+            const drafted = await quickApply.preview(job.id);
+            if (cancelled) return;
+            setPreview(drafted);
+            setCoverLetter(drafted.coverLetter);
+          } catch (err) {
+            if (cancelled) return;
+            if (isAlreadyApplied(err)) {
+              onSuccess();
+              return;
+            }
+            setError(toFriendlyError(err));
+          } finally {
+            if (!cancelled) setPreviewLoading(false);
+          }
         })
         .catch((err) => {
-          setError(toFriendlyError(err));
+          if (!cancelled) setError(toFriendlyError(err));
         })
         .finally(() => {
-          setLoading(false);
+          if (!cancelled) setLoading(false);
         });
+      return () => {
+        cancelled = true;
+      };
     }
+    // onSuccess is intentionally excluded: callers pass an inline closure and
+    // re-running the draft on every parent render would refetch the letter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isOnPlatformApply, job.id]);
 
   useEffect(() => {
@@ -87,16 +128,29 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
       });
       return;
     }
+    const reviewedLetter = coverLetter.trim();
+    if (!reviewedLetter) {
+      setError({
+        title: "Add a short cover letter",
+        description: "Employers respond better to applications with a few lines about why you fit the role.",
+        tone: "info",
+      });
+      return;
+    }
     setApplying(true);
     setError(null);
 
     try {
-      await quickApply.apply(job.id, { confirm: true });
+      await quickApply.apply(job.id, { confirm: true, coverLetter: reviewedLetter });
       setSuccess(true);
       setTimeout(() => {
         onSuccess();
       }, 1500);
     } catch (err) {
+      if (isAlreadyApplied(err)) {
+        onSuccess();
+        return;
+      }
       setError(toFriendlyError(err));
     } finally {
       setApplying(false);
@@ -135,7 +189,7 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md mx-4">
+      <div className="relative w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <h2 id="quick-apply-title" className="sr-only">Quick Apply to {job.title}</h2>
         <Card className="shadow-xl">
           <CardContent className="p-6">
@@ -236,7 +290,9 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-1">Application Sent!</h3>
                 <p className="text-sm text-gray-600 text-center">
-                  Your profile and resume have been sent to the employer.
+                  {preview?.resume
+                    ? "Your profile, resume and cover letter have been sent to the employer."
+                    : "Your profile and cover letter have been sent to the employer."}
                 </p>
               </div>
             )}
@@ -270,11 +326,68 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                   </div>
                 </div>
 
-                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-emerald-800">
-                    Your profile and active resume will be sent to the employer.
-                  </p>
-                </div>
+                {previewLoading && (
+                  <div className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 mb-4" data-testid="quick-apply-preview-loading">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-600"></div>
+                    <p className="text-sm text-gray-600">Drafting your cover letter...</p>
+                  </div>
+                )}
+
+                {!previewLoading && preview && (
+                  <>
+                    {preview.resume ? (
+                      <div className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4" data-testid="quick-apply-resume">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Resume attached</p>
+                          <p className="truncate text-sm font-medium text-emerald-900">{preview.resume.name}</p>
+                        </div>
+                        <Link
+                          href={localizePath("/candidate/resumes", locale)}
+                          className="shrink-0 text-xs font-medium text-emerald-700 underline-offset-2 hover:underline"
+                        >
+                          Change
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-900" data-testid="quick-apply-no-resume">
+                        <p className="font-medium">No resume attached</p>
+                        <p className="mt-0.5">
+                          Applications with a resume get far more replies.{" "}
+                          <Link href={localizePath("/candidate/resumes", locale)} className="font-medium underline">
+                            Upload one
+                          </Link>{" "}
+                          or{" "}
+                          <Link href={localizePath("/candidate/resume-builder", locale)} className="font-medium underline">
+                            build one in minutes
+                          </Link>
+                          . You can still apply now with your profile and cover letter.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="mb-4">
+                      <div className="mb-1 flex items-baseline justify-between">
+                        <label htmlFor="quick-apply-cover-letter" className="text-sm font-medium text-gray-900">
+                          Cover letter
+                        </label>
+                        <span className="text-xs text-gray-500">
+                          {coverLetter.length}/{COVER_LETTER_MAX}
+                        </span>
+                      </div>
+                      <p className="mb-2 text-xs text-gray-500">
+                        We drafted this from your profile. Edit it so it sounds like you; the employer sees exactly this text.
+                      </p>
+                      <textarea
+                        id="quick-apply-cover-letter"
+                        data-testid="quick-apply-cover-letter"
+                        className="w-full min-h-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        value={coverLetter}
+                        maxLength={COVER_LETTER_MAX}
+                        onChange={(e) => setCoverLetter(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
 
                 {error && (
                   <div
@@ -307,7 +420,7 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                     className="mt-0.5 h-4 w-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
                   />
                   <span className="text-sm text-gray-700">
-                    I confirm I&apos;ve reviewed this application and want AfriTalent to submit it on my behalf.
+                    I&apos;ve reviewed my cover letter{preview?.resume ? " and the resume being attached" : ""}, and I want AfriTalent to send this application on my behalf.
                   </span>
                 </label>
 
@@ -315,10 +428,10 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                   className="w-full"
                   size="lg"
                   onClick={handleApply}
-                  disabled={applying || !consented}
+                  disabled={applying || !consented || previewLoading || !preview || !coverLetter.trim()}
                   data-testid="quick-apply-submit"
                 >
-                  {applying ? "Submitting..." : "Apply Now"}
+                  {applying ? "Submitting..." : "Submit application"}
                 </Button>
               </div>
             )}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
+  CreateJobData,
   EmployerJobPreview,
   EmployerTrustDashboard,
   employerAnalytics,
@@ -18,6 +19,12 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import {
+  EMPTY_JOB_MOBILITY,
+  JobMobilityFields,
+  type JobMobilityValues,
+} from "@/components/employer/job-mobility-fields";
+import { parseCountryList, VISA_SPONSORSHIP_OPTIONS, WORKPLACE_TYPES } from "@/lib/job-options";
 
 const jobTypes = ["Full-time", "Part-time", "Contract", "Freelance", "Internship"];
 const seniorityLevels = ["Junior", "Mid-level", "Senior", "Lead", "Executive"];
@@ -44,6 +51,7 @@ export default function NewJobPage() {
     tags: "",
     applicationUrl: "",
   });
+  const [mobility, setMobility] = useState<JobMobilityValues>(EMPTY_JOB_MOBILITY);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState<{ jobId: string; pending: boolean; pendingReason: string | null } | null>(null);
@@ -130,6 +138,11 @@ export default function NewJobPage() {
         currency: formData.currency || undefined,
         tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
         applicationUrl: formData.applicationUrl || undefined,
+        workplaceType: mobility.workplaceType || undefined,
+        jobField: mobility.jobField || undefined,
+        visaSponsorship: mobility.visaSponsorship as CreateJobData["visaSponsorship"],
+        relocationAssistance: mobility.relocationAssistance,
+        eligibleCountries: parseCountryList(mobility.eligibleCountries),
       });
       setSubmitted({
         jobId: result.id,
@@ -145,6 +158,10 @@ export default function NewJobPage() {
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateMobility = <K extends keyof JobMobilityValues>(field: K, value: JobMobilityValues[K]) => {
+    setMobility((prev) => ({ ...prev, [field]: value }));
   };
 
   const nextStep = () => {
@@ -406,6 +423,8 @@ export default function NewJobPage() {
                     </div>
                   </div>
 
+                  <JobMobilityFields values={mobility} onChange={updateMobility} />
+
                   <Input
                     id="tags"
                     label="Skills or tags"
@@ -437,6 +456,19 @@ export default function NewJobPage() {
                     <p>
                       <strong>Salary:</strong> {formData.salaryMin || "-"} - {formData.salaryMax || "-"} {formData.currency}
                     </p>
+                    <p>
+                      <strong>Workplace:</strong>{" "}
+                      {WORKPLACE_TYPES.find((option) => option.value === mobility.workplaceType)?.label ?? "Not specified"}
+                      {mobility.jobField ? ` · ${mobility.jobField}` : ""}
+                    </p>
+                    <p>
+                      <strong>Visa sponsorship:</strong>{" "}
+                      {VISA_SPONSORSHIP_OPTIONS.find((option) => option.value === mobility.visaSponsorship)?.label}
+                      {mobility.relocationAssistance ? " · Relocation assistance" : ""}
+                    </p>
+                    {mobility.eligibleCountries.trim() && (
+                      <p><strong>Eligible countries:</strong> {parseCountryList(mobility.eligibleCountries).join(", ")}</p>
+                    )}
                     <p><strong>Tags:</strong> {formData.tags || "None added yet"}</p>
                     <p><strong>Application path:</strong> {formData.applicationUrl ? "AfriTalent and employer site" : "AfriTalent direct apply"}</p>
                   </div>

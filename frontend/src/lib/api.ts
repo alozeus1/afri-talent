@@ -338,6 +338,14 @@ export const applications = {
   forJob: (jobId: string, token?: string) =>
     fetchAPI<Application[]>(`/api/applications/job/${jobId}`, { token }),
 
+  /**
+   * Employer (job owner) / admin: resolve an applicant's CV. Returns a
+   * short-lived `url` to open, or the resume `text` when no file storage is
+   * configured (e.g. local Docker) or the candidate used the resume builder.
+   */
+  cv: (applicationId: string) =>
+    fetchAPI<ApplicationCv>(`/api/applications/${applicationId}/cv`),
+
   updateStatus: (id: string, data: { status: string; notes?: string }, token?: string) =>
     fetchAPI<Application>(`/api/applications/${id}/status`, {
       method: "PUT",
@@ -1619,6 +1627,27 @@ export interface CreateJobData {
   salaryPeriod?: string;
   tags?: string[];
   applicationUrl?: string;
+  jobField?: string;
+  workplaceType?: string;
+  visaSponsorship?: "YES" | "NO" | "UNKNOWN";
+  relocationAssistance?: boolean;
+  eligibleCountries?: string[];
+}
+
+export interface ApplicantProfileSummary {
+  headline: string | null;
+  skills: string[];
+  yearsExperience: number | null;
+  linkedinUrl: string | null;
+  githubUrl: string | null;
+  portfolioUrl: string | null;
+  profileCompleteness: number;
+}
+
+export interface ApplicationCv {
+  url?: string;
+  text?: string;
+  expiresIn?: number;
 }
 
 export interface Application {
@@ -1643,6 +1672,8 @@ export interface Application {
     id: string;
     name: string;
     email: string;
+    candidateProfile?: ApplicantProfileSummary | null;
+    socialProfile?: { location: string | null } | null;
   };
   locked?: boolean;
   upgradeRequired?: boolean;
@@ -2935,10 +2966,20 @@ export const quickApply = {
    * The backend requires `confirm: true` to enforce explicit candidate
    * consent before AfriTalent submits an application on their behalf.
    */
-  apply: (jobId: string, opts: { confirm: true } = { confirm: true }) =>
+  apply: (jobId: string, opts: { confirm: true; coverLetter?: string } = { confirm: true }) =>
     fetchAPI<Application>("/api/quick-apply", {
       method: "POST",
-      body: JSON.stringify({ jobId, confirm: opts.confirm }),
+      body: JSON.stringify({
+        jobId,
+        confirm: opts.confirm,
+        ...(opts.coverLetter ? { coverLetter: opts.coverLetter } : {}),
+      }),
+    }),
+  /** Drafts the cover letter and reports which resume will be attached. Creates nothing. */
+  preview: (jobId: string) =>
+    fetchAPI<QuickApplyPreview>("/api/quick-apply/preview", {
+      method: "POST",
+      body: JSON.stringify({ jobId }),
     }),
   checkEligibility: (jobId: string) =>
     fetchAPI<QuickApplyEligibility>(`/api/quick-apply/eligible/${jobId}`),
@@ -3367,6 +3408,11 @@ export interface QuickApplyEligibility {
   reason?: string;
   profileCompleteness: number;
   hasActiveResume: boolean;
+}
+
+export interface QuickApplyPreview {
+  coverLetter: string;
+  resume: { id: string; name: string } | null;
 }
 
 export interface SkillAssessmentItem {

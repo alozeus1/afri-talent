@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { applications, Job } from "@/lib/api";
+import { ApiError, applications, Job } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,6 +23,21 @@ interface JobApplyPanelProps {
   job: Job;
 }
 
+/** A duplicate submit means the candidate already applied: treat it as success. */
+function isAlreadyAppliedError(error: unknown): boolean {
+  if (error instanceof ApiError && error.status === 409) return true;
+  const message = error instanceof Error ? error.message : "";
+  return message.toLowerCase().includes("already applied");
+}
+
+function formatAppliedDate(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
 export function JobApplyPanel({ job }: JobApplyPanelProps) {
   const locale = useLocale();
   const router = useRouter();
@@ -30,11 +45,43 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
   const { online, isLowBandwidth } = useNetworkProfile();
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [appliedAt, setAppliedAt] = useState<string | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [emailVerifyNeeded, setEmailVerifyNeeded] = useState(false);
   const [quickApplyOpen, setQuickApplyOpen] = useState(false);
   const isOnPlatformApply = job.discovery?.deliveryModel === "ON_PLATFORM" || job.jobSource === "EMPLOYER_POSTED";
   const externalApplyUrl = job.applicationUrl || job.sourceUrl || null;
+  const isCandidate = user?.role === "CANDIDATE";
+
+  // Restore the applied state on revisit/reload so candidates never see
+  // "Apply Now" for a job they already applied to.
+  useEffect(() => {
+    if (!isCandidate) return;
+    let cancelled = false;
+    applications
+      .my()
+      .then((mine) => {
+        if (cancelled) return;
+        const existing = mine.find((application) => application.job?.id === job.id);
+        if (existing) {
+          setApplied(true);
+          setAppliedAt(existing.createdAt ?? null);
+        }
+      })
+      .catch(() => {
+        // Non-fatal: the panel still works, and a duplicate submit is treated as success.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isCandidate, job.id]);
+
+  const markApplied = () => {
+    setApplied(true);
+    setAppliedAt((prev) => prev ?? new Date().toISOString());
+    setToastVisible(true);
+  };
 
   const handleApply = async () => {
     if (!online) {
@@ -74,37 +121,21 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
           setApplying(false);
           return;
         }
-        if (!message.toLowerCase().includes("already applied")) {
+        if (!isAlreadyAppliedError(error)) {
           setApplyError(message || "Failed to record this application");
           setApplying(false);
           return;
         }
       }
       window.open(externalApplyUrl, "_blank", "noopener,noreferrer");
-      setApplied(true);
+      markApplied();
       setApplying(false);
       return;
     }
 
-    setApplying(true);
-    setApplyError(null);
-
-    try {
-      await applications.apply({ jobId: job.id });
-      setApplied(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to apply";
-      if (message.includes("EMAIL_VERIFICATION_REQUIRED") || message.toLowerCase().includes("verify your email")) {
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("verifyReturnTo", window.location.href);
-        }
-        setEmailVerifyNeeded(true);
-      } else {
-        setApplyError(message);
-      }
-    } finally {
-      setApplying(false);
-    }
+    // On-platform jobs always go through the reviewed Quick Apply flow:
+    // resume being attached + editable cover letter + explicit consent.
+    setQuickApplyOpen(true);
   };
 
   return (
@@ -179,23 +210,25 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
                 </div>
               )}
               <div className="space-y-3">
-                <Button className="w-full" size="lg" onClick={handleApply} disabled={applying || !online}>
-                  {applying
-                    ? "Applying..."
-                    : applied
-                      ? "Applied"
+                {applied && isCandidate ? (
+                  <>
+                    <Button className="w-full" size="lg" disabled data-testid="job-applied-state">
+                      {appliedAt ? `Applied on ${formatAppliedDate(appliedAt)}` : "Applied"}
+                    </Button>
+                    <Link
+                      href={localizePath("/candidate/applications", locale)}
+                      className="block text-center text-sm font-medium text-emerald-700 underline-offset-2 hover:underline"
+                    >
+                      Track this application
+                    </Link>
+                  </>
+                ) : (
+                  <Button className="w-full" size="lg" onClick={handleApply} disabled={applying || !online}>
+                    {applying
+                      ? "Applying..."
                       : isOnPlatformApply
                         ? "Apply Now"
                         : "Continue to Employer Site"}
-                </Button>
-                {user?.role === "CANDIDATE" && isOnPlatformApply && (
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setQuickApplyOpen(true)}
-                    disabled={!online}
-                  >
-                    Quick Apply
                   </Button>
                 )}
               </div>
@@ -210,12 +243,12 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
         onClose={() => setQuickApplyOpen(false)}
         onSuccess={() => {
           setQuickApplyOpen(false);
-          setApplied(true);
+          markApplied();
         }}
       />
-      <FeedbackToast 
-        visible={applied} 
-        onClose={() => setApplied(false)} 
+      <FeedbackToast
+        visible={toastVisible}
+        onClose={() => setToastVisible(false)}
         mode="success" 
         title="Success!"
         message={isOnPlatformApply ? "Application submitted successfully!" : "Employer application page opened."}

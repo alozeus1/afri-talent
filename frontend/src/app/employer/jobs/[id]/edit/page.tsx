@@ -4,11 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { jobs } from "@/lib/api";
+import { CreateJobData, jobs } from "@/lib/api";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  EMPTY_JOB_MOBILITY,
+  JobMobilityFields,
+  type JobMobilityValues,
+} from "@/components/employer/job-mobility-fields";
+import { parseCountryList } from "@/lib/job-options";
 
 const jobTypes = ["Full-time", "Part-time", "Contract", "Freelance", "Internship"];
 const seniorityLevels = ["Junior", "Mid-level", "Senior", "Lead", "Executive"];
@@ -31,6 +37,7 @@ export default function EditJobPage() {
     currency: "USD",
     tags: "",
   });
+  const [mobility, setMobility] = useState<JobMobilityValues>(EMPTY_JOB_MOBILITY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -63,6 +70,13 @@ export default function EditJobPage() {
         currency: job.currency || "USD",
         tags: job.tags?.join(", ") || "",
       });
+      setMobility({
+        workplaceType: job.workplaceType || "",
+        jobField: job.jobField || "",
+        visaSponsorship: job.visaSponsorship || "UNKNOWN",
+        relocationAssistance: Boolean(job.relocationAssistance),
+        eligibleCountries: job.eligibleCountries?.join(", ") || "",
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load job");
     } finally {
@@ -91,7 +105,12 @@ export default function EditJobPage() {
         salaryMin: formData.salaryMin ? parseInt(formData.salaryMin) : undefined,
         salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : undefined,
         currency: formData.currency || undefined,
-        tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()) : undefined,
+        tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
+        workplaceType: mobility.workplaceType || undefined,
+        jobField: mobility.jobField || undefined,
+        visaSponsorship: mobility.visaSponsorship as CreateJobData["visaSponsorship"],
+        relocationAssistance: mobility.relocationAssistance,
+        eligibleCountries: parseCountryList(mobility.eligibleCountries),
       };
 
       await jobs.update(jobId, body);
@@ -120,6 +139,10 @@ export default function EditJobPage() {
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateMobility = <K extends keyof JobMobilityValues>(field: K, value: JobMobilityValues[K]) => {
+    setMobility((prev) => ({ ...prev, [field]: value }));
   };
 
   if (isLoading || !user) {
@@ -304,6 +327,8 @@ export default function EditJobPage() {
                 </select>
               </div>
             </div>
+
+            <JobMobilityFields values={mobility} onChange={updateMobility} />
 
             <Input
               id="tags"

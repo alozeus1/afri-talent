@@ -3,8 +3,9 @@ import { z } from "zod/v4";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { authenticate, authorize, requireVerifiedEmail } from "../middleware/auth.js";
-import { ApplicationStatus, JobStatus, Role } from "@prisma/client";
+import { ApplicationStatus, JobStatus, Role, type Job } from "@prisma/client";
 import { generateQuickCoverLetter } from "../lib/ai/cover-letter.js";
+import { computeProfileCompleteness } from "../lib/profile-completeness.js";
 import { requireAccountStanding } from "../middleware/account-standing.js";
 import {
   SubmitGuardError,
@@ -24,7 +25,123 @@ const quickApplySchema = z.object({
    * Must be `true`. Missing or false returns 400 / CONSENT_REQUIRED.
    */
   confirm: z.literal(true, "Consent required: set confirm=true to submit."),
+  /**
+   * The cover letter the candidate reviewed (and possibly edited) in the
+   * preview step. When present it is stored verbatim instead of drafting a
+   * fresh one, so the employer sees exactly what the candidate approved.
+   */
+  coverLetter: z.string().trim().min(1).max(5000).optional(),
 });
+
+const previewSchema = z.object({
+  jobId: z.string().uuid(),
+});
+
+type QuickApplyResume = { id: string; name: string } | null;
+
+/**
+ * Loads the candidate profile and works out which resume will be attached.
+ * Prefers the active uploaded resume (cvUrl = its S3 key); falls back to the
+ * resume-builder document (no cvUrl, employers read its text via
+ * GET /api/applications/:id/cv).
+ */
+async function loadApplicantContext(userId: string) {
+  const profile = await prisma.candidateProfile.findUnique({
+    where: { userId },
+    include: {
+      resumes: {
+        where: { isActive: true },
+        take: 1,
+      },
+    },
+  });
+  if (!profile) return null;
+
+  const activeResume = profile.resumes[0];
+  let resume: QuickApplyResume = null;
+  let cvUrl: string | null = null;
+  if (activeResume) {
+    resume = { id: activeResume.id, name: activeResume.fileName };
+    cvUrl = activeResume.s3Key;
+  } else {
+    const builtResume = await prisma.userResume.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (builtResume) {
+      resume = { id: builtResume.id, name: "AfriTalent resume (resume builder)" };
+    }
+  }
+  return { profile, resume, cvUrl };
+}
+
+type ApplicantContext = NonNullable<Awaited<ReturnType<typeof loadApplicantContext>>>;
+
+async function draftCoverLetter(
+  userId: string,
+  job: Job,
+  profile: ApplicantContext["profile"],
+): Promise<string | undefined> {
+  const companyName =
+    job.employerId
+      ? (await prisma.employer.findUnique({ where: { id: job.employerId }, select: { companyName: true } }))?.companyName ?? job.sourceName ?? "the company"
+      : job.sourceName ?? "the company";
+
+  try {
+    const clResult = await generateQuickCoverLetter({
+      candidateName: (await prisma.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name ?? "Candidate",
+      headline: profile.headline,
+      skills: profile.skills,
+      bio: profile.bio,
+      yearsExperience: profile.yearsExperience,
+      jobTitle: job.title,
+      companyName,
+      jobDescription: job.description,
+    });
+    logger.info({ jobId: job.id, source: clResult.source }, "[quick-apply] cover letter generated");
+    return clResult.coverLetter;
+  } catch (err) {
+    logger.warn({ err }, "[quick-apply] cover letter generation failed, applying without");
+    return profile.headline
+      ? `${profile.headline}${profile.skills.length ? ` | Skills: ${profile.skills.join(", ")}` : ""}`
+      : undefined;
+  }
+}
+
+// POST /api/quick-apply/preview — draft the cover letter and show which
+// resume will be attached, without creating an application. Same guards as
+// submit so the candidate never reviews something they cannot send.
+router.post(
+  "/preview",
+  authenticate,
+  authorize(Role.CANDIDATE),
+  requireAccountStanding(),
+  requireVerifiedEmail({ roles: [Role.CANDIDATE] }),
+  async (req: Request, res: Response) => {
+    try {
+      const data = previewSchema.parse(req.body);
+      const guard = await assertCanSubmitApplication({ userId: req.user!.userId, jobId: data.jobId });
+      const context = await loadApplicantContext(req.user!.userId);
+      if (!context) {
+        res.status(400).json({ error: "Candidate profile not found. Please complete your profile first." });
+        return;
+      }
+      const coverLetter = await draftCoverLetter(req.user!.userId, guard.job, context.profile);
+      res.json({ coverLetter: coverLetter ?? "", resume: context.resume });
+    } catch (error) {
+      if (error instanceof SubmitGuardError) {
+        res.status(error.httpStatus).json(error.toJSON());
+        return;
+      }
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Validation failed", details: error.issues });
+        return;
+      }
+      logger.error({ err: error }, "[quick-apply] preview failed");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
 
 // POST /api/quick-apply — Quick apply to a job using profile data
 router.post(
@@ -42,52 +159,17 @@ router.post(
     const guard = await assertCanSubmitApplication({ userId: req.user!.userId, jobId: data.jobId });
     const job = guard.job;
 
-    // Pull candidate profile data
-    const profile = await prisma.candidateProfile.findUnique({
-      where: { userId: req.user!.userId },
-      include: {
-        resumes: {
-          where: { isActive: true },
-          take: 1,
-        },
-      },
-    });
-
-    if (!profile) {
+    const context = await loadApplicantContext(req.user!.userId);
+    if (!context) {
       res.status(400).json({ error: "Candidate profile not found. Please complete your profile first." });
       return;
     }
+    const { cvUrl } = context;
 
-    // Use active resume's s3Key as cvUrl
-    const activeResume = profile.resumes[0];
-    const cvUrl = activeResume?.s3Key ?? null;
-
-    // Generate AI-powered cover letter specific to this job
-    const companyName =
-      job.employerId
-        ? (await prisma.employer.findUnique({ where: { id: job.employerId }, select: { companyName: true } }))?.companyName ?? job.sourceName ?? "the company"
-        : job.sourceName ?? "the company";
-
-    let coverLetter: string | undefined;
-    try {
-      const clResult = await generateQuickCoverLetter({
-        candidateName: (await prisma.user.findUnique({ where: { id: req.user!.userId }, select: { name: true } }))?.name ?? "Candidate",
-        headline: profile.headline,
-        skills: profile.skills,
-        bio: profile.bio,
-        yearsExperience: profile.yearsExperience,
-        jobTitle: job.title,
-        companyName,
-        jobDescription: job.description,
-      });
-      coverLetter = clResult.coverLetter;
-      logger.info({ jobId: data.jobId, source: clResult.source }, "[quick-apply] cover letter generated");
-    } catch (err) {
-      logger.warn({ err }, "[quick-apply] cover letter generation failed, applying without");
-      coverLetter = profile.headline
-        ? `${profile.headline} | Skills: ${profile.skills.join(", ")}`
-        : undefined;
-    }
+    // Use the letter the candidate reviewed in the preview step; only draft
+    // one here for older clients that submit without previewing.
+    const coverLetter =
+      data.coverLetter ?? (await draftCoverLetter(req.user!.userId, job, context.profile));
 
     const risk = assessSubmissionRisk(guard, coverLetter);
     const application = await prisma.application.create({
@@ -172,18 +254,9 @@ router.get("/eligible/:jobId", authenticate, authorize(Role.CANDIDATE), async (r
       return;
     }
 
-    // Get candidate profile
-    const profile = await prisma.candidateProfile.findUnique({
-      where: { userId: req.user!.userId },
-      include: {
-        resumes: {
-          where: { isActive: true },
-          take: 1,
-        },
-      },
-    });
+    const context = await loadApplicantContext(req.user!.userId);
 
-    if (!profile) {
+    if (!context) {
       res.json({
         eligible: false,
         reason: "No candidate profile found",
@@ -193,16 +266,18 @@ router.get("/eligible/:jobId", authenticate, authorize(Role.CANDIDATE), async (r
       return;
     }
 
-    const hasActiveResume = profile.resumes.length > 0;
-    const profileCompleteness = profile.profileCompleteness;
-
-    // Require at least some profile completeness and an active resume
-    const eligible = profileCompleteness >= 30 && hasActiveResume;
-    const reason = !hasActiveResume
-      ? "No active resume uploaded"
-      : profileCompleteness < 30
-        ? "Profile completeness must be at least 30%"
-        : undefined;
+    // An attached resume is recommended but optional: candidates without one
+    // can still apply with their profile and a reviewed cover letter (the
+    // modal prompts them to upload or build a resume first).
+    const hasActiveResume = context.resume !== null;
+    // The stored score is only refreshed on profile saves, so seeded or
+    // imported profiles can read 0 while being complete. Use the live score.
+    const profileCompleteness = Math.max(
+      context.profile.profileCompleteness ?? 0,
+      computeProfileCompleteness({ ...context.profile, resumes: context.profile.resumes ?? [] }),
+    );
+    const eligible = profileCompleteness >= 30;
+    const reason = eligible ? undefined : "Profile completeness must be at least 30%";
 
     res.json({
       eligible,

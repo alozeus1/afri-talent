@@ -48,6 +48,11 @@ const createJobSchema = z.object({
   currency: z.string().optional(),
   tags: z.array(z.string()).optional(),
   applicationUrl: z.string().url().max(500).optional().or(z.literal("")),
+  // Mobility fields map 1:1 onto existing Job columns (no migration). They
+  // drive the Visa Sponsored / Relocation / Remote search filters.
+  visaSponsorship: z.enum(["YES", "NO", "UNKNOWN"]).optional(),
+  relocationAssistance: z.boolean().optional(),
+  eligibleCountries: z.array(z.string().trim().min(1).max(80)).max(60).optional(),
 });
 
 // JobStatus has no CLOSED value; DRAFT is the closest "not accepting
@@ -502,6 +507,9 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
       type: jobData.type,
       jobField: jobData.jobField ?? null,
       workplaceType: jobData.workplaceType ?? null,
+      visaSponsorship: jobData.visaSponsorship ?? null,
+      relocationAssistance: jobData.relocationAssistance ?? null,
+      eligibleCountries: jobData.eligibleCountries ?? [],
       seniority: jobData.seniority,
       salaryMin: jobData.salaryMin ?? null,
       salaryMax: jobData.salaryMax ?? null,
@@ -763,6 +771,14 @@ router.put("/:id", authenticate, authorize(Role.EMPLOYER), requireAccountStandin
       description: data.description ?? existingJob.description,
       location: data.location ?? existingJob.location,
       type: data.type ?? existingJob.type,
+      jobField: data.jobField ?? existingJob.jobField,
+      workplaceType: data.workplaceType ?? existingJob.workplaceType,
+      visaSponsorship: data.visaSponsorship ?? existingJob.visaSponsorship,
+      relocationAssistance: data.relocationAssistance ?? existingJob.relocationAssistance,
+      eligibleCountries: data.eligibleCountries ?? existingJob.eligibleCountries,
+      // buildJobIntelligenceUpdate echoes applicationUrl back into the update,
+      // so pass the effective value or an edit would silently clear it.
+      applicationUrl: data.applicationUrl !== undefined ? data.applicationUrl || null : existingJob.applicationUrl,
       seniority: data.seniority ?? existingJob.seniority,
       salaryMin: data.salaryMin ?? existingJob.salaryMin ?? null,
       salaryMax: data.salaryMax ?? existingJob.salaryMax ?? null,

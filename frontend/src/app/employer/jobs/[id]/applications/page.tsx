@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { applications, messages, Application } from "@/lib/api";
+import { toFriendlyError } from "@/lib/friendly-error";
 import { employerOnboardingEvents } from "@/lib/analytics";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,73 @@ const statusVariants: Record<string, "default" | "success" | "warning" | "danger
   ACCEPTED: "success",
 };
 
+function safeExternalUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function ApplicantSummary({ application }: { application: Application }) {
+  const profile = application.candidate?.candidateProfile;
+  const location = application.candidate?.socialProfile?.location;
+  if (!profile && !location) return null;
+
+  const skills = (profile?.skills ?? []).filter(Boolean);
+  const links = [
+    { label: "LinkedIn", href: safeExternalUrl(profile?.linkedinUrl) },
+    { label: "GitHub", href: safeExternalUrl(profile?.githubUrl) },
+    { label: "Portfolio", href: safeExternalUrl(profile?.portfolioUrl) },
+  ].filter((link): link is { label: string; href: string } => Boolean(link.href));
+  const facts = [
+    typeof profile?.yearsExperience === "number"
+      ? `${profile.yearsExperience} yr${profile.yearsExperience === 1 ? "" : "s"} experience`
+      : null,
+    location || null,
+    // The stored score can lag behind the profile (it refreshes on save), so
+    // only surface it when it carries information.
+    profile?.profileCompleteness ? `Profile ${profile.profileCompleteness}% complete` : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="mb-4 space-y-2" data-testid="applicant-summary">
+      {profile?.headline && <p className="text-sm font-medium text-gray-800">{profile.headline}</p>}
+      {facts.length > 0 && <p className="text-xs text-gray-500">{facts.join(" · ")}</p>}
+      {skills.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {skills.slice(0, 6).map((skill) => (
+            <span key={skill} className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+              {skill}
+            </span>
+          ))}
+          {skills.length > 6 && (
+            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600">+{skills.length - 6} more</span>
+          )}
+        </div>
+      )}
+      {links.length > 0 && (
+        <div className="flex flex-wrap gap-3 text-sm">
+          {links.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-700 underline-offset-2 hover:underline"
+            >
+              {link.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function JobApplicationsPage() {
   const locale = useLocale();
   const params = useParams();
@@ -32,6 +100,11 @@ export default function JobApplicationsPage() {
   const [messagingId, setMessagingId] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [messageError, setMessageError] = useState<string | null>(null);
+  const [cvLoadingId, setCvLoadingId] = useState<string | null>(null);
+  const [cvErrors, setCvErrors] = useState<Record<string, string>>({});
+  const [cvLinks, setCvLinks] = useState<Record<string, string>>({});
+  const [cvText, setCvText] = useState<{ name: string; text: string } | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<Application | null>(null);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "EMPLOYER")) {
@@ -71,6 +144,44 @@ export default function JobApplicationsPage() {
     }
   };
 
+  const viewCv = async (application: Application) => {
+    setCvLoadingId(application.id);
+    setCvErrors((prev) => {
+      const next = { ...prev };
+      delete next[application.id];
+      return next;
+    });
+    try {
+      const cv = await applications.cv(application.id);
+      if (cv.url) {
+        // No "noopener" feature string: it makes window.open return null even
+        // on success. Detach the opener manually instead, and fall back to a
+        // link when a popup blocker stops the new tab.
+        const opened = window.open(cv.url, "_blank");
+        if (opened) {
+          opened.opener = null;
+        } else {
+          setCvLinks((prev) => ({ ...prev, [application.id]: cv.url! }));
+        }
+        return;
+      }
+      if (cv.text) {
+        setCvText({ name: application.candidate?.name ?? "Candidate", text: cv.text });
+      }
+    } catch (err) {
+      setCvErrors((prev) => ({ ...prev, [application.id]: toFriendlyError(err).description }));
+    } finally {
+      setCvLoadingId(null);
+    }
+  };
+
+  const confirmReject = async () => {
+    if (!rejectTarget) return;
+    const target = rejectTarget;
+    setRejectTarget(null);
+    await updateStatus(target.id, "REJECTED");
+  };
+
   const startThread = async (candidateUserId: string) => {
     if (!user || !messageInput.trim()) return;
     setMessagingId(candidateUserId);
@@ -106,6 +217,62 @@ export default function JobApplicationsPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {rejectTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reject-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        >
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6">
+              <h2 id="reject-dialog-title" className="mb-2 text-lg font-semibold text-gray-900">
+                Reject {rejectTarget.candidate?.name ?? "this candidate"}?
+              </h2>
+              <p className="mb-6 text-sm text-gray-600">
+                The candidate will be notified that their application was not successful.
+              </p>
+              <div className="flex gap-3">
+                <Button variant="danger" className="flex-1" onClick={() => void confirmReject()}>
+                  Reject application
+                </Button>
+                <Button variant="outline" onClick={() => setRejectTarget(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {cvText && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cv-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        >
+          <Card className="flex max-h-[85vh] w-full max-w-2xl flex-col">
+            <CardContent className="flex min-h-0 flex-col p-6">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <h2 id="cv-dialog-title" className="text-lg font-semibold text-gray-900">
+                  {cvText.name}&apos;s resume
+                </h2>
+                <Button size="sm" variant="outline" onClick={() => setCvText(null)}>
+                  Close
+                </Button>
+              </div>
+              <pre
+                data-testid="cv-text"
+                className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap rounded-lg bg-gray-50 p-4 font-sans text-sm text-gray-800"
+              >
+                {cvText.text}
+              </pre>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <Link href={localizePath("/employer", locale)} className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
         <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -141,7 +308,7 @@ export default function JobApplicationsPage() {
               {jobApplications.map((application) => (
                 <div key={application.id} className="py-6">
                   <div className="flex justify-between items-start mb-3">
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="font-semibold text-gray-900">{application.candidate?.name}</h3>
                       <p className="text-sm text-gray-600">{application.candidate?.email}</p>
                       <p className="text-xs text-gray-400 mt-1">
@@ -153,6 +320,8 @@ export default function JobApplicationsPage() {
                     </Badge>
                   </div>
 
+                  {!candidateAccessLocked && <ApplicantSummary application={application} />}
+
                   {application.coverLetter && (
                     <div className="bg-gray-50 rounded-lg p-4 mb-4">
                       <p className="text-sm text-gray-600 font-medium mb-1">Cover Letter</p>
@@ -162,15 +331,30 @@ export default function JobApplicationsPage() {
                     </div>
                   )}
 
-                  {application.cvUrl && (
-                    <a
-                      href={application.cvUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-emerald-600 hover:text-emerald-700 text-sm mb-4 inline-block"
-                    >
-                      View CV/Resume
-                    </a>
+                  {!candidateAccessLocked && (
+                    <div className="mb-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={cvLoadingId === application.id}
+                        onClick={() => void viewCv(application)}
+                      >
+                        {cvLoadingId === application.id ? "Opening CV..." : "View CV"}
+                      </Button>
+                      {cvLinks[application.id] && (
+                        <a
+                          href={cvLinks[application.id]}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-3 text-sm text-emerald-700 underline-offset-2 hover:underline"
+                        >
+                          Open CV
+                        </a>
+                      )}
+                      {cvErrors[application.id] && (
+                        <p className="mt-1 text-xs text-gray-500">{cvErrors[application.id]}</p>
+                      )}
+                    </div>
                   )}
 
                   <div className="flex gap-2 mt-4">
@@ -201,7 +385,7 @@ export default function JobApplicationsPage() {
                       size="sm"
                       variant="danger"
                       disabled={candidateAccessLocked || updating === application.id || application.status === "REJECTED"}
-                      onClick={() => updateStatus(application.id, "REJECTED")}
+                      onClick={() => setRejectTarget(application)}
                     >
                       Reject
                     </Button>
