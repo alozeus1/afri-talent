@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "../lib/ai/anthropic-client.js";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { authenticate } from "../middleware/auth.js";
@@ -15,6 +15,60 @@ const RATE_LIMIT_FREE = 10; // messages per day
 const RATE_LIMIT_PRO = 200;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+const CANNED_REPLY =
+  "Hi, I'm Mara, your AfriTalent career assistant. I'm running in demo mode right now " +
+  "(no AI model is configured on this server), so I can't give personalised advice yet. " +
+  "In the meantime you can browse jobs, update your profile and use the resume tools.";
+
+/**
+ * Canned replies are used when MOCK_AI=1 or no Anthropic key is configured
+ * (local Docker / dev). In production a missing key is a 503, not a canned
+ * reply; the caller handles that distinction.
+ */
+function useCannedReply(): boolean {
+  return process.env.MOCK_AI === "1" || !process.env.ANTHROPIC_API_KEY;
+}
+
+type ChatTurn = { role: "user" | "assistant"; content: string };
+
+/**
+ * Build the Claude messages array from chronological history plus the new
+ * user message. Guarantees the array starts with a user turn, ends with the
+ * new user message, and alternates roles (consecutive same-role turns, e.g.
+ * an orphan USER row left by an older failure, are merged).
+ */
+export function buildChatMessages(
+  history: { role: string; content: string }[],
+  newUserContent: string
+): ChatTurn[] {
+  const turns: ChatTurn[] = [];
+  const push = (role: ChatTurn["role"], content: string): void => {
+    const last = turns[turns.length - 1];
+    if (last && last.role === role) {
+      last.content = `${last.content}\n\n${content}`;
+    } else {
+      turns.push({ role, content });
+    }
+  };
+
+  for (const msg of history) {
+    if (msg.role === "USER") push("user", msg.content);
+    else if (msg.role === "ASSISTANT") push("assistant", msg.content);
+  }
+
+  // Must start with a user turn.
+  while (turns.length > 0 && turns[0].role !== "user") turns.shift();
+
+  push("user", newUserContent);
+
+  // Keep within the history window without breaking the user-first rule.
+  while (turns.length > MAX_HISTORY_MESSAGES) {
+    turns.shift();
+    while (turns.length > 1 && turns[0].role !== "user") turns.shift();
+  }
+  return turns;
+}
 
 async function hasValidConsent(userId: string): Promise<boolean> {
   const consent = await prisma.chatConsent.findUnique({ where: { userId } });
@@ -106,69 +160,76 @@ router.post("/message", authenticate, async (req: Request, res: Response) => {
       return;
     }
 
-    // Save user message
-    await prisma.chatMessage.create({
-      data: { conversationId, role: "USER", content: message.trim() },
-    });
+    const userContent = message.trim();
+    // Captured before the model call so the USER row sorts before the
+    // ASSISTANT row even though both are written after the call succeeds.
+    const userMessageAt = new Date();
 
-    // Load conversation history
-    const history = await prisma.chatMessage.findMany({
+    // Load the most recent history (newest first, then reverse to chronological).
+    // The new user message is NOT persisted yet: it is saved only after the
+    // model call succeeds, so a failure leaves no orphan USER row and does not
+    // consume the user's daily message allowance.
+    const recent = await prisma.chatMessage.findMany({
       where: { conversationId },
-      orderBy: { createdAt: "asc" },
-      take: MAX_HISTORY_MESSAGES + 10, // fetch a few extra to include system context
+      orderBy: { createdAt: "desc" },
+      take: MAX_HISTORY_MESSAGES - 1, // leave room for the new user message
       select: { role: true, content: true },
     });
+    const messages = buildChatMessages(recent.reverse(), userContent);
 
     // Build context-aware system prompt
     const { systemPrompt, tokenEstimate } = await buildChatContext(userId);
 
-    // Build messages array for Claude
-    const messages: { role: "user" | "assistant"; content: string }[] = [];
-    for (const msg of history) {
-      if (msg.role === "USER") {
-        messages.push({ role: "user", content: msg.content });
-      } else if (msg.role === "ASSISTANT") {
-        messages.push({ role: "assistant", content: msg.content });
+    let assistantMessage: string;
+    let assistantTokens: number | null = null;
+    let modelUsed = CHAT_MODEL;
+
+    if (useCannedReply()) {
+      if (!process.env.ANTHROPIC_API_KEY && process.env.NODE_ENV === "production" && process.env.MOCK_AI !== "1") {
+        res.status(503).json({ error: "AI assistant is not configured on this server" });
+        return;
       }
+      assistantMessage = CANNED_REPLY;
+      modelUsed = "mock";
+    } else {
+      // Call Claude
+      const client = getAnthropicClient();
+      const response = await client.messages.create({
+        model: CHAT_MODEL,
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages,
+      });
+
+      const assistantContent = response.content[0];
+      if (!assistantContent || assistantContent.type !== "text") {
+        res.status(500).json({ error: "Unexpected AI response format" });
+        return;
+      }
+      assistantMessage = assistantContent.text.trim();
+      assistantTokens = response.usage?.output_tokens || null;
     }
 
-    // Ensure we don't exceed context window — trim older messages
-    if (messages.length > MAX_HISTORY_MESSAGES) {
-      messages.splice(0, messages.length - MAX_HISTORY_MESSAGES);
-    }
-
-    // Call Claude
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const response = await client.messages.create({
-      model: CHAT_MODEL,
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages,
-    });
-
-    const assistantContent = response.content[0];
-    if (assistantContent.type !== "text") {
-      res.status(500).json({ error: "Unexpected AI response format" });
-      return;
-    }
-
-    const assistantMessage = assistantContent.text.trim();
-    const assistantTokens = response.usage?.output_tokens || null;
-
-    // Save assistant response
-    const saved = await prisma.chatMessage.create({
-      data: {
-        conversationId,
-        role: "ASSISTANT",
-        content: assistantMessage,
-        tokenCount: assistantTokens,
-        metadata: { model: CHAT_MODEL, contextTokenEstimate: tokenEstimate },
-      },
-    });
+    // Persist the exchange only after a successful reply.
+    const [, saved] = await prisma.$transaction([
+      prisma.chatMessage.create({
+        data: { conversationId, role: "USER", content: userContent, createdAt: userMessageAt },
+      }),
+      prisma.chatMessage.create({
+        data: {
+          conversationId,
+          role: "ASSISTANT",
+          content: assistantMessage,
+          tokenCount: assistantTokens,
+          metadata: { model: modelUsed, contextTokenEstimate: tokenEstimate },
+          createdAt: new Date(Math.max(Date.now(), userMessageAt.getTime() + 1)),
+        },
+      }),
+    ]);
 
     // Update conversation title from first exchange
     if (!conv.title || conv.title === "New conversation") {
-      const title = message.trim().slice(0, 100);
+      const title = userContent.slice(0, 100);
       await prisma.chatConversation.update({ where: { id: conversationId }, data: { title } });
     }
 

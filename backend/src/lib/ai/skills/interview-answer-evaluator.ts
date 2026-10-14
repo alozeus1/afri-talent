@@ -1,6 +1,6 @@
 // Interview Answer Evaluator — STAR method scoring + actionable feedback
 
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "../anthropic-client.js";
 import logger from "../../logger.js";
 
 const QUALITY_MODEL = process.env.AI_QUALITY_MODEL || "claude-sonnet-4-6";
@@ -38,7 +38,7 @@ export async function evaluateInterviewAnswer(input: AnswerEvalInput): Promise<A
 }
 
 async function generateWithClaude(input: AnswerEvalInput): Promise<AnswerEvalResult> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = getAnthropicClient();
 
   const prompt = `You are an expert interview coach. Evaluate this interview answer.
 

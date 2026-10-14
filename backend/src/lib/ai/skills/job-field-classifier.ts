@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "../anthropic-client.js";
 import { z } from "zod";
 import logger from "../../logger.js";
 import { emitClassifierEvaluation, emitClassifierCorrect } from "../../observability/metrics.js";
@@ -289,7 +289,7 @@ function classifyByKeywords(input: ClassifierInput): { field: TaxonomyField; con
 
 async function classifyByLlm(input: ClassifierInput): Promise<ClassificationResult | null> {
   if (MOCK_AI || !ANTHROPIC_KEY) return null;
-  const client = new Anthropic({ apiKey: ANTHROPIC_KEY });
+  const client = getAnthropicClient();
 
   const allowed = JOB_TAXONOMY.join(", ");
   const prompt = `Classify the following job into EXACTLY ONE of these categories: ${allowed}.

@@ -245,8 +245,8 @@ async function parseJobText(text: string) {
   }
 
   try {
-    const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const { getAnthropicClient } = await import("../lib/ai/anthropic-client.js");
+    const client = getAnthropicClient();
 
     const response = await client.messages.create({
       model: process.env.AI_FAST_MODEL || "claude-haiku-4-5-20251001",

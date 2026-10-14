@@ -7,7 +7,7 @@
 // Falls back to a template-based letter when AI is unavailable.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "./anthropic-client.js";
 import logger from "../logger.js";
 
 const FAST_MODEL = process.env.AI_FAST_MODEL || "claude-haiku-4-5-20251001";
@@ -48,7 +48,7 @@ export async function generateQuickCoverLetter(
 }
 
 async function generateWithAI(input: CoverLetterInput): Promise<string> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = getAnthropicClient();
 
   const skillsText = input.skills.slice(0, 10).join(", ");
   const experience = input.yearsExperience

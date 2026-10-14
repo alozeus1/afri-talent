@@ -11,6 +11,9 @@ const DAILY_APPLY_PACK_LIMIT = parseInt(process.env.DAILY_APPLY_PACK_LIMIT || "5
 const DAILY_JOB_MATCH_LIMIT = parseInt(process.env.DAILY_JOB_MATCH_LIMIT || "20", 10);
 const DAILY_RESUME_REVIEW_LIMIT = parseInt(process.env.DAILY_RESUME_REVIEW_LIMIT || "10", 10);
 
+// In-flight (RUNNING) runs younger than this count toward the daily quota.
+const RUNNING_WINDOW_MS = 15 * 60 * 1000;
+
 const LIMITS: Record<string, number> = {
   apply_pack: DAILY_APPLY_PACK_LIMIT,
   job_match: DAILY_JOB_MATCH_LIMIT,
@@ -55,13 +58,20 @@ export async function checkDailyQuota(
       resume_review: AiRunType.RESUME_REVIEW,
     };
 
+    // Runs still in flight are counted too (if started in the last
+    // RUNNING_WINDOW_MS) so concurrent requests cannot all pass the check
+    // before any of them completes. Older RUNNING rows are treated as stale.
+    const runningSince = new Date(Date.now() - RUNNING_WINDOW_MS);
     const count = await aiRunModel.count({
       where: {
         userId,
         runType: typeMap[run_type],
         createdAt: { gte: startOfDay },
-        // Only count completed/partial runs (not blocked/failed)
-        status: { in: ["COMPLETE", "PARTIAL"] as any },
+        // Count completed/partial runs plus recent in-flight runs (not blocked/failed)
+        OR: [
+          { status: { in: ["COMPLETE", "PARTIAL"] as any } },
+          { status: "RUNNING" as any, createdAt: { gte: runningSince } },
+        ],
       },
     });
 

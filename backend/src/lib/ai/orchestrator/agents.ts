@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "../anthropic-client.js";
 import type {
   ResumeSchema,
   JobSchema,
@@ -37,7 +38,7 @@ function getClient(): Anthropic {
     if (!process.env.ANTHROPIC_API_KEY) {
       throw new Error("ANTHROPIC_API_KEY not set — AI agents are unavailable");
     }
-    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    _client = getAnthropicClient();
   }
   return _client;
 }
@@ -399,7 +400,7 @@ Output this exact schema:
     {
       "type": "fabrication"|"inconsistency"|"exaggeration",
       "field": string,
-      "original_value": string,
+      "original_value": string|null,
       "fabricated_value": string,
       "severity": "high"|"medium"|"low"
     }

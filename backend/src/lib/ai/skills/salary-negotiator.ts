@@ -1,6 +1,6 @@
 // Salary Negotiator — Africa-aware negotiation guidance
 
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "../anthropic-client.js";
 import logger from "../../logger.js";
 
 const QUALITY_MODEL = process.env.AI_QUALITY_MODEL || "claude-sonnet-4-6";
@@ -41,7 +41,7 @@ export async function generateNegotiationGuidance(
 }
 
 async function generateWithClaude(input: SalaryNegotiationInput): Promise<SalaryNegotiationResult> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = getAnthropicClient();
 
   const prompt = `You are a salary negotiation expert with deep knowledge of African job markets.
 

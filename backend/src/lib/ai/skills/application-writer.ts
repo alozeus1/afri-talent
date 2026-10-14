@@ -6,7 +6,7 @@
 // context from the user's saved resume data.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "../anthropic-client.js";
 import logger from "../../logger.js";
 
 const QUALITY_MODEL = process.env.AI_QUALITY_MODEL || "claude-sonnet-4-6";
@@ -44,7 +44,7 @@ export async function writeCoverLetter(
 }
 
 async function generateWithClaude(input: ApplicationWriterInput): Promise<string> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = getAnthropicClient();
 
   const toneInstruction = input.tone === "conversational"
     ? "Use a warm, approachable, and conversational tone — friendly yet professional."

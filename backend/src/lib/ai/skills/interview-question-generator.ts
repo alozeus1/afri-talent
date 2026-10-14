@@ -1,6 +1,6 @@
 // Interview Question Generator — role and difficulty aware
 
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "../anthropic-client.js";
 import logger from "../../logger.js";
 
 const QUALITY_MODEL = process.env.AI_QUALITY_MODEL || "claude-sonnet-4-6";
@@ -42,7 +42,7 @@ export async function generateInterviewQuestions(
 }
 
 async function generateWithClaude(input: InterviewQuestionInput): Promise<InterviewQuestionsResult> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = getAnthropicClient();
   const count = Math.min(input.count, 10);
 
   const prompt = `Generate ${count} interview questions for a ${input.difficulty} difficulty ${input.role} interview.
