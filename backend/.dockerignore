@@ -29,7 +29,7 @@ README.md
 *.md
 
 # Test files
-*.test.ts
-*.spec.ts
-__tests__
+**/*.test.ts
+**/*.spec.ts
+**/__tests__
 coverage

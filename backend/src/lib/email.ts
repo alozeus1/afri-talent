@@ -7,6 +7,26 @@ const SES_REGION = process.env.SES_REGION || process.env.AWS_REGION || "us-east-
 const FROM_EMAIL = process.env.SES_FROM_EMAIL;
 const IS_DEV = !FROM_EMAIL;
 
+/**
+ * Local-dev affordance: when SES is not configured the email body is never
+ * delivered, so account links (verify / reset) would be unreachable. Surface
+ * them at info level only when SES is unset AND we are outside a deployed
+ * environment (or the operator opts in with EMAIL_DEV_LOG_LINKS=1).
+ * Never logs when SES_FROM_EMAIL is configured.
+ */
+export function shouldLogDevEmailLinks(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.SES_FROM_EMAIL?.trim()) return false;
+  const nodeEnv = env.NODE_ENV ?? "development";
+  const deployed = nodeEnv === "production" || nodeEnv === "staging";
+  return !deployed || env.EMAIL_DEV_LOG_LINKS === "1";
+}
+
+function logDevEmailLink(fields: Record<string, string>, message: string): void {
+  if (IS_DEV && shouldLogDevEmailLinks()) {
+    logger.info(fields, message);
+  }
+}
+
 let _ses: SESClient | null = null;
 
 function getSES(): SESClient {
@@ -335,6 +355,7 @@ export async function passwordResetEmail(opts: {
   resetUrl: string;
   expiresInHours: number;
 }): Promise<void> {
+  logDevEmailLink({ resetUrl: opts.resetUrl }, "DEV password reset link");
   await sendEmail({
     to: opts.to,
     subject: "Reset your AfriTalent password",
@@ -438,6 +459,7 @@ export async function accountEmailVerificationEmail(opts: {
   verifyUrl: string;
   expiresInHours: number;
 }): Promise<void> {
+  logDevEmailLink({ verifyUrl: opts.verifyUrl }, "DEV email verification link");
   await sendEmail({
     to: opts.to,
     subject: "Verify your AfriTalent email",
