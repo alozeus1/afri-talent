@@ -78,10 +78,17 @@ function formHasDraft(value: FormState): boolean {
   );
 }
 
-function fromProfile(candidateProfile: CandidateProfile): Partial<FormState> {
+function fromProfile(
+  candidateProfile: CandidateProfile,
+  account?: { name?: string | null; email?: string | null } | null,
+): Partial<FormState> {
   return {
+    // Account identity fills the required Basics fields so "Start from
+    // profile" leaves the wizard ready to advance.
+    ...(account?.name ? { fullName: account.name } : {}),
+    ...(account?.email ? { email: account.email } : {}),
     location: candidateProfile.targetCountries?.[0] || "",
-    targetRole: candidateProfile.targetRoles?.[0] || "",
+    targetRole: candidateProfile.targetRoles?.[0] || candidateProfile.headline || "",
     yearsExperience: String(candidateProfile.yearsExperience ?? 0),
     summary: candidateProfile.bio || candidateProfile.headline || "",
     skills: candidateProfile.skills.join(", "),
@@ -194,7 +201,7 @@ export default function ResumeBuilderPage() {
         setForm((current) => {
           if (formHasDraft(current)) return current;
           setProfileNotice("Resume builder started from your saved profile.");
-          return { ...current, ...fromProfile(candidateProfile) };
+          return { ...current, ...fromProfile(candidateProfile, user) };
         });
       })
       .catch(() => undefined);
@@ -268,7 +275,7 @@ export default function ResumeBuilderPage() {
   }
 
   function applyProfileToForm(candidateProfile: CandidateProfile, overwrite = false) {
-    const profileForm = fromProfile(candidateProfile);
+    const profileForm = fromProfile(candidateProfile, user);
     setForm((prev) => ({
       ...prev,
       ...Object.fromEntries(

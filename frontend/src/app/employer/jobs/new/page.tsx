@@ -489,12 +489,15 @@ export default function NewJobPage() {
                     Back
                   </Button>
                 )}
+                {/* Distinct keys: without them React reuses the same <button>
+                    and flips type="button" -> "submit" during the click, so the
+                    browser submits the form and skips the step-3 review. */}
                 {step < 3 ? (
-                  <Button type="button" className="flex-1" onClick={nextStep}>
+                  <Button key="continue" type="button" className="flex-1" onClick={nextStep}>
                     Continue
                   </Button>
                 ) : (
-                  <Button type="submit" className="flex-1" disabled={loading}>
+                  <Button key="submit" type="submit" className="flex-1" disabled={loading}>
                     {loading ? "Creating..." : "Post job"}
                   </Button>
                 )}

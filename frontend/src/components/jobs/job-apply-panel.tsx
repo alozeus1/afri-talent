@@ -187,7 +187,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                   <p className="font-semibold mb-1">Verify your email to apply</p>
                   <p className="mb-3">We sent a verification link to your email address. Open it, then come back here to apply.</p>
-                  <Link href="/candidate" className="text-emerald-700 underline font-medium">
+                  <Link href={localizePath("/candidate", locale)} className="text-emerald-700 underline font-medium">
                     Go to dashboard to resend
                   </Link>
                 </div>

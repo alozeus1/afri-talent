@@ -102,7 +102,7 @@ router.post("/register", registerLimiter, validateHumanAuthSubmission, async (re
           reason: "missing_employer_fields",
         },
       });
-      res.status(400).json({ error: "Employer registration requires companyName and location" });
+      res.status(400).json({ error: "Please add your company name and company location to create an employer account." });
       return;
     }
 

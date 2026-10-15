@@ -1,9 +1,17 @@
 # Docker Compose for the local end-to-end stack (Docker Desktop, amd64/arm64).
-# Usage: docker compose up --build        (see docs/local-docker-e2e.md)
-# Seed (DESTRUCTIVE, fresh DB only): docker compose --profile seed run --rm seed
+# Usage: docker compose up --build        (see docs/LOCAL_DOCKER_E2E.md)
+# Order: postgres -> backend (runs migrations) -> seed (only if DB has no users)
+#        -> frontend. Re-seed (DESTRUCTIVE): docker compose run --rm -e SEED_FORCE=1 seed
 #
 # Runs with no Anthropic, SES, S3 or Stripe keys: MOCK_AI=1 stubs the AI and
 # email verification links are logged by the backend (EMAIL_DEV_LOG_LINKS=1).
+
+name: afritalent-local
+
+# Host ports are overridable (e.g. in .env) when 3000/4000/55432 are taken:
+#   FRONTEND_HOST_PORT=3100 BACKEND_HOST_PORT=4100 DB_HOST_PORT=55433
+# The browser-facing API URL is baked into the frontend image at build time, so
+# rebuild (`up --build`) after changing BACKEND_HOST_PORT.
 
 x-backend-database-url: &backend-database-url postgresql://postgres:postgres@postgres:5432/afritalent  # secret-scan:allow (local-only dev credentials)
 
@@ -12,7 +20,6 @@ services:
     # pgvector is required: migrations run CREATE EXTENSION vector and add
     # vector(1536) columns with hnsw indexes.
     image: pgvector/pgvector:0.8.0-pg16
-    container_name: afritalent-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -21,7 +28,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     # Host 5432 is commonly taken; exposed on loopback 55432 for debugging only.
     ports:
-      - "127.0.0.1:55432:5432"
+      - "127.0.0.1:${DB_HOST_PORT:-55432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -32,7 +39,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: afritalent-backend
     environment:
       # development: non-Secure cookies over http://localhost and relaxed auth
       # rate limits. The entrypoint still runs `prisma migrate deploy`.
@@ -40,7 +46,7 @@ services:
       DATABASE_URL: *backend-database-url
       JWT_SECRET: ${JWT_SECRET:-local-dev-only-jwt-secret-please-change-0123456789abcdef}
       CSRF_SECRET: ${CSRF_SECRET:-local-dev-only-csrf-secret-please-change-0123456789abcd}
-      FRONTEND_URL: http://localhost:3000
+      FRONTEND_URL: http://localhost:${FRONTEND_HOST_PORT:-3000}
       PORT: 4000
       MOCK_AI: ${MOCK_AI:-1}
       # Free launch: every user fully entitled at read time (see backend/.env.example).
@@ -54,7 +60,7 @@ services:
       ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
       ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
     ports:
-      - "4000:4000"
+      - "${BACKEND_HOST_PORT:-4000}:4000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,11 +77,10 @@ services:
       dockerfile: Dockerfile
       args:
         # Inlined at build time; used by the browser on the host.
-        NEXT_PUBLIC_API_URL: http://localhost:4000
-        NEXT_PUBLIC_BACKEND_URL: http://localhost:4000
+        NEXT_PUBLIC_API_URL: http://localhost:${BACKEND_HOST_PORT:-4000}
+        NEXT_PUBLIC_BACKEND_URL: http://localhost:${BACKEND_HOST_PORT:-4000}
         # Free launch UI (no paywalls/upgrade CTAs). Pair with backend FREE_MODE.
         NEXT_PUBLIC_FREE_MODE: ${NEXT_PUBLIC_FREE_MODE:-true}
-    container_name: afritalent-frontend
     environment:
       NODE_ENV: production
       # Server-only, read at runtime: SSR reaches the backend over the compose
@@ -83,10 +88,12 @@ services:
       INTERNAL_API_URL: http://backend:4000
       INTERNAL_FETCH_SECRET: ${INTERNAL_FETCH_SECRET:-local-internal-fetch-secret-0123456789}
     ports:
-      - "3000:3000"
+      - "${FRONTEND_HOST_PORT:-3000}:3000"
     depends_on:
       backend:
         condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/"]
       interval: 15s
@@ -94,20 +101,33 @@ services:
       retries: 5
       start_period: 30s
 
-  # One-shot seed. DESTRUCTIVE: wipes users/jobs/applications before seeding.
-  # Run only against a fresh local DB:
-  #   docker compose --profile seed run --rm seed
+  # One-shot demo seed. Runs after the backend has migrated the schema and
+  # seeds ONLY when the users table is empty, so restarts never wipe data.
+  # prisma/seed.ts itself is destructive (deletes users/jobs/applications);
+  # SEED_FORCE=1 re-runs it on a non-empty local DB on purpose.
   seed:
-    profiles: ["seed"]
     build:
       context: ./backend
       dockerfile: Dockerfile
       target: builder
     environment:
       DATABASE_URL: *backend-database-url
+      SEED_FORCE: ${SEED_FORCE:-0}
     # tsx is a devDependency removed by `npm prune` in the builder stage, so it
-    # is fetched on demand.
-    command: ["npx", "--yes", "tsx", "prisma/seed.ts"]
+    # is fetched on demand (needs internet on first run).
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        USERS=$$(node -e 'const {PrismaClient}=require("@prisma/client");const p=new PrismaClient();p.user.count().then(n=>{console.log(n);return p.$$disconnect()}).catch(e=>{console.error(e);process.exit(1)})')
+        if [ "$$USERS" = "0" ] || [ "$$SEED_FORCE" = "1" ]; then
+          echo "Seeding demo data (users=$$USERS)..."
+          npx --yes tsx prisma/seed.ts
+        else
+          echo "Database already has $$USERS users; skipping seed."
+        fi
+    restart: "no"
     depends_on:
       backend:
         condition: service_healthy

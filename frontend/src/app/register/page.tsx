@@ -58,8 +58,13 @@ function RegisterForm() {
       errors.password = "Password must contain an uppercase letter, a lowercase letter, and a number";
     }
     
-    if (formData.role === "EMPLOYER" && !formData.companyName) {
+    if (formData.role === "EMPLOYER" && !formData.companyName.trim()) {
       errors.companyName = "Company name is required";
+    }
+
+    // Backend rejects employer sign-up without a location; flag it inline.
+    if (formData.role === "EMPLOYER" && !formData.location.trim()) {
+      errors.location = "Company location is required";
     }
     
     setFieldErrors(errors);
@@ -227,6 +232,7 @@ function RegisterForm() {
                 placeholder="e.g., Remote, Lagos, Nigeria"
                 value={formData.location}
                 onChange={(e) => updateField("location", e.target.value)}
+                error={fieldErrors.location}
               />
             </>
           )}

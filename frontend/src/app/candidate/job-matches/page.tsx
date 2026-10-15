@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { skills, JobMatch } from "@/lib/api";
+import { skills, JobMatch, ApiError } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PlanBadge } from "@/components/ui/plan-badge";
@@ -61,7 +61,13 @@ export default function JobMatchesPage() {
       const data = await skills.getJobMatches(10);
       setMatches(data.matches);
     } catch (err) {
-      setError(toFriendlyError(err));
+      // No saved resume yet is the normal first-visit state, not an error:
+      // fall through to the "Build your resume" empty state.
+      if (err instanceof ApiError && err.code === "NO_RESUME") {
+        setMatches([]);
+      } else {
+        setError(toFriendlyError(err));
+      }
     } finally {
       setLoading(false);
     }
