@@ -51,6 +51,87 @@ function decodeHtmlEntitiesDeep(value: string, passes = 3): string {
   return decoded;
 }
 
+export function normalizeDescriptionText(value: string): string {
+  const decoded = decodeHtmlEntitiesDeep(value);
+  const withStructure = decoded
+    .replace(/\r\n?/g, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|section|article|header|footer|h[1-6]|blockquote|table|tr)>/gi, "\n\n")
+    .replace(/<li\b[^>]*>/gi, "\n- ")
+    .replace(/<\/(ul|ol)>/gi, "\n")
+    .replace(/<[^>]*>/g, " ");
+
+  const lines = withStructure
+    .replace(/\u00a0/g, " ")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim());
+
+  const normalizedLines: string[] = [];
+  for (const line of lines) {
+    if (line.length === 0) {
+      if (normalizedLines.length > 0 && normalizedLines[normalizedLines.length - 1] !== "") {
+        normalizedLines.push("");
+      }
+      continue;
+    }
+
+    normalizedLines.push(line);
+  }
+
+  while (normalizedLines[normalizedLines.length - 1] === "") {
+    normalizedLines.pop();
+  }
+
+  return normalizedLines.join("\n").trim();
+}
+
+export function extractSkillsFromText(text: string): string[] {
+  const skillPatterns = [
+    // Programming languages
+    /\b(javascript|typescript|python|java|c\+\+|c#|ruby|go|golang|rust|php|swift|kotlin|scala)\b/gi,
+    // Frameworks
+    /\b(react|angular|vue|node\.?js|express|django|flask|spring|rails|laravel|nextjs|next\.js)\b/gi,
+    // Databases
+    /\b(postgresql|mysql|mongodb|redis|elasticsearch|dynamodb|cassandra|oracle)\b/gi,
+    // Cloud
+    /\b(aws|azure|gcp|google cloud|kubernetes|k8s|docker|terraform|ansible)\b/gi,
+    // Tools
+    /\b(git|jenkins|circleci|github actions|jira|figma|sketch|adobe xd)\b/gi,
+  ];
+
+  const skills = new Set<string>();
+  for (const pattern of skillPatterns) {
+    const matches = text.match(pattern);
+    if (matches) {
+      matches.forEach((m) => skills.add(m.toLowerCase()));
+    }
+  }
+
+  return Array.from(skills);
+}
+
+export function detectSeniorityFromText(title: string, description: string): "Junior" | "Mid-level" | "Senior" | "Lead" | "Executive" | null {
+  const text = `${title} ${description}`.toLowerCase();
+
+  if (text.includes("executive") || text.includes("director") || text.includes("vp ") || text.includes("chief")) {
+    return "Executive";
+  }
+  if (text.includes("lead") || text.includes("principal") || text.includes("staff")) {
+    return "Lead";
+  }
+  if (text.includes("senior") || text.includes("sr.") || text.includes("sr ")) {
+    return "Senior";
+  }
+  if (text.includes("junior") || text.includes("jr.") || text.includes("jr ") || text.includes("entry")) {
+    return "Junior";
+  }
+  if (text.includes("mid") || text.includes("intermediate")) {
+    return "Mid-level";
+  }
+
+  return null;
+}
+
 export abstract class BaseJobSource {
   protected config: JobSourceConfig;
   protected requestCount = 0;
@@ -93,37 +174,7 @@ export abstract class BaseJobSource {
   }
 
   protected normalizeDescription(value: string): string {
-    const decoded = decodeHtmlEntitiesDeep(value);
-    const withStructure = decoded
-      .replace(/\r\n?/g, "\n")
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/(p|div|section|article|header|footer|h[1-6]|blockquote|table|tr)>/gi, "\n\n")
-      .replace(/<li\b[^>]*>/gi, "\n- ")
-      .replace(/<\/(ul|ol)>/gi, "\n")
-      .replace(/<[^>]*>/g, " ");
-
-    const lines = withStructure
-      .replace(/\u00a0/g, " ")
-      .split("\n")
-      .map((line) => line.replace(/[ \t]+/g, " ").trim());
-
-    const normalizedLines: string[] = [];
-    for (const line of lines) {
-      if (line.length === 0) {
-        if (normalizedLines.length > 0 && normalizedLines[normalizedLines.length - 1] !== "") {
-          normalizedLines.push("");
-        }
-        continue;
-      }
-
-      normalizedLines.push(line);
-    }
-
-    while (normalizedLines[normalizedLines.length - 1] === "") {
-      normalizedLines.pop();
-    }
-
-    return normalizedLines.join("\n").trim();
+    return normalizeDescriptionText(value);
   }
 
   protected normalizeLocation(location: string): { city: string; country: string; locationType: "remote" | "hybrid" | "onsite" } {
@@ -141,28 +192,7 @@ export abstract class BaseJobSource {
   }
 
   protected extractSkills(text: string): string[] {
-    const skillPatterns = [
-      // Programming languages
-      /\b(javascript|typescript|python|java|c\+\+|c#|ruby|go|golang|rust|php|swift|kotlin|scala)\b/gi,
-      // Frameworks
-      /\b(react|angular|vue|node\.?js|express|django|flask|spring|rails|laravel|nextjs|next\.js)\b/gi,
-      // Databases
-      /\b(postgresql|mysql|mongodb|redis|elasticsearch|dynamodb|cassandra|oracle)\b/gi,
-      // Cloud
-      /\b(aws|azure|gcp|google cloud|kubernetes|k8s|docker|terraform|ansible)\b/gi,
-      // Tools
-      /\b(git|jenkins|circleci|github actions|jira|figma|sketch|adobe xd)\b/gi,
-    ];
-
-    const skills = new Set<string>();
-    for (const pattern of skillPatterns) {
-      const matches = text.match(pattern);
-      if (matches) {
-        matches.forEach((m) => skills.add(m.toLowerCase()));
-      }
-    }
-
-    return Array.from(skills);
+    return extractSkillsFromText(text);
   }
 
   protected detectVisaSponsorship(text: string): "YES" | "NO" | "UNKNOWN" {
@@ -200,25 +230,7 @@ export abstract class BaseJobSource {
   }
 
   protected detectSeniority(title: string, description: string): "Junior" | "Mid-level" | "Senior" | "Lead" | "Executive" | null {
-    const text = `${title} ${description}`.toLowerCase();
-
-    if (text.includes("executive") || text.includes("director") || text.includes("vp ") || text.includes("chief")) {
-      return "Executive";
-    }
-    if (text.includes("lead") || text.includes("principal") || text.includes("staff")) {
-      return "Lead";
-    }
-    if (text.includes("senior") || text.includes("sr.") || text.includes("sr ")) {
-      return "Senior";
-    }
-    if (text.includes("junior") || text.includes("jr.") || text.includes("jr ") || text.includes("entry")) {
-      return "Junior";
-    }
-    if (text.includes("mid") || text.includes("intermediate")) {
-      return "Mid-level";
-    }
-
-    return null;
+    return detectSeniorityFromText(title, description);
   }
 
   protected classifyJobField(input: {

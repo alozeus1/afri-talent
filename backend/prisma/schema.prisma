@@ -1022,6 +1022,10 @@ model Job {
   // §4.2 — tri-key dedup K1 (`normCompany:normTitle:normCity`). Persisted
   // for O(1) lookup on insert; populated by the ingest write-path.
   dedupKeyV2                 String?               @db.VarChar(255)
+  // Aggregator engine — sha256 of the normalised ingest payload. When an
+  // incoming posting hashes identically the engine only touches
+  // sourceLastSeenAt and skips classification/LLM work entirely.
+  contentHash                String?               @db.VarChar(64)
   sourceLineage              Json?
   sourceFirstSeenAt          DateTime?
   sourceLastSeenAt           DateTime?
@@ -1086,6 +1090,26 @@ model Job {
   @@index([freshnessScore, qualityScore])
   @@index([riskLevel, riskScore])
   @@index([isFeatured, status])
+}
+
+// Aggregator engine — one row per ingestion run (cron, manual or dry-run).
+// `sources` holds the per-source metrics array (fetched/eligible/new/updated/
+// unchanged/rejected/duplicates/errors/durationMs/circuit state) exposed to
+// the admin via GET /api/aggregator/runs.
+model AggregatorRun {
+  id         String    @id @default(uuid())
+  trigger    String    @db.VarChar(32)
+  dryRun     Boolean   @default(false)
+  status     String    @db.VarChar(16)
+  startedAt  DateTime
+  finishedAt DateTime?
+  durationMs Int       @default(0)
+  totals     Json
+  sources    Json
+  createdAt  DateTime  @default(now())
+
+  @@index([startedAt(sort: Desc)])
+  @@index([status, startedAt])
 }
 
 model CompanyCareerSource {
