@@ -33,7 +33,7 @@ export default function NotFound() {
           </Link>
         </div>
         <div className="mt-12 text-sm text-gray-400 dark:text-gray-500">
-          <p>Think this is a mistake? <a href="mailto:support@afritalent.com" className="text-emerald-600 hover:underline">Contact support</a></p>
+          <p>Think this is a mistake? <Link href="/contact?topic=TECHNICAL" prefetch={false} className="text-emerald-600 hover:underline">Contact support</Link></p>
         </div>
       </div>
     </div>
