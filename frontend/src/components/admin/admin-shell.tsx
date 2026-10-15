@@ -166,7 +166,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 aria-expanded={accountOpen}
                 aria-controls="admin-account-menu"
                 aria-label={t("shell.accountMenu")}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-700 text-xs font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
               >
                 {initialsOf(user.name)}
               </button>

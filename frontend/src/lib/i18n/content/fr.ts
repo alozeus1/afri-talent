@@ -86,6 +86,30 @@ const overlay: ContentOverlay = {
     "prepare-remote-work": { title: "Se préparer au télétravail", description: "Développez des habitudes de communication, de documentation et de fiabilité pour les équipes internationales.", steps: ["Planifiez des points en asynchrone.", "Fixez des limites de travail.", "Documentez les décisions.", "Prévoyez une connexion Internet de secours."], outcomes: ["Mieux travailler à distance.", "Démontrer votre fiabilité.", "Répondre aux questions d'entretien sur le télétravail."], checklist: ["Espace de travail stable.", "Points d'avancement clairs.", "Attention aux fuseaux horaires."], practiceTask: "Rédigez un exemple de point d'avancement asynchrone sur un projet." },
     "negotiate-salary": { title: "Négocier son salaire", description: "Préparez vos prétentions salariales avec des recherches, une fourchette et un discours respectueux.", steps: ["Recherchez les données du marché.", "Définissez une fourchette.", "Tenez compte des avantages.", "Entraînez-vous avec des réponses types."], outcomes: ["Parler salaire avec assurance.", "Éviter de vous sous-évaluer.", "Gérer les questions des recruteurs."], checklist: ["Connaître son minimum.", "Utiliser des fourchettes.", "Rester professionnel."], practiceTask: "Rédigez une réponse sur vos prétentions salariales pour un poste à distance." },
   },
+  interviewTracks: {
+    "Cloud Engineer": { role: "Ingénieur cloud", focus: "fondamentaux AWS, dépannage, réseau, supervision" },
+    "DevOps Engineer": { role: "Ingénieur DevOps", focus: "CI/CD, conteneurs, infrastructure as code, retour arrière" },
+    "DevSecOps Engineer": { role: "Ingénieur DevSecOps", focus: "pipelines sécurisés, analyse des dépendances, automatisation guidée par les menaces" },
+    "AWS Solutions Architect": { role: "Architecte de solutions AWS", focus: "arbitrages d'architecture, disponibilité, coûts, sécurité" },
+    "SOC Analyst": { role: "Analyste SOC", focus: "tri des alertes, preuves, escalade, revue des journaux" },
+    "Cybersecurity Analyst": { role: "Analyste en cybersécurité", focus: "risque, gestion des vulnérabilités, réponse à incident, sécurité des utilisateurs" },
+    "Frontend Developer": { role: "Développeur front-end", focus: "qualité de l'interface, accessibilité, gestion d'état, performance" },
+    "Backend Developer": { role: "Développeur back-end", focus: "API, modélisation des données, fiabilité, sécurité" },
+    "Product Manager": { role: "Product manager", focus: "problèmes utilisateurs, priorisation, arbitrages, indicateurs" },
+    "Data Analyst": { role: "Analyste de données", focus: "SQL, indicateurs, tableaux de bord, aide à la décision" },
+    "AI Engineer": { role: "Ingénieur IA", focus: "workflows LLM, évaluation, garde-fous, recherche documentaire" },
+    "Technical Support Engineer": { role: "Ingénieur support technique", focus: "débogage client, communication, escalade" },
+  },
+  interviewInsights: {
+    "aws-cloud-engineer-questions": { title: "Questions fréquentes en entretien d'ingénieur cloud AWS", summary: "Attendez-vous à des questions sur le VPC, l'IAM, la supervision, la réponse à incident et les arbitrages de coûts." },
+    "devops-questions": { title: "Questions fréquentes en entretien d'ingénieur DevOps", summary: "La plupart des étapes évaluent la conception de pipelines, la sécurité des déploiements, les secrets et la logique de retour arrière." },
+    "cyber-analyst-questions": { title: "Questions fréquentes en entretien d'analyste en cybersécurité", summary: "Les entretiens d'analyste valorisent un raisonnement fondé sur les preuves plutôt que des réponses spectaculaires." },
+    "tell-me-about-yourself": { title: "Comment répondre à « Parlez-moi de vous »", summary: "Utilisez une structure concise présent-passé-futur liée au poste." },
+    "explain-project": { title: "Comment présenter un projet que vous avez réalisé", summary: "Les recruteurs veulent le problème, les contraintes, les choix techniques, les arbitrages et les résultats." },
+    "salary-expectations": { title: "Comment répondre aux questions sur vos prétentions salariales", summary: "Préparez une fourchette documentée et évitez de vous enfermer trop tôt dans le chiffre le plus bas." },
+    "remote-global-interviews": { title: "Comment préparer un entretien à distance à l'international", summary: "Les entretiens à distance évaluent la communication, la fiabilité et l'autonomie autant que les compétences techniques." },
+    "star-answering": { title: "Exercices d'entraînement avec la méthode STAR", summary: "La méthode STAR rend vos réponses comportementales précises et évite les récits vagues." },
+  },
 };
 
 export default overlay;

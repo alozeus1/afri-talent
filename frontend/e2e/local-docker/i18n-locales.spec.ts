@@ -45,7 +45,7 @@ const ALLOWED = [
   /^Powered by Maralito Labs StudioTM$/,
   /LinkedIn|GitHub|Google|WhatsApp|Telegram|Stripe|Greenhouse|Lever|Ashby|Workable|Recruitee|SmartRecruiters/,
   /@example\.com|@afri-talent\.com/,
-  /^We Work Remotely$/, // job source brand
+  /^(We Work Remotely|Working Nomads)$/, // job source brands (crawler panel)
   /U\.S\. Bureau of Labor Statistics/, // cited dataset name
   // Same word in the target language (fr "visa"; "Lead / Staff" is the industry level name in fr/pt).
   /^Europe \+ visa$/,
@@ -61,6 +61,9 @@ const USER_CONTENT = new Set([
   "Full-Stack Engineer",
   "Backend Engineer",
   "United Kingdom",
+  // Seeded candidate bio and skills (resume builder "start from profile" preview).
+  "5 years building products in FinTech and e-commerce.",
+  "TypeScript • React • Node.js • PostgreSQL • Docker",
 ]);
 
 type Role = "public" | "candidate" | "employer" | "admin";
@@ -112,7 +115,8 @@ async function uiStrings(page: Page): Promise<string[]> {
 }
 
 /** "1 applications", "1 jobs found": a singular count followed by a plural noun. */
-const badPlural = (s: string) => /(^|[^\d.,])1 [A-Za-z]+s\b/.test(s) && !/\b1 (of|plus|is|was|has)\b/.test(s);
+// Words ending in a double s (business, class, access) are singular already.
+const badPlural = (s: string) => /(^|[^\d.,])1 [A-Za-z]*[A-Za-rt-z]s\b/.test(s) && !/\b1 (of|plus|is|was|has)\b/.test(s);
 
 const looksLikeEnglishProse = (s: string) =>
   /[a-z]{2,}/i.test(s) && s.split(/\s+/).filter((w) => /^[A-Za-z][A-Za-z'’-]+$/.test(w)).length >= 2;

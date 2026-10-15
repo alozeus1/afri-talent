@@ -50,6 +50,10 @@ function ConsentPanel({
 
   const allChecked = POLICY_KEYS.every((key) => checks[key]);
   const { policies } = consentData;
+  // Policy v1.0 copy is translated client-side; a newer backend version
+  // shows the backend text until its translation lands.
+  const policyText = (key: PolicyKey, field: "title" | "summary") =>
+    policies[key].version === "1.0" ? t(`chat.consent.policy.${key}.${field}`) : policies[key][field];
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -70,7 +74,7 @@ function ConsentPanel({
             {POLICY_KEYS.map((key) => (
               <label
                 key={key}
-                aria-label={policies[key].title}
+                aria-label={policyText(key, "title")}
                 className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-4 transition-colors hover:border-line-strong has-[:checked]:border-success-line has-[:checked]:bg-success-soft"
               >
                 <input
@@ -80,8 +84,8 @@ function ConsentPanel({
                   className="mt-1 h-4 w-4 rounded border-line-strong accent-[var(--primary)]"
                 />
                 <div className="flex-1">
-                  <p className="font-medium text-fg">{policies[key].title}</p>
-                  <p className="mt-1 text-sm text-fg-secondary">{policies[key].summary}</p>
+                  <p className="font-medium text-fg">{policyText(key, "title")}</p>
+                  <p className="mt-1 text-sm text-fg-secondary">{policyText(key, "summary")}</p>
                   <span className="mt-1 block text-xs text-fg-muted">
                     {t("chat.consent.version", { version: policies[key].version })}
                   </span>

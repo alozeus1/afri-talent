@@ -86,6 +86,30 @@ const overlay: ContentOverlay = {
     "prepare-remote-work": { title: "Cómo prepararte para el trabajo remoto", description: "Desarrolla hábitos de comunicación, documentación y fiabilidad para equipos globales.", steps: ["Planifica actualizaciones asíncronas.", "Define límites de trabajo.", "Documenta las decisiones.", "Prepara una conexión a Internet de respaldo."], outcomes: ["Trabajar mejor en remoto.", "Demostrar fiabilidad.", "Responder preguntas de entrevista sobre trabajo remoto."], checklist: ["Espacio de trabajo estable.", "Actualizaciones claras.", "Atención a los husos horarios."], practiceTask: "Escribe un ejemplo de actualización asíncrona de un proyecto." },
     "negotiate-salary": { title: "Cómo negociar tu salario", description: "Prepara tus expectativas salariales con investigación, un rango y un enfoque respetuoso.", steps: ["Investiga datos del mercado.", "Define un rango.", "Ten en cuenta los beneficios.", "Practica respuestas tipo."], outcomes: ["Hablar de salario con seguridad.", "Evitar infravalorarte.", "Gestionar las preguntas de los reclutadores."], checklist: ["Conocer tu mínimo.", "Usar rangos.", "Mantener la profesionalidad."], practiceTask: "Escribe una respuesta sobre tus expectativas salariales para un puesto remoto." },
   },
+  interviewTracks: {
+    "Cloud Engineer": { role: "Ingeniero/a cloud", focus: "fundamentos de AWS, resolución de problemas, redes, monitorización" },
+    "DevOps Engineer": { role: "Ingeniero/a DevOps", focus: "CI/CD, contenedores, infraestructura como código, reversión" },
+    "DevSecOps Engineer": { role: "Ingeniero/a DevSecOps", focus: "pipelines seguros, análisis de dependencias, automatización basada en amenazas" },
+    "AWS Solutions Architect": { role: "Arquitecto/a de soluciones AWS", focus: "decisiones de arquitectura, disponibilidad, costes, seguridad" },
+    "SOC Analyst": { role: "Analista SOC", focus: "triaje de alertas, evidencias, escalado, revisión de registros" },
+    "Cybersecurity Analyst": { role: "Analista de ciberseguridad", focus: "riesgo, gestión de vulnerabilidades, respuesta a incidentes, seguridad del usuario" },
+    "Frontend Developer": { role: "Desarrollador/a frontend", focus: "calidad de la interfaz, accesibilidad, estado, rendimiento" },
+    "Backend Developer": { role: "Desarrollador/a backend", focus: "API, modelado de datos, fiabilidad, seguridad" },
+    "Product Manager": { role: "Product manager", focus: "problemas de usuarios, priorización, compromisos, métricas" },
+    "Data Analyst": { role: "Analista de datos", focus: "SQL, métricas, paneles, apoyo a la toma de decisiones" },
+    "AI Engineer": { role: "Ingeniero/a de IA", focus: "flujos con LLM, evaluación, salvaguardas, recuperación de información" },
+    "Technical Support Engineer": { role: "Ingeniero/a de soporte técnico", focus: "depuración con clientes, comunicación, escalado" },
+  },
+  interviewInsights: {
+    "aws-cloud-engineer-questions": { title: "Preguntas habituales en entrevistas de ingeniería cloud en AWS", summary: "Prepárate para preguntas sobre VPC, IAM, monitorización, respuesta a incidentes y costes." },
+    "devops-questions": { title: "Preguntas habituales en entrevistas de ingeniería DevOps", summary: "La mayoría de las rondas evalúan el diseño de pipelines, la seguridad de los despliegues, los secretos y la estrategia de reversión." },
+    "cyber-analyst-questions": { title: "Preguntas habituales en entrevistas de analista de ciberseguridad", summary: "Las entrevistas de analista premian el razonamiento basado en evidencias por encima de las respuestas espectaculares." },
+    "tell-me-about-yourself": { title: "Cómo responder a «Háblame de ti»", summary: "Usa una estructura breve de presente, pasado y futuro vinculada al puesto." },
+    "explain-project": { title: "Cómo explicar un proyecto que has creado", summary: "Los entrevistadores quieren conocer el problema, las restricciones, las decisiones técnicas, los compromisos y los resultados." },
+    "salary-expectations": { title: "Cómo responder a preguntas sobre expectativas salariales", summary: "Prepara un rango documentado y evita fijarte demasiado pronto en la cifra más baja." },
+    "remote-global-interviews": { title: "Cómo prepararte para entrevistas remotas internacionales", summary: "Las entrevistas remotas evalúan la comunicación, la fiabilidad y la responsabilidad tanto como la técnica." },
+    "star-answering": { title: "Ejercicios de práctica con el método STAR", summary: "El método STAR mantiene tus respuestas de comportamiento concretas y evita relatos vagos." },
+  },
 };
 
 export default overlay;

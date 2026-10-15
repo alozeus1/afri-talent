@@ -30,6 +30,7 @@ import {
 } from "@/components/candidate/candidate-ui";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { enumLabel, useCandidateT, type CandidateMessageKey } from "@/lib/i18n/candidate-messages";
+import { useLocalizedContent } from "@/lib/i18n/content";
 
 type Difficulty = InterviewDifficulty;
 type Stage = "setup" | "question" | "feedback" | "complete";
@@ -55,6 +56,10 @@ export default function InterviewPrepPage() {
   const router = useRouter();
   const locale = useLocale();
   const t = useCandidateT();
+  const content = useLocalizedContent();
+  // Display copy is localized; the English role stays the selection key.
+  const localizedTracks = content.interviewTracks(INTERVIEW_ROLE_TRACKS);
+  const localizedInsights = content.interviewInsights(INTERVIEW_INSIGHTS);
 
   const [stage, setStage] = useState<Stage>("setup");
   const [role, setRole] = useState(INTERVIEW_ROLE_TRACKS[0].role);
@@ -208,7 +213,8 @@ export default function InterviewPrepPage() {
                   {t("ip.roleTrack")} <span aria-hidden="true" className="text-danger">*</span>
                 </legend>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {INTERVIEW_ROLE_TRACKS.map((track) => {
+                  {INTERVIEW_ROLE_TRACKS.map((track, index) => {
+                    const shown = localizedTracks[index];
                     const active = role === track.role && !customRole;
                     return (
                       <button
@@ -224,10 +230,10 @@ export default function InterviewPrepPage() {
                         }`}
                       >
                         <span className={`block text-sm font-semibold ${active ? "text-primary-text" : "text-fg"}`} dir="auto">
-                          {track.role}
+                          {shown.role}
                         </span>
                         <span className="mt-1 block text-xs text-fg-muted" dir="auto">
-                          {track.focus}
+                          {shown.focus}
                         </span>
                       </button>
                     );
@@ -423,7 +429,7 @@ export default function InterviewPrepPage() {
             <h2 className="text-lg font-semibold text-fg">{t("ip.insights")}</h2>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
-            {INTERVIEW_INSIGHTS.slice(0, 8).map((insight) => (
+            {localizedInsights.slice(0, 8).map((insight) => (
               <div key={insight.id} className="rounded-xl border border-line bg-surface-sunken p-3" dir="auto">
                 <p className="text-sm font-semibold text-fg">{insight.title}</p>
                 <p className="mt-1 text-xs text-fg-secondary">{insight.summary}</p>
