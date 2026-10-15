@@ -188,7 +188,7 @@ export function UserDetailDrawer({
           {error && <Notice tone="error" onDismiss={() => setError(null)}>{error}</Notice>}
 
           <div className="mb-6 flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-lg font-semibold text-white">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-success text-lg font-semibold text-primary-fg">
               {initials}
             </div>
             <div className="min-w-0">
@@ -282,7 +282,7 @@ export function UserDetailDrawer({
               <ul className="space-y-2">
                 {detail.applications.map((a) => (
                   <li key={a.id} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="min-w-0 truncate text-fg dark:text-zinc-200">
+                    <span className="min-w-0 truncate text-fg">
                       {a.job.title} · <span className={muted}>{a.job.employer?.companyName ?? a.job.sourceName ?? "—"}</span>
                     </span>
                     <span className={`shrink-0 text-xs ${muted}`}>{appStatusLabel(a.status)} · {fmt.date(a.createdAt)}</span>
@@ -297,7 +297,7 @@ export function UserDetailDrawer({
               <ul className="space-y-2">
                 {detail.jobs.map((j) => (
                   <li key={j.id} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="min-w-0 truncate text-fg dark:text-zinc-200">{j.title}</span>
+                    <span className="min-w-0 truncate text-fg">{j.title}</span>
                     <span className="flex shrink-0 items-center gap-2">
                       <Pill tone={jobStatusTone[j.status]}>{t(`jobStatus.${j.status}`)}</Pill>
                       <span className={`text-xs ${muted}`}>{j._count.applications}</span>
@@ -325,8 +325,8 @@ export function UserDetailDrawer({
               <ol className="relative space-y-3 border-s border-[var(--border-soft)] ps-4">
                 {detail.activity.map((item, i) => (
                   <li key={`${item.kind}-${i}`} className="text-sm">
-                    <span className="absolute -start-1.5 mt-1.5 h-3 w-3 rounded-full border-2 border-[var(--surface)] bg-emerald-500" aria-hidden />
-                    <p className="text-fg dark:text-zinc-200">{item.label}</p>
+                    <span className="absolute -start-1.5 mt-1.5 h-3 w-3 rounded-full border-2 border-surface bg-primary" aria-hidden />
+                    <p className="text-fg">{item.label}</p>
                     <p className={`text-xs ${muted}`}>{fmt.dateTime(item.at)}</p>
                   </li>
                 ))}
@@ -342,10 +342,10 @@ export function UserDetailDrawer({
                 {detail.auditTrail.map((entry) => (
                   <li key={entry.id} className="rounded-xl border border-[var(--border-soft)] p-3 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className={`font-medium ${strong}`}>{entry.action.replace(/_/g, " ").toLowerCase()}</span>
+                      <span className={`font-medium ${strong}`}>{lookup(`auditAction.${entry.action}`, entry.action)}</span>
                       <span className={`text-xs ${muted}`}>{fmt.dateTime(entry.createdAt)}</span>
                     </div>
-                    {entry.reason && <p className="mt-1 text-fg-secondary dark:text-zinc-300">{entry.reason}</p>}
+                    {entry.reason && <p className="mt-1 text-fg-secondary">{entry.reason}</p>}
                     <p className={`mt-1 text-xs ${muted}`}>
                       {entry.admin?.admin
                         ? t("detail.by", { name: entry.admin.admin.name || entry.admin.admin.email })
@@ -378,7 +378,7 @@ export function UserDetailDrawer({
                     <legend className={labelClass}>{t("roles.permissions")}</legend>
                     <div className="grid max-h-48 grid-cols-1 gap-1 overflow-y-auto rounded-lg border border-[var(--border-soft)] p-2 sm:grid-cols-2">
                       {ALL_PERMISSIONS.map((p) => (
-                        <label key={p} className="flex items-center gap-2 text-xs text-fg-secondary dark:text-zinc-300">
+                        <label key={p} className="flex items-center gap-2 text-xs text-fg-secondary">
                           <input
                             type="checkbox"
                             checked={roleForm.permissions.includes(p)}

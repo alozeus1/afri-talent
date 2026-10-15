@@ -1,239 +1,174 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { adminAts, AdminAtsDashboard } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-
-function formatTimestamp(value: string | null | undefined): string {
-  if (!value) {
-    return "Not yet";
-  }
-
-  return new Date(value).toLocaleString();
-}
-
-function healthVariant(health: string): "success" | "warning" | "danger" | "info" {
-  switch (health) {
-    case "HEALTHY":
-      return "success";
-    case "DEGRADED":
-      return "warning";
-    case "DOWN":
-      return "danger";
-    default:
-      return "info";
-  }
-}
+import { useAdminEnum, useAdminFormatters, useAdminT } from "@/lib/i18n/admin-messages";
+import {
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  Panel,
+  Pill,
+  SkeletonList,
+  StatCard,
+  muted,
+  statusTone,
+  strong,
+} from "@/components/admin/console-ui";
 
 export default function AdminIntegrationsPage() {
-  const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const t = useAdminT();
+  const label = useAdminEnum();
+  const fmt = useAdminFormatters();
   const [dashboard, setDashboard] = useState<AdminAtsDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "ADMIN")) {
-      router.push("/login");
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setDashboard(await adminAts.dashboard());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setLoading(false);
     }
-  }, [isLoading, router, user]);
+  }, [t]);
 
   useEffect(() => {
-    if (user?.role === "ADMIN") {
-      void adminAts.dashboard()
-        .then((data) => setDashboard(data))
-        .catch((err) => setError(err instanceof Error ? err.message : "Failed to load ATS operations"))
-        .finally(() => setLoading(false));
-    }
-  }, [user]);
+    void load();
+  }, [load]);
 
-  if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-      </div>
-    );
-  }
+  const when = (value: string | null | undefined) => (value ? fmt.dateTime(value) : t("ats.notYet"));
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-fg">ATS Operations</h1>
-          <p className="mt-2 max-w-3xl text-fg-secondary">
-            Monitor employer integration health, failed syncs, webhook issues, and writeback readiness across Greenhouse, Lever, and Workable.
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => router.push("/admin")}>
-          Back to admin
-        </Button>
-      </div>
-
-      {error && (
-        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
-      )}
+    <div>
+      <PageHeader title={t("ats.title")} subtitle={t("ats.subtitle")} />
 
       {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-        </div>
+        <SkeletonList rows={4} />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => void load()} />
       ) : !dashboard ? (
-        <div className="rounded-2xl border border-dashed border-line-strong p-8 text-center text-sm text-fg-secondary">
-          ATS operations data is unavailable right now.
-        </div>
+        <EmptyState title={t("ats.unavailable")} />
       ) : (
-        <>
-          <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-sm text-fg-muted">Healthy connections</div>
-                <div className="mt-2 text-3xl font-semibold text-emerald-700">{dashboard.summary.healthyConnections}</div>
-                <p className="mt-2 text-sm text-fg-secondary">{dashboard.summary.totalConnections} total integrations</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-sm text-fg-muted">Need attention</div>
-                <div className="mt-2 text-3xl font-semibold text-blue-700">{dashboard.summary.needsAttentionConnections}</div>
-                <p className="mt-2 text-sm text-fg-secondary">Credential or mapping gaps</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-sm text-fg-muted">Failed syncs, 7d</div>
-                <div className="mt-2 text-3xl font-semibold text-amber-700">{dashboard.summary.failedSyncRunsLast7Days}</div>
-                <p className="mt-2 text-sm text-fg-secondary">Recent import or writeback issues</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-sm text-fg-muted">Failed webhooks, 7d</div>
-                <div className="mt-2 text-3xl font-semibold text-red-700">{dashboard.summary.failedWebhooksLast7Days}</div>
-                <p className="mt-2 text-sm text-fg-secondary">Inbound event delivery or verification failures</p>
-              </CardContent>
-            </Card>
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label={t("ats.healthy")}
+              value={fmt.number(dashboard.summary.healthyConnections)}
+              hint={t("ats.totalIntegrations", { count: fmt.number(dashboard.summary.totalConnections) })}
+              tone="brand"
+            />
+            <StatCard label={t("ats.needsAttention")} value={fmt.number(dashboard.summary.needsAttentionConnections)} hint={t("ats.needsAttentionHint")} tone="info" />
+            <StatCard label={t("ats.failedSyncs")} value={fmt.number(dashboard.summary.failedSyncRunsLast7Days)} hint={t("ats.failedSyncsHint")} tone="warning" />
+            <StatCard label={t("ats.failedWebhooks")} value={fmt.number(dashboard.summary.failedWebhooksLast7Days)} hint={t("ats.failedWebhooksHint")} tone="danger" />
           </div>
 
-          <div className="mb-8 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-            <Card>
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-fg">Provider breakdown</h2>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {dashboard.providerBreakdown.map((provider) => (
-                  <div key={provider.provider} className="rounded-2xl border border-line p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="font-semibold text-fg">{provider.label}</p>
-                        <p className="mt-1 text-sm text-fg-secondary">{provider.total} connected accounts</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="success">{provider.healthy} healthy</Badge>
-                        <Badge variant="warning">{provider.degraded} degraded</Badge>
-                        <Badge variant="danger">{provider.down} down</Badge>
-                        <Badge variant="info">{provider.needsAttention} needs attention</Badge>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-fg">Connections needing review</h2>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {dashboard.connections
-                  .filter((connection) => connection.healthStatus !== "HEALTHY")
-                  .slice(0, 8)
-                  .map((connection) => (
-                    <div key={connection.id} className="rounded-2xl border border-line p-4">
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <Panel title={t("ats.providers")}>
+              {dashboard.providerBreakdown.length === 0 ? (
+                <p className={`text-sm ${muted}`}>{t("ats.noProviders")}</p>
+              ) : (
+                <ul className="space-y-3">
+                  {dashboard.providerBreakdown.map((provider) => (
+                    <li key={provider.provider} className="rounded-xl border border-line p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold text-fg">{connection.employer.companyName}</p>
-                            <Badge variant={healthVariant(connection.healthStatus)}>
-                              {connection.healthStatus.replace(/_/g, " ")}
-                            </Badge>
-                          </div>
-                          <p className="mt-1 text-sm text-fg-secondary">
-                            {connection.providerLabel} • {connection.externalOrgId} • {connection.employer.user.email}
-                          </p>
-                          {connection.lastErrorMessage && (
-                            <p className="mt-2 text-sm text-red-700">{connection.lastErrorMessage}</p>
-                          )}
+                          <p className={`font-semibold ${strong}`}>{provider.label}</p>
+                          <p className={`mt-0.5 text-sm ${muted}`}>{t("ats.connectedAccounts", { count: fmt.number(provider.total) })}</p>
                         </div>
-                        <div className="text-sm text-fg-secondary">
-                          <p>Last sync: {formatTimestamp(connection.lastSyncedAt)}</p>
-                          <p>Last webhook: {formatTimestamp(connection.lastWebhookAt)}</p>
-                          <p>{connection.recentLogSummary.failedSyncRuns} failed sync runs</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          <Pill tone="green">{t("ats.countHealthy", { count: provider.healthy })}</Pill>
+                          <Pill tone="amber">{t("ats.countDegraded", { count: provider.degraded })}</Pill>
+                          <Pill tone="red">{t("ats.countDown", { count: provider.down })}</Pill>
+                          <Pill tone="blue">{t("ats.countAttention", { count: provider.needsAttention })}</Pill>
                         </div>
                       </div>
-                    </div>
+                    </li>
                   ))}
-              </CardContent>
-            </Card>
+                </ul>
+              )}
+            </Panel>
+
+            <Panel title={t("ats.review")}>
+              {(() => {
+                const items = dashboard.connections.filter((c) => c.healthStatus !== "HEALTHY").slice(0, 8);
+                if (items.length === 0) return <p className={`text-sm ${muted}`}>{t("ats.allHealthy")}</p>;
+                return (
+                  <ul className="space-y-3">
+                    {items.map((connection) => (
+                      <li key={connection.id} className="rounded-xl border border-line p-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className={`font-semibold ${strong}`}>{connection.employer.companyName}</p>
+                              <Pill tone={statusTone(connection.healthStatus)}>{label("atsHealth", connection.healthStatus)}</Pill>
+                            </div>
+                            <p className={`mt-1 break-all text-sm ${muted}`}>
+                              {connection.providerLabel} · {connection.externalOrgId} · {connection.employer.user.email}
+                            </p>
+                            {connection.lastErrorMessage && <p className="mt-2 text-sm text-danger">{connection.lastErrorMessage}</p>}
+                          </div>
+                          <div className={`shrink-0 text-xs md:text-end ${muted}`}>
+                            <p>{t("ats.lastSync", { time: when(connection.lastSyncedAt) })}</p>
+                            <p>{t("ats.lastWebhook", { time: when(connection.lastWebhookAt) })}</p>
+                            <p>{t("ats.failedRuns", { count: connection.recentLogSummary.failedSyncRuns })}</p>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </Panel>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-fg">Recent failed syncs</h2>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {dashboard.recentFailedSyncs.length === 0 ? (
-                  <p className="text-sm text-fg-muted">No failed syncs in the past 7 days.</p>
-                ) : (
-                  dashboard.recentFailedSyncs.map((run) => (
-                    <div key={run.id} className="rounded-2xl border border-line p-4">
+            <Panel title={t("ats.recentFailedSyncs")}>
+              {dashboard.recentFailedSyncs.length === 0 ? (
+                <p className={`text-sm ${muted}`}>{t("ats.noFailedSyncs")}</p>
+              ) : (
+                <ul className="space-y-3">
+                  {dashboard.recentFailedSyncs.map((run) => (
+                    <li key={run.id} className="rounded-xl border border-line p-4">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-fg">{run.connection.employer.companyName}</p>
-                        <Badge variant={run.status === "FAILED" ? "danger" : "warning"}>{run.status}</Badge>
+                        <p className={`font-semibold ${strong}`}>{run.connection.employer.companyName}</p>
+                        <Pill tone={statusTone(run.status)}>{label("atsRun", run.status)}</Pill>
                       </div>
-                      <p className="mt-1 text-sm text-fg-secondary">
-                        {run.connection.provider} • {run.syncType.replace(/_/g, " ")} • {formatTimestamp(run.startedAt)}
+                      <p className={`mt-1 text-sm ${muted}`}>
+                        {run.connection.provider} · {label("atsSync", run.syncType)} · {when(run.startedAt)}
                       </p>
-                      <p className="mt-2 text-sm text-fg-secondary">
-                        Errors: {run.errorCount} • Retries: {run.retryCount}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
+                      <p className="mt-2 text-sm text-fg-secondary">{t("ats.errorsRetries", { errors: run.errorCount, retries: run.retryCount })}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
 
-            <Card>
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-fg">Recent failed webhooks</h2>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {dashboard.recentFailedWebhooks.length === 0 ? (
-                  <p className="text-sm text-fg-muted">No failed webhooks in the past 7 days.</p>
-                ) : (
-                  dashboard.recentFailedWebhooks.map((event) => (
-                    <div key={event.id} className="rounded-2xl border border-line p-4">
+            <Panel title={t("ats.recentFailedWebhooks")}>
+              {dashboard.recentFailedWebhooks.length === 0 ? (
+                <p className={`text-sm ${muted}`}>{t("ats.noFailedWebhooks")}</p>
+              ) : (
+                <ul className="space-y-3">
+                  {dashboard.recentFailedWebhooks.map((event) => (
+                    <li key={event.id} className="rounded-xl border border-line p-4">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-fg">{event.connection.employer.companyName}</p>
-                        <Badge variant="danger">{event.status}</Badge>
+                        <p className={`font-semibold ${strong}`}>{event.connection.employer.companyName}</p>
+                        <Pill tone="red">{label("atsRun", event.status)}</Pill>
                       </div>
-                      <p className="mt-1 text-sm text-fg-secondary">
-                        {event.connection.provider} • {event.eventType} • {formatTimestamp(event.receivedAt)}
+                      <p className={`mt-1 break-all text-sm ${muted}`}>
+                        {event.connection.provider} · {event.eventType} · {when(event.receivedAt)}
                       </p>
-                      {event.errorMessage && (
-                        <p className="mt-2 text-sm text-red-700">{event.errorMessage}</p>
-                      )}
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
+                      {event.errorMessage && <p className="mt-2 text-sm text-danger">{event.errorMessage}</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

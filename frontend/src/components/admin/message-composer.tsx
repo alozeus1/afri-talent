@@ -81,11 +81,11 @@ export function MessageComposer({
           type="checkbox"
           checked={sendEmail}
           onChange={(e) => setSendEmail(e.target.checked)}
-          className="h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500 dark:border-zinc-600 dark:bg-zinc-900"
+          className="h-4 w-4 rounded border-line-strong text-primary-text focus:ring-focus"
         />
         {t("message.sendEmail")}
       </label>
-      {error && <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       <Button type="submit" isLoading={sending}>{submitLabel ?? t("message.send")}</Button>
     </form>
   );

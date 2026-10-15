@@ -9,6 +9,9 @@ import { AdminMessageKey, useAdminT } from "@/lib/i18n/admin-messages";
 import { muted, strong } from "./console-ui";
 import "./admin-console.css";
 
+// Brand name, intentionally not translated.
+const BRAND = "AfriTalent";
+
 type NavItem = { href: string; key: AdminMessageKey; icon: string };
 
 const MANAGE: NavItem[] = [
@@ -82,10 +85,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
         key={item.href}
         href={`${prefix}${item.href}`}
         aria-current={active ? "page" : undefined}
-        className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${compact ? "whitespace-nowrap" : ""} ${
+        className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${compact ? "whitespace-nowrap" : ""} ${
           active
-            ? "bg-emerald-600 text-white shadow-sm dark:bg-emerald-600"
-            : "text-fg-secondary hover:bg-surface-muted hover:text-fg dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+            ? "bg-primary text-primary-fg shadow-xs"
+            : "text-fg-secondary hover:bg-surface-muted hover:text-fg"
         }`}
       >
         <NavIcon d={item.icon} />
@@ -99,7 +102,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <aside className="lg:w-60 lg:shrink-0">
         <div className="lg:sticky lg:top-24">
           <div className="mb-4 hidden lg:block">
-            <p className={`text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400`}>AfriTalent</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-text">{BRAND}</p>
             <p className={`mt-1 text-lg font-semibold ${strong}`}>{t("shell.title")}</p>
             <p className={`text-xs ${muted}`}>{t("shell.subtitle")}</p>
           </div>
@@ -117,8 +120,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <p className={`mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider ${muted}`}>{t("nav.sectionPlatform")}</p>
               <div className="space-y-0.5">{PLATFORM.map((item) => renderLink(item))}</div>
             </div>
-            <Link href={prefix || "/"} className={`block px-3 text-xs underline-offset-4 hover:underline ${muted}`}>
-              ← {t("shell.backToSite")}
+            <Link href={prefix || "/"} className={`block rounded-sm px-3 text-xs underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${muted}`}>
+              <span aria-hidden className="inline-block rtl:rotate-180">←</span> {t("shell.backToSite")}
             </Link>
           </nav>
         </div>

@@ -179,7 +179,7 @@ export default function AdminJobsPage() {
                     <p className={`text-xs ${muted}`}>
                       {job.employer?.companyName ?? job.sourceName ?? "—"} · {job.location} · {fmt.date(job.createdAt)}
                     </p>
-                    {job.moderationReason && <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{job.moderationReason}</p>}
+                    {job.moderationReason && <p className="mt-1 text-xs text-warning">{job.moderationReason}</p>}
                   </Td>
                   <Td>
                     <div className="flex flex-col items-start gap-1">
