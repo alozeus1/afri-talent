@@ -214,6 +214,9 @@ jobs:
           NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          # Free launch switch (hides paywalls/upgrade CTAs). Inlined at build
+          # time; set repo variable NEXT_PUBLIC_FREE_MODE=false to turn it off.
+          NEXT_PUBLIC_FREE_MODE: ${{ vars.NEXT_PUBLIC_FREE_MODE || 'true' }}
         run: |
           IMAGE="$REGISTRY/$REPO"
           if [ -z "$PUBLIC_API_URL" ]; then
@@ -226,6 +229,7 @@ jobs:
             --build-arg NEXT_PUBLIC_API_URL="$PUBLIC_API_URL" \
             --build-arg NEXT_PUBLIC_BACKEND_URL="$PUBLIC_API_URL" \
             --build-arg NEXT_PUBLIC_SENTRY_DSN="$NEXT_PUBLIC_SENTRY_DSN" \
+            --build-arg NEXT_PUBLIC_FREE_MODE="$NEXT_PUBLIC_FREE_MODE" \
             --build-arg SENTRY_ORG="$SENTRY_ORG" \
             --build-arg SENTRY_PROJECT="$SENTRY_PROJECT" \
             --build-arg GIT_SHA="${{ steps.provenance.outputs.git_sha }}" \
