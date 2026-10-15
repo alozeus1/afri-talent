@@ -12,6 +12,7 @@ import discover from "./messages/discover";
 import guides from "./messages/guides";
 import legal from "./messages/legal";
 import site from "./messages/site";
+import { formatMessage } from "./format";
 
 type KeysOf<N> = N extends { en: infer E } ? keyof E & string : never;
 
@@ -34,15 +35,14 @@ export const PUBLIC_MESSAGES = Object.fromEntries(
 
 export type PublicVars = Record<string, string | number>;
 
-export function formatPublicMessage(template: string, vars?: PublicVars): string {
-  if (!vars) return template;
-  return template.replace(/\{(\w+)\}/g, (match, key: string) => (key in vars ? String(vars[key]) : match));
+export function formatPublicMessage(template: string, vars?: PublicVars, locale: SupportedLocale = "en"): string {
+  return formatMessage(template, vars, locale);
 }
 
 /** Translate a public-surface key in a given locale (usable outside React). */
 export function translatePublic(locale: SupportedLocale, key: PublicMessageKey, vars?: PublicVars): string {
   const dict = PUBLIC_MESSAGES[locale] ?? PUBLIC_MESSAGES.en;
-  return formatPublicMessage(dict[key] || PUBLIC_MESSAGES.en[key] || key, vars);
+  return formatPublicMessage(dict[key] || PUBLIC_MESSAGES.en[key] || key, vars, locale);
 }
 
 export type PublicT = (key: PublicMessageKey, vars?: PublicVars) => string;

@@ -22,6 +22,7 @@ import {
 } from "@/components/candidate/candidate-ui";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { enumLabel, useCandidateT } from "@/lib/i18n/candidate-messages";
+import { useLocationLabel } from "@/lib/i18n/public-labels";
 
 const scoreVariant = (score: number): "success" | "info" | "warning" | "default" => {
   if (score >= 80) return "success";
@@ -55,6 +56,7 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
 export default function JobMatchesPage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const locationLabel = useLocationLabel();
   const locale = useLocale();
   const t = useCandidateT();
 
@@ -198,7 +200,7 @@ export default function JobMatchesPage() {
                           {match.location ? (
                             <span className="inline-flex items-center gap-1">
                               · <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                              {match.location}
+                              {locationLabel(match.location)}
                             </span>
                           ) : null}
                         </p>

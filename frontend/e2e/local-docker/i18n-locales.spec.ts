@@ -1,7 +1,8 @@
 /**
  * Locale coverage against the local Docker stack: switching language from the
  * header switcher, RTL for Arabic, and no untranslated English left on key
- * pages in fr / pt / ar (public, candidate, employer and admin).
+ * pages in es / fr / pt / ar (public, candidate incl. resume builder and AI
+ * tools, employer and admin incl. jobs, reviews, audit logs and users).
  *
  *   APP_BASE_URL=http://localhost:3000 API_BASE_URL=http://localhost:4000 \
  *     npx playwright test -c playwright.local-docker.config.ts i18n-locales
@@ -9,15 +10,32 @@
  * "Untranslated" = a visible text node, placeholder or aria-label on the
  * localised page that is identical to one on the English page and reads as
  * English prose (2+ words). User/DB content (job titles, company names, people)
- * and brand names are excluded.
+ * and brand names are excluded: pages mark it with [data-user-content]. Table
+ * bodies are scanned too, so status/role badges and other chrome cells count.
+ * Count strings are also checked for plural agreement ("1 applications").
  */
 import { test, expect, type Browser, type Page } from "@playwright/test";
 
-const LOCALES = ["fr", "pt", "ar"] as const;
+const LOCALES = ["es", "fr", "pt", "ar"] as const;
 const PUBLIC_PAGES = ["", "/jobs", "/pricing", "/login", "/register", "/contact", "/companies", "/salaries", "/interviews", "/trust"];
-const CANDIDATE_PAGES = ["/candidate", "/candidate/applications", "/candidate/profile", "/candidate/settings"];
+const CANDIDATE_PAGES = [
+  "/candidate",
+  "/candidate/applications",
+  "/candidate/profile",
+  "/candidate/settings",
+  "/candidate/resume-builder",
+  // AI tools
+  "/candidate/ai-assistant",
+  "/candidate/cover-letter",
+  "/candidate/interview-prep",
+  "/candidate/job-matches",
+  "/candidate/salary",
+  "/candidate/career-gap",
+  "/candidate/career-advisor",
+  "/candidate/chat",
+];
 const EMPLOYER_PAGES = ["/employer", "/employer/jobs/new"];
-const ADMIN_PAGES = ["/admin", "/admin/users", "/admin/support", "/admin/ops"];
+const ADMIN_PAGES = ["/admin", "/admin/users", "/admin/jobs", "/admin/reviews", "/admin/audit-logs", "/admin/support", "/admin/ops"];
 const SEEDED_PASSWORD = "Password123!";
 
 // Proper nouns and product names that stay the same in every language.
@@ -68,7 +86,7 @@ async function uiStrings(page: Page): Promise<string[]> {
   await page.waitForTimeout(500);
   return page.evaluate(() => {
     const SKIP =
-      'a[href*="/jobs/"], a[href*="/companies/"], article, [data-i18n-ignore], [data-user-content], script, style, noscript, code, pre, [aria-hidden="true"], table tbody, input, textarea, select, option, time';
+      'a[href*="/jobs/"], a[href*="/companies/"], article, [data-i18n-ignore], [data-user-content], script, style, noscript, code, pre, [aria-hidden="true"], input, textarea, select, option, time';
     const out = new Set<string>();
     const visible = (el: Element) => {
       const r = el.getBoundingClientRect();
@@ -93,6 +111,9 @@ async function uiStrings(page: Page): Promise<string[]> {
   });
 }
 
+/** "1 applications", "1 jobs found": a singular count followed by a plural noun. */
+const badPlural = (s: string) => /(^|[^\d.,])1 [A-Za-z]+s\b/.test(s) && !/\b1 (of|plus|is|was|has)\b/.test(s);
+
 const looksLikeEnglishProse = (s: string) =>
   /[a-z]{2,}/i.test(s) && s.split(/\s+/).filter((w) => /^[A-Za-z][A-Za-z'’-]+$/.test(w)).length >= 2;
 
@@ -110,7 +131,7 @@ async function untranslated(browser: Browser, role: Role, path: string, locale: 
     (s) => en.has(s) && looksLikeEnglishProse(s) && !USER_CONTENT.has(s) && !ALLOWED.some((re) => re.test(s)),
   );
   await ctx.close();
-  return leftovers;
+  return [...leftovers, ...[...en].filter(badPlural).map((s) => `en plural: ${s}`)];
 }
 
 test.beforeAll(async ({ browser }, testInfo) => {
@@ -123,7 +144,7 @@ test("header language switcher changes locale, and Arabic is RTL", async ({ page
   await page.goto("/en/jobs");
   await expect(page.locator("html")).toHaveAttribute("lang", /^en/);
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
-  for (const locale of ["fr", "pt", "ar"] as const) {
+  for (const locale of ["es", "fr", "pt", "ar"] as const) {
     await page.getByRole("combobox", { name: /language|langue|idioma|اللغة/i }).first().selectOption(locale);
     await page.waitForURL(new RegExp(`/${locale}/jobs`));
     await expect(page.locator("html")).toHaveAttribute("lang", new RegExp(`^${locale}`));

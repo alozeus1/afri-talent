@@ -20,9 +20,11 @@ import {
 } from "@/components/candidate/candidate-ui";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { enumLabel, useCandidateFormatters, useCandidateT } from "@/lib/i18n/candidate-messages";
+import { useLocationLabel } from "@/lib/i18n/public-labels";
 
 export default function SavedJobsPage() {
   const locale = useLocale();
+  const locationLabel = useLocationLabel();
   const t = useCandidateT();
   const fmt = useCandidateFormatters();
   const [items, setItems] = useState<SavedJobItem[]>([]);
@@ -117,7 +119,7 @@ export default function SavedJobsPage() {
                         {item.job.location ? (
                           <span className="inline-flex items-center gap-1">
                             <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                            {item.job.location}
+                            {locationLabel(item.job.location)}
                           </span>
                         ) : null}
                         {item.job.type ? <span>{enumLabel(t, "jobType", item.job.type)}</span> : null}

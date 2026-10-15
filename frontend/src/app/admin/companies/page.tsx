@@ -27,6 +27,7 @@ import {
   strong,
   verificationTone,
 } from "@/components/admin/console-ui";
+import { useLocationLabel } from "@/lib/i18n/public-labels";
 
 const LEVELS: EmployerVerificationLevel[] = [
   "UNVERIFIED",
@@ -46,6 +47,7 @@ type Filters = {
 
 export default function AdminCompaniesPage() {
   const t = useAdminT();
+  const locationLabel = useLocationLabel();
   const fmt = useAdminFormatters();
   const href = useAdminHref();
   const { user: me } = useAuth();
@@ -182,7 +184,7 @@ export default function AdminCompaniesPage() {
                   <tr key={c.id}>
                     <Td>
                       <p className={`font-medium ${strong}`}>{c.companyName}</p>
-                      <p className={`text-xs ${muted}`}>{c.location} · {fmt.date(c.createdAt)}</p>
+                      <p className={`text-xs ${muted}`}>{locationLabel(c.location)} · {fmt.date(c.createdAt)}</p>
                       {c.website && (
                         <a
                           href={c.website.startsWith("http") ? c.website : `https://${c.website}`}

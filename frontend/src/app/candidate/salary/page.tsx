@@ -20,6 +20,7 @@ import {
 } from "@/components/candidate/candidate-ui";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { useCandidateFormatters, useCandidateT } from "@/lib/i18n/candidate-messages";
+import { useLocationLabel, usePublicLabel } from "@/lib/i18n/public-labels";
 
 interface NegotiationResult {
   recommendedRange: string;
@@ -36,6 +37,8 @@ export default function SalaryPage() {
   const router = useRouter();
   const locale = useLocale();
   const t = useCandidateT();
+  const levelLabel = usePublicLabel();
+  const locationLabel = useLocationLabel();
   const fmt = useCandidateFormatters();
 
   const [role, setRole] = useState("");
@@ -293,9 +296,11 @@ export default function SalaryPage() {
                       <tbody>
                         {benchmarks.map((row, i) => (
                           <tr key={i} className="border-b border-line text-fg-secondary">
-                            <td className="py-2 pe-4">{row.role}</td>
-                            <td className="py-2 pe-4 capitalize">{row.level}</td>
-                            <td className="py-2 pe-4">{row.country}</td>
+                            <td className="py-2 pe-4" data-user-content>{row.role}</td>
+                            <td className="py-2 pe-4">
+                              {row.level ? levelLabel(row.level.charAt(0).toUpperCase() + row.level.slice(1)) : ""}
+                            </td>
+                            <td className="py-2 pe-4">{locationLabel(row.country)}</td>
                             <td className="py-2 pe-4 text-end tabular-nums">{fmt.currency(row.salaryMin, row.currency)}</td>
                             <td className="py-2 pe-4 text-end font-semibold tabular-nums text-fg">
                               {fmt.currency(row.salaryMedian, row.currency)}

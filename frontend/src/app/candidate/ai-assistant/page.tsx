@@ -36,6 +36,7 @@ import {
   type CandidateMessageKey,
   type CandidateT,
 } from "@/lib/i18n/candidate-messages";
+import { useLocationLabel } from "@/lib/i18n/public-labels";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -646,6 +647,7 @@ function RunHistoryItem({ run }: { run: AiRunHistory }) {
 
 export default function AIAssistantPage() {
   const router = useRouter();
+  const locationLabel = useLocationLabel();
   const locale = useLocale();
   const t = useCandidateT();
   const fmt = useCandidateFormatters();
@@ -964,7 +966,7 @@ export default function AIAssistantPage() {
                         >
                           <span className="font-medium text-fg">{job.title}</span>
                           <span className="ms-2 text-fg-muted">· {job.company}</span>
-                          {job.location ? <span className="ms-2 text-xs text-fg-muted">{job.location}</span> : null}
+                          {job.location ? <span className="ms-2 text-xs text-fg-muted">{locationLabel(job.location)}</span> : null}
                         </button>
                       </li>
                     ))}

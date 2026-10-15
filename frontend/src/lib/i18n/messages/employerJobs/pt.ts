@@ -76,8 +76,7 @@ export default {
 
   "apps.eyebrow": "Funil de candidatos",
   "apps.title": "Candidaturas",
-  "apps.count.one": "{count} candidato se candidatou",
-  "apps.count.other": "{count} candidatos se candidataram",
+  "apps.count": "{count, plural, one {# candidato se candidatou} other {# candidatos se candidataram}}",
   "apps.filterLabel": "Filtrar candidatos por status",
   "apps.filterAll": "Todos",
   "apps.filterEmpty": "Nenhum candidato nesta etapa ainda.",
@@ -88,7 +87,7 @@ export default {
   "apps.unlock": "Faça upgrade para avaliar candidatos",
   "apps.appliedOn": "Candidatou-se em {date}",
   "apps.profileComplete": "Perfil {pct}% completo",
-  "apps.moreSkills": "+{count} a mais",
+  "apps.moreSkills": "{count, plural, one {+# a mais} other {+# a mais}}",
   "apps.coverLetter": "Carta de apresentação",
   "apps.viewCv": "Ver currículo",
   "apps.openingCv": "Abrindo currículo…",

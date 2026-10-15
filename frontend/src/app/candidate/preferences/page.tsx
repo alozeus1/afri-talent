@@ -22,6 +22,7 @@ import {
 } from "@/components/candidate/candidate-ui";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { useCandidateFormatters, useCandidateT, type CandidateMessageKey } from "@/lib/i18n/candidate-messages";
+import { useLocationLabel } from "@/lib/i18n/public-labels";
 
 type PreferenceKey =
   | "savedSearchAlerts"
@@ -35,6 +36,7 @@ type PreferenceKey =
 
 export default function CandidatePreferencesPage() {
   const router = useRouter();
+  const locationLabel = useLocationLabel();
   const locale = useLocale();
   const t = useCandidateT();
   const fmt = useCandidateFormatters();
@@ -132,7 +134,7 @@ export default function CandidatePreferencesPage() {
               })}
             </p>
             <p className="mt-1 text-xs text-fg-secondary">
-              {t("prefs.cadence", { hours: fmt.number(summary.snapshot.notificationCadenceHours) })}
+              {t("prefs.cadence", { hours: summary.snapshot.notificationCadenceHours })}
             </p>
           </div>
         }
@@ -189,7 +191,7 @@ export default function CandidatePreferencesPage() {
                     {job.title}
                   </Link>
                   <p className="mt-1 text-xs text-fg-muted">
-                    {[job.employer?.companyName, job.location].filter(Boolean).join(" · ")}
+                    {[job.employer?.companyName, locationLabel(job.location)].filter(Boolean).join(" · ")}
                   </p>
                   {job.rankingExplanation?.summary ? (
                     <p className="mt-2 text-xs text-fg-secondary">{job.rankingExplanation.summary}</p>

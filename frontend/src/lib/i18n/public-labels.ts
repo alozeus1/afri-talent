@@ -6,6 +6,7 @@
 // unchanged; unknown text is returned as-is, so new backend values degrade to
 // English instead of breaking.
 import { useCallback } from "react";
+import { useLocale } from "./client";
 import { usePublicT, type PublicMessageKey, type PublicT, type PublicVars } from "./public-messages";
 
 const EXACT: Record<string, PublicMessageKey> = {
@@ -268,4 +269,112 @@ export function translateLabel(tp: PublicT, text: string | null | undefined): st
 export function usePublicLabel() {
   const tp = usePublicT();
   return useCallback((text: string | null | undefined) => translateLabel(tp, text), [tp]);
+}
+
+// ------------------------------------------------------------- locations ---
+// Job locations are free text ("Remote", "Lagos, Nigeria", "Remote (Africa)").
+// Known region words are translated through the dictionary, country names
+// through Intl.DisplayNames, and everything else (cities) is kept as-is.
+
+const LOCATION_WORDS: Record<string, PublicMessageKey> = {
+  remote: "discover.enum.remote",
+  "fully remote": "discover.enum.remote",
+  "remote-first": "discover.enum.remote",
+  hybrid: "discover.enum.hybrid",
+  onsite: "discover.enum.onsite",
+  "on-site": "discover.enum.onsite",
+  "on site": "discover.enum.onsite",
+  "in office": "discover.enum.onsite",
+  worldwide: "discover.loc.worldwide",
+  global: "discover.loc.worldwide",
+  "remote worldwide": "discover.loc.worldwide",
+  anywhere: "discover.loc.anywhere",
+  africa: "discover.loc.africa",
+  "sub-saharan africa": "discover.loc.subSaharanAfrica",
+  "west africa": "discover.loc.westAfrica",
+  "east africa": "discover.loc.eastAfrica",
+  europe: "discover.loc.europe",
+  emea: "discover.loc.emea",
+  americas: "discover.loc.americas",
+  asia: "discover.loc.asia",
+  "middle east": "discover.loc.middleEast",
+  "multiple locations": "discover.loc.multiple",
+};
+
+const COUNTRY_ALIASES: Record<string, string> = {
+  usa: "US",
+  "u.s.": "US",
+  us: "US",
+  "united states of america": "US",
+  uk: "GB",
+  "u.k.": "GB",
+  england: "GB",
+  uae: "AE",
+  "drc": "CD",
+  "dr congo": "CD",
+  "ivory coast": "CI",
+  "cote d'ivoire": "CI",
+};
+
+let countryIndex: Map<string, string> | null = null;
+function countryCode(name: string): string | undefined {
+  const key = name.toLowerCase();
+  if (COUNTRY_ALIASES[key]) return COUNTRY_ALIASES[key];
+  if (!countryIndex) {
+    countryIndex = new Map();
+    try {
+      const english = new Intl.DisplayNames(["en"], { type: "region" });
+      const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      for (const a of letters) {
+        for (const b of letters) {
+          const code = a + b;
+          const label = english.of(code);
+          if (label && label !== code) countryIndex.set(label.toLowerCase(), code);
+        }
+      }
+    } catch {
+      // Intl.DisplayNames unavailable: countries stay in English.
+    }
+  }
+  return countryIndex.get(key);
+}
+
+const displayNamesCache = new Map<string, Intl.DisplayNames | null>();
+function countryName(locale: string, code: string): string | undefined {
+  if (!displayNamesCache.has(locale)) {
+    try {
+      displayNamesCache.set(locale, new Intl.DisplayNames([locale], { type: "region" }));
+    } catch {
+      displayNamesCache.set(locale, null);
+    }
+  }
+  return displayNamesCache.get(locale)?.of(code);
+}
+
+function translateLocationPart(tp: PublicT, locale: string, part: string): string {
+  const trimmed = part.trim();
+  if (!trimmed) return part;
+  const word = LOCATION_WORDS[trimmed.toLowerCase()];
+  if (word) return part.replace(trimmed, tp(word));
+  const code = countryCode(trimmed);
+  const localized = code && locale !== "en" ? countryName(locale, code) : undefined;
+  return localized ? part.replace(trimmed, localized) : part;
+}
+
+/** "Remote (Africa)" -> "À distance (Afrique)" in French; cities pass through. */
+export function translateLocation(tp: PublicT, locale: string, text: string | null | undefined): string {
+  if (!text) return "";
+  const whole = translateLocationPart(tp, locale, text);
+  if (whole !== text) return whole;
+  return text
+    .split(/(\s*[,·/|()]\s*|\s+[-–]\s+)/)
+    .map((part, i) => (i % 2 === 1 ? part : translateLocationPart(tp, locale, part)))
+    .join("");
+}
+
+/** `location("Remote, Nigeria")` -> "Remoto, Nigéria" in Portuguese. */
+export function useLocationLabel() {
+  const tp = usePublicT();
+  const locale = useLocale();
+  return useCallback((text: string | null | undefined) => translateLocation(tp, locale, text), [tp, locale]);
 }

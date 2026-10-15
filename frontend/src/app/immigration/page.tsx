@@ -708,7 +708,7 @@ function StepRow({ step, onToggle }: { step: ImmigrationStep; onToggle: () => vo
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className={`text-sm font-medium ${isCompleted ? "text-fg-secondary line-through" : "text-fg"}`}>{step.name}</span>
-          {!isCompleted && step.status !== "PENDING" && <Badge variant="info">{step.status}</Badge>}
+          {!isCompleted && step.status !== "PENDING" && <StatusBadge status={step.status} tp={tp} />}
         </div>
         {step.description && <p className="mt-0.5 text-xs text-fg-muted">{step.description}</p>}
         <div className="mt-1 flex flex-wrap items-center gap-3">

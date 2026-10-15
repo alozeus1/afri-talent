@@ -22,6 +22,7 @@ import {
 import { adminConsole, ConsoleJob, ConsoleJobStatus, ConsoleOverview } from "@/lib/admin-console-api";
 import type { AccountRestrictionStatus } from "@/lib/api";
 import { useAdminFormatters, useAdminT } from "@/lib/i18n/admin-messages";
+import { useLocationLabel } from "@/lib/i18n/public-labels";
 
 const STATUS_ORDER: AccountRestrictionStatus[] = ["ACTIVE", "LIMITED", "SUSPENDED", "BANNED"];
 const JOB_ORDER: ConsoleJobStatus[] = ["PUBLISHED", "PENDING_REVIEW", "DRAFT", "CLOSED", "REJECTED", "REMOVED"];
@@ -90,6 +91,7 @@ function ApplicationsChart({ data, formatDate }: { data: ConsoleOverview["applic
 
 export default function AdminOverviewPage() {
   const t = useAdminT();
+  const locationLabel = useLocationLabel();
   const fmt = useAdminFormatters();
   const href = useAdminHref();
   const [overview, setOverview] = useState<ConsoleOverview | null>(null);
@@ -134,7 +136,7 @@ export default function AdminOverviewPage() {
 
   if (loading && !overview) return <Spinner />;
   if (loadError || !overview) {
-    return <LoadErrorCard error={loadError} subject="admin overview" onRetry={() => void load()} />;
+    return <LoadErrorCard error={loadError} subject={t("overview.loadSubject")} onRetry={() => void load()} />;
   }
 
   const roles = overview.users.byRole;
@@ -246,7 +248,7 @@ export default function AdminOverviewPage() {
                 <div className="min-w-0">
                   <p className={`truncate font-medium ${strong}`}>{job.title}</p>
                   <p className={`text-xs ${muted}`}>
-                    {job.employer?.companyName ?? job.sourceName ?? "—"} · {job.location} · {fmt.date(job.createdAt)}
+                    {job.employer?.companyName ?? job.sourceName ?? "—"} · {locationLabel(job.location)} · {fmt.date(job.createdAt)}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">

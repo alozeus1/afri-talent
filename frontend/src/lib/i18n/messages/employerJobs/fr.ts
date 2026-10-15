@@ -76,8 +76,7 @@ export default {
 
   "apps.eyebrow": "Suivi des candidats",
   "apps.title": "Candidatures",
-  "apps.count.one": "{count} candidat a postulé",
-  "apps.count.other": "{count} candidats ont postulé",
+  "apps.count": "{count, plural, one {# candidat a postulé} other {# candidats ont postulé}}",
   "apps.filterLabel": "Filtrer les candidats par statut",
   "apps.filterAll": "Tous",
   "apps.filterEmpty": "Aucun candidat à cette étape pour l'instant.",
@@ -88,7 +87,7 @@ export default {
   "apps.unlock": "Passer à l'offre supérieure pour évaluer les candidats",
   "apps.appliedOn": "A postulé le {date}",
   "apps.profileComplete": "Profil complet à {pct} %",
-  "apps.moreSkills": "+{count} de plus",
+  "apps.moreSkills": "{count, plural, one {+# autre} other {+# autres}}",
   "apps.coverLetter": "Lettre de motivation",
   "apps.viewCv": "Voir le CV",
   "apps.openingCv": "Ouverture du CV…",

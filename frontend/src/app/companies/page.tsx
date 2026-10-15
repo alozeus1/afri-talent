@@ -174,7 +174,7 @@ export default function CompaniesPage() {
       {!loading && data && (
         <>
           <p className="mb-4 text-fg-secondary" aria-live="polite">
-            {tp(data.pagination.total === 1 ? "discover.companies.countOne" : "discover.companies.count", { count: data.pagination.total })}
+            {tp("discover.companies.count", { count: data.pagination.total })}
           </p>
 
           {data.companies.length === 0 ? (
@@ -276,7 +276,7 @@ export default function CompaniesPage() {
                         <div className="mb-3">
                           <StarRating rating={company.ratingAggregate.averageOverall} />
                           <p className="text-xs text-fg-muted mt-1">
-                            {tp(company.ratingAggregate.totalReviews === 1 ? "discover.companies.reviewsOne" : "discover.companies.reviews", { count: company.ratingAggregate.totalReviews })}
+                            {tp("discover.companies.reviews", { count: company.ratingAggregate.totalReviews })}
                           </p>
                         </div>
                       )}
@@ -289,7 +289,7 @@ export default function CompaniesPage() {
                           <Badge variant="info">{company.trustBadge ? label(company.trustBadge) : tp("discover.companies.registered")}</Badge>
                         )}
                         {(company.jobCount ?? 0) > 0 && (
-                          <Badge>{tp(company.jobCount === 1 ? "discover.companies.rolesOne" : "discover.companies.roles", { count: company.jobCount ?? 0 })}</Badge>
+                          <Badge>{tp("discover.companies.roles", { count: company.jobCount ?? 0 })}</Badge>
                         )}
                       </div>
                     </CardContent>

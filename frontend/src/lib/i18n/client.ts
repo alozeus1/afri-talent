@@ -4,6 +4,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { DEFAULT_LOCALE, isSupportedLocale, normalizeLocale, SupportedLocale } from "./config";
 import { MESSAGES, MessageKey } from "./messages";
+import { formatMessage, type MessageVars } from "./format";
 
 export const LOCALE_COOKIE = "afritalent-locale";
 
@@ -76,6 +77,7 @@ export function useLocale(): SupportedLocale {
 export function useT() {
   const locale = useLocale();
   const dict = MESSAGES[locale];
-  return (key: MessageKey): string => dict[key] || MESSAGES.en[key] || key;
+  return (key: MessageKey, vars?: MessageVars): string =>
+    formatMessage(dict[key] || MESSAGES.en[key] || key, vars, locale);
 }
 

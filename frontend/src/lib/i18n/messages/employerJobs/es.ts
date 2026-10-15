@@ -76,8 +76,7 @@ export default {
 
   "apps.eyebrow": "Proceso de candidatos",
   "apps.title": "Candidaturas",
-  "apps.count.one": "{count} candidato se postuló",
-  "apps.count.other": "{count} candidatos se postularon",
+  "apps.count": "{count, plural, one {# candidato se postuló} other {# candidatos se postularon}}",
   "apps.filterLabel": "Filtrar candidatos por estado",
   "apps.filterAll": "Todos",
   "apps.filterEmpty": "Aún no hay candidatos en esta etapa.",
@@ -88,7 +87,7 @@ export default {
   "apps.unlock": "Mejora tu plan para revisar candidatos",
   "apps.appliedOn": "Se postuló el {date}",
   "apps.profileComplete": "Perfil completo al {pct} %",
-  "apps.moreSkills": "+{count} más",
+  "apps.moreSkills": "{count, plural, one {+# más} other {+# más}}",
   "apps.coverLetter": "Carta de presentación",
   "apps.viewCv": "Ver CV",
   "apps.openingCv": "Abriendo CV…",

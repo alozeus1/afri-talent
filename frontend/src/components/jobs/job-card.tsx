@@ -15,7 +15,7 @@ import { formatPostedShort } from "@/lib/posted-age";
 import { MapPin, Briefcase, Globe, Plane, Heart, Clock } from "lucide-react";
 import { Coachmark } from "@/components/ui/coachmark";
 import { usePublicT } from "@/lib/i18n/public-messages";
-import { usePublicLabel } from "@/lib/i18n/public-labels";
+import { usePublicLabel, useLocationLabel } from "@/lib/i18n/public-labels";
 
 interface JobCardProps {
   job: Job;
@@ -95,6 +95,7 @@ export function selectCardBadges(job: Job): { trust: CardBadge[]; caution: CardB
 
 export function JobCard({ job, initialSaved = false }: JobCardProps) {
   const locale = useLocale();
+  const locationLabel = useLocationLabel();
   const tp = usePublicT();
   const label = usePublicLabel();
   const [isSaved, setIsSaved] = useState(initialSaved);
@@ -230,7 +231,7 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
           <div className="flex flex-wrap gap-4 mb-4">
             <span className="inline-flex items-center text-sm font-medium text-fg-secondary">
               <MapPin aria-hidden="true" className="w-4 h-4 me-1.5 text-primary-text" />
-              {job.workplaceType ? `${job.location} · ${label(job.workplaceType).toLowerCase()}` : job.location}
+              {job.workplaceType ? `${locationLabel(job.location)} · ${label(job.workplaceType).toLowerCase()}` : locationLabel(job.location)}
             </span>
             <span className="inline-flex items-center text-sm font-medium text-fg-secondary">
               <Briefcase aria-hidden="true" className="w-4 h-4 me-1.5 text-primary-text" />

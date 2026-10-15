@@ -207,9 +207,11 @@ export default function AdminUsersPage() {
                     />
                   </Td>
                   <Td>
-                    <p className={`font-medium ${strong}`}>{u.name}</p>
-                    <p className={`text-xs ${muted}`}>{u.email}</p>
-                    {u.employer && <p className="text-xs text-primary-text">{u.employer.companyName}</p>}
+                    <div data-user-content>
+                      <p className={`font-medium ${strong}`}>{u.name}</p>
+                      <p className={`text-xs ${muted}`}>{u.email}</p>
+                      {u.employer && <p className="text-xs text-primary-text">{u.employer.companyName}</p>}
+                    </div>
                   </Td>
                   <Td>
                     <Pill tone={u.role === "ADMIN" ? "violet" : u.role === "EMPLOYER" ? "blue" : "green"}>{t(`role.${u.role}`)}</Pill>

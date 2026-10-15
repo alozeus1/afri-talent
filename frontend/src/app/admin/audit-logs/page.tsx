@@ -207,12 +207,12 @@ export default function AuditLogsPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Pill tone={actionTone(log.action)}>{label("auditAction", log.action)}</Pill>
-                      {log.status && log.status !== "SUCCESS" && <Pill tone="amber">{log.status}</Pill>}
+                      {log.status && log.status !== "SUCCESS" && <Pill tone="amber">{label("auditStatus", log.status)}</Pill>}
                     </div>
-                    <p className={`mt-2 text-sm font-medium ${strong}`}>
+                    <p className={`mt-2 text-sm font-medium ${strong}`} data-user-content>
                       {log.admin ? t("audit.actor", { name: log.admin.name || log.admin.email, title: log.admin.title }) : t("detail.system")}
                     </p>
-                    <p className="mt-0.5 break-all text-sm text-fg-secondary">
+                    <p className="mt-0.5 break-all text-sm text-fg-secondary" data-user-content>
                       {label("targetType", log.target.type)}: {log.target.name || log.target.id || t("common.notAvailable")}
                     </p>
                   </div>
@@ -223,7 +223,7 @@ export default function AuditLogsPage() {
                 </div>
                 {log.reason && (
                   <p className="mt-3 rounded-lg bg-surface-sunken px-3 py-2 text-sm text-fg-secondary">
-                    <span className={`font-semibold ${strong}`}>{t("common.reason")}:</span> {log.reason}
+                    <span className={`font-semibold ${strong}`}>{t("common.reason")}:</span> <span data-user-content>{log.reason}</span>
                   </p>
                 )}
                 {log.changes && Object.keys(log.changes).length > 0 && (

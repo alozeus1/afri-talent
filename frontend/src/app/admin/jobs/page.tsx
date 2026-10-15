@@ -23,6 +23,7 @@ import {
   muted,
   strong,
 } from "@/components/admin/console-ui";
+import { useLocationLabel } from "@/lib/i18n/public-labels";
 
 const STATUSES: ConsoleJobStatus[] = ["PENDING_REVIEW", "PUBLISHED", "DRAFT", "CLOSED", "REJECTED", "REMOVED"];
 
@@ -54,6 +55,7 @@ const DANGER: JobAction[] = ["reject", "remove", "close"];
 
 export default function AdminJobsPage() {
   const t = useAdminT();
+  const locationLabel = useLocationLabel();
   const fmt = useAdminFormatters();
   const href = useAdminHref();
   const [filters, setFilters] = useState<Filters | null>(null);
@@ -176,10 +178,10 @@ export default function AdminJobsPage() {
                     <Link href={href(`/jobs/${job.slug}`)} className={`font-medium hover:underline ${strong}`} target="_blank">
                       {job.title}
                     </Link>
-                    <p className={`text-xs ${muted}`}>
-                      {job.employer?.companyName ?? job.sourceName ?? "—"} · {job.location} · {fmt.date(job.createdAt)}
+                    <p className={`text-xs ${muted}`} data-user-content>
+                      {job.employer?.companyName ?? job.sourceName ?? "—"} · {locationLabel(job.location)} · {fmt.date(job.createdAt)}
                     </p>
-                    {job.moderationReason && <p className="mt-1 text-xs text-warning">{job.moderationReason}</p>}
+                    {job.moderationReason && <p className="mt-1 text-xs text-warning" data-user-content>{job.moderationReason}</p>}
                   </Td>
                   <Td>
                     <div className="flex flex-col items-start gap-1">
@@ -190,7 +192,7 @@ export default function AdminJobsPage() {
                   </Td>
                   <Td className="hidden md:table-cell">
                     <span className="text-sm">{job.jobSource === "EMPLOYER_POSTED" ? t("jobs.employerPosted") : t("jobs.aggregated")}</span>
-                    {job.sourceName && job.jobSource !== "EMPLOYER_POSTED" && <p className={`text-xs ${muted}`}>{job.sourceName}</p>}
+                    {job.sourceName && job.jobSource !== "EMPLOYER_POSTED" && <p className={`text-xs ${muted}`} data-user-content>{job.sourceName}</p>}
                   </Td>
                   <Td className="hidden lg:table-cell">
                     <span className="tabular-nums">{job._count.applications}</span>

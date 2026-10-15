@@ -76,8 +76,7 @@ export default {
 
   "apps.eyebrow": "مسار المتقدمين",
   "apps.title": "الطلبات",
-  "apps.count.one": "تقدّم {count} مرشح",
-  "apps.count.other": "تقدّم {count} مرشحين",
+  "apps.count": "{count, plural, zero {لم يتقدّم أي مرشح} one {تقدّم مرشح واحد} two {تقدّم مرشحان} few {تقدّم # مرشحين} many {تقدّم # مرشحًا} other {تقدّم # مرشح}}",
   "apps.filterLabel": "تصفية المتقدمين حسب الحالة",
   "apps.filterAll": "الكل",
   "apps.filterEmpty": "لا يوجد متقدمون في هذه المرحلة بعد.",
@@ -88,7 +87,7 @@ export default {
   "apps.unlock": "قم بالترقية لمراجعة المرشحين",
   "apps.appliedOn": "تقدّم في {date}",
   "apps.profileComplete": "الملف مكتمل بنسبة {pct}%",
-  "apps.moreSkills": "+{count} أخرى",
+  "apps.moreSkills": "{count, plural, zero {+# أخرى} one {+# أخرى} two {+# أخريان} few {+# أخرى} many {+# أخرى} other {+# أخرى}}",
   "apps.coverLetter": "خطاب التقديم",
   "apps.viewCv": "عرض السيرة الذاتية",
   "apps.openingCv": "جارٍ فتح السيرة الذاتية…",

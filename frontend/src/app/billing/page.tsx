@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { FREE_MODE } from "@/lib/free-mode";
-import { localizePath, useLocale } from "@/lib/i18n/client";
+import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
 import { billing, pricing, BillingStatus, PricingData, RegionalPriceInfo } from "@/lib/api";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,51 +17,62 @@ type Interval = "MONTHLY" | "YEARLY";
 const PLAN_ORDER = ["FREE", "BASIC", "PROFESSIONAL"] as const;
 const EMPLOYER_PLAN_ORDER = ["EMPLOYER_FREE", "EMPLOYER_BASIC", "EMPLOYER_PREMIUM"] as const;
 
-const PLAN_META: Record<string, { name: string; features: string[]; popular?: boolean }> = {
+// Plan copy is resolved at render time through usePublicT, so every locale
+// gets translated names and features.
+type PlanFeature = { key: PublicMessageKey; perMonth?: number };
+const PLAN_META: Record<string, { name: PublicMessageKey; features: PlanFeature[]; popular?: boolean }> = {
   FREE: {
-    name: "Free",
-    features: ["Browse all jobs", "Apply to 5 jobs/month", "Basic profile"],
+    name: "discover.plan.free",
+    features: [
+      { key: "discover.feat.browseAll" },
+      { key: "discover.feat.applications", perMonth: 5 },
+      { key: "discover.feat.basicProfile" },
+    ],
   },
   BASIC: {
-    name: "Basic",
+    name: "discover.plan.basic",
     features: [
-      "Everything in Free",
-      "Unlimited applications",
-      "AI resume review (10/month)",
-      "Saved searches",
-      "Job alerts",
-      "AI Chat assistant",
+      { key: "discover.billing.everythingFree" },
+      { key: "discover.feat.unlimitedApplications" },
+      { key: "discover.feat.aiResumeReview", perMonth: 10 },
+      { key: "discover.feat.savedSearches" },
+      { key: "discover.feat.jobAlerts" },
+      { key: "discover.feat.chatbot" },
     ],
   },
   PROFESSIONAL: {
-    name: "Professional",
+    name: "discover.plan.professional",
     popular: true,
     features: [
-      "Everything in Basic",
-      "AI job matching (20/month)",
-      "AI apply packs (5/month)",
-      "Priority support",
-      "Skills assessments",
-      "Autopilot mode",
+      { key: "discover.feat.everythingBasic" },
+      { key: "discover.feat.aiMatching", perMonth: 20 },
+      { key: "discover.feat.applyPacks", perMonth: 5 },
+      { key: "discover.feat.prioritySupport" },
+      { key: "discover.feat.assessments" },
+      { key: "discover.feat.autopilot" },
     ],
   },
   EMPLOYER_FREE: {
-    name: "Employer Free",
-    features: ["Unlimited job postings", "Basic applicant management"],
+    name: "discover.plan.employerFree",
+    features: [{ key: "discover.feat.unlimitedPosts" }, { key: "discover.feat.applicantMgmt" }],
   },
   EMPLOYER_BASIC: {
-    name: "Employer Basic",
-    features: ["Unlimited job postings", "Talent search", "Analytics dashboard"],
+    name: "discover.plan.employerBasic",
+    features: [
+      { key: "discover.feat.unlimitedPosts" },
+      { key: "discover.feat.candidateSearch" },
+      { key: "discover.feat.analytics" },
+    ],
   },
   EMPLOYER_PREMIUM: {
-    name: "Employer Premium",
+    name: "discover.plan.employerPremium",
     popular: true,
     features: [
-      "Unlimited job posts",
-      "Talent search",
-      "Advanced analytics",
-      "API access",
-      "Priority support",
+      { key: "discover.feat.unlimitedPosts" },
+      { key: "discover.feat.candidateSearch" },
+      { key: "discover.feat.advancedAnalytics" },
+      { key: "discover.feat.api" },
+      { key: "discover.feat.prioritySupport" },
     ],
   },
 };
@@ -111,6 +123,15 @@ export default function BillingPage() {
 
   const router = useRouter();
   const locale = useLocale();
+  const tp = usePublicT();
+  const t = useT();
+  const featureLabel = (feature: PlanFeature) =>
+    feature.perMonth
+      ? tp("discover.billing.withLimit", {
+          feature: tp(feature.key),
+          limit: tp("discover.feat.perMonth", { count: feature.perMonth }),
+        })
+      : tp(feature.key);
   const showFreeModePortal = FREE_MODE && hasManageablePaidPlan(status);
 
   // Free launch: nothing to buy. Only people with an existing paid
@@ -162,10 +183,10 @@ export default function BillingPage() {
         <Card>
           <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
             <p className="text-fg-secondary dark:text-gray-300">
-              AfriTalent is now free for everyone. You can manage or cancel your existing subscription here.
+              {tp("discover.billing.freeModeBody")}
             </p>
             <Button onClick={handlePortal} disabled={actionLoading === "portal"}>
-              {actionLoading === "portal" ? "Opening..." : "Manage subscription"}
+              {actionLoading === "portal" ? tp("discover.billing.opening") : tp("discover.billing.manageSubscription")}
             </Button>
           </CardContent>
         </Card>
@@ -182,7 +203,7 @@ export default function BillingPage() {
     : status?.billingProvider === "STRIPE"
       ? "Stripe"
       : region === "AFRICA"
-        ? "Flutterwave in Nigeria, Stripe elsewhere"
+        ? tp("discover.billing.providerAfrica")
         : "Stripe";
 
   const isEmployer = user && (currentPlan.startsWith("EMPLOYER_") || user.role === "EMPLOYER");
@@ -191,19 +212,19 @@ export default function BillingPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-fg mb-2">Plans &amp; Pricing</h1>
+        <h1 className="text-3xl font-bold text-fg mb-2">{tp("discover.billing.title")}</h1>
         <p className="text-fg-secondary max-w-2xl mx-auto">
-          Choose the plan that fits your needs. Upgrade anytime to unlock powerful features.
+          {tp("discover.billing.subtitle")}
         </p>
 
         {/* Region badge */}
         <div className="mt-3 flex items-center justify-center gap-2 text-sm text-fg-muted">
-          <span>Showing prices for</span>
+          <span>{tp("discover.billing.pricesFor")}</span>
           <Badge variant="info">{region}</Badge>
-          <span>in {currency}</span>
+          <span>{tp("discover.billing.inCurrency", { currency })}</span>
         </div>
         <p className="mt-3 text-sm text-fg-muted">
-          Checkout routing: {providerLabel}. Google Pay appears automatically on eligible Stripe devices.
+          {tp("discover.billing.routing", { provider: providerLabel })}
         </p>
       </div>
 
@@ -218,7 +239,7 @@ export default function BillingPage() {
             }`}
             onClick={() => setInterval("MONTHLY")}
           >
-            Monthly
+            {t("pricing.monthly")}
           </button>
           <button
             className={`px-4 py-2 text-sm font-medium rounded-md transition ${
@@ -228,8 +249,8 @@ export default function BillingPage() {
             }`}
             onClick={() => setInterval("YEARLY")}
           >
-            Yearly
-            <span className="ml-1 text-xs text-primary-text font-semibold">Save ~17%</span>
+            {t("pricing.yearly")}
+            <span className="ml-1 text-xs text-primary-text font-semibold">{t("pricing.savePercent")}</span>
           </button>
         </div>
       </div>
@@ -240,15 +261,17 @@ export default function BillingPage() {
           <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-semibold text-fg">Current Plan:</span>
-                <Badge variant="success">{PLAN_META[currentPlan]?.name ?? currentPlan}</Badge>
+                <span className="font-semibold text-fg">{tp("discover.billing.currentPlan")}</span>
+                <Badge variant="success">{PLAN_META[currentPlan] ? tp(PLAN_META[currentPlan].name) : currentPlan}</Badge>
                 {status.status === "ACTIVE" && currentPlan !== "FREE" && currentPlan !== "EMPLOYER_FREE" && (
-                  <Badge variant="info">Active</Badge>
+                  <Badge variant="info">{tp("discover.billing.active")}</Badge>
                 )}
               </div>
               {status.currentPeriodEnd && (
                 <p className="text-sm text-fg-muted">
-                  Renews on {new Date(status.currentPeriodEnd).toLocaleDateString()}
+                  {tp("discover.billing.renewsOn", {
+                    date: new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(status.currentPeriodEnd)),
+                  })}
                 </p>
               )}
             </div>
@@ -259,7 +282,7 @@ export default function BillingPage() {
                 onClick={handlePortal}
                 disabled={actionLoading === "portal"}
               >
-                {actionLoading === "portal" ? "Redirecting..." : "Manage Billing"}
+                {actionLoading === "portal" ? tp("discover.plan.redirecting") : tp("discover.billing.manageBilling")}
               </Button>
             )}
           </CardContent>
@@ -279,10 +302,10 @@ export default function BillingPage() {
             ? "$0"
             : priceInfo?.displayAmount ?? "—";
           const period = isFree
-            ? "forever"
+            ? tp("discover.plan.forever")
             : interval === "MONTHLY"
-              ? "/month"
-              : "/year";
+              ? tp("discover.plan.perMonth")
+              : tp("discover.plan.perYear");
 
           return (
             <Card
@@ -294,29 +317,29 @@ export default function BillingPage() {
               {meta.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <Badge variant="success" className="bg-emerald-600 text-white px-3 py-1">
-                    Most Popular
+                    {tp("discover.plan.popular")}
                   </Badge>
                 </div>
               )}
 
               <CardHeader className="text-center pt-8">
-                <h2 className="text-xl font-bold text-fg">{meta.name}</h2>
+                <h2 className="text-xl font-bold text-fg">{tp(meta.name)}</h2>
                 <div className="mt-2">
                   <span className="text-4xl font-extrabold text-fg">{displayPrice}</span>
                   <span className="text-fg-muted ml-1">{period}</span>
                 </div>
                 {pricingData?.taxLabel && !isFree && (
-                  <p className="text-xs text-gray-400 mt-1">excl. {pricingData.taxLabel}</p>
+                  <p className="text-xs text-gray-400 mt-1">{tp("discover.plan.excl", { tax: pricingData.taxLabel })}</p>
                 )}
                 {isCurrent && (
-                  <Badge variant="success" className="mt-3">Current Plan</Badge>
+                  <Badge variant="success" className="mt-3">{tp("discover.plan.current")}</Badge>
                 )}
               </CardHeader>
 
               <CardContent className="flex-1">
                 <ul className="space-y-3">
                   {meta.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm text-fg-secondary">
+                    <li key={feature.key} className="flex items-start gap-2 text-sm text-fg-secondary">
                       <svg
                         className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5"
                         fill="none"
@@ -326,7 +349,7 @@ export default function BillingPage() {
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
-                      {feature}
+                      {featureLabel(feature)}
                     </li>
                   ))}
                 </ul>
@@ -340,12 +363,12 @@ export default function BillingPage() {
                       size="lg"
                       className="w-full"
                     >
-                      {isFree ? "Sign Up Free" : "Get Started"}
+                      {isFree ? tp("discover.plan.signUpFree") : tp("discover.plan.getStarted")}
                     </Button>
                   </Link>
                 ) : isCurrent ? (
                   <Button variant="secondary" size="lg" className="w-full" disabled>
-                    Current Plan
+                    {tp("discover.plan.current")}
                   </Button>
                 ) : !isFree ? (
                   <Button
@@ -355,11 +378,11 @@ export default function BillingPage() {
                     onClick={() => handleCheckout(planKey)}
                     disabled={actionLoading === planKey}
                   >
-                    {actionLoading === planKey ? "Redirecting..." : "Upgrade"}
+                    {actionLoading === planKey ? tp("discover.plan.redirecting") : tp("discover.plan.upgrade")}
                   </Button>
                 ) : (
                   <Button variant="secondary" size="lg" className="w-full" disabled>
-                    Free
+                    {t("pricing.free")}
                   </Button>
                 )}
               </CardFooter>
@@ -374,7 +397,7 @@ export default function BillingPage() {
           href={isEmployer ? "/billing?view=candidate" : "/billing?view=employer"}
           className="text-sm text-primary-text hover:underline"
         >
-          {isEmployer ? "View candidate plans" : "Looking to hire? View employer plans"}
+          {isEmployer ? tp("discover.billing.viewCandidatePlans") : tp("discover.billing.viewEmployerPlans")}
         </Link>
       </div>
     </div>

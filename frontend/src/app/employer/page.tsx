@@ -34,6 +34,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { useEmployerI18n } from "@/lib/i18n/employer-messages";
 import { FREE_MODE } from "@/lib/free-mode";
+import { useLocationLabel } from "@/lib/i18n/public-labels";
 
 const statusTones: Record<string, "neutral" | "warning" | "success" | "danger"> = {
   DRAFT: "neutral",
@@ -47,6 +48,7 @@ type DashboardTab = (typeof TAB_ITEMS)[number];
 
 export default function EmployerDashboard() {
   const locale = useLocale();
+  const locationLabel = useLocationLabel();
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { t, tn, tv, ts, fmt } = useEmployerI18n();
@@ -388,7 +390,7 @@ export default function EmployerDashboard() {
                               )}
                             </div>
                             <p className="mt-2 text-sm text-fg-secondary">
-                              {[job.location, tv("opt.jobType", job.type), tv("opt.seniority", job.seniority)]
+                              {[locationLabel(job.location), tv("opt.jobType", job.type), tv("opt.seniority", job.seniority)]
                                 .filter(Boolean)
                                 .join(" • ")}
                             </p>

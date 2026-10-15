@@ -3,15 +3,19 @@
  * i18n health check (npm run i18n:check).
  *
  * 1. Parity (fails the run): every key in messages/<namespace>/en.ts exists,
- *    non-empty and with the same {placeholders}, in every other locale file.
- * 2. Hard-coded copy (report only): counts user-facing string literals in JSX
- *    (text nodes and placeholder/title/alt/aria-label/label attributes) per
- *    area, so teams can track progress towards fully translated pages.
+ *    non-empty and with the same arguments ({name} and ICU
+ *    {count, plural, ...} / {kind, select, ...}), in every other locale file.
+ * 2. Plurals (fails the run): every {x, plural, ...} message lists each plural
+ *    category its locale uses (Arabic: zero, one, two, few, many, other), and
+ *    count-like messages ("{count} jobs") must use ICU plural syntax.
+ * 3. Hard-coded copy (fails the run when above the budget, default 0): counts
+ *    user-facing string literals in JSX (text nodes and placeholder/title/alt/
+ *    aria-label/label attributes) per area.
  *
  * Flags:
  *   --verbose          list every hard-coded literal with file:line
  *   --area=<name>      only report that area (e.g. --area=employer)
- *   --max-literals=N   also fail when the total literal count exceeds N
+ *   --max-literals=N   hard-coded literal budget (default 0)
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
@@ -26,22 +30,27 @@ const messagesDir = path.join(root, "src/lib/i18n/messages");
 const args = process.argv.slice(2);
 const verbose = args.includes("--verbose");
 const areaFilter = args.find((a) => a.startsWith("--area="))?.split("=")[1];
-const maxLiterals = Number(args.find((a) => a.startsWith("--max-literals="))?.split("=")[1] ?? NaN);
+const maxLiterals = Number(args.find((a) => a.startsWith("--max-literals="))?.split("=")[1] ?? 0);
 
 const configSrc = readFileSync(path.join(root, "src/lib/i18n/config.ts"), "utf8");
 const LOCALES = JSON.parse(configSrc.match(/SUPPORTED_LOCALES = (\[[^\]]+\])/)[1]);
 
 // ---------------------------------------------------------------- parity ---
-function loadDict(file) {
+function loadModule(file) {
   const js = ts.transpileModule(readFileSync(file, "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
   const mod = { exports: {} };
   new Function("module", "exports", "require", js)(mod, mod.exports, () => ({}));
-  return mod.exports.default;
+  return mod.exports;
 }
+const loadDict = (file) => loadModule(file).default;
 
-const placeholders = (s) => (s.match(/\{\w+\}/g) ?? []).sort().join(",");
+// Same parser the runtime uses (src/lib/i18n/format.ts).
+const { argumentSignature, pluralProblems, messageArguments } = loadModule(path.join(root, "src/lib/i18n/format.ts"));
+const placeholders = (s) => argumentSignature(s).join(",");
+// A bare {count}/{n} next to a counted noun ("{count} jobs") must be an ICU plural.
+const COUNT_NOUN = /\{(count|days|hours)\}(\s+|-)[A-Za-z]{3,}/;
 const problems = [];
 const namespaces = readdirSync(messagesDir).filter((n) => statSync(path.join(messagesDir, n)).isDirectory());
 let keyTotal = 0;
@@ -49,6 +58,12 @@ for (const ns of namespaces) {
   const en = loadDict(path.join(messagesDir, ns, "en.ts"));
   const keys = Object.keys(en);
   keyTotal += keys.length;
+  for (const key of keys) {
+    if (COUNT_NOUN.test(en[key]) && !messageArguments(en[key]).some((a) => a.kind === "plural")) {
+      problems.push(`${ns}/en.ts: "${key}" counts something; use {count, plural, one {...} other {...}}`);
+    }
+    for (const p of pluralProblems(en[key], "en")) problems.push(`${ns}/en.ts: plural in "${key}" ${p}`);
+  }
   for (const locale of LOCALES.filter((l) => l !== "en")) {
     const file = path.join(messagesDir, ns, `${locale}.ts`);
     let dict;
@@ -62,6 +77,7 @@ for (const ns of namespaces) {
       const value = dict[key];
       if (typeof value !== "string" || !value.trim()) problems.push(`${ns}/${locale}.ts: missing "${key}"`);
       else if (placeholders(value) !== placeholders(en[key])) problems.push(`${ns}/${locale}.ts: placeholder mismatch in "${key}"`);
+      else for (const p of pluralProblems(value, locale)) problems.push(`${ns}/${locale}.ts: plural in "${key}" ${p}`);
     }
     for (const key of Object.keys(dict)) if (!(key in en)) problems.push(`${ns}/${locale}.ts: extra key "${key}" not in en`);
   }
@@ -130,6 +146,6 @@ if (problems.length) {
   console.error(`\nTranslation parity problems (${problems.length}):`);
   for (const p of problems) console.error(`  - ${p}`);
 }
-const overBudget = Number.isFinite(maxLiterals) && literals.length > maxLiterals;
+const overBudget = literals.length > maxLiterals;
 if (overBudget) console.error(`\nHard-coded literal count ${literals.length} exceeds --max-literals=${maxLiterals}`);
 process.exit(problems.length || overBudget ? 1 : 0);

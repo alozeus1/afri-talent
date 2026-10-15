@@ -13,7 +13,7 @@ import { CardGridSkeleton } from "@/components/ui/skeleton";
 import { TOP_PAYING_ROLE_GUIDANCE } from "@/lib/early-tester-content";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 import { usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
-import { usePublicLabel } from "@/lib/i18n/public-labels";
+import { usePublicLabel, useLocationLabel } from "@/lib/i18n/public-labels";
 import { useLocalizedContent } from "@/lib/i18n/content";
 import { MARKET_SALARY_BENCHMARKS } from "@/lib/market-reference-data";
 
@@ -32,6 +32,7 @@ const CHART_TICK_CLASS = "fill-fg-secondary";
 
 export default function SalariesPage() {
   const t = useT();
+  const locationLabel = useLocationLabel();
   const tp = usePublicT();
   const label = usePublicLabel();
   const locale = useLocale();
@@ -357,7 +358,7 @@ export default function SalariesPage() {
                       <div>
                         <p className="font-medium text-fg">{report.jobTitle}</p>
                         <p className="text-sm text-fg-muted">
-                          {report.location} · {label(report.country)}
+                          {locationLabel(report.location)} · {label(report.country)}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">

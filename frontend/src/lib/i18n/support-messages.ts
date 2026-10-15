@@ -6,6 +6,7 @@
 import { useLocale } from "./client";
 import type { SupportedLocale } from "./config";
 import supportNamespace from "./messages/support";
+import { formatMessage } from "./format";
 
 // Strings live in ./messages/support/<locale>.ts.
 export type SupportMessageKey = keyof typeof supportNamespace.en;
@@ -13,13 +14,17 @@ type SupportDictionary = Record<SupportMessageKey, string>;
 
 export const SUPPORT_MESSAGES: Record<SupportedLocale, SupportDictionary> = supportNamespace;
 
-export function formatSupportMessage(template: string, vars: Record<string, string> = {}): string {
-  return template.replace(/\{(\w+)\}/g, (match, key: string) => (key in vars ? vars[key] : match));
+export function formatSupportMessage(
+  template: string,
+  vars: Record<string, string | number> = {},
+  locale: SupportedLocale = "en",
+): string {
+  return formatMessage(template, vars, locale);
 }
 
 export function useSupportT() {
   const locale = useLocale();
   const dict = SUPPORT_MESSAGES[locale] ?? SUPPORT_MESSAGES.en;
-  return (key: SupportMessageKey, vars?: Record<string, string>): string =>
-    formatSupportMessage(dict[key] || SUPPORT_MESSAGES.en[key] || key, vars);
+  return (key: SupportMessageKey, vars?: Record<string, string | number>): string =>
+    formatSupportMessage(dict[key] || SUPPORT_MESSAGES.en[key] || key, vars, locale);
 }

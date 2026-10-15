@@ -90,7 +90,7 @@ export default {
   "site.stats.liveNote": "Validação de empresas, número de parceiros de contratação e depoimentos só aparecerão depois que fluxos verificados de acesso antecipado gerarem provas reais.",
 
   "site.pulse.eyebrow": "O pulso do mercado nesta semana",
-  "site.pulse.title": "Dados ao vivo de {count} vagas abertas",
+  "site.pulse.title": "Dados ao vivo de {count, plural, one {# vaga aberta} other {# vagas abertas}}",
   "site.pulse.digest": "Ler o resumo semanal",
   "site.pulse.newJobs": "Novas vagas nesta semana",
   "site.pulse.africaRoles": "Vagas verificadas que contratam da África",

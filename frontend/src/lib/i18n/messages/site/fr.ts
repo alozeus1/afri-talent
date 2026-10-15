@@ -90,7 +90,7 @@ export default {
   "site.stats.liveNote": "La validation des employeurs, le nombre de partenaires et les témoignages n'apparaîtront qu'une fois que des parcours vérifiés d'accès anticipé auront produit de vraies preuves.",
 
   "site.pulse.eyebrow": "Le pouls du marché cette semaine",
-  "site.pulse.title": "Données en direct sur {count} postes ouverts",
+  "site.pulse.title": "Données en direct sur {count, plural, one {# poste ouvert} other {# postes ouverts}}",
   "site.pulse.digest": "Lire le récapitulatif hebdomadaire",
   "site.pulse.newJobs": "Nouvelles offres cette semaine",
   "site.pulse.africaRoles": "Postes vérifiés ouverts aux candidats d'Afrique",

@@ -19,7 +19,7 @@ import { africaEligibility, deriveJobTrustLabels, type AfricaEligibilityStatus }
 import { formatPostedLong } from "@/lib/posted-age";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { usePublicT, type PublicT } from "@/lib/i18n/public-messages";
-import { usePublicLabel } from "@/lib/i18n/public-labels";
+import { usePublicLabel, useLocationLabel } from "@/lib/i18n/public-labels";
 import type { Job, TrustRiskLevel } from "@/lib/api";
 import { ArrowLeft, Briefcase, Check, Clock, Globe2, MapPin, Wallet } from "lucide-react";
 
@@ -83,6 +83,7 @@ export function JobDetailError({ error }: { error: string | null }) {
 
 export function JobDetailView({ job }: { job: Job }) {
   const tp = usePublicT();
+  const locationLabel = useLocationLabel();
   const label = usePublicLabel();
   const locale = useLocale();
 
@@ -197,7 +198,7 @@ export function JobDetailView({ job }: { job: Job }) {
               <div className="inline-flex items-center gap-2">
                 <dt className="sr-only">{tp("discover.detail.location")}</dt>
                 <MapPin className="h-5 w-5 text-fg-muted" aria-hidden="true" />
-                <dd>{job.location}</dd>
+                <dd>{locationLabel(job.location)}</dd>
               </div>
               <div className="inline-flex items-center gap-2">
                 <dt className="sr-only">{tp("discover.detail.seniority")}</dt>

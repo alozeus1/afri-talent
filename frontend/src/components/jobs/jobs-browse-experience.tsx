@@ -157,7 +157,7 @@ export function JobsBrowseExperience({
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-2">
             <p className="font-display text-2xl font-bold text-fg">
-              {tp(pagination.total === 1 ? "discover.results.countOne" : "discover.results.count", { count: pagination.total })}
+              {tp("discover.results.count", { count: pagination.total })}
             </p>
             <p className="text-sm text-fg-secondary">{tp("discover.results.anchored")}</p>
           </div>

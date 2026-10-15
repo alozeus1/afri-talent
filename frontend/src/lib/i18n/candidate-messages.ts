@@ -14,6 +14,7 @@ import { useLocale } from "./client";
 import candidateHome from "./messages/candidateHome";
 import candidateProfile from "./messages/candidateProfile";
 import candidateAi from "./messages/candidateAi";
+import { formatMessage } from "./format";
 
 export const CANDIDATE_NAMESPACES = { candidateHome, candidateProfile, candidateAi } as const;
 
@@ -30,15 +31,12 @@ export const CANDIDATE_MESSAGES = Object.fromEntries(
   ]),
 ) as Record<SupportedLocale, CandidateDictionary>;
 
-export function formatCandidateMessage(template: string, vars?: CandidateVars): string {
-  if (!vars) return template;
-  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
-    Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key]) : match,
-  );
+export function formatCandidateMessage(template: string, vars?: CandidateVars, locale: SupportedLocale = "en"): string {
+  return formatMessage(template, vars, locale);
 }
 
 export function translateCandidate(locale: SupportedLocale, key: CandidateMessageKey, vars?: CandidateVars): string {
-  return formatCandidateMessage(CANDIDATE_MESSAGES[locale]?.[key] || en[key] || key, vars);
+  return formatCandidateMessage(CANDIDATE_MESSAGES[locale]?.[key] || en[key] || key, vars, locale);
 }
 
 export type CandidateT = (key: CandidateMessageKey, vars?: CandidateVars) => string;

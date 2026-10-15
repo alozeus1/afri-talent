@@ -698,7 +698,7 @@ function InterviewCard({
         {experience.questions.length > 0 && !isExpanded && (
           <p className="mb-3 inline-flex items-center gap-1.5 text-sm text-fg-muted">
             <Lightbulb className="h-4 w-4" aria-hidden="true" />
-            {tp(experience.questions.length === 1 ? "guides.iv.questionsSharedOne" : "guides.iv.questionsShared", {
+            {tp("guides.iv.questionsShared", {
               count: experience.questions.length,
             })}
           </p>

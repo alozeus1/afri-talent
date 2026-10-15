@@ -8,6 +8,7 @@ import employerJobs from "./messages/employerJobs";
 import employerTalent from "./messages/employerTalent";
 import employerSetup from "./messages/employerSetup";
 import employerInsights from "./messages/employerInsights";
+import { formatMessage } from "./format";
 
 // Employer area dictionary (dashboard, jobs, talent, onboarding, trust,
 // analytics, integrations). Strings live in ./messages/employer*/<locale>.ts,
@@ -39,11 +40,8 @@ export function hasEmployerKey(key: string): key is EmployerMessageKey {
   return Object.prototype.hasOwnProperty.call(en, key);
 }
 
-export function formatEmployerMessage(template: string, vars?: EmployerVars): string {
-  if (!vars) return template;
-  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
-    Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key]) : match,
-  );
+export function formatEmployerMessage(template: string, vars?: EmployerVars, locale: SupportedLocale = "en"): string {
+  return formatMessage(template, vars, locale);
 }
 
 // Reverse index of English copy the API still returns as text (onboarding
@@ -60,7 +58,7 @@ export function translateEmployer(
   key: EmployerMessageKey,
   vars?: EmployerVars,
 ): string {
-  return formatEmployerMessage(EMPLOYER_MESSAGES[locale]?.[key] || en[key] || key, vars);
+  return formatEmployerMessage(EMPLOYER_MESSAGES[locale]?.[key] || en[key] || key, vars, locale);
 }
 
 export function useEmployerT() {
@@ -74,7 +72,7 @@ export function useEmployerT() {
 /**
  * Translation helpers for the employer area:
  * - `t(key, vars)` plain lookup with `{var}` interpolation;
- * - `tn(base, count, vars)` picks `${base}.one` / `${base}.other`;
+ * - `tn(key, count, vars)` formats an ICU plural message with `{count}`;
  * - `tv(prefix, value)` translates an enum or option value (`status.job.DRAFT`),
  *   falling back to a humanised value for anything the API adds later;
  * - `ts(text)` translates known English API copy, else returns it unchanged;
@@ -85,10 +83,8 @@ export function useEmployerI18n() {
 
   return useMemo(() => {
     const t = (key: EmployerMessageKey, vars?: EmployerVars) => translateEmployer(locale, key, vars);
-    const tn = (base: string, count: number, vars?: EmployerVars) => {
-      const key = `${base}.${count === 1 ? "one" : "other"}`;
-      return hasEmployerKey(key) ? t(key, { count, ...vars }) : String(count);
-    };
+    const tn = (key: string, count: number, vars?: EmployerVars) =>
+      hasEmployerKey(key) ? t(key, { count, ...vars }) : String(count);
     const tv = (prefix: string, value: string | null | undefined) => {
       if (!value) return "";
       const key = `${prefix}.${value}`;

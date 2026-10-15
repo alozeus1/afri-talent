@@ -30,6 +30,7 @@ import {
   candidateFieldClass,
 } from "@/components/candidate/candidate-ui";
 import { applicationStatusVariants } from "@/components/candidate/application-status";
+import { useLocationLabel } from "@/lib/i18n/public-labels";
 
 const statusBar: Record<string, string> = {
   PENDING: "bg-line-strong",
@@ -48,6 +49,7 @@ const TRACKER_STORAGE_KEY = "afritalent_application_tracker";
 
 export default function CandidateApplicationsPage() {
   const router = useRouter();
+  const locationLabel = useLocationLabel();
   const { user, isLoading } = useAuth();
   const locale = useLocale();
   const t = useCandidateT();
@@ -254,7 +256,7 @@ export default function CandidateApplicationsPage() {
                               </Badge>
                             </div>
                             <p className="text-sm text-fg-secondary">
-                              {[app.job.employer?.companyName, app.job.location, app.job.type ? enumLabel(t, "jobType", app.job.type) : null]
+                              {[app.job.employer?.companyName, locationLabel(app.job.location), app.job.type ? enumLabel(t, "jobType", app.job.type) : null]
                                 .filter(Boolean)
                                 .join(" · ")}
                             </p>

@@ -92,7 +92,7 @@ export default {
   "site.stats.liveNote": "Employer validation, hiring-partner counts, and testimonials will appear only after verified early-access workflows produce real proof.",
 
   "site.pulse.eyebrow": "This week's market pulse",
-  "site.pulse.title": "Live data from {count} open roles",
+  "site.pulse.title": "Live data from {count, plural, one {# open role} other {# open roles}}",
   "site.pulse.digest": "Read the weekly digest",
   "site.pulse.newJobs": "New jobs this week",
   "site.pulse.africaRoles": "Verified hire-from-Africa roles",

@@ -140,28 +140,28 @@ export default function AdminReviewsPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className={`text-base font-semibold ${strong}`}>{review.companyName}</h2>
+                        <h2 className={`text-base font-semibold ${strong}`} data-user-content>{review.companyName}</h2>
                         <Pill tone={status === "APPROVED" ? "green" : status === "REJECTED" ? "red" : "amber"}>
                           {t(`moderation.${status}`)}
                         </Pill>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         <Stars rating={review.rating} label={t("reviews.ratingLabel", { rating: review.rating })} />
-                        <span className={`text-sm ${muted}`}>{t("reviews.by", { name: review.reviewerName })}</span>
+                        <span className={`text-sm ${muted}`} data-user-content>{t("reviews.by", { name: review.reviewerName })}</span>
                       </div>
                     </div>
                     <span className={`text-xs ${muted}`}>{fmt.date(review.createdAt)}</span>
                   </div>
 
-                  <h3 className={`mt-3 font-medium ${strong}`}>{review.title}</h3>
+                  <h3 className={`mt-3 font-medium ${strong}`} data-user-content>{review.title}</h3>
                   <div className="mt-3 grid gap-4 md:grid-cols-2">
                     <div className="rounded-xl border border-success-line bg-success-soft p-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-success">{t("reviews.pros")}</p>
-                      <p className="mt-1 text-sm text-fg-secondary">{review.pros}</p>
+                      <p className="mt-1 text-sm text-fg-secondary" data-user-content>{review.pros}</p>
                     </div>
                     <div className="rounded-xl border border-danger-line bg-danger-soft p-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-danger">{t("reviews.cons")}</p>
-                      <p className="mt-1 text-sm text-fg-secondary">{review.cons}</p>
+                      <p className="mt-1 text-sm text-fg-secondary" data-user-content>{review.cons}</p>
                     </div>
                   </div>
 

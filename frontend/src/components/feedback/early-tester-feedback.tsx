@@ -201,9 +201,9 @@ export function EarlyTesterFeedback({
           />
           <p id="early-tester-feedback-hint" className="-mt-2 text-xs text-fg-secondary">
             {!rating
-              ? t("common.feedback.hintPick").replace("{count}", String(MIN_COMMENT_LENGTH))
+              ? t("common.feedback.hintPick", { count: MIN_COMMENT_LENGTH })
               : comment.trim().length < MIN_COMMENT_LENGTH
-                ? t("common.feedback.hintMore").replace("{count}", String(MIN_COMMENT_LENGTH - comment.trim().length))
+                ? t("common.feedback.hintMore", { count: MIN_COMMENT_LENGTH - comment.trim().length })
                 : t("common.feedback.ready")}
           </p>
 

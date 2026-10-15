@@ -77,10 +77,7 @@ function candidateTrustReasons(candidate: TalentProfile, t: T, ts: (text: string
   if (candidate.verifiedSkills?.length) {
     fallback.push({
       title: t("talent.verifiedSkillsTitle"),
-      description:
-        candidate.verifiedSkills.length === 1
-          ? t("talent.verifiedSkillsBody.one")
-          : t("talent.verifiedSkillsBody.other", { count: candidate.verifiedSkills.length }),
+      description: t("talent.verifiedSkillsBody", { count: candidate.verifiedSkills.length }),
       statusLabel: t("talent.evidenceBacked"),
       statusVariant: "success",
     });

@@ -4,8 +4,9 @@ import { SUPPORTED_LOCALES } from "../config";
 import { MESSAGES } from "../messages";
 import { ALL_NAMESPACES, SITE_NAMESPACES } from "../messages/registry";
 import { readLocaleCookie, resolveLocale } from "../client";
+import { argumentSignature } from "../format";
 
-const placeholders = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort();
+const placeholders = (s: string) => argumentSignature(s);
 
 describe("i18n namespaces", () => {
   it("registers every namespace directory", () => {

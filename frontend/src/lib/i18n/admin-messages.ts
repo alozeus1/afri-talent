@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import type { SupportedLocale } from "./config";
 import { useLocale } from "./client";
 import adminNamespace from "./messages/admin";
+import { formatMessage } from "./format";
 
 // Admin console dictionary. Kept separate from messages.ts so the console can
 // ship complete translations without colliding with site-wide copy work.
@@ -16,11 +17,12 @@ type AdminDictionary = Record<AdminMessageKey, string>;
 
 export const ADMIN_MESSAGES: Record<SupportedLocale, AdminDictionary> = adminNamespace;
 
-export function formatAdminMessage(template: string, vars?: Record<string, string | number>): string {
-  if (!vars) return template;
-  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
-    Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key]) : match,
-  );
+export function formatAdminMessage(
+  template: string,
+  vars?: Record<string, string | number>,
+  locale: SupportedLocale = "en",
+): string {
+  return formatMessage(template, vars, locale);
 }
 
 export function hasAdminKey(key: string): key is AdminMessageKey {
@@ -31,7 +33,7 @@ export function useAdminT() {
   const locale = useLocale();
   return useCallback(
     (key: AdminMessageKey, vars?: Record<string, string | number>) =>
-      formatAdminMessage(ADMIN_MESSAGES[locale]?.[key] ?? en[key] ?? key, vars),
+      formatAdminMessage(ADMIN_MESSAGES[locale]?.[key] ?? en[key] ?? key, vars, locale),
     [locale],
   );
 }

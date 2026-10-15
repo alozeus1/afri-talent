@@ -56,6 +56,7 @@ import {
   type CandidateMessageKey,
 } from "@/lib/i18n/candidate-messages";
 import { useCandidateBackendText } from "@/lib/i18n/candidate-backend-text";
+import { useLocationLabel } from "@/lib/i18n/public-labels";
 
 interface CandidateProfile {
   id: string;
@@ -167,6 +168,7 @@ function QuickLink({
 
 export default function CandidateDashboard() {
   const locale = useLocale();
+  const locationLabel = useLocationLabel();
   const t = useCandidateT();
   const bt = useCandidateBackendText();
   const fmt = useCandidateFormatters();
@@ -538,7 +540,7 @@ export default function CandidateDashboard() {
                           {job.title}
                         </Link>
                         <p className="mt-1 text-xs text-fg-muted">
-                          {[job.employer?.companyName, job.location].filter(Boolean).join(" · ")}
+                          {[job.employer?.companyName, locationLabel(job.location)].filter(Boolean).join(" · ")}
                         </p>
                         {job.rankingExplanation?.summary ? (
                           <p className="mt-2 text-xs text-fg-secondary">{job.rankingExplanation.summary}</p>
@@ -754,7 +756,7 @@ export default function CandidateDashboard() {
                         </div>
                         <div className="mb-3 mt-4 flex flex-wrap items-center gap-3 text-xs text-fg-muted">
                           <span className="flex items-center gap-1">
-                            <MapPin className="h-3.5 w-3.5" aria-hidden="true" /> {job.location}
+                            <MapPin className="h-3.5 w-3.5" aria-hidden="true" /> {locationLabel(job.location)}
                           </span>
                           {job.hiresFromAfrica && (
                             <span className="font-medium text-primary-text">{t("dash.recommended.hiresFromAfrica")}</span>
@@ -844,7 +846,7 @@ export default function CandidateDashboard() {
                           {application.job.title}
                         </Link>
                         <p className="text-sm text-fg-secondary">
-                          {[application.job.employer?.companyName, application.job.location].filter(Boolean).join(" · ")}
+                          {[application.job.employer?.companyName, locationLabel(application.job.location)].filter(Boolean).join(" · ")}
                         </p>
                         <p className="mt-1 text-xs text-fg-muted">
                           {t("dash.apps.applied", { date: fmt.date(application.createdAt) })}

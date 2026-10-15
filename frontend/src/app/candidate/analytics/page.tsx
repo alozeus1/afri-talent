@@ -25,6 +25,7 @@ import {
 } from "@/components/candidate/candidate-ui";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { enumLabel, useCandidateFormatters, useCandidateT } from "@/lib/i18n/candidate-messages";
+import { useLocationLabel } from "@/lib/i18n/public-labels";
 
 function MetricTile({ label, value }: { label: string; value: string }) {
   return (
@@ -37,6 +38,7 @@ function MetricTile({ label, value }: { label: string; value: string }) {
 
 export default function CandidateAnalyticsPage() {
   const router = useRouter();
+  const locationLabel = useLocationLabel();
   const locale = useLocale();
   const t = useCandidateT();
   const fmt = useCandidateFormatters();
@@ -223,7 +225,7 @@ export default function CandidateAnalyticsPage() {
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-fg">{job.title}</p>
                             <p className="mt-1 text-xs text-fg-secondary">
-                              {[job.employer.companyName, job.location].filter(Boolean).join(" · ")}
+                              {[job.employer.companyName, locationLabel(job.location)].filter(Boolean).join(" · ")}
                             </p>
                           </div>
                           {job.discovery?.trustedJob ? (

@@ -34,10 +34,8 @@ export default {
   "common.portfolio": "Portfolio",
   "common.loadErrorTitle": "We couldn't load {subject}.",
   "common.loadErrorBody": "Something went wrong on our side or your connection dropped. Please try again.",
-  "common.yearsExperience.one": "{count} yr experience",
-  "common.yearsExperience.other": "{count} yrs experience",
-  "common.years.one": "{count} year",
-  "common.years.other": "{count} years",
+  "common.yearsExperience": "{count, plural, one {# yr experience} other {# yrs experience}}",
+  "common.years": "{count, plural, one {# year} other {# years}}",
 
   // Activation checklist
   "checklist.eyebrow": "Employer activation",
@@ -120,8 +118,7 @@ export default {
   "dash.companyReviewed": "Company reviewed",
   "dash.qualityChecked": "Quality checked",
   "dash.newEmployerCaution": "New employer caution",
-  "dash.applicationCount.one": "{count} application",
-  "dash.applicationCount.other": "{count} applications",
+  "dash.applicationCount": "{count, plural, one {# application} other {# applications}}",
   "dash.createdOn": "Created {date}",
   "dash.viewApplications": "View applications",
   "dash.closeJob": "Close job",

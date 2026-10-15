@@ -79,8 +79,7 @@ export default {
   // Applicant pipeline
   "apps.eyebrow": "Applicant pipeline",
   "apps.title": "Applications",
-  "apps.count.one": "{count} candidate applied",
-  "apps.count.other": "{count} candidates applied",
+  "apps.count": "{count, plural, one {# candidate applied} other {# candidates applied}}",
   "apps.filterLabel": "Filter applicants by status",
   "apps.filterAll": "All",
   "apps.filterEmpty": "No applicants in this stage yet.",
@@ -91,7 +90,7 @@ export default {
   "apps.unlock": "Upgrade to review candidates",
   "apps.appliedOn": "Applied {date}",
   "apps.profileComplete": "Profile {pct}% complete",
-  "apps.moreSkills": "+{count} more",
+  "apps.moreSkills": "{count, plural, one {+# more} other {+# more}}",
   "apps.coverLetter": "Cover letter",
   "apps.viewCv": "View CV",
   "apps.openingCv": "Opening CV…",

@@ -156,7 +156,7 @@ function StarInput({
             type="button"
             role="radio"
             aria-checked={value === star}
-            aria-label={tp(star === 1 ? "discover.company.starOne" : "discover.company.stars", { count: star })}
+            aria-label={tp("discover.company.stars", { count: star })}
             onClick={() => onChange(value === star && !required ? 0 : star)}
             className={`rounded p-0.5 text-2xl leading-none transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
               star <= value ? "text-amber-400" : "text-fg-muted/50 hover:text-amber-300"
@@ -407,7 +407,7 @@ export default function CompanyDetailPage() {
                       <StarRating rating={ratings.averageOverall} />
                     </div>
                     <p className="mt-1 text-sm text-fg-secondary">
-                      {tp(ratings.totalReviews === 1 ? "discover.companies.reviewsOne" : "discover.companies.reviews", { count: ratings.totalReviews })}
+                      {tp("discover.companies.reviews", { count: ratings.totalReviews })}
                       {ratings.recommendationPct != null && ` · ${tp("discover.company.recommend", { pct: Math.round(ratings.recommendationPct) })}`}
                     </p>
                   </div>
