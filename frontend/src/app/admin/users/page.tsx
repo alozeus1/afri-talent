@@ -193,7 +193,7 @@ export default function AdminUsersPage() {
               users.map((u) => (
                 <tr
                   key={u.id}
-                  className="cursor-pointer transition-colors hover:bg-surface-sunken dark:hover:bg-zinc-800/50"
+                  className="cursor-pointer transition-colors hover:bg-surface-sunken"
                   onClick={() => setSelectedId(u.id)}
                 >
                   <Td>
@@ -203,13 +203,13 @@ export default function AdminUsersPage() {
                       checked={checked.has(u.id)}
                       onClick={(e) => e.stopPropagation()}
                       onChange={() => toggle(u.id)}
-                      className="h-4 w-4 rounded border-line-strong dark:border-zinc-600 dark:bg-zinc-900"
+                      className="h-4 w-4 rounded border-line-strong"
                     />
                   </Td>
                   <Td>
                     <p className={`font-medium ${strong}`}>{u.name}</p>
                     <p className={`text-xs ${muted}`}>{u.email}</p>
-                    {u.employer && <p className="text-xs text-emerald-700 dark:text-emerald-400">{u.employer.companyName}</p>}
+                    {u.employer && <p className="text-xs text-primary-text">{u.employer.companyName}</p>}
                   </Td>
                   <Td>
                     <Pill tone={u.role === "ADMIN" ? "violet" : u.role === "EMPLOYER" ? "blue" : "green"}>{t(`role.${u.role}`)}</Pill>
@@ -220,7 +220,7 @@ export default function AdminUsersPage() {
                       {u.accountRestrictedUntil && (
                         <span className={`text-xs ${muted}`}>{t("users.until", { date: fmt.date(u.accountRestrictedUntil) })}</span>
                       )}
-                      {!u.emailVerified && <span className="text-xs text-amber-700 dark:text-amber-300">{t("users.unverified")}</span>}
+                      {!u.emailVerified && <span className="text-xs text-warning">{t("users.unverified")}</span>}
                     </div>
                   </Td>
                   <Td className="hidden md:table-cell">

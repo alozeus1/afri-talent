@@ -1,9 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
 import {
   AdminTicket,
   AdminTicketFilters,
@@ -14,49 +12,42 @@ import {
   SupportTopic,
   adminSupport,
 } from "@/lib/api/support";
-import { SUPPORT_MESSAGES } from "@/lib/i18n/support-messages";
+import { useSupportT } from "@/lib/i18n/support-messages";
+import { useAdminEnum, useAdminFormatters, useAdminT } from "@/lib/i18n/admin-messages";
+import { useAdminHref } from "@/components/admin/admin-shell";
 import { Button } from "@/components/ui/button";
+import {
+  EmptyState,
+  Field,
+  FilterChips,
+  Notice,
+  PageHeader,
+  Pill,
+  PillTone,
+  SkeletonList,
+  Spinner,
+  fieldClass,
+  labelClass,
+  linkClass,
+  muted,
+  strong,
+} from "@/components/admin/console-ui";
 
 const STATUSES: SupportStatus[] = ["OPEN", "PENDING", "RESOLVED"];
 const PRIORITIES: SupportPriority[] = ["LOW", "NORMAL", "HIGH", "URGENT"];
 
-const STATUS_LABEL: Record<SupportStatus, string> = {
-  OPEN: "Open",
-  PENDING: "Awaiting customer",
-  RESOLVED: "Resolved",
-};
+const STATUS_TONE: Record<SupportStatus, PillTone> = { OPEN: "amber", PENDING: "blue", RESOLVED: "green" };
+const PRIORITY_TONE: Record<SupportPriority, PillTone> = { LOW: "zinc", NORMAL: "zinc", HIGH: "red", URGENT: "red" };
 
-const topicLabel = (topic: SupportTopic) => SUPPORT_MESSAGES.en[`contact.topic.${topic}`] ?? topic;
-
-const controlClass =
-  "rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100";
-
-function statusTone(status: SupportStatus): string {
-  if (status === "RESOLVED") return "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300";
-  if (status === "PENDING") return "bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300";
-  return "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300";
-}
-
-function priorityTone(priority: SupportPriority): string {
-  if (priority === "URGENT") return "bg-red-600 text-white";
-  if (priority === "HIGH") return "bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300";
-  if (priority === "LOW") return "bg-surface-muted text-fg-secondary dark:bg-zinc-800 dark:text-zinc-300";
-  return "bg-surface-muted text-fg dark:bg-zinc-800 dark:text-zinc-200";
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.round(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 48) return `${hours}h ago`;
-  return new Date(iso).toLocaleDateString();
-}
+type UpdateField = "status" | "priority" | "topic" | "assignee" | "notes";
 
 export default function AdminSupportPage() {
-  const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const t = useAdminT();
+  const st = useSupportT();
+  const label = useAdminEnum();
+  const fmt = useAdminFormatters();
+  const href = useAdminHref();
+  const topicLabel = (topic: SupportTopic) => st(`contact.topic.${topic}`);
 
   const [status, setStatus] = useState<SupportStatus | "ALL">("OPEN");
   const [priority, setPriority] = useState<SupportPriority | "">("");
@@ -80,10 +71,6 @@ export default function AdminSupportPage() {
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "ADMIN")) router.push("/login");
-  }, [user, isLoading, router]);
 
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get("ticket");
@@ -114,52 +101,54 @@ export default function AdminSupportPage() {
       setCounts(data.counts);
       setTotalPages(data.pagination.totalPages);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load tickets");
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, t]);
 
-  const loadDetail = useCallback(async (id: string) => {
-    setDetailLoading(true);
-    try {
-      const { ticket } = await adminSupport.get(id);
-      setSelected(ticket);
-      setNotes(ticket.internalNotes ?? "");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load ticket");
-      setSelected(null);
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
+  const loadDetail = useCallback(
+    async (id: string) => {
+      setDetailLoading(true);
+      try {
+        const { ticket } = await adminSupport.get(id);
+        setSelected(ticket);
+        setNotes(ticket.internalNotes ?? "");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t("common.error"));
+        setSelected(null);
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
-    if (user?.role === "ADMIN") void loadTickets();
-  }, [user, loadTickets]);
+    void loadTickets();
+  }, [loadTickets]);
 
   useEffect(() => {
-    if (user?.role !== "ADMIN") return;
     adminSupport
       .assignees()
       .then((data) => setAssignees(data.assignees))
       .catch(() => setAssignees([]));
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    if (selectedId && user?.role === "ADMIN") void loadDetail(selectedId);
-  }, [selectedId, user, loadDetail]);
+    if (selectedId) void loadDetail(selectedId);
+  }, [selectedId, loadDetail]);
 
-  async function applyUpdate(patch: Parameters<typeof adminSupport.update>[1], label: string) {
+  async function applyUpdate(patch: Parameters<typeof adminSupport.update>[1], field: UpdateField) {
     if (!selected) return;
-    setBusy(label);
+    setBusy(field);
     setFlash(null);
     try {
       await adminSupport.update(selected.id, patch);
       await Promise.all([loadDetail(selected.id), loadTickets()]);
-      setFlash(`${label} saved`);
+      setFlash(t("support.saved", { field: t(`support.field.${field}`) }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setBusy(null);
     }
@@ -174,281 +163,279 @@ export default function AdminSupportPage() {
       const result = await adminSupport.reply(selected.id, reply.trim(), resolve ? "RESOLVED" : undefined);
       setReply("");
       await Promise.all([loadDetail(selected.id), loadTickets()]);
-      const channels = [result.delivery.email ? "email" : null, result.delivery.inApp ? "in-app" : null].filter(Boolean);
+      const { email, inApp } = result.delivery;
       setFlash(
-        channels.length > 0
-          ? `Reply sent via ${channels.join(" + ")}`
-          : "Reply saved (email delivery is not configured in this environment)",
+        email && inApp
+          ? t("support.sentEmailInApp")
+          : email
+            ? t("support.sentEmail")
+            : inApp
+              ? t("support.sentInApp")
+              : t("support.sentNoDelivery"),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send reply");
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setBusy(null);
     }
   }
 
-  if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24" role="status" aria-label="Loading">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-      </div>
-    );
-  }
+  const applySearch = (e: FormEvent) => {
+    e.preventDefault();
+    setSearch(query.trim());
+    setPage(1);
+  };
 
-  const tabs: (SupportStatus | "ALL")[] = ["OPEN", "PENDING", "RESOLVED", "ALL"];
+  const roleLabel = (role: string | null) => (role ? label("role", role) : t("support.guest"));
+  const tabs: Array<{ value: SupportStatus | "ALL"; label: string; count: number }> = [
+    { value: "OPEN", label: t("supportStatus.OPEN"), count: counts.OPEN },
+    { value: "PENDING", label: t("supportStatus.PENDING"), count: counts.PENDING },
+    { value: "RESOLVED", label: t("supportStatus.RESOLVED"), count: counts.RESOLVED },
+    { value: "ALL", label: t("common.all"), count: counts.OPEN + counts.PENDING + counts.RESOLVED },
+  ];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <Link href="/admin" className="text-sm text-emerald-700 hover:underline dark:text-emerald-400">
-            ← Admin dashboard
+    <div>
+      <PageHeader
+        title={t("support.title")}
+        subtitle={t("support.subtitle")}
+        actions={
+          <Link href={href("/admin/reviews")} className={`text-sm ${linkClass}`}>
+            {t("support.reviewsLink")}
           </Link>
-          <h1 className="mt-2 text-3xl font-bold text-fg dark:text-zinc-50">Support desk</h1>
-          <p className="mt-1 text-fg-secondary dark:text-zinc-300">
-            Contact-form tickets from candidates, employers and guests. Replies are emailed to the submitter.
-          </p>
-        </div>
-        <Link href="/admin/reviews" className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400">
-          Review moderation →
-        </Link>
+        }
+      />
+
+      <div className="mb-4">
+        <FilterChips
+          label={t("support.statusLabel")}
+          options={tabs}
+          value={status}
+          onChange={(value) => {
+            setStatus(value);
+            setPage(1);
+          }}
+        />
       </div>
 
-      {/* Status tabs */}
-      <div role="tablist" aria-label="Ticket status" className="mb-4 flex flex-wrap gap-2">
-        {tabs.map((tab) => {
-          const active = status === tab;
-          const count = tab === "ALL" ? counts.OPEN + counts.PENDING + counts.RESOLVED : counts[tab];
-          return (
-            <button
-              key={tab}
-              role="tab"
-              aria-selected={active}
-              onClick={() => {
-                setStatus(tab);
-                setPage(1);
-              }}
-              className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-                active
-                  ? "border-emerald-600 bg-emerald-600 text-white"
-                  : "border-line bg-surface text-fg-secondary hover:bg-surface-sunken dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              }`}
-            >
-              {tab === "ALL" ? "All" : STATUS_LABEL[tab]}
-              <span className={`ms-2 rounded-full px-1.5 text-xs ${active ? "bg-white/20" : "bg-surface-muted dark:bg-zinc-800"}`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Filters */}
-      <form
-        className="mb-6 flex flex-wrap gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setSearch(query.trim());
-          setPage(1);
-        }}
-      >
+      <form className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_auto]" onSubmit={applySearch}>
         <input
           type="search"
-          aria-label="Search tickets"
-          placeholder="Search reference, email, name or text"
+          aria-label={t("support.searchLabel")}
+          placeholder={t("support.searchPlaceholder")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className={`${controlClass} min-w-64 flex-1`}
+          className={`${fieldClass} sm:col-span-2 lg:col-span-1`}
         />
-        <select aria-label="Priority" className={controlClass} value={priority} onChange={(e) => { setPriority(e.target.value as SupportPriority | ""); setPage(1); }}>
-          <option value="">Any priority</option>
+        <select
+          aria-label={t("common.priority")}
+          className={fieldClass}
+          value={priority}
+          onChange={(e) => {
+            setPriority(e.target.value as SupportPriority | "");
+            setPage(1);
+          }}
+        >
+          <option value="">{t("support.anyPriority")}</option>
           {PRIORITIES.map((p) => (
-            <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>
+            <option key={p} value={p}>{t(`supportPriority.${p}`)}</option>
           ))}
         </select>
-        <select aria-label="Topic" className={controlClass} value={topic} onChange={(e) => { setTopic(e.target.value as SupportTopic | ""); setPage(1); }}>
-          <option value="">Any topic</option>
-          {SUPPORT_TOPICS.map((t) => (
-            <option key={t} value={t}>{topicLabel(t)}</option>
+        <select
+          aria-label={t("support.topic")}
+          className={fieldClass}
+          value={topic}
+          onChange={(e) => {
+            setTopic(e.target.value as SupportTopic | "");
+            setPage(1);
+          }}
+        >
+          <option value="">{t("support.anyTopic")}</option>
+          {SUPPORT_TOPICS.map((tp) => (
+            <option key={tp} value={tp}>{topicLabel(tp)}</option>
           ))}
         </select>
-        <select aria-label="Assignee" className={controlClass} value={assigneeId} onChange={(e) => { setAssigneeId(e.target.value); setPage(1); }}>
-          <option value="">Anyone</option>
-          <option value="me">Assigned to me</option>
-          <option value="unassigned">Unassigned</option>
+        <select
+          aria-label={t("support.assignee")}
+          className={fieldClass}
+          value={assigneeId}
+          onChange={(e) => {
+            setAssigneeId(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">{t("support.anyone")}</option>
+          <option value="me">{t("support.assignedToMe")}</option>
+          <option value="unassigned">{t("common.unassigned")}</option>
           {assignees.map((a) => (
             <option key={a.id} value={a.id}>{a.name || a.email}</option>
           ))}
         </select>
-        <Button type="submit" variant="outline">Search</Button>
+        <Button type="submit" variant="outline">{t("common.search")}</Button>
       </form>
 
-      {error && (
-        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-          {error}
-        </div>
-      )}
+      {error && <Notice tone="error" onDismiss={() => setError(null)}>{error}</Notice>}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        {/* Ticket list */}
-        <section aria-label="Tickets" className="space-y-3">
+        <section aria-label={t("support.ticketsLabel")} className="space-y-3">
           {loading ? (
-            <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-b-2 border-emerald-600" /></div>
+            <SkeletonList rows={4} />
           ) : tickets.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-line-strong p-10 text-center text-fg-secondary dark:border-zinc-700 dark:text-zinc-400">
-              No tickets match these filters.
-            </div>
+            <EmptyState title={t("common.noResults")} />
           ) : (
-            tickets.map((ticket) => (
-              <button
-                key={ticket.id}
-                type="button"
-                onClick={() => setSelectedId(ticket.id)}
-                aria-current={selectedId === ticket.id}
-                className={`block w-full rounded-2xl border p-4 text-start transition-colors ${
-                  selectedId === ticket.id
-                    ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-500/10"
-                    : "border-line bg-surface hover:border-line-strong dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
-                }`}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-xs font-semibold text-fg dark:text-zinc-100">{ticket.reference}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusTone(ticket.status)}`}>{STATUS_LABEL[ticket.status]}</span>
-                  {ticket.priority !== "NORMAL" && (
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${priorityTone(ticket.priority)}`}>{ticket.priority}</span>
-                  )}
-                  <span className="ms-auto text-xs text-fg-secondary dark:text-zinc-400">{timeAgo(ticket.createdAt)}</span>
-                </div>
-                <p className="mt-2 font-medium text-fg dark:text-zinc-50">{ticket.subject || topicLabel(ticket.topic)}</p>
-                <p className="mt-1 line-clamp-2 text-sm text-fg-secondary dark:text-zinc-300">{ticket.message}</p>
-                <p className="mt-2 text-xs text-fg-secondary dark:text-zinc-400">
-                  {ticket.name} · {ticket.userRole ? ticket.userRole.toLowerCase() : "guest"}
-                  {ticket.assignee ? ` · ${ticket.assignee.name || ticket.assignee.email}` : " · unassigned"}
-                  {ticket._count && ticket._count.replies > 0 ? ` · ${ticket._count.replies} repl${ticket._count.replies === 1 ? "y" : "ies"}` : ""}
-                </p>
-              </button>
-            ))
+            tickets.map((ticket) => {
+              const active = selectedId === ticket.id;
+              const replies = ticket._count?.replies ?? 0;
+              return (
+                <button
+                  key={ticket.id}
+                  type="button"
+                  onClick={() => setSelectedId(ticket.id)}
+                  aria-current={active ? "true" : undefined}
+                  className={`block w-full rounded-2xl border p-4 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                    active ? "border-primary bg-primary-soft" : "border-line bg-surface hover:border-line-strong hover:bg-surface-sunken"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`font-mono text-xs font-semibold ${strong}`}>{ticket.reference}</span>
+                    <Pill tone={STATUS_TONE[ticket.status]}>{t(`supportStatus.${ticket.status}`)}</Pill>
+                    {ticket.priority !== "NORMAL" && <Pill tone={PRIORITY_TONE[ticket.priority]}>{t(`supportPriority.${ticket.priority}`)}</Pill>}
+                    <span className={`ms-auto text-xs ${muted}`}>{fmt.relative(ticket.createdAt)}</span>
+                  </div>
+                  <p className={`mt-2 font-medium ${strong}`}>{ticket.subject || topicLabel(ticket.topic)}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-fg-secondary">{ticket.message}</p>
+                  <p className={`mt-2 text-xs ${muted}`}>
+                    {ticket.name} · {roleLabel(ticket.userRole)} ·{" "}
+                    {ticket.assignee ? ticket.assignee.name || ticket.assignee.email : t("common.unassigned")}
+                    {replies > 0 ? ` · ${t("support.replyCount", { count: replies })}` : ""}
+                  </p>
+                </button>
+              );
+            })
           )}
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-3 pt-2">
-              <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</Button>
-              <span className="text-sm text-fg-secondary dark:text-zinc-300">Page {page} of {totalPages}</span>
-              <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+              <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>{t("common.prev")}</Button>
+              <span className={`text-sm ${muted}`}>{t("common.pageOf", { page, total: totalPages })}</span>
+              <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>{t("common.next")}</Button>
             </div>
           )}
         </section>
 
-        {/* Ticket detail */}
-        <section aria-label="Ticket detail" className="rounded-2xl border border-line bg-surface p-6 dark:border-zinc-800 dark:bg-zinc-950 lg:sticky lg:top-24 lg:self-start">
+        <section aria-label={t("support.detailLabel")} className="surface-panel rounded-2xl p-6 lg:sticky lg:top-24 lg:self-start">
           {!selectedId ? (
-            <p className="py-16 text-center text-fg-secondary dark:text-zinc-400">Select a ticket to triage and reply.</p>
+            <p className={`py-16 text-center text-sm ${muted}`}>{t("support.selectPrompt")}</p>
           ) : detailLoading && !selected ? (
-            <div className="flex justify-center py-16"><div className="h-6 w-6 animate-spin rounded-full border-b-2 border-emerald-600" /></div>
+            <Spinner />
           ) : selected ? (
             <div className="space-y-6">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-sm font-semibold text-fg dark:text-zinc-100">{selected.reference}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusTone(selected.status)}`}>{STATUS_LABEL[selected.status]}</span>
-                  <span className="text-xs text-fg-secondary dark:text-zinc-400">opened {new Date(selected.createdAt).toLocaleString()}</span>
+                  <span className={`font-mono text-sm font-semibold ${strong}`}>{selected.reference}</span>
+                  <Pill tone={STATUS_TONE[selected.status]}>{t(`supportStatus.${selected.status}`)}</Pill>
+                  <span className={`text-xs ${muted}`}>{t("support.opened", { time: fmt.dateTime(selected.createdAt) })}</span>
                 </div>
-                <h2 className="mt-2 text-xl font-semibold text-fg dark:text-zinc-50">{selected.subject || topicLabel(selected.topic)}</h2>
-                <p className="mt-1 text-sm text-fg-secondary dark:text-zinc-300">
-                  {selected.name} &lt;<a className="text-emerald-700 hover:underline dark:text-emerald-400" href={`mailto:${selected.email}`}>{selected.email}</a>&gt;
-                  {" · "}{selected.userRole ? `registered ${selected.userRole.toLowerCase()}` : "guest"}
+                <h2 className={`mt-2 text-xl font-semibold ${strong}`}>{selected.subject || topicLabel(selected.topic)}</h2>
+                <p className="mt-1 break-words text-sm text-fg-secondary">
+                  {selected.name} ·{" "}
+                  <a className={linkClass} href={`mailto:${selected.email}`}>{selected.email}</a>
+                  {" · "}
+                  {selected.userRole ? t("support.registered", { role: roleLabel(selected.userRole) }) : t("support.guest")}
                   {selected.locale ? ` · ${selected.locale.toUpperCase()}` : ""}
-                  {selected.pageUrl ? ` · from ${selected.pageUrl}` : ""}
+                  {selected.pageUrl ? ` · ${t("support.fromPage", { url: selected.pageUrl })}` : ""}
                 </p>
               </div>
 
-              <div className="whitespace-pre-line rounded-xl bg-surface-sunken p-4 text-sm leading-6 text-fg dark:bg-zinc-900 dark:text-zinc-200">
-                {selected.message}
-              </div>
+              <div className="whitespace-pre-line rounded-xl bg-surface-sunken p-4 text-sm leading-6 text-fg">{selected.message}</div>
 
-              {/* Triage */}
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-sm text-fg dark:text-zinc-200">
-                  <span className="mb-1 block font-medium">Status</span>
-                  <select className={`${controlClass} w-full`} value={selected.status} disabled={busy !== null}
-                    onChange={(e) => applyUpdate({ status: e.target.value as SupportStatus }, "Status")}>
-                    {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-                  </select>
-                </label>
-                <label className="text-sm text-fg dark:text-zinc-200">
-                  <span className="mb-1 block font-medium">Priority</span>
-                  <select className={`${controlClass} w-full`} value={selected.priority} disabled={busy !== null}
-                    onChange={(e) => applyUpdate({ priority: e.target.value as SupportPriority }, "Priority")}>
-                    {PRIORITIES.map((p) => <option key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</option>)}
-                  </select>
-                </label>
-                <label className="text-sm text-fg dark:text-zinc-200">
-                  <span className="mb-1 block font-medium">Topic</span>
-                  <select className={`${controlClass} w-full`} value={selected.topic} disabled={busy !== null}
-                    onChange={(e) => applyUpdate({ topic: e.target.value as SupportTopic }, "Topic")}>
-                    {SUPPORT_TOPICS.map((t) => <option key={t} value={t}>{topicLabel(t)}</option>)}
-                  </select>
-                </label>
-                <label className="text-sm text-fg dark:text-zinc-200">
-                  <span className="mb-1 block font-medium">Assignee</span>
-                  <select className={`${controlClass} w-full`} value={selected.assignee?.id ?? ""} disabled={busy !== null}
-                    onChange={(e) => applyUpdate({ assigneeId: e.target.value || null }, "Assignee")}>
-                    <option value="">Unassigned</option>
-                    {assignees.map((a) => <option key={a.id} value={a.id}>{a.name || a.email}</option>)}
-                  </select>
-                </label>
+                <Field label={t("common.status")}>
+                  {(id) => (
+                    <select id={id} className={fieldClass} value={selected.status} disabled={busy !== null}
+                      onChange={(e) => void applyUpdate({ status: e.target.value as SupportStatus }, "status")}>
+                      {STATUSES.map((s) => <option key={s} value={s}>{t(`supportStatus.${s}`)}</option>)}
+                    </select>
+                  )}
+                </Field>
+                <Field label={t("common.priority")}>
+                  {(id) => (
+                    <select id={id} className={fieldClass} value={selected.priority} disabled={busy !== null}
+                      onChange={(e) => void applyUpdate({ priority: e.target.value as SupportPriority }, "priority")}>
+                      {PRIORITIES.map((p) => <option key={p} value={p}>{t(`supportPriority.${p}`)}</option>)}
+                    </select>
+                  )}
+                </Field>
+                <Field label={t("support.topic")}>
+                  {(id) => (
+                    <select id={id} className={fieldClass} value={selected.topic} disabled={busy !== null}
+                      onChange={(e) => void applyUpdate({ topic: e.target.value as SupportTopic }, "topic")}>
+                      {SUPPORT_TOPICS.map((tp) => <option key={tp} value={tp}>{topicLabel(tp)}</option>)}
+                    </select>
+                  )}
+                </Field>
+                <Field label={t("support.assignee")}>
+                  {(id) => (
+                    <select id={id} className={fieldClass} value={selected.assignee?.id ?? ""} disabled={busy !== null}
+                      onChange={(e) => void applyUpdate({ assigneeId: e.target.value || null }, "assignee")}>
+                      <option value="">{t("common.unassigned")}</option>
+                      {assignees.map((a) => <option key={a.id} value={a.id}>{a.name || a.email}</option>)}
+                    </select>
+                  )}
+                </Field>
               </div>
 
-              <div>
-                <label htmlFor="ticket-notes" className="mb-1 block text-sm font-medium text-fg dark:text-zinc-200">
-                  Internal notes <span className="font-normal text-fg-secondary dark:text-zinc-400">(never shown to the customer)</span>
-                </label>
-                <textarea id="ticket-notes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)}
-                  className={`${controlClass} w-full`} maxLength={10000} />
-                <div className="mt-2 flex justify-end">
-                  <Button size="sm" variant="outline" disabled={busy !== null || notes === (selected.internalNotes ?? "")}
-                    onClick={() => applyUpdate({ internalNotes: notes || null }, "Notes")}>
-                    Save notes
-                  </Button>
-                </div>
-              </div>
+              <Field label={t("support.internalNotes")} help={t("support.internalNotesHelp")}>
+                {(id) => (
+                  <>
+                    <textarea id={id} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className={fieldClass} maxLength={10000} />
+                    <div className="mt-2 flex justify-end">
+                      <Button size="sm" variant="outline" isLoading={busy === "notes"}
+                        disabled={busy !== null || notes === (selected.internalNotes ?? "")}
+                        onClick={() => void applyUpdate({ internalNotes: notes || null }, "notes")}>
+                        {t("support.saveNotes")}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </Field>
 
-              {/* Conversation */}
               {selected.replies && selected.replies.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-fg-secondary dark:text-zinc-400">Replies</h3>
+                  <h3 className={labelClass}>{t("support.replies")}</h3>
                   {selected.replies.map((r) => (
-                    <div key={r.id} className="rounded-xl border-s-4 border-emerald-500 bg-emerald-50 p-3 dark:bg-emerald-500/10">
-                      <p className="text-xs text-emerald-900 dark:text-emerald-300">
-                        {r.author?.name ?? "Admin"} · {new Date(r.createdAt).toLocaleString()} · {r.emailSent ? "emailed" : "not emailed"}
+                    <div key={r.id} className="rounded-xl border-s-4 border-primary bg-primary-soft p-3">
+                      <p className={`text-xs ${muted}`}>
+                        {r.author?.name ?? t("role.ADMIN")} · {fmt.dateTime(r.createdAt)} · {r.emailSent ? t("support.emailed") : t("support.notEmailed")}
                       </p>
-                      <p className="mt-1 whitespace-pre-line text-sm text-fg dark:text-zinc-200">{r.body}</p>
+                      <p className="mt-1 whitespace-pre-line text-sm text-fg">{r.body}</p>
                     </div>
                   ))}
                 </div>
               )}
 
-              <form onSubmit={(e) => sendReply(e)} className="space-y-3">
-                <label htmlFor="ticket-reply" className="block text-sm font-medium text-fg dark:text-zinc-200">
-                  Reply to {selected.name}
-                </label>
-                <textarea id="ticket-reply" rows={5} value={reply} onChange={(e) => setReply(e.target.value)}
-                  placeholder="Write a reply. It is emailed to the customer and shown in their account if they are registered."
-                  className={`${controlClass} w-full placeholder:text-fg-muted dark:placeholder:text-zinc-400`} maxLength={10000} />
+              <form onSubmit={(e) => void sendReply(e)} className="space-y-3">
+                <Field label={t("support.replyTo", { name: selected.name })}>
+                  {(id) => (
+                    <textarea id={id} rows={5} value={reply} onChange={(e) => setReply(e.target.value)}
+                      placeholder={t("support.replyPlaceholder")} className={fieldClass} maxLength={10000} />
+                  )}
+                </Field>
                 <div className="flex flex-wrap justify-end gap-3">
-                  <Button type="button" variant="outline" disabled={busy !== null || reply.trim().length < 2} onClick={(e) => sendReply(e, true)}>
-                    Send & resolve
+                  <Button type="button" variant="outline" isLoading={busy === "resolve"}
+                    disabled={busy !== null || reply.trim().length < 2} onClick={(e) => void sendReply(e, true)}>
+                    {t("support.sendResolve")}
                   </Button>
                   <Button type="submit" disabled={busy !== null || reply.trim().length < 2} isLoading={busy === "reply"}>
-                    Send reply
+                    {t("support.sendReply")}
                   </Button>
                 </div>
               </form>
 
-              {flash && <p role="status" className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{flash}</p>}
+              {flash && <p role="status" className="text-sm font-medium text-success">{flash}</p>}
             </div>
           ) : (
-            <p className="py-16 text-center text-fg-secondary dark:text-zinc-400">Ticket not found.</p>
+            <p className={`py-16 text-center text-sm ${muted}`}>{t("support.notFound")}</p>
           )}
         </section>
       </div>

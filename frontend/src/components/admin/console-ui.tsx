@@ -6,29 +6,68 @@ import { useAdminT } from "@/lib/i18n/admin-messages";
 import type { AccountRestrictionStatus } from "@/lib/api";
 import type { ConsoleJobStatus, EmployerVerificationLevel, Pagination as PaginationData } from "@/lib/admin-console-api";
 
-// Shared building blocks for the admin console. All colours resolve through
-// light/dark pairs so text keeps WCAG-AA contrast on both themes.
+// Shared building blocks for the admin console. Every colour resolves through
+// the semantic design tokens (globals.css), which carry their own light/dark
+// values, so text keeps WCAG-AA contrast on both themes.
 
-export const muted = "text-fg-secondary dark:text-zinc-400";
-export const strong = "text-fg dark:text-zinc-50";
+export const muted = "text-fg-muted";
+export const strong = "text-fg";
 export const fieldClass =
-  "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-zinc-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500";
-export const labelClass = "mb-1 block text-xs font-semibold uppercase tracking-wide text-fg-secondary dark:text-zinc-400";
+  "w-full rounded-lg border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg placeholder:text-fg-muted shadow-xs transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-60";
+export const labelClass = "mb-1 block text-xs font-semibold uppercase tracking-wide text-fg-muted";
+export const linkClass =
+  "font-medium text-primary-text underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-sm";
 
-export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+  eyebrow,
+}: {
+  title: string;
+  subtitle?: string;
+  actions?: ReactNode;
+  eyebrow?: string;
+}) {
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h1 className={`text-2xl font-semibold sm:text-3xl ${strong}`}>{title}</h1>
-        {subtitle && <p className={`mt-1 text-sm ${muted}`}>{subtitle}</p>}
+      <div className="min-w-0">
+        {eyebrow && <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary-text">{eyebrow}</p>}
+        <h1 className={`text-2xl font-semibold tracking-tight sm:text-3xl ${strong}`}>{title}</h1>
+        {subtitle && <p className={`mt-1 max-w-3xl text-sm ${muted}`}>{subtitle}</p>}
       </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
 
-export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <section className={`surface-panel rounded-2xl p-5 ${className}`}>{children}</section>;
+export function Panel({
+  children,
+  className = "",
+  title,
+  description,
+  actions,
+}: {
+  children: ReactNode;
+  className?: string;
+  title?: string;
+  description?: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <section className={`surface-panel rounded-2xl p-5 ${className}`}>
+      {(title || actions) && (
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            {title && <h2 className={`text-base font-semibold ${strong}`}>{title}</h2>}
+            {description && <p className={`mt-0.5 text-sm ${muted}`}>{description}</p>}
+          </div>
+          {actions && <div className="flex flex-wrap items-end gap-2">{actions}</div>}
+        </div>
+      )}
+      {children}
+    </section>
+  );
 }
 
 export function StatCard({
@@ -43,14 +82,14 @@ export function StatCard({
   tone?: "neutral" | "brand" | "warning" | "danger" | "info";
 }) {
   const accent = {
-    neutral: "from-zinc-400/15",
-    brand: "from-emerald-500/20",
-    warning: "from-amber-500/20",
-    danger: "from-rose-500/20",
-    info: "from-sky-500/20",
+    neutral: "from-surface-muted",
+    brand: "from-primary-soft",
+    warning: "from-warning-soft",
+    danger: "from-danger-soft",
+    info: "from-info-soft",
   }[tone];
   return (
-    <div className={`surface-panel relative overflow-hidden rounded-2xl p-5`}>
+    <div className="surface-panel relative overflow-hidden rounded-2xl p-5">
       <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} to-transparent`} aria-hidden />
       <div className="relative">
         <p className={`text-xs font-semibold uppercase tracking-wide ${muted}`}>{label}</p>
@@ -63,12 +102,12 @@ export function StatCard({
 
 const pillBase = "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap";
 const pillTones = {
-  green: "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-700/50 dark:bg-emerald-900/40 dark:text-emerald-200",
-  amber: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-700/50 dark:bg-amber-900/40 dark:text-amber-200",
-  red: "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-700/50 dark:bg-rose-900/40 dark:text-rose-200",
-  blue: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-700/50 dark:bg-sky-900/40 dark:text-sky-200",
-  violet: "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-700/50 dark:bg-violet-900/40 dark:text-violet-200",
-  zinc: "border-line bg-surface-muted text-fg-secondary dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200",
+  green: "border-success-line bg-success-soft text-success",
+  amber: "border-warning-line bg-warning-soft text-warning",
+  red: "border-danger-line bg-danger-soft text-danger",
+  blue: "border-info-line bg-info-soft text-info",
+  violet: "border-line bg-primary-soft text-primary-text",
+  zinc: "border-line bg-surface-muted text-fg-secondary",
 } as const;
 export type PillTone = keyof typeof pillTones;
 
@@ -100,29 +139,214 @@ export const verificationTone: Record<EmployerVerificationLevel, PillTone> = {
   PREMIUM_TRUSTED: "violet",
 };
 
-export function Notice({ tone, children, onDismiss }: { tone: "success" | "error" | "info"; children: ReactNode; onDismiss?: () => void }) {
+/** Maps a free-form backend status onto a pill tone. */
+export function statusTone(status: string | null | undefined): PillTone {
+  switch (status) {
+    case "APPROVED":
+    case "ACTIVE":
+    case "PUBLISHED":
+    case "RESOLVED":
+    case "COMPLETED":
+    case "SUCCESS":
+    case "PROCESSED":
+    case "RECONCILED":
+    case "VERIFIED":
+    case "ACTIONED":
+    case "HEALTHY":
+    case "VALIDATED":
+      return "green";
+    case "REJECTED":
+    case "FAILED":
+    case "DOWN":
+    case "CRITICAL":
+    case "HIGH":
+    case "REVOKED":
+    case "SUSPENDED":
+    case "BANNED":
+      return "red";
+    case "PENDING":
+    case "OPEN":
+    case "IN_REVIEW":
+    case "NEEDS_MORE_INFO":
+    case "PARTIAL":
+    case "DEGRADED":
+    case "WARNING":
+    case "QUEUED":
+    case "RUNNING":
+    case "TRIAGED":
+    case "DUPLICATE":
+    case "PAST_DUE":
+    case "MEDIUM":
+    case "ACKNOWLEDGED":
+      return "amber";
+    case "INFO":
+    case "RECEIVED":
+      return "blue";
+    default:
+      return "zinc";
+  }
+}
+
+export function Notice({ tone, children, onDismiss }: { tone: "success" | "error" | "info" | "warning"; children: ReactNode; onDismiss?: () => void }) {
+  const t = useAdminT();
   const styles = {
-    success: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-700/50 dark:bg-emerald-900/30 dark:text-emerald-100",
-    error: "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-700/50 dark:bg-rose-900/30 dark:text-rose-100",
-    info: "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-700/50 dark:bg-sky-900/30 dark:text-sky-100",
+    success: "border-success-line bg-success-soft text-fg",
+    error: "border-danger-line bg-danger-soft text-fg",
+    info: "border-info-line bg-info-soft text-fg",
+    warning: "border-warning-line bg-warning-soft text-fg",
   }[tone];
+  const dot = { success: "bg-success", error: "bg-danger", info: "bg-info", warning: "bg-warning" }[tone];
   return (
     <div role={tone === "error" ? "alert" : "status"} className={`mb-4 flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${styles}`}>
-      <div>{children}</div>
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden />
+        <div className="min-w-0 break-words">{children}</div>
+      </div>
       {onDismiss && (
-        <button type="button" onClick={onDismiss} className="text-current opacity-70 hover:opacity-100" aria-label="×">
-          ×
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="rounded-md px-1 text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          aria-label={t("common.dismiss")}
+        >
+          <span aria-hidden>×</span>
         </button>
       )}
     </div>
   );
 }
 
-export function Spinner() {
+export function Spinner({ label }: { label?: string }) {
+  const t = useAdminT();
   return (
-    <div className="flex justify-center py-16" aria-busy="true">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
+    <div className="flex justify-center py-16" role="status" aria-live="polite">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-hidden />
+      <span className="sr-only">{label ?? t("common.loading")}</span>
     </div>
+  );
+}
+
+/** Skeleton rows for list/card loading states. */
+export function SkeletonList({ rows = 3 }: { rows?: number }) {
+  const t = useAdminT();
+  return (
+    <div className="space-y-3" role="status" aria-live="polite">
+      <span className="sr-only">{t("common.loading")}</span>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="surface-panel animate-pulse rounded-2xl p-5" aria-hidden>
+          <div className="h-3 w-1/3 rounded bg-surface-muted" />
+          <div className="mt-3 h-3 w-2/3 rounded bg-surface-muted" />
+          <div className="mt-2 h-3 w-1/2 rounded bg-surface-muted" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-6 py-12 text-center">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary-soft text-primary-text" aria-hidden>
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h10M4 17h7" />
+        </svg>
+      </div>
+      <p className={`text-sm font-medium ${strong}`}>{title}</p>
+      {description && <p className={`mt-1 max-w-md text-sm ${muted}`}>{description}</p>}
+      {action && <div className="mt-4">{action}</div>}
+    </div>
+  );
+}
+
+export function ErrorState({ message, onRetry }: { message?: string | null; onRetry?: () => void }) {
+  const t = useAdminT();
+  return (
+    <div role="alert" className="flex flex-col items-center justify-center rounded-2xl border border-danger-line bg-danger-soft px-6 py-10 text-center">
+      <p className={`text-sm font-semibold ${strong}`}>{t("common.loadFailed")}</p>
+      <p className={`mt-1 max-w-md text-sm ${muted}`}>{message || t("common.error")}</p>
+      {onRetry && (
+        <Button size="sm" variant="outline" className="mt-4" onClick={onRetry}>
+          {t("common.retry")}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** Segmented filter control. Buttons expose aria-pressed for assistive tech. */
+export function FilterChips<V extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: Array<{ value: V; label: string; count?: number }>;
+  value: V;
+  onChange: (value: V) => void;
+}) {
+  return (
+    <div role="group" aria-label={label} className="inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-line bg-surface p-1 shadow-xs">
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(option.value)}
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+              active ? "bg-primary text-primary-fg shadow-xs" : "text-fg-secondary hover:bg-surface-muted hover:text-fg"
+            }`}
+          >
+            {option.label}
+            {option.count !== undefined && (
+              <span className={`rounded-full px-1.5 text-xs tabular-nums ${active ? "bg-white/20" : "bg-surface-muted text-fg-muted"}`}>
+                {option.count}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Label + control pair with a generated id, so every field is announced. */
+export function Field({
+  label,
+  help,
+  className = "",
+  children,
+}: {
+  label: string;
+  help?: string;
+  className?: string;
+  children: (id: string) => ReactNode;
+}) {
+  const id = useId();
+  return (
+    <div className={className}>
+      <label htmlFor={id} className={labelClass}>
+        {label}
+      </label>
+      {children(id)}
+      {help && <p className={`mt-1 text-xs ${muted}`}>{help}</p>}
+    </div>
+  );
+}
+
+/** Definition list for read-only key/value facts. */
+export function KeyValueList({ items }: { items: Array<{ label: string; value: ReactNode }> }) {
+  return (
+    <dl className="divide-y divide-line text-sm">
+      {items.map((item) => (
+        <div key={item.label} className="flex items-start justify-between gap-4 py-2">
+          <dt className={muted}>{item.label}</dt>
+          <dd className={`min-w-0 break-all text-end font-medium ${strong}`}>{item.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -132,7 +356,7 @@ export function PaginationBar({ pagination, onPage }: { pagination?: PaginationD
   return (
     <div className={`mt-4 flex flex-col items-center justify-between gap-3 text-sm sm:flex-row ${muted}`}>
       <span>
-        {t("common.results", { count: pagination.total })} · {t("common.pageOf", { page: pagination.page, total: pagination.totalPages })}
+        {t("common.results", { count: pagination.total })} · {t("common.pageOf", { page: pagination.page, total: Math.max(1, pagination.totalPages) })}
       </span>
       <div className="flex gap-2">
         <Button variant="outline" size="sm" disabled={pagination.page <= 1} onClick={() => onPage(pagination.page - 1)}>
@@ -173,9 +397,9 @@ export function Drawer({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <button type="button" className="absolute inset-0 bg-zinc-950/50 backdrop-blur-sm" aria-label={t("common.close")} onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-2xl flex-col overflow-hidden border-s border-[var(--border-soft)] bg-[var(--surface)] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-4">
+      <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-label={t("common.close")} onClick={onClose} />
+      <div className="relative flex h-full w-full max-w-2xl flex-col overflow-hidden border-s border-line bg-surface shadow-2xl">
+        <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <h2 id={titleId} className={`text-lg font-semibold ${strong}`}>{title}</h2>
           <Button variant="ghost" size="sm" onClick={onClose}>
             {t("common.close")}
@@ -230,8 +454,8 @@ function ConfirmDialogBody({ request, onClose }: { request: ConfirmRequest; onCl
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <button type="button" className="absolute inset-0 bg-zinc-950/60 backdrop-blur-sm" aria-label={t("common.cancel")} onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl border border-[var(--border-soft)] bg-[var(--surface)] p-6 shadow-2xl">
+      <button type="button" className="absolute inset-0 bg-black/60 backdrop-blur-sm" aria-label={t("common.cancel")} onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-2xl">
         <h2 id={titleId} className={`text-lg font-semibold ${strong}`}>{request.title}</h2>
         {request.description && <p className={`mt-1 text-sm ${muted}`}>{request.description}</p>}
         <div className="mt-4 space-y-4">
@@ -258,7 +482,7 @@ function ConfirmDialogBody({ request, onClose }: { request: ConfirmRequest; onCl
             </div>
           )}
           <p className={`text-xs ${muted}`}>{t("confirm.audited")}</p>
-          {error && <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">{error}</p>}
+          {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         </div>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose} disabled={submitting}>
@@ -277,7 +501,7 @@ export function TableShell({ children }: { children: ReactNode }) {
   return (
     <div className="surface-panel overflow-hidden rounded-2xl">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-[var(--border-soft)] text-sm">{children}</table>
+        <table className="min-w-full divide-y divide-line text-sm">{children}</table>
       </div>
     </div>
   );
@@ -285,12 +509,12 @@ export function TableShell({ children }: { children: ReactNode }) {
 
 export function Th({ children, className = "" }: { children?: ReactNode; className?: string }) {
   return (
-    <th scope="col" className={`bg-surface-sunken px-4 py-3 text-start text-xs font-semibold uppercase tracking-wide text-fg-secondary dark:bg-zinc-900/60 dark:text-zinc-400 ${className}`}>
+    <th scope="col" className={`bg-surface-sunken px-4 py-3 text-start text-xs font-semibold uppercase tracking-wide text-fg-muted ${className}`}>
       {children}
     </th>
   );
 }
 
 export function Td({ children, className = "", colSpan }: { children?: ReactNode; className?: string; colSpan?: number }) {
-  return <td colSpan={colSpan} className={`px-4 py-3 align-top text-fg dark:text-zinc-200 ${className}`}>{children}</td>;
+  return <td colSpan={colSpan} className={`px-4 py-3 align-top text-fg ${className}`}>{children}</td>;
 }

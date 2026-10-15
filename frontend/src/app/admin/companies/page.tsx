@@ -188,7 +188,7 @@ export default function AdminCompaniesPage() {
                           href={c.website.startsWith("http") ? c.website : `https://${c.website}`}
                           target="_blank"
                           rel="noreferrer noopener"
-                          className="text-xs text-emerald-700 hover:underline dark:text-emerald-400"
+                          className="text-xs text-primary-text hover:underline"
                         >
                           {c.website}
                         </a>
@@ -204,13 +204,13 @@ export default function AdminCompaniesPage() {
                     <Td>
                       <div className="flex flex-col items-start gap-1">
                         <Pill tone={verificationTone[level]}>{t(`verify.${level}`)}</Pill>
-                        <span className={`text-xs ${c.trustProfile?.postingEligibility ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-300"}`}>
+                        <span className={`text-xs ${c.trustProfile?.postingEligibility ? "text-primary-text" : "text-warning"}`}>
                           {c.trustProfile?.postingEligibility ? t("companies.postingEligible") : t("companies.postingBlocked")}
                         </span>
                       </div>
                     </Td>
                     <Td className="hidden lg:table-cell">
-                      <Link href={href(`/admin/jobs?employerId=${c.id}`)} className="text-sm text-emerald-700 hover:underline dark:text-emerald-400">
+                      <Link href={href(`/admin/jobs?employerId=${c.id}`)} className="text-sm text-primary-text hover:underline">
                         {c._count.jobs} · {t("companies.viewJobs")}
                       </Link>
                     </Td>

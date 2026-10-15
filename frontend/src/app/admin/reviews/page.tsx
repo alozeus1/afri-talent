@@ -1,15 +1,23 @@
 "use client";
 
-import * as Tabs from "@radix-ui/react-tabs";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useState } from "react";
+import { fetchAPI } from "@/lib/api";
 import { adminReviews } from "@/lib/api/support";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { Button } from "@/components/ui/button";
+import { useAdminFormatters, useAdminT } from "@/lib/i18n/admin-messages";
+import type { Pagination } from "@/lib/admin-console-api";
+import {
+  EmptyState,
+  ErrorState,
+  FilterChips,
+  Notice,
+  PageHeader,
+  PaginationBar,
+  Pill,
+  SkeletonList,
+  muted,
+  strong,
+} from "@/components/admin/console-ui";
 
 interface CompanyReview {
   id: string;
@@ -26,258 +34,160 @@ interface CompanyReview {
 
 type ReviewFilter = "ALL" | "PENDING" | "APPROVED" | "REJECTED";
 
-interface ReviewsResponse {
-  reviews: CompanyReview[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+function Stars({ rating, label }: { rating: number; label: string }) {
+  return (
+    <span className="inline-flex gap-0.5" role="img" aria-label={label}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <span key={star} aria-hidden className={`text-sm ${star <= rating ? "text-accent-text" : "text-line-strong"}`}>
+          ★
+        </span>
+      ))}
+    </span>
+  );
 }
 
 export default function AdminReviewsPage() {
-  const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const t = useAdminT();
+  const fmt = useAdminFormatters();
   const [reviews, setReviews] = useState<CompanyReview[]>([]);
+  const [pagination, setPagination] = useState<Pagination | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [moderating, setModerating] = useState<string | null>(null);
-
-  // Filters
   const [filter, setFilter] = useState<ReviewFilter>("PENDING");
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "ADMIN")) {
-      router.push("/login");
-    }
-  }, [user, isLoading, router]);
-
-  useEffect(() => {
-    if (user?.role === "ADMIN") {
-      loadReviews();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, filter, page]);
-
-  const loadReviews = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ page: String(page) });
       if (filter !== "ALL") params.set("status", filter.toLowerCase());
-      params.set("page", page.toString());
-      const query = params.toString();
-
-      const res = await fetch(`${API_URL}/api/admin/reviews${query ? `?${query}` : ""}`, {
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch reviews");
-      }
-
-      const data: ReviewsResponse = await res.json();
+      const data = await fetchAPI<{ reviews: CompanyReview[]; pagination: Pagination }>(`/api/admin/reviews?${params}`);
       setReviews(data.reviews);
-      setTotalPages(data.pagination.totalPages);
+      setPagination(data.pagination);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load reviews");
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, page, t]);
 
-  const moderateReview = async (id: string, action: "approve" | "reject") => {
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const moderate = async (id: string, action: "approve" | "reject") => {
     setModerating(id);
-    setError(null);
+    setActionError(null);
     try {
-      // Shared client: attaches the CSRF token (raw fetch was rejected).
+      // Shared client attaches the CSRF token; approval also recomputes the
+      // company's ratings server-side.
       await adminReviews.moderate(id, action);
-      // Refresh list (approval also recomputes the company's ratings server-side)
-      await loadReviews();
+      await load();
     } catch (err) {
-      setError(err instanceof Error ? `Moderation failed: ${err.message}` : "Moderation failed");
+      setActionError(t("reviews.moderationFailed", { error: err instanceof Error ? err.message : t("common.error") }));
     } finally {
       setModerating(null);
     }
   };
 
-  const renderStars = (rating: number) => {
-    return (
-      <div className="flex gap-0.5">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <span
-            key={star}
-            className={`text-sm ${star <= rating ? "text-yellow-400" : "text-gray-300"}`}
-          >
-            ★
-          </span>
-        ))}
-      </div>
-    );
-  };
+  const filters: Array<{ value: ReviewFilter; label: string }> = [
+    { value: "PENDING", label: t("moderation.PENDING") },
+    { value: "APPROVED", label: t("moderation.APPROVED") },
+    { value: "REJECTED", label: t("moderation.REJECTED") },
+    { value: "ALL", label: t("common.all") },
+  ];
 
-  if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
-  }
+  const emptyKey = {
+    PENDING: "reviews.emptyPending",
+    APPROVED: "reviews.emptyApproved",
+    REJECTED: "reviews.emptyRejected",
+    ALL: "reviews.empty",
+  } as const;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-fg mb-2">Review Moderation</h1>
-        <p className="text-fg-secondary">Review and moderate company reviews</p>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="mb-6 flex">
-        <Tabs.Root
+    <div>
+      <PageHeader title={t("reviews.title")} subtitle={t("reviews.subtitle")} />
+      <div className="mb-4">
+        <FilterChips
+          label={t("reviews.filterLabel")}
+          options={filters}
           value={filter}
-          onValueChange={(val) => { setFilter(val as ReviewFilter); setPage(1); }}
-        >
-          <Tabs.List
-            className="flex items-center gap-x-1 p-1 bg-surface border border-line rounded-xl shadow-sm text-sm"
-            aria-label="Filter Reviews"
-          >
-            {(["PENDING", "APPROVED", "REJECTED", "ALL"] as const).map((f) => (
-              <Tabs.Trigger
-                key={f}
-                value={f}
-                className="data-[state=active]:bg-surface-muted data-[state=active]:text-fg data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-fg-muted hover:text-fg-secondary hover:bg-surface-sunken active:bg-surface-muted font-medium"
-              >
-                {f === "ALL" ? "All Reviews" : f === "PENDING" ? "Pending" : f === "APPROVED" ? "Approved" : "Rejected"}
-              </Tabs.Trigger>
-            ))}
-          </Tabs.List>
-        </Tabs.Root>
+          onChange={(value) => {
+            setFilter(value);
+            setPage(1);
+          }}
+        />
       </div>
 
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      {actionError && <Notice tone="error" onDismiss={() => setActionError(null)}>{actionError}</Notice>}
 
-      {/* Reviews List */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-        </div>
+        <SkeletonList />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => void load()} />
       ) : reviews.length === 0 ? (
-        <Card>
-          <CardContent className="p-12">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">✅</span>
-              </div>
-              <p className="text-fg-secondary">
-                {filter === "PENDING"
-                  ? "No pending reviews to moderate"
-                  : filter === "APPROVED"
-                  ? "No approved reviews yet"
-                  : filter === "REJECTED"
-                  ? "No rejected reviews"
-                  : "No reviews found"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <EmptyState title={t(emptyKey[filter])} />
       ) : (
-        <div className="space-y-4">
-          {reviews.map((review) => (
-            <Card key={review.id}>
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-semibold text-fg text-lg">{review.companyName}</h3>
-                      <Badge
-                        variant={
-                          review.approved ? "success" : review.moderationStatus === "REJECTED" ? "danger" : "warning"
-                        }
+        <>
+          <ul className="space-y-3">
+            {reviews.map((review) => {
+              const status = review.approved ? "APPROVED" : review.moderationStatus === "REJECTED" ? "REJECTED" : "PENDING";
+              return (
+                <li key={review.id} className="surface-panel rounded-2xl p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className={`text-base font-semibold ${strong}`}>{review.companyName}</h2>
+                        <Pill tone={status === "APPROVED" ? "green" : status === "REJECTED" ? "red" : "amber"}>
+                          {t(`moderation.${status}`)}
+                        </Pill>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <Stars rating={review.rating} label={t("reviews.ratingLabel", { rating: review.rating })} />
+                        <span className={`text-sm ${muted}`}>{t("reviews.by", { name: review.reviewerName })}</span>
+                      </div>
+                    </div>
+                    <span className={`text-xs ${muted}`}>{fmt.date(review.createdAt)}</span>
+                  </div>
+
+                  <h3 className={`mt-3 font-medium ${strong}`}>{review.title}</h3>
+                  <div className="mt-3 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-success-line bg-success-soft p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-success">{t("reviews.pros")}</p>
+                      <p className="mt-1 text-sm text-fg-secondary">{review.pros}</p>
+                    </div>
+                    <div className="rounded-xl border border-danger-line bg-danger-soft p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-danger">{t("reviews.cons")}</p>
+                      <p className="mt-1 text-sm text-fg-secondary">{review.cons}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
+                    {!review.approved && (
+                      <Button size="sm" onClick={() => void moderate(review.id, "approve")} isLoading={moderating === review.id}>
+                        {t("common.approve")}
+                      </Button>
+                    )}
+                    {review.moderationStatus !== "REJECTED" && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => void moderate(review.id, "reject")}
+                        disabled={moderating === review.id}
                       >
-                        {review.approved ? "Approved" : review.moderationStatus === "REJECTED" ? "Rejected" : "Pending"}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 mb-1">
-                      {renderStars(review.rating)}
-                      <span className="text-sm text-fg-muted">by {review.reviewerName}</span>
-                    </div>
+                        {review.approved ? t("reviews.unpublish") : t("common.reject")}
+                      </Button>
+                    )}
                   </div>
-                  <span className="text-xs text-gray-400">
-                    {new Date(review.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-
-                <h4 className="font-medium text-fg mb-2">{review.title}</h4>
-
-                <div className="grid md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Pros</p>
-                    <p className="text-sm text-fg-secondary">{review.pros}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">Cons</p>
-                    <p className="text-sm text-fg-secondary">{review.cons}</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-3 border-t border-line dark:border-zinc-800">
-                  {!review.approved && (
-                    <Button
-                      size="sm"
-                      onClick={() => moderateReview(review.id, "approve")}
-                      disabled={moderating === review.id}
-                    >
-                      {moderating === review.id ? "Processing..." : "Approve"}
-                    </Button>
-                  )}
-                  {review.moderationStatus !== "REJECTED" && (
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => moderateReview(review.id, "reject")}
-                      disabled={moderating === review.id}
-                    >
-                      {review.approved ? "Unpublish" : "Reject"}
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center gap-2 mt-6">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-              >
-                Previous
-              </Button>
-              <span className="flex items-center px-3 text-sm text-fg-secondary">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-              >
-                Next
-              </Button>
-            </div>
-          )}
-        </div>
+                </li>
+              );
+            })}
+          </ul>
+          {pagination && pagination.totalPages > 1 && <PaginationBar pagination={pagination} onPage={setPage} />}
+        </>
       )}
     </div>
   );

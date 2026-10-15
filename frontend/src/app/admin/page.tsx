@@ -27,11 +27,11 @@ const STATUS_ORDER: AccountRestrictionStatus[] = ["ACTIVE", "LIMITED", "SUSPENDE
 const JOB_ORDER: ConsoleJobStatus[] = ["PUBLISHED", "PENDING_REVIEW", "DRAFT", "CLOSED", "REJECTED", "REMOVED"];
 
 const barColor: Record<string, string> = {
-  green: "bg-emerald-500",
-  amber: "bg-amber-500",
-  red: "bg-rose-500",
-  blue: "bg-sky-500",
-  zinc: "bg-zinc-400 dark:bg-zinc-500",
+  green: "bg-success",
+  amber: "bg-warning",
+  red: "bg-danger",
+  blue: "bg-info",
+  zinc: "bg-line-strong",
   violet: "bg-violet-500",
 };
 
@@ -43,7 +43,7 @@ function Breakdown({
   const total = rows.reduce((a, b) => a + b.value, 0) || 1;
   return (
     <div className="space-y-3">
-      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-muted dark:bg-zinc-800" aria-hidden>
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-muted" aria-hidden>
         {rows.map((r) => (
           <div key={r.label} className={barColor[r.tone]} style={{ width: `${(r.value / total) * 100}%` }} />
         ))}
@@ -51,7 +51,7 @@ function Breakdown({
       <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
         {rows.map((r) => (
           <li key={r.label} className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-2 text-fg-secondary dark:text-zinc-300">
+            <span className="flex items-center gap-2 text-fg-secondary">
               <span className={`h-2 w-2 rounded-full ${barColor[r.tone]}`} aria-hidden />
               {r.label}
             </span>
@@ -71,10 +71,10 @@ function ApplicationsChart({ data, formatDate }: { data: ConsoleOverview["applic
         {data.map((d) => (
           <div key={d.date} className="group relative flex h-full flex-1 flex-col justify-end">
             <div
-              className="rounded-t-md bg-gradient-to-t from-emerald-600 to-emerald-400 transition-opacity group-hover:opacity-80 dark:from-emerald-500 dark:to-teal-300"
+              className="rounded-t-md bg-gradient-to-t from-primary to-success transition-opacity group-hover:opacity-80"
               style={{ height: `${Math.max(4, (d.count / max) * 100)}%` }}
             />
-            <span className="pointer-events-none absolute -top-7 left-1/2 hidden -translate-x-1/2 rounded bg-zinc-900 px-1.5 py-0.5 text-[11px] text-white group-hover:block dark:bg-zinc-100 dark:text-zinc-900">
+            <span className="pointer-events-none absolute -top-7 left-1/2 hidden -translate-x-1/2 rounded bg-surface-inverse px-1.5 py-0.5 text-[11px] text-fg-inverse group-hover:block">
               {d.count}
             </span>
           </div>
@@ -196,7 +196,7 @@ export default function AdminOverviewPage() {
             {queues.map((q) => (
               <li key={q.key}>
                 <Link href={href(q.href)} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:opacity-80">
-                  <span className="text-fg-secondary dark:text-zinc-300">{t(q.key)}</span>
+                  <span className="text-fg-secondary">{t(q.key)}</span>
                   {q.value === null ? (
                     <Pill tone="zinc">{t("overview.notConnected")}</Pill>
                   ) : (
@@ -233,7 +233,7 @@ export default function AdminOverviewPage() {
       <Panel className="mt-6">
         <div className="mb-3 flex items-center justify-between">
           <h2 className={`text-sm font-semibold ${strong}`}>{t("overview.pendingJobs")}</h2>
-          <Link href={href("/admin/jobs?status=PENDING_REVIEW")} className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400">
+          <Link href={href("/admin/jobs?status=PENDING_REVIEW")} className="text-sm font-medium text-primary-text hover:underline">
             {t("nav.jobs")} →
           </Link>
         </div>
