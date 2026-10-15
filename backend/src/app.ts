@@ -83,6 +83,7 @@ import adminAlertsRoutes from "./routes/admin-alerts.js";
 import adminBulkRoutes from "./routes/admin-bulk.js";
 import adminBlogRoutes from "./routes/admin-blog.js";
 import adminTotpRoutes from "./routes/admin-totp.js";
+import adminConsoleRoutes from "./routes/admin-console.js";
 import onboardingRoutes from "./routes/onboarding.js";
 import savedJobsRoutes from "./routes/saved-jobs.js";
 // AI Skills routes (premium, additive)
@@ -451,6 +452,7 @@ app.use("/api/resources", resourcesRoutes);
 // Test-mode bypass via `x-admin-totp-test-bypass: enforce` header.
 app.use("/api/admin", adminTotpGate);
 app.use("/api/admin", adminRoutes);
+app.use("/api/admin/console", adminConsoleRoutes);
 app.use("/api/admin/audit-logs", adminAuditRoutes);
 app.use("/api/admin/alerts", adminAlertsRoutes);
 app.use("/api/admin/bulk", adminBulkRoutes);

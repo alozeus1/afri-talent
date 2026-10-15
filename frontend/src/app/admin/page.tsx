@@ -1,257 +1,265 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/lib/auth-context";
-import { admin, AdminStats, AdminTrustDashboard, Job, adminTrust } from "@/lib/api";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrustBadge } from "@/components/trust/trust-badge";
 import { LoadErrorCard } from "@/components/ui/load-error-card";
-import { toFriendlyError } from "@/lib/friendly-error";
+import { useAdminHref } from "@/components/admin/admin-shell";
+import {
+  ConfirmDialog,
+  ConfirmRequest,
+  Notice,
+  PageHeader,
+  Panel,
+  Pill,
+  Spinner,
+  StatCard,
+  jobStatusTone,
+  muted,
+  restrictionTone,
+  strong,
+} from "@/components/admin/console-ui";
+import { adminConsole, ConsoleJob, ConsoleJobStatus, ConsoleOverview } from "@/lib/admin-console-api";
+import type { AccountRestrictionStatus } from "@/lib/api";
+import { useAdminFormatters, useAdminT } from "@/lib/i18n/admin-messages";
 
-export default function AdminDashboard() {
-  const router = useRouter();
-  const { user, isLoading } = useAuth();
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [trustOverview, setTrustOverview] = useState<AdminTrustDashboard | null>(null);
-  const [pendingJobs, setPendingJobs] = useState<Job[]>([]);
+const STATUS_ORDER: AccountRestrictionStatus[] = ["ACTIVE", "LIMITED", "SUSPENDED", "BANNED"];
+const JOB_ORDER: ConsoleJobStatus[] = ["PUBLISHED", "PENDING_REVIEW", "DRAFT", "CLOSED", "REJECTED", "REMOVED"];
+
+const barColor: Record<string, string> = {
+  green: "bg-emerald-500",
+  amber: "bg-amber-500",
+  red: "bg-rose-500",
+  blue: "bg-sky-500",
+  zinc: "bg-zinc-400 dark:bg-zinc-500",
+  violet: "bg-violet-500",
+};
+
+function Breakdown({
+  rows,
+}: {
+  rows: Array<{ label: string; value: number; tone: string }>;
+}) {
+  const total = rows.reduce((a, b) => a + b.value, 0) || 1;
+  return (
+    <div className="space-y-3">
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800" aria-hidden>
+        {rows.map((r) => (
+          <div key={r.label} className={barColor[r.tone]} style={{ width: `${(r.value / total) * 100}%` }} />
+        ))}
+      </div>
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        {rows.map((r) => (
+          <li key={r.label} className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
+              <span className={`h-2 w-2 rounded-full ${barColor[r.tone]}`} aria-hidden />
+              {r.label}
+            </span>
+            <span className={`tabular-nums font-medium ${strong}`}>{r.value}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ApplicationsChart({ data, formatDate }: { data: ConsoleOverview["applications"]["perDay"]; formatDate: (d: string) => string }) {
+  const max = Math.max(1, ...data.map((d) => d.count));
+  return (
+    <div>
+      <div className="flex h-40 items-end gap-1.5" role="img" aria-label={data.map((d) => `${d.date}: ${d.count}`).join(", ")}>
+        {data.map((d) => (
+          <div key={d.date} className="group relative flex h-full flex-1 flex-col justify-end">
+            <div
+              className="rounded-t-md bg-gradient-to-t from-emerald-600 to-emerald-400 transition-opacity group-hover:opacity-80 dark:from-emerald-500 dark:to-teal-300"
+              style={{ height: `${Math.max(4, (d.count / max) * 100)}%` }}
+            />
+            <span className="pointer-events-none absolute -top-7 left-1/2 hidden -translate-x-1/2 rounded bg-zinc-900 px-1.5 py-0.5 text-[11px] text-white group-hover:block dark:bg-zinc-100 dark:text-zinc-900">
+              {d.count}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className={`mt-2 flex justify-between text-[11px] ${muted}`}>
+        <span>{formatDate(data[0]?.date ?? "")}</span>
+        <span>{formatDate(data[data.length - 1]?.date ?? "")}</span>
+      </div>
+    </div>
+  );
+}
+
+export default function AdminOverviewPage() {
+  const t = useAdminT();
+  const fmt = useAdminFormatters();
+  const href = useAdminHref();
+  const [overview, setOverview] = useState<ConsoleOverview | null>(null);
+  const [pending, setPending] = useState<ConsoleJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
-  const [reviewing, setReviewing] = useState<string | null>(null);
-  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "ADMIN")) {
-      router.push("/login");
-    }
-  }, [user, isLoading, router]);
-
-  const loadDashboard = useCallback(() => {
-    Promise.all([admin.stats(), admin.pendingJobs(), adminTrust.dashboard().catch(() => null)])
-      .then(([statsData, jobsData, trustData]) => {
-        setStats(statsData);
-        setPendingJobs(jobsData);
-        setTrustOverview(trustData);
-      })
-      .catch((err) => setLoadError(err))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const retryLoadDashboard = () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    loadDashboard();
-  };
-
-  const isAdmin = user?.role === "ADMIN";
-  useEffect(() => {
-    if (isAdmin) {
-      loadDashboard();
-    }
-  }, [isAdmin, loadDashboard]);
-
-  const reviewJob = async (jobId: string, status: "APPROVED" | "REJECTED") => {
-    if (!user) return;
-    setReviewing(jobId);
-    setReviewError(null);
     try {
-      await admin.reviewJob(jobId, { status });
-      setPendingJobs((prev) => prev.filter((j) => j.id !== jobId));
-      if (stats) {
-        setStats({ ...stats, pendingJobs: stats.pendingJobs - 1 });
-      }
+      const [ov, jobs] = await Promise.all([
+        adminConsole.overview(),
+        adminConsole.jobs({ status: "PENDING_REVIEW", limit: 5 }),
+      ]);
+      setOverview(ov);
+      setPending(jobs.jobs);
     } catch (err) {
-      setReviewError(`Review not saved. ${toFriendlyError(err).description}`);
+      setLoadError(err);
     } finally {
-      setReviewing(null);
+      setLoading(false);
     }
-  };
+  }, []);
 
-  if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const reviewJob = (job: ConsoleJob, action: "approve" | "reject") =>
+    setConfirm({
+      title: t("confirm.title", { action: t(`jobAction.${action}`), target: job.title }),
+      confirmLabel: t(`jobAction.${action}`),
+      danger: action === "reject",
+      onConfirm: async ({ reason }) => {
+        await adminConsole.jobAction(job.id, { action, reason });
+        setNotice(t("action.applied", { action: t(`jobAction.${action}`) }));
+        await load();
+      },
+    });
+
+  if (loading && !overview) return <Spinner />;
+  if (loadError || !overview) {
+    return <LoadErrorCard error={loadError} subject="admin overview" onRetry={() => void load()} />;
   }
 
+  const roles = overview.users.byRole;
+  const queues: Array<{ key: Parameters<typeof t>[0]; value: number | null; href: string; tone: "warning" | "danger" | "info" }> = [
+    { key: "overview.pendingJobs", value: overview.queues.pendingJobs, href: "/admin/jobs?status=PENDING_REVIEW", tone: "warning" },
+    { key: "overview.openReports", value: overview.queues.openAbuseReports, href: "/admin/trust", tone: "danger" },
+    { key: "overview.verificationBacklog", value: overview.queues.verificationBacklog, href: "/admin/trust", tone: "info" },
+    { key: "overview.unverifiedEmployers", value: overview.queues.unverifiedEmployers, href: "/admin/companies?verificationLevel=UNVERIFIED", tone: "info" },
+    { key: "overview.reviewsPending", value: overview.queues.reviewsPending, href: "/admin/reviews", tone: "warning" },
+    { key: "overview.supportTickets", value: overview.queues.supportTicketsOpen, href: "/admin/messages", tone: "info" },
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-        <p className="text-gray-600">Manage and moderate the platform</p>
-        <div className="flex flex-wrap gap-3 mt-4">
-          <Link href="/admin/ops">
-            <Button variant="outline">Platform Operations</Button>
-          </Link>
-          <Link href="/admin/audit-logs">
-            <Button variant="outline">Audit Logs</Button>
-          </Link>
-          <Link href="/admin/bulk">
-            <Button variant="outline">Bulk Operations</Button>
-          </Link>
-          <Link href="/admin/integrations">
-            <Button variant="outline">ATS Operations</Button>
-          </Link>
-          <Link href="/admin/billing">
-            <Button variant="outline">Billing Operations</Button>
-          </Link>
-          <Link href="/admin/partners">
-            <Button variant="outline">Partner Operations</Button>
-          </Link>
-          <Link href="/admin/trust">
-            <Button variant="outline">Trust Operations</Button>
-          </Link>
-          <Link href="/admin/users">
-            <Button variant="outline">Users</Button>
-          </Link>
-          <Link href="/admin/reviews">
-            <Button variant="outline">Reviews</Button>
-          </Link>
-          <Link href="/admin/blog">
-            <Button variant="outline">Blog</Button>
-          </Link>
-          <Link href="/admin/learning-feedback">
-            <Button variant="outline">Learning Feedback</Button>
-          </Link>
-        </div>
+    <div>
+      <PageHeader
+        title={t("overview.title")}
+        subtitle={t("overview.subtitle")}
+        actions={
+          <span className={`text-xs ${muted}`}>{t("overview.updated", { time: fmt.dateTime(overview.generatedAt) })}</span>
+        }
+      />
+
+      {notice && <Notice tone="success" onDismiss={() => setNotice(null)}>{notice}</Notice>}
+      {!overview.emailDeliveryConfigured && <Notice tone="info">{t("overview.emailOff")}</Notice>}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label={t("overview.totalUsers")}
+          value={fmt.number(overview.users.total)}
+          hint={t("overview.newThisWeek", { count: overview.users.newLast7d })}
+          tone="brand"
+        />
+        <StatCard
+          label={`${t("overview.candidates")} · ${t("overview.employers")}`}
+          value={`${fmt.number(roles.CANDIDATE ?? 0)} · ${fmt.number(roles.EMPLOYER ?? 0)}`}
+          hint={`${t("overview.admins")}: ${roles.ADMIN ?? 0}`}
+          tone="info"
+        />
+        <StatCard
+          label={t("overview.jobsTotal")}
+          value={fmt.number(overview.jobs.total)}
+          hint={t("overview.featuredJobs", { count: overview.jobs.featured })}
+        />
+        <StatCard
+          label={t("overview.applications14d")}
+          value={fmt.number(overview.applications.last14d)}
+          tone="warning"
+        />
       </div>
 
-      {reviewError && (
-        <p role="alert" className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {reviewError}
-        </p>
-      )}
+      <div className="mt-6 grid gap-6 xl:grid-cols-3">
+        <Panel className="xl:col-span-2">
+          <h2 className={`mb-4 text-sm font-semibold ${strong}`}>{t("overview.applicationsPerDay")}</h2>
+          <ApplicationsChart data={overview.applications.perDay} formatDate={(d) => (d ? fmt.date(d) : "")} />
+        </Panel>
+        <Panel>
+          <h2 className={`mb-4 text-sm font-semibold ${strong}`}>{t("overview.queues")}</h2>
+          <ul className="divide-y divide-[var(--border-soft)]">
+            {queues.map((q) => (
+              <li key={q.key}>
+                <Link href={href(q.href)} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:opacity-80">
+                  <span className="text-zinc-700 dark:text-zinc-300">{t(q.key)}</span>
+                  {q.value === null ? (
+                    <Pill tone="zinc">{t("overview.notConnected")}</Pill>
+                  ) : (
+                    <Pill tone={q.value === 0 ? "green" : q.tone === "danger" ? "red" : q.tone === "warning" ? "amber" : "blue"}>
+                      {q.value}
+                    </Pill>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <Panel>
+          <h2 className={`mb-4 text-sm font-semibold ${strong}`}>{t("overview.usersByStatus")}</h2>
+          <Breakdown
+            rows={STATUS_ORDER.map((s) => ({
+              label: t(`status.${s}`),
+              value: overview.users.byStatus[s] ?? 0,
+              tone: restrictionTone[s] === "red" && s === "BANNED" ? "zinc" : restrictionTone[s],
+            }))}
+          />
+        </Panel>
+        <Panel>
+          <h2 className={`mb-4 text-sm font-semibold ${strong}`}>{t("overview.jobsByStatus")}</h2>
+          <Breakdown
+            rows={JOB_ORDER.map((s) => ({ label: t(`jobStatus.${s}`), value: overview.jobs.byStatus[s] ?? 0, tone: jobStatusTone[s] }))}
+          />
+        </Panel>
+      </div>
+
+      <Panel className="mt-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className={`text-sm font-semibold ${strong}`}>{t("overview.pendingJobs")}</h2>
+          <Link href={href("/admin/jobs?status=PENDING_REVIEW")} className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400">
+            {t("nav.jobs")} →
+          </Link>
         </div>
-      ) : loadError ? (
-        <LoadErrorCard error={loadError} subject="admin stats and the moderation queue" onRetry={retryLoadDashboard} />
-      ) : (
-        <>
-          <div className="grid md:grid-cols-5 gap-6 mb-8">
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-3xl font-bold text-gray-900 mb-1">{stats?.totalUsers || 0}</div>
-                <div className="text-gray-600">Total Users</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-3xl font-bold text-emerald-600 mb-1">{stats?.totalJobs || 0}</div>
-                <div className="text-gray-600">Total Jobs</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-3xl font-bold text-yellow-600 mb-1">{stats?.pendingJobs || 0}</div>
-                <div className="text-gray-600">Pending Review</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-3xl font-bold text-blue-600 mb-1">{stats?.totalApplications || 0}</div>
-                <div className="text-gray-600">Applications</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-3xl font-bold text-purple-600 mb-1">{stats?.totalResources || 0}</div>
-                <div className="text-gray-600">Resources</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {trustOverview && (
-            <Card className="mb-8 border-slate-200 bg-slate-50">
-              <CardContent className="p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="max-w-3xl">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <TrustBadge label={`${trustOverview.pendingVerificationArtifacts} pending artifacts`} variant="warning" />
-                      <TrustBadge label={`${trustOverview.openRiskCases} open risk cases`} riskLevel={trustOverview.openRiskCases > 0 ? "HIGH" : "LOW"} />
-                      <TrustBadge label={`${trustOverview.openReports} open reports`} variant="info" />
-                    </div>
-                    <h2 className="mt-4 text-lg font-semibold text-gray-900">Trust moderation needs active coverage</h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                      {trustOverview.limitedAccounts} limited account(s), {trustOverview.suspendedAccounts} suspended account(s), and {trustOverview.heldJobs} held job(s) are currently in the trust workflow.
-                    </p>
-                  </div>
-                  <Link href="/admin/trust">
-                    <Button>Open trust queue</Button>
-                  </Link>
+        {pending.length === 0 ? (
+          <p className={`py-6 text-center text-sm ${muted}`}>{t("common.noResults")}</p>
+        ) : (
+          <ul className="divide-y divide-[var(--border-soft)]">
+            {pending.map((job) => (
+              <li key={job.id} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className={`truncate font-medium ${strong}`}>{job.title}</p>
+                  <p className={`text-xs ${muted}`}>
+                    {job.employer?.companyName ?? job.sourceName ?? "—"} · {job.location} · {fmt.date(job.createdAt)}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <h2 className="text-xl font-semibold text-gray-900">Jobs Pending Review</h2>
-            </CardHeader>
-            <CardContent>
-              {pendingJobs.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <p className="text-gray-600">All jobs have been reviewed!</p>
+                <div className="flex shrink-0 gap-2">
+                  <Button size="sm" onClick={() => reviewJob(job, "approve")}>{t("jobAction.approve")}</Button>
+                  <Button size="sm" variant="outline" onClick={() => reviewJob(job, "reject")}>{t("jobAction.reject")}</Button>
                 </div>
-              ) : (
-                <div className="divide-y divide-gray-200">
-                  {pendingJobs.map((job) => (
-                    <div key={job.id} className="py-6">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h3 className="font-semibold text-gray-900 text-lg">{job.title}</h3>
-                          <p className="text-emerald-600 font-medium">{job.employer.companyName}</p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {job.location} • {job.type} • {job.seniority}
-                          </p>
-                        </div>
-                        <Badge variant="warning">Pending Review</Badge>
-                      </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
 
-                      <p className="text-gray-600 text-sm mb-4 line-clamp-3">{job.description}</p>
-
-                      {job.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {job.tags.map((tag) => (
-                            <Badge key={tag} variant="default">{tag}</Badge>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={() => reviewJob(job.id, "APPROVED")}
-                          disabled={reviewing === job.id}
-                        >
-                          {reviewing === job.id ? "Processing..." : "Approve"}
-                        </Button>
-                        <Button
-                          variant="danger"
-                          onClick={() => reviewJob(job.id, "REJECTED")}
-                          disabled={reviewing === job.id}
-                        >
-                          Reject
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+      <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
     </div>
   );
 }

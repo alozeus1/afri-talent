@@ -17,6 +17,7 @@ import {
 import { getIngestionReliabilityState, getLastSyncTime } from "../workers/aggregator-cron.js";
 import { summarizeDeadLetters, getWorkerStates, listDeadLetters } from "../lib/ops/resilience.js";
 import { redisHealthStatus } from "../lib/redis.js";
+import { invalidateAccountAccess } from "../lib/account-access.js";
 
 const router = Router();
 
@@ -667,6 +668,8 @@ router.patch("/users/:id/status", userStatusRbac, async (req: Request, res: Resp
         _count: { select: { applications: true, companyReviews: true, sentMessages: true } },
       },
     });
+
+    invalidateAccountAccess(existing.id);
 
     await createAuditLog(
       req.adminRole?.id,

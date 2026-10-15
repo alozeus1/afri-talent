@@ -594,3 +594,42 @@ export async function phoneVerifiedEmail(opts: {
     text: `Hi ${opts.userName},\n\nYour phone number ending in ${opts.phoneMasked} is now verified.\n\nIf you didn't perform this verification, reset your password and contact support immediately.`,
   });
 }
+
+// ── Admin console: direct message to a user ─────────────────────────────────
+
+export function isEmailDeliveryConfigured(): boolean {
+  return !IS_DEV;
+}
+
+function escapeAdminHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export async function adminMessageEmail(opts: {
+  to: string;
+  userName: string;
+  subject: string;
+  body: string;
+  appUrl: string;
+}): Promise<void> {
+  const safeBody = escapeAdminHtml(opts.body).replace(/\n/g, "<br />");
+  await sendEmail({
+    to: opts.to,
+    subject: opts.subject,
+    templateName: "admin_message",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${escapeAdminHtml(opts.userName)},</h2>
+        <p>${safeBody}</p>
+        <p><a href="${opts.appUrl}/notifications" style="background:#059669;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Open AfriTalent</a></p>
+        <p style="color:#6b7280;font-size:12px;">Sent by the AfriTalent team.</p>
+      </div>
+    `,
+    text: `Hi ${opts.userName},\n\n${opts.body}\n\nOpen AfriTalent: ${opts.appUrl}/notifications\n\n— The AfriTalent team`,
+  });
+}

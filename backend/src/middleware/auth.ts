@@ -3,6 +3,11 @@ import { verifyToken, JWTPayload } from "../lib/jwt.js";
 import { isTokenBlocked } from "../lib/redis.js";
 import { Role } from "@prisma/client";
 import prisma from "../lib/prisma.js";
+import {
+  clearExpiredSuspension,
+  evaluateAccountAccess,
+  loadAccountAccessRecord,
+} from "../lib/account-access.js";
 
 declare global {
   namespace Express {
@@ -52,12 +57,30 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       return;
     }
 
+    // Admin console — suspended/banned accounts and revoked sessions are
+    // blocked on every protected route, not just at login.
+    const access = await checkAccountAccess(payload);
+    if (access && !access.allowed) {
+      res.status(access.status).json({ error: access.error, code: access.code, until: access.until });
+      return;
+    }
+
     req.user = payload;
     req.rawToken = token;
     next();
   } catch {
     res.status(401).json({ error: "Invalid or expired token" });
   }
+}
+
+async function checkAccountAccess(payload: JWTPayload) {
+  const record = await loadAccountAccessRecord(payload.userId);
+  if (!record) return null; // unknown user or lookup failure: route decides
+  const decision = evaluateAccountAccess(record, { tokenIssuedAtSeconds: payload.iat });
+  if (decision.allowed && decision.suspensionExpired) {
+    clearExpiredSuspension(payload.userId);
+  }
+  return decision;
 }
 
 export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
@@ -70,6 +93,11 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
   try {
     const payload = verifyToken(token);
     if (await isTokenBlocked(token)) {
+      next();
+      return;
+    }
+    const access = await checkAccountAccess(payload);
+    if (access && !access.allowed) {
       next();
       return;
     }

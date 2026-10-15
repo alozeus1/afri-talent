@@ -75,7 +75,7 @@ interface BotShieldPayload {
   startedAt: number;
 }
 
-async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
+export async function fetchAPI<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { token, ...fetchOptions } = options;
 
   const headers: HeadersInit = {
@@ -1733,7 +1733,7 @@ export interface PublicStats {
   lastUpdated: string;
 }
 
-export type AccountRestrictionStatus = "ACTIVE" | "LIMITED" | "SUSPENDED";
+export type AccountRestrictionStatus = "ACTIVE" | "LIMITED" | "SUSPENDED" | "BANNED";
 
 export type AdminPermission =
   | "VIEW_USERS"

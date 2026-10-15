@@ -32,6 +32,10 @@ enum JobStatus {
   PENDING_REVIEW
   PUBLISHED
   REJECTED
+  // Admin console — a closed listing no longer accepts applications; a removed
+  // listing was taken down by moderation. Both are hidden from public search.
+  CLOSED
+  REMOVED
 }
 
 enum ApplicationStatus {
@@ -159,6 +163,7 @@ enum NotificationType {
   EMAIL_VERIFIED
   NEW_APPLICATION
   JOB_PUBLISHED
+  ADMIN_MESSAGE
 }
 
 enum NotificationStatus {
@@ -452,6 +457,9 @@ enum AccountRestrictionStatus {
   ACTIVE
   LIMITED
   SUSPENDED
+  // Admin console — permanent revocation. Blocked at login and on every
+  // authenticated request until an admin reactivates the account.
+  BANNED
 }
 
 enum PhoneVerificationStatus {
@@ -521,6 +529,20 @@ enum AdminAction {
   BULK_OPERATION_COMPLETED
   SYSTEM_CONFIGURATION_CHANGED
   ALERT_SETTINGS_UPDATED
+  // Admin console lifecycle + moderation actions
+  USER_SUSPENDED
+  USER_BANNED
+  USER_REACTIVATED
+  USER_SESSIONS_REVOKED
+  USER_EMAIL_REVERIFICATION_FORCED
+  USER_MESSAGED
+  USERS_BROADCAST_SENT
+  JOB_CLOSED
+  JOB_REOPENED
+  JOB_FEATURED
+  JOB_UNFEATURED
+  JOB_REMOVED
+  EMPLOYER_VERIFICATION_UPDATED
 }
 
 enum AlertSeverity {
@@ -761,7 +783,7 @@ model RegionConfig {
 // ──────────────── Existing Models ────────────────
 
 model User {
-  savedJobs SavedJob[] @relation("UserSavedJobs")
+  savedJobs                SavedJob[]               @relation("UserSavedJobs")
   id                       String                   @id @default(uuid())
   email                    String                   @unique
   password                 String                   @default("")
@@ -774,6 +796,10 @@ model User {
   accountRestrictionStatus AccountRestrictionStatus @default(ACTIVE)
   accountRestrictionReason String?                  @db.VarChar(160)
   accountRestrictedAt      DateTime?
+  // Admin console — optional end of a temporary suspension (null = indefinite).
+  accountRestrictedUntil   DateTime?
+  // Admin console — JWTs issued before this instant are rejected.
+  sessionsRevokedAt        DateTime?
   deletionRequestedAt      DateTime?
   deletedAt                DateTime?
   phoneNumber              String?                  @db.VarChar(30)
@@ -940,7 +966,7 @@ model EmployerTalentPoolCandidate {
 }
 
 model Job {
-  savedBy SavedJob[] @relation("JobSavedBy")
+  savedBy            SavedJob[]     @relation("JobSavedBy")
   id                 String         @id @default(uuid())
   title              String
   slug               String         @unique
@@ -971,6 +997,11 @@ model Job {
   tags               String[]
   status             JobStatus
   publishedAt        DateTime?
+  // Admin console moderation
+  isFeatured         Boolean        @default(false)
+  featuredAt         DateTime?
+  closedAt           DateTime?
+  moderationReason   String?        @db.VarChar(500)
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
@@ -1054,6 +1085,7 @@ model Job {
   @@index([sourceLastSeenAt])
   @@index([freshnessScore, qualityScore])
   @@index([riskLevel, riskScore])
+  @@index([isFeatured, status])
 }
 
 model CompanyCareerSource {

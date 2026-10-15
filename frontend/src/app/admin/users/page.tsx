@@ -1,550 +1,268 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import {
-  AccountRestrictionStatus,
-  admin,
-  AdminPermission,
-  AdminUserDetailResponse,
-  AdminUserListItem,
-  UserListResponse,
-} from "@/lib/api";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { useAuth } from "@/lib/auth-context";
+import type { AccountRestrictionStatus } from "@/lib/api";
+import { adminConsole, ConsoleRole, ConsoleUser, Pagination } from "@/lib/admin-console-api";
+import { useAdminFormatters, useAdminT } from "@/lib/i18n/admin-messages";
+import {
+  ConfirmDialog,
+  ConfirmRequest,
+  Drawer,
+  Notice,
+  PageHeader,
+  PaginationBar,
+  Pill,
+  Spinner,
+  TableShell,
+  Td,
+  Th,
+  fieldClass,
+  labelClass,
+  muted,
+  restrictionTone,
+  strong,
+} from "@/components/admin/console-ui";
+import { UserDetailDrawer } from "@/components/admin/user-detail-drawer";
+import { MessageComposer } from "@/components/admin/message-composer";
 
-const roleVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
-  ADMIN: "danger",
-  EMPLOYER: "info",
-  CANDIDATE: "success",
+const ROLES: ConsoleRole[] = ["CANDIDATE", "EMPLOYER", "ADMIN"];
+const STATUSES: AccountRestrictionStatus[] = ["ACTIVE", "LIMITED", "SUSPENDED", "BANNED"];
+
+type Filters = {
+  search: string;
+  role: ConsoleRole | "";
+  status: AccountRestrictionStatus | "";
+  emailVerified: "true" | "false" | "";
+  sort: "newest" | "oldest" | "name";
+  page: number;
 };
 
-const statusVariants: Record<AccountRestrictionStatus, "success" | "warning" | "danger"> = {
-  ACTIVE: "success",
-  LIMITED: "warning",
-  SUSPENDED: "danger",
-};
-
-const adminPermissionOptions: AdminPermission[] = [
-  "VIEW_USERS",
-  "MANAGE_USER_ACCOUNTS",
-  "RESTRICT_USER_ACCOUNT",
-  "RESET_USER_PASSWORD",
-  "VIEW_AUDIT_LOGS",
-  "VIEW_HEALTH_STATUS",
-  "MANAGE_ALERTS",
-  "VIEW_SYSTEMS_METRICS",
-  "REVIEW_JOBS",
-  "REVIEW_APPLICATIONS",
-  "REVIEW_RESOURCES",
-  "REVIEW_COMPANY_DATA",
-  "VIEW_TRUST_CASES",
-  "MANAGE_TRUST_CASES",
-  "VIEW_ABUSE_REPORTS",
-  "MANAGE_ABUSE_REPORTS",
-  "VIEW_VERIFICATION_ARTIFACTS",
-  "APPROVE_VERIFICATION",
-  "VIEW_BILLING_DATA",
-  "MANAGE_BILLING_DISPUTES",
-  "VIEW_REVENUE_REPORTS",
-  "EXPORT_DATA",
-  "RUN_BULK_OPERATIONS",
-  "MODIFY_BULK_DATA",
-];
+function readInitialFilters(): Filters {
+  const base: Filters = { search: "", role: "", status: "", emailVerified: "", sort: "newest", page: 1 };
+  if (typeof window === "undefined") return base;
+  const q = new URLSearchParams(window.location.search);
+  const role = q.get("role");
+  const status = q.get("status");
+  return {
+    ...base,
+    search: q.get("search") ?? "",
+    role: ROLES.includes(role as ConsoleRole) ? (role as ConsoleRole) : "",
+    status: STATUSES.includes(status as AccountRestrictionStatus) ? (status as AccountRestrictionStatus) : "",
+  };
+}
 
 export default function AdminUsersPage() {
-  const router = useRouter();
-  const { user, isLoading } = useAuth();
-  const [usersData, setUsersData] = useState<UserListResponse | null>(null);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [selectedDetail, setSelectedDetail] = useState<AdminUserDetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  const [search, setSearch] = useState("");
+  const t = useAdminT();
+  const fmt = useAdminFormatters();
+  const { user: me } = useAuth();
+  const [filters, setFilters] = useState<Filters | null>(null);
   const [searchInput, setSearchInput] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [page, setPage] = useState(1);
-
-  const [roleForm, setRoleForm] = useState<{
-    role: AdminUserListItem["role"];
-    adminTitle: string;
-    adminRoleActive: boolean;
-    permissions: AdminPermission[];
-    reason: string;
-  }>({
-    role: "CANDIDATE",
-    adminTitle: "Platform Administrator",
-    adminRoleActive: true,
-    permissions: ["VIEW_USERS"],
-    reason: "",
-  });
-  const [statusForm, setStatusForm] = useState<{ status: AccountRestrictionStatus; reason: string }>({
-    status: "ACTIVE",
-    reason: "",
-  });
+  const [users, setUsers] = useState<ConsoleUser[]>([]);
+  const [pagination, setPagination] = useState<Pagination | undefined>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
 
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== "ADMIN")) {
-      router.push("/login");
-    }
-  }, [user, isLoading, router]);
+    const initial = readInitialFilters();
+    setFilters(initial);
+    setSearchInput(initial.search);
+    const userId = new URLSearchParams(window.location.search).get("user");
+    if (userId) setSelectedId(userId);
+  }, []);
 
-  useEffect(() => {
-    if (user?.role === "ADMIN") {
-      loadUsers();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, search, roleFilter, statusFilter, page]);
-
-  useEffect(() => {
-    if (selectedUserId) {
-      loadUserDetail(selectedUserId);
-    }
-  }, [selectedUserId]);
-
-  const loadUsers = async () => {
+  const load = useCallback(async (f: Filters) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await admin.users(undefined, {
-        role: roleFilter || undefined,
-        status: statusFilter || undefined,
-        search: search || undefined,
-        page,
-        limit: 20,
-      });
-      setUsersData(data);
+      const data = await adminConsole.users({ ...f, limit: 25 });
+      setUsers(data.users);
+      setPagination(data.pagination);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load users");
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
-  const loadUserDetail = async (id: string) => {
-    setDetailLoading(true);
-    setError(null);
-    try {
-      const detail = await admin.user(id);
-      setSelectedDetail(detail);
-      setRoleForm({
-        role: detail.user.role,
-        adminTitle: detail.user.adminRole?.title ?? "Platform Administrator",
-        adminRoleActive: detail.user.adminRole?.isActive ?? true,
-        permissions: detail.user.adminRole?.permissions ?? ["VIEW_USERS"],
-        reason: "",
-      });
-      setStatusForm({
-        status: detail.user.accountRestrictionStatus,
-        reason: detail.user.accountRestrictionReason ?? "",
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load user detail");
-    } finally {
-      setDetailLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (filters) void load(filters);
+  }, [filters, load]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const update = (patch: Partial<Filters>) => setFilters((f) => (f ? { ...f, page: 1, ...patch } : f));
+
+  const onSearch = (e: FormEvent) => {
     e.preventDefault();
-    setSearch(searchInput.trim());
-    setPage(1);
+    update({ search: searchInput.trim() });
   };
 
-  const selectUser = (selected: AdminUserListItem) => {
-    setSelectedUserId(selected.id);
-    setSelectedDetail(null);
-    setSuccess(null);
-  };
+  const toggle = (id: string) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
-  const togglePermission = (permission: AdminPermission) => {
-    setRoleForm((current) => ({
-      ...current,
-      permissions: current.permissions.includes(permission)
-        ? current.permissions.filter((item) => item !== permission)
-        : [...current.permissions, permission],
-    }));
-  };
-
-  const submitRoleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedUserId) return;
-
-    setSaving(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      await admin.updateUserRole(selectedUserId, {
-        role: roleForm.role,
-        adminTitle: roleForm.role === "ADMIN" ? roleForm.adminTitle : undefined,
-        adminRoleActive: roleForm.role === "ADMIN" ? roleForm.adminRoleActive : undefined,
-        permissions: roleForm.role === "ADMIN" ? roleForm.permissions : undefined,
-        reason: roleForm.reason || undefined,
-      });
-      setSuccess("Role and admin permissions updated.");
-      await Promise.all([loadUsers(), loadUserDetail(selectedUserId)]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update role");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const submitStatusUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedUserId) return;
-
-    setSaving(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      await admin.updateUserStatus(selectedUserId, {
-        status: statusForm.status,
-        reason: statusForm.reason || undefined,
-      });
-      setSuccess("Account status updated.");
-      await Promise.all([loadUsers(), loadUserDetail(selectedUserId)]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update account status");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-      </div>
-    );
-  }
-
-  const totalPages = usersData?.pagination.totalPages || 1;
-  const selectedUser = selectedDetail?.user;
+  if (!filters) return <Spinner />;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="mb-2 text-3xl font-bold text-gray-900">User Management</h1>
-        <p className="text-gray-600">Search users, inspect account state, and apply audit-logged admin changes.</p>
-      </div>
+    <div>
+      <PageHeader
+        title={t("users.title")}
+        subtitle={t("users.subtitle")}
+        actions={
+          checked.size > 0 ? (
+            <Button onClick={() => setBulkOpen(true)}>{t("users.messageSelected", { count: checked.size })}</Button>
+          ) : null
+        }
+      />
 
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <form onSubmit={handleSearch} className="flex min-w-[240px] flex-1 gap-2">
-              <Input
-                placeholder="Search name or email"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-              />
-              <Button type="submit" variant="outline">Search</Button>
-            </form>
-            <Select
-              aria-label="Role filter"
-              value={roleFilter}
-              onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
-              className="min-w-[140px]"
-            >
-              <option value="">All roles</option>
-              <option value="CANDIDATE">Candidate</option>
-              <option value="EMPLOYER">Employer</option>
-              <option value="ADMIN">Admin</option>
-            </Select>
-            <Select
-              aria-label="Status filter"
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              className="min-w-[150px]"
-            >
-              <option value="">All statuses</option>
-              <option value="ACTIVE">Active</option>
-              <option value="LIMITED">Limited</option>
-              <option value="SUSPENDED">Suspended</option>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {notice && <Notice tone="success" onDismiss={() => setNotice(null)}>{notice}</Notice>}
+      {error && <Notice tone="error" onDismiss={() => setError(null)}>{error}</Notice>}
 
-      {error && <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-      {success && <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{success}</div>}
+      <form onSubmit={onSearch} className="surface-panel mb-4 grid gap-3 rounded-2xl p-4 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="sm:col-span-2">
+          <label htmlFor="users-search" className={labelClass}>{t("common.search")}</label>
+          <input
+            id="users-search"
+            type="search"
+            className={fieldClass}
+            placeholder={t("users.searchPlaceholder")}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onBlur={() => searchInput.trim() !== filters.search && update({ search: searchInput.trim() })}
+          />
+        </div>
+        <div>
+          <label htmlFor="users-role" className={labelClass}>{t("users.filterRole")}</label>
+          <select id="users-role" className={fieldClass} value={filters.role} onChange={(e) => update({ role: e.target.value as Filters["role"] })}>
+            <option value="">{t("common.all")}</option>
+            {ROLES.map((r) => <option key={r} value={r}>{t(`role.${r}`)}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="users-status" className={labelClass}>{t("users.filterStatus")}</label>
+          <select id="users-status" className={fieldClass} value={filters.status} onChange={(e) => update({ status: e.target.value as Filters["status"] })}>
+            <option value="">{t("common.all")}</option>
+            {STATUSES.map((s) => <option key={s} value={s}>{t(`status.${s}`)}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="users-verified" className={labelClass}>{t("users.filterVerified")}</label>
+          <select id="users-verified" className={fieldClass} value={filters.emailVerified} onChange={(e) => update({ emailVerified: e.target.value as Filters["emailVerified"] })}>
+            <option value="">{t("common.all")}</option>
+            <option value="true">{t("users.verified")}</option>
+            <option value="false">{t("users.unverified")}</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="users-sort" className={labelClass}>{t("users.sort")}</label>
+          <select id="users-sort" className={fieldClass} value={filters.sort} onChange={(e) => update({ sort: e.target.value as Filters["sort"] })}>
+            <option value="newest">{t("users.sortNewest")}</option>
+            <option value="oldest">{t("users.sortOldest")}</option>
+            <option value="name">{t("users.sortName")}</option>
+          </select>
+        </div>
+      </form>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">Users</h2>
-              {usersData && <span className="text-sm text-gray-500">{usersData.pagination.total} total</span>}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-              </div>
-            ) : !usersData || usersData.users.length === 0 ? (
-              <div className="py-12 text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-500">
-                  0
-                </div>
-                <p className="text-gray-600">No users found</p>
-              </div>
+      {loading && users.length === 0 ? (
+        <Spinner />
+      ) : (
+        <TableShell>
+          <thead>
+            <tr>
+              <Th className="w-10"><span className="sr-only">{t("users.select")}</span></Th>
+              <Th>{t("users.colUser")}</Th>
+              <Th>{t("users.colRole")}</Th>
+              <Th>{t("users.colStatus")}</Th>
+              <Th className="hidden md:table-cell">{t("users.colActivity")}</Th>
+              <Th className="hidden md:table-cell">{t("users.colJoined")}</Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border-soft)]">
+            {users.length === 0 ? (
+              <tr><Td colSpan={6} className="py-10 text-center"><span className={muted}>{t("common.noResults")}</span></Td></tr>
             ) : (
-              <>
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">User</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Role</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Joined</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Activity</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {usersData.users.map((u) => (
-                        <tr key={u.id} className={selectedUserId === u.id ? "bg-emerald-50" : "hover:bg-gray-50"}>
-                          <td className="px-4 py-3">
-                            <span className="font-medium text-gray-900">{u.name}</span>
-                            <p className="text-sm text-gray-600">{u.email}</p>
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge variant={roleVariants[u.role] || "default"}>{u.role}</Badge>
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge variant={statusVariants[u.accountRestrictionStatus]}>{u.accountRestrictionStatus}</Badge>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-500">{new Date(u.createdAt).toLocaleDateString()}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {u._count.applications} apps · {u._count.sentMessages} msgs
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <Button type="button" variant="outline" size="sm" onClick={() => selectUser(u)}>
-                              Inspect
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="divide-y divide-gray-200 md:hidden">
-                  {usersData.users.map((u) => (
-                    <button key={u.id} type="button" onClick={() => selectUser(u)} className="block w-full py-4 text-left">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <span className="font-medium text-gray-900">{u.name}</span>
-                          <p className="text-sm text-gray-600">{u.email}</p>
-                        </div>
-                        <Badge variant={statusVariants[u.accountRestrictionStatus]}>{u.accountRestrictionStatus}</Badge>
-                      </div>
-                      <div className="mt-2 flex gap-2">
-                        <Badge variant={roleVariants[u.role] || "default"}>{u.role}</Badge>
-                        <span className="text-xs text-gray-500">Joined {new Date(u.createdAt).toLocaleDateString()}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-
-                {totalPages > 1 && (
-                  <div className="mt-6 flex justify-center gap-2 border-t border-gray-200 pt-4">
-                    <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-                      Previous
-                    </Button>
-                    <span className="flex items-center px-3 text-sm text-gray-600">Page {page} of {totalPages}</span>
-                    <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-                      Next
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">User Detail</h2>
-          </CardHeader>
-          <CardContent>
-            {!selectedUserId ? (
-              <p className="text-sm text-gray-600">Select a user to inspect details and manage access.</p>
-            ) : detailLoading || !selectedUser ? (
-              <div className="flex justify-center py-12">
-                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{selectedUser.name}</h3>
-                  <p className="text-sm text-gray-600">{selectedUser.email}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Badge variant={roleVariants[selectedUser.role] || "default"}>{selectedUser.role}</Badge>
-                    <Badge variant={statusVariants[selectedUser.accountRestrictionStatus]}>
-                      {selectedUser.accountRestrictionStatus}
-                    </Badge>
-                    {selectedUser.emailVerified && <Badge variant="success">Email verified</Badge>}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 rounded-xl bg-gray-50 p-4 text-sm">
-                  <div>
-                    <p className="text-gray-500">Applications</p>
-                    <p className="font-semibold text-gray-900">{selectedUser._count.applications}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Messages</p>
-                    <p className="font-semibold text-gray-900">{selectedUser._count.sentMessages}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Reviews</p>
-                    <p className="font-semibold text-gray-900">{selectedUser._count.companyReviews}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Saved searches</p>
-                    <p className="font-semibold text-gray-900">{selectedUser._count.savedSearches}</p>
-                  </div>
-                </div>
-
-                {selectedUser.employer && (
-                  <div className="rounded-xl border border-gray-200 p-4 text-sm">
-                    <p className="font-semibold text-gray-900">{selectedUser.employer.companyName}</p>
-                    <p className="text-gray-600">{selectedUser.employer.location}</p>
-                  </div>
-                )}
-
-                {selectedUser.candidateProfile && (
-                  <div className="rounded-xl border border-gray-200 p-4 text-sm">
-                    <p className="font-semibold text-gray-900">{selectedUser.candidateProfile.headline || "Candidate profile"}</p>
-                    <p className="text-gray-600">
-                      {selectedUser.candidateProfile.targetCountries.join(", ") || "No target countries"} · {selectedUser.candidateProfile.yearsExperience ?? 0} yrs
-                    </p>
-                  </div>
-                )}
-
-                <form onSubmit={submitRoleUpdate} className="space-y-4 border-t border-gray-200 pt-6">
-                  <h3 className="font-semibold text-gray-900">Role and Permissions</h3>
-                  <Select
-                    value={roleForm.role}
-                    onChange={(e) => setRoleForm((current) => ({ ...current, role: e.target.value as AdminUserListItem["role"] }))}
-                    className="w-full"
-                  >
-                    <option value="CANDIDATE">Candidate</option>
-                    <option value="EMPLOYER">Employer</option>
-                    <option value="ADMIN">Admin</option>
-                  </Select>
-
-                  {roleForm.role === "ADMIN" && (
-                    <div className="space-y-3 rounded-xl border border-gray-200 p-4">
-                      <Input
-                        value={roleForm.adminTitle}
-                        onChange={(e) => setRoleForm((current) => ({ ...current, adminTitle: e.target.value }))}
-                        placeholder="Admin title"
-                      />
-                      <label className="flex items-center gap-2 text-sm text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={roleForm.adminRoleActive}
-                          onChange={(e) => setRoleForm((current) => ({ ...current, adminRoleActive: e.target.checked }))}
-                        />
-                        Active admin role
-                      </label>
-                      <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
-                        {adminPermissionOptions.map((permission) => (
-                          <label key={permission} className="flex items-center gap-2 text-xs text-gray-700">
-                            <input
-                              type="checkbox"
-                              checked={roleForm.permissions.includes(permission)}
-                              onChange={() => togglePermission(permission)}
-                            />
-                            {permission}
-                          </label>
-                        ))}
-                      </div>
+              users.map((u) => (
+                <tr
+                  key={u.id}
+                  className="cursor-pointer transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  onClick={() => setSelectedId(u.id)}
+                >
+                  <Td>
+                    <input
+                      type="checkbox"
+                      aria-label={`${t("users.select")}: ${u.email}`}
+                      checked={checked.has(u.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggle(u.id)}
+                      className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-600 dark:bg-zinc-900"
+                    />
+                  </Td>
+                  <Td>
+                    <p className={`font-medium ${strong}`}>{u.name}</p>
+                    <p className={`text-xs ${muted}`}>{u.email}</p>
+                    {u.employer && <p className="text-xs text-emerald-700 dark:text-emerald-400">{u.employer.companyName}</p>}
+                  </Td>
+                  <Td>
+                    <Pill tone={u.role === "ADMIN" ? "violet" : u.role === "EMPLOYER" ? "blue" : "green"}>{t(`role.${u.role}`)}</Pill>
+                  </Td>
+                  <Td>
+                    <div className="flex flex-col items-start gap-1">
+                      <Pill tone={restrictionTone[u.accountRestrictionStatus]}>{t(`status.${u.accountRestrictionStatus}`)}</Pill>
+                      {u.accountRestrictedUntil && (
+                        <span className={`text-xs ${muted}`}>{t("users.until", { date: fmt.date(u.accountRestrictedUntil) })}</span>
+                      )}
+                      {!u.emailVerified && <span className="text-xs text-amber-700 dark:text-amber-300">{t("users.unverified")}</span>}
                     </div>
-                  )}
-
-                  <Input
-                    value={roleForm.reason}
-                    onChange={(e) => setRoleForm((current) => ({ ...current, reason: e.target.value }))}
-                    placeholder="Audit reason, optional"
-                  />
-                  <Button
-                    type="submit"
-                    isLoading={saving}
-                    disabled={saving || selectedUser.id === user.id || (roleForm.role === "ADMIN" && roleForm.permissions.length === 0)}
-                  >
-                    Save role changes
-                  </Button>
-                  {roleForm.role === "ADMIN" && roleForm.permissions.length === 0 && (
-                    <p className="text-xs text-red-600">Select at least one admin permission.</p>
-                  )}
-                  {selectedUser.id === user.id && <p className="text-xs text-gray-500">You cannot change your own role or admin permissions.</p>}
-                </form>
-
-                <form onSubmit={submitStatusUpdate} className="space-y-4 border-t border-gray-200 pt-6">
-                  <h3 className="font-semibold text-gray-900">Account Status</h3>
-                  <Select
-                    value={statusForm.status}
-                    onChange={(e) => setStatusForm((current) => ({ ...current, status: e.target.value as AccountRestrictionStatus }))}
-                    className="w-full"
-                  >
-                    <option value="ACTIVE">Active</option>
-                    <option value="LIMITED">Limited</option>
-                    <option value="SUSPENDED">Suspended</option>
-                  </Select>
-                  <Input
-                    value={statusForm.reason}
-                    onChange={(e) => setStatusForm((current) => ({ ...current, reason: e.target.value }))}
-                    placeholder={statusForm.status === "ACTIVE" ? "Reason, optional" : "Reason required for restriction"}
-                  />
-                  <Button
-                    type="submit"
-                    variant={statusForm.status === "SUSPENDED" ? "danger" : "primary"}
-                    isLoading={saving}
-                    disabled={saving || (selectedUser.id === user.id && statusForm.status !== "ACTIVE")}
-                  >
-                    Save status
-                  </Button>
-                </form>
-
-                <div className="border-t border-gray-200 pt-6">
-                  <h3 className="mb-3 font-semibold text-gray-900">Recent Audit Activity</h3>
-                  {selectedDetail.auditLogs.length === 0 ? (
-                    <p className="text-sm text-gray-600">No recent user-management audit events.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {selectedDetail.auditLogs.map((log) => (
-                        <div key={log.id} className="rounded-xl border border-gray-200 p-3 text-sm">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-gray-900">{log.action}</span>
-                            <span className="text-xs text-gray-500">{new Date(log.createdAt).toLocaleString()}</span>
-                          </div>
-                          <p className="mt-1 text-xs text-gray-600">
-                            {log.admin?.admin.email || "System"}{log.reason ? ` · ${log.reason}` : ""}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+                  </Td>
+                  <Td className="hidden md:table-cell">
+                    <span className={`text-xs ${muted}`}>{t("users.applicationsCount", { count: u._count.applications })}</span>
+                  </Td>
+                  <Td className="hidden md:table-cell">
+                    <span className={`text-xs ${muted}`}>{fmt.date(u.createdAt)}</span>
+                  </Td>
+                </tr>
+              ))
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </tbody>
+        </TableShell>
+      )}
+
+      <PaginationBar pagination={pagination} onPage={(page) => setFilters((f) => (f ? { ...f, page } : f))} />
+
+      <UserDetailDrawer
+        userId={selectedId}
+        currentAdminId={me?.id ?? ""}
+        onClose={() => setSelectedId(null)}
+        onChanged={() => filters && void load(filters)}
+        onConfirm={setConfirm}
+      />
+
+      <Drawer open={bulkOpen} title={t("users.messageSelected", { count: checked.size })} onClose={() => setBulkOpen(false)}>
+        <p className={`mb-4 text-sm ${muted}`}>{t("broadcast.bannedExcluded")}</p>
+        <MessageComposer
+          submitLabel={t("broadcast.send")}
+          onSend={async (input) => {
+            const result = await adminConsole.broadcast({ ...input, segment: { userIds: Array.from(checked) } });
+            return { email: result.email };
+          }}
+          onSent={(msg) => {
+            setNotice(msg);
+            setBulkOpen(false);
+            setChecked(new Set());
+          }}
+        />
+      </Drawer>
+
+      <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
     </div>
   );
 }
