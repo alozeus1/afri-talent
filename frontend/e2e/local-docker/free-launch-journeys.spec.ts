@@ -114,7 +114,7 @@ test("employer registers, verifies company domain and posts a job (no payment pr
   await expect(employer.getByLabel("Min salary")).toBeVisible();
   await employer.getByRole("button", { name: "Continue" }).click();
   // Step 3 must be a real review step (regression: Continue used to submit).
-  await expect(employer.getByText("Publish review")).toBeVisible();
+  await expect(employer.getByText("Review before publishing")).toBeVisible();
   await expectNoPaywall(employer);
   await employer.getByRole("button", { name: "Post job" }).click();
   await expect(employer.getByText("Job published!")).toBeVisible();
@@ -161,7 +161,7 @@ test("employer sees the applicant", async () => {
   await employer.goto("/en/employer");
   await employer.getByRole("tab", { name: "Jobs" }).click();
   await expect(employer.locator("body")).toContainText(jobTitle);
-  await expect(employer.locator("body")).toContainText("1 application(s)");
+  await expect(employer.locator("body")).toContainText(/1\sapplication\b/);
   await employer.getByRole("button", { name: "View applications" }).first().click();
   await expect(employer.locator("body")).toContainText(candidateName);
   await expectNoPaywall(employer);

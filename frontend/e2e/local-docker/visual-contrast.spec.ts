@@ -17,8 +17,25 @@ const VIEWPORTS = [
   { name: "desktop", width: 1366, height: 900 },
   { name: "mobile", width: 390, height: 844 },
 ] as const;
-const PUBLIC_PAGES = ["/en", "/en/jobs", "/en/pricing", "/en/login", "/en/register", "/en/contact"];
-const CANDIDATE_PAGES = ["/en/candidate"];
+const PUBLIC_PAGES = [
+  "/en",
+  "/en/jobs",
+  "/en/pricing",
+  "/en/login",
+  "/en/register",
+  "/en/contact",
+  "/en/companies",
+  "/en/salaries",
+  "/en/interviews",
+  "/en/trust",
+  "/en/learning",
+];
+// Resolved at runtime from the API (first published job / first company).
+const DETAIL_PAGES = ["job", "company"] as const;
+const CANDIDATE_PAGES = ["/en/candidate", "/en/candidate/applications", "/en/candidate/profile", "/en/candidate/settings"];
+const EMPLOYER_PAGES = ["/en/employer", "/en/employer/jobs/new"];
+const ADMIN_PAGES = ["/admin", "/admin/users", "/admin/jobs", "/admin/support", "/admin/reviews", "/admin/ops", "/admin/audit-logs"];
+const SEEDED_PASSWORD = "Password123!";
 
 type Theme = (typeof THEMES)[number];
 
@@ -53,6 +70,23 @@ async function expectNoContrastViolations(page: Page, label: string) {
 }
 
 let candidateState: string | undefined;
+let employerState: string | undefined;
+let adminState: string | undefined;
+const detailPaths: Record<(typeof DETAIL_PAGES)[number], string> = { job: "/en/jobs", company: "/en/companies" };
+
+async function seededState(browser: Browser, email: string, home: RegExp, file: string) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto("/en/login");
+  await page.waitForTimeout(3500); // bot shield rejects instant submissions
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(SEEDED_PASSWORD);
+  await page.getByRole("button", { name: "Sign In" }).click();
+  await page.waitForURL(home, { timeout: 60_000 });
+  await context.storageState({ path: file });
+  await context.close();
+  return file;
+}
 
 test.beforeAll(async ({ browser }, testInfo) => {
   const context = await browser.newContext();
@@ -76,6 +110,25 @@ test.beforeAll(async ({ browser }, testInfo) => {
   candidateState = testInfo.outputPath("candidate-state.json");
   await context.storageState({ path: candidateState });
   await context.close();
+
+  employerState = await seededState(browser, "employer@example.com", /\/en\/employer/, testInfo.outputPath("employer-state.json"));
+  adminState = await seededState(browser, "admin@example.com", /\/admin(\/|$)/, testInfo.outputPath("admin-state.json"));
+
+  // Detail pages: follow the first job / company link like a visitor would.
+  const browse = await browser.newContext();
+  const page2 = await browse.newPage();
+  for (const [kind, list, pattern] of [
+    ["job", "/en/jobs", /^\/en\/jobs\/[^/?#]+$/],
+    ["company", "/en/companies", /^\/en\/companies\/[^/?#]+$/],
+  ] as const) {
+    await page2.goto(list);
+    await page2.waitForLoadState("networkidle").catch(() => undefined);
+    const hrefs = await page2.locator("main a[href]").evaluateAll((as) => as.map((a) => a.getAttribute("href") ?? ""));
+    const href = hrefs.find((h) => pattern.test(h));
+    if (!href) throw new Error(`no ${kind} detail link on ${list}`);
+    detailPaths[kind] = href;
+  }
+  await browse.close();
 });
 
 for (const theme of THEMES) {
@@ -87,6 +140,28 @@ for (const theme of THEMES) {
         await expectNoContrastViolations(page, `${path}:${theme}:${viewport.name}`);
         await context.close();
       });
+    }
+    for (const kind of DETAIL_PAGES) {
+      test(`public ${kind} detail ${theme} ${viewport.name}`, async ({ browser }) => {
+        const { context, page } = await newThemedPage(browser, theme, viewport);
+        await page.goto(detailPaths[kind]);
+        await expectNoContrastViolations(page, `${kind}-detail:${theme}:${viewport.name}`);
+        await context.close();
+      });
+    }
+    for (const [role, pages, state] of [
+      ["employer", EMPLOYER_PAGES, () => employerState],
+      ["admin", ADMIN_PAGES, () => adminState],
+    ] as const) {
+      for (const path of pages) {
+        test(`${role} ${path} ${theme} ${viewport.name}`, async ({ browser }) => {
+          const { context, page } = await newThemedPage(browser, theme, viewport, state());
+          await page.goto(path);
+          await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+          await expectNoContrastViolations(page, `${path}:${theme}:${viewport.name}`);
+          await context.close();
+        });
+      }
     }
     for (const path of CANDIDATE_PAGES) {
       test(`candidate ${path} ${theme} ${viewport.name}`, async ({ browser }) => {
