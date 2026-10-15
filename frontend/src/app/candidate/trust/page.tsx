@@ -39,6 +39,7 @@ import {
   type CandidateMessageKey,
   type CandidateVars,
 } from "@/lib/i18n/candidate-messages";
+import { useCandidateBackendText } from "@/lib/i18n/candidate-backend-text";
 
 const ARTIFACT_TYPES = ["IDENTITY_DOCUMENT", "CERTIFICATION", "EMPLOYMENT_PROOF"] as const;
 type CandidateArtifactType = (typeof ARTIFACT_TYPES)[number];
@@ -65,6 +66,7 @@ function isUploadUnavailable(error: unknown) {
 export default function CandidateTrustPage() {
   const locale = useLocale();
   const t = useCandidateT();
+  const bt = useCandidateBackendText();
   const fmt = useCandidateFormatters();
   const router = useRouter();
   const { user, isLoading } = useAuth();
@@ -316,7 +318,7 @@ export default function CandidateTrustPage() {
       <TrustScoreCard
         title={dashboard.profile?.headline || user.name}
         subtitle={t("trust.scoreSubtitle")}
-        badge={dashboard.trust.badge}
+        badge={bt(dashboard.trust.badge)}
         authenticityScore={dashboard.trust.authenticityScore}
         riskScore={dashboard.trust.riskScore}
         riskLevel={dashboard.trust.riskLevel}
@@ -349,7 +351,7 @@ export default function CandidateTrustPage() {
             <div className="rounded-2xl border border-line bg-surface-sunken p-5">
               <h3 className="text-lg font-semibold text-fg">{t("trust.signals.title")}</h3>
               <div className="mt-4 flex flex-wrap gap-2">
-                <TrustBadge label={dashboard.trust.badge} riskLevel={dashboard.trust.riskLevel} variant="success" />
+                <TrustBadge label={bt(dashboard.trust.badge)} riskLevel={dashboard.trust.riskLevel} variant="success" />
                 {dashboard.trust.maskedPhone && (
                   <TrustBadge label={t("trust.signals.phone", { phone: dashboard.trust.maskedPhone })} variant="info" />
                 )}
@@ -377,7 +379,7 @@ export default function CandidateTrustPage() {
                 <h3 className="text-lg font-semibold text-fg">{t("trust.warnings")}</h3>
                 <ul className="mt-3 list-disc space-y-2 ps-5 text-sm text-fg-secondary">
                   {dashboard.trust.warnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
+                    <li key={warning}>{bt(warning)}</li>
                   ))}
                 </ul>
               </div>

@@ -19,6 +19,7 @@ import {
   statusTone,
   strong,
 } from "@/components/admin/console-ui";
+import { CrawlerPanel } from "@/components/admin/crawler-panel";
 
 type AlertStatus = "ACTIVE" | "ACKNOWLEDGED" | "RESOLVED";
 type StatusFilter = AlertStatus | "ALL";
@@ -177,6 +178,8 @@ export default function OpsPage() {
           ))}
         </ul>
       )}
+
+      <CrawlerPanel />
 
       <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
     </div>

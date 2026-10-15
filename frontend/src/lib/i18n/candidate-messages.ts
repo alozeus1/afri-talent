@@ -55,6 +55,9 @@ export function enumLabel(t: CandidateT, prefix: string, value: string | null | 
   if (!value) return "";
   const key = `${prefix}.${value}`;
   if (hasCandidateKey(key)) return t(key);
+  // Data sources disagree on casing ("full-time" vs "FULL_TIME").
+  const normalisedKey = `${prefix}.${value.trim().toUpperCase().replace(/[\s-]+/g, "_")}`;
+  if (hasCandidateKey(normalisedKey)) return t(normalisedKey);
   const words = value.replace(/[_-]+/g, " ").toLowerCase().trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }

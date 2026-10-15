@@ -55,6 +55,7 @@ import {
   useCandidateT,
   type CandidateMessageKey,
 } from "@/lib/i18n/candidate-messages";
+import { useCandidateBackendText } from "@/lib/i18n/candidate-backend-text";
 
 interface CandidateProfile {
   id: string;
@@ -167,6 +168,7 @@ function QuickLink({
 export default function CandidateDashboard() {
   const locale = useLocale();
   const t = useCandidateT();
+  const bt = useCandidateBackendText();
   const fmt = useCandidateFormatters();
   const router = useRouter();
   const { user, isLoading } = useAuth();
@@ -392,7 +394,7 @@ export default function CandidateDashboard() {
                   <div className="max-w-3xl">
                     <div className="flex flex-wrap items-center gap-2">
                       <TrustBadge
-                        label={trustDashboard.trust.badge}
+                        label={bt(trustDashboard.trust.badge)}
                         riskLevel={trustDashboard.trust.riskLevel}
                         variant="success"
                       />
@@ -433,7 +435,7 @@ export default function CandidateDashboard() {
                     {trustDashboard.trust.warnings.length > 0 && (
                       <ul className="mt-3 list-disc space-y-1 ps-5 text-sm text-fg-secondary">
                         {trustDashboard.trust.warnings.map((warning) => (
-                          <li key={warning}>{warning}</li>
+                          <li key={warning}>{bt(warning)}</li>
                         ))}
                       </ul>
                     )}
@@ -471,8 +473,8 @@ export default function CandidateDashboard() {
                     <div key={journey.key} className="rounded-2xl border border-line bg-surface-sunken p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-fg">{journey.title}</p>
-                          <p className="mt-1 text-xs leading-5 text-fg-secondary">{journey.description}</p>
+                          <p className="text-sm font-semibold text-fg">{bt(journey.title)}</p>
+                          <p className="mt-1 text-xs leading-5 text-fg-secondary">{bt(journey.description)}</p>
                         </div>
                         <Badge
                           variant={journey.status === "DONE" ? "success" : journey.status === "READY" ? "warning" : "info"}
@@ -491,7 +493,7 @@ export default function CandidateDashboard() {
                           }
                         >
                           <Button size="sm" variant={journey.status === "DONE" ? "ghost" : "outline"}>
-                            {journey.ctaLabel}
+                            {bt(journey.ctaLabel)}
                           </Button>
                         </Link>
                       </div>
@@ -503,7 +505,7 @@ export default function CandidateDashboard() {
               <Card>
                 <CardHeader>
                   <h2 className="text-lg font-semibold text-fg">{t("dash.matches.title")}</h2>
-                  <p className="mt-1 text-sm text-fg-secondary">{retentionSummary.weeklyDigest.headline}</p>
+                  <p className="mt-1 text-sm text-fg-secondary">{bt(retentionSummary.weeklyDigest.headline)}</p>
                 </CardHeader>
                 <CardContent>
                   <div className="mb-4 grid grid-cols-2 gap-3">

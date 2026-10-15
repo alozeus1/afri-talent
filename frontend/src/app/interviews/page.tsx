@@ -59,11 +59,11 @@ const label = (map: Record<string, PublicMessageKey>, value: string, tp: PublicT
 
 // Clearly labelled practice scenarios shown until real community entries exist.
 const SAMPLE_SCENARIOS = [
-  { id: "aws", jobTitle: "AWS Cloud Engineer", difficulty: "MEDIUM", interviewType: "TECHNICAL", helpfulCount: 42, ageDays: 2 },
-  { id: "devops", jobTitle: "DevOps Engineer", difficulty: "HARD", interviewType: "SYSTEM_DESIGN", helpfulCount: 15, ageDays: 5 },
-  { id: "security", jobTitle: "Cybersecurity Analyst", difficulty: "HARD", interviewType: "TECHNICAL", helpfulCount: 89, ageDays: 12 },
-  { id: "backend", jobTitle: "Backend Developer", difficulty: "MEDIUM", interviewType: "TECHNICAL", helpfulCount: 23, ageDays: 18 },
-  { id: "product", jobTitle: "Product Manager", difficulty: "MEDIUM", interviewType: "BEHAVIORAL", helpfulCount: 7, ageDays: 25 },
+  { id: "aws", difficulty: "MEDIUM", interviewType: "TECHNICAL", helpfulCount: 42, ageDays: 2 },
+  { id: "devops", difficulty: "HARD", interviewType: "SYSTEM_DESIGN", helpfulCount: 15, ageDays: 5 },
+  { id: "security", difficulty: "HARD", interviewType: "TECHNICAL", helpfulCount: 89, ageDays: 12 },
+  { id: "backend", difficulty: "MEDIUM", interviewType: "TECHNICAL", helpfulCount: 23, ageDays: 18 },
+  { id: "product", difficulty: "MEDIUM", interviewType: "BEHAVIORAL", helpfulCount: 7, ageDays: 25 },
 ] as const;
 
 function buildSampleExperiences(tp: PublicT): InterviewExperienceItem[] {
@@ -72,7 +72,7 @@ function buildSampleExperiences(tp: PublicT): InterviewExperienceItem[] {
     return {
       id: `sample-${sample.id}`,
       company: { id: `sample-company-${sample.id}`, name: tp(key("company")) },
-      jobTitle: sample.jobTitle,
+      jobTitle: tp(key("role")),
       difficulty: sample.difficulty,
       outcome: "IN_PROGRESS",
       interviewType: sample.interviewType,
