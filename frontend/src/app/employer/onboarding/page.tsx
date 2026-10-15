@@ -12,60 +12,39 @@ import {
 } from "@/lib/api";
 import { employerOnboardingEvents } from "@/lib/analytics";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { EXAMPLE } from "@/components/employer/locale-neutral";
+import { useEmployerI18n, type EmployerMessageKey } from "@/lib/i18n/employer-messages";
 import { FREE_MODE } from "@/lib/free-mode";
 import { EmployerActivationChecklist } from "@/components/employer/activation-checklist";
 import { EmployerMilestones } from "@/components/employer/activation-milestones";
+import {
+  Eyebrow,
+  Notice,
+  PageSpinner,
+  Spinner,
+  checkboxClass,
+  controlClass,
+  labelClass,
+} from "@/components/employer/employer-ui";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
-const onboardingSteps: Array<{
-  key: EmployerOnboardingStep;
-  title: string;
-  subtitle: string;
-}> = [
-  {
-    key: "company_setup",
-    title: "Company setup",
-    subtitle: "Tell candidates who you are so the first application starts from trust, not doubt.",
-  },
-  {
-    key: "verification",
-    title: "Verification",
-    subtitle: "Confirm the employer is real before you scale reach or spend.",
-  },
-  {
-    key: "team_setup",
-    title: "Team member setup",
-    subtitle: "Avoid a single-threaded hiring process by adding at least one collaborator.",
-  },
-  {
-    key: "first_job_post",
-    title: "First job post",
-    subtitle: "Launch a credible role with enough signal to pass moderation and attract fit candidates.",
-  },
-  {
-    key: "candidate_filters",
-    title: "Candidate filters",
-    subtitle: "Define the shortlist you want before inbound volume starts growing.",
-  },
-  {
-    key: "subscription_choice",
-    title: "Subscription choice",
-    subtitle: "Pick the plan that fits your search depth, analytics needs, and hiring speed.",
-  },
-  {
-    key: "trust_completion",
-    title: "Trust completion",
-    subtitle: "Finish the last credibility steps that improve apply quality and moderation speed.",
-  },
+const ONBOARDING_STEPS: EmployerOnboardingStep[] = [
+  "company_setup",
+  "verification",
+  "team_setup",
+  "first_job_post",
+  "candidate_filters",
+  "subscription_choice",
+  "trust_completion",
 ];
 
 // Free launch: there is no plan to choose, so the subscription step is skipped.
 const visibleSteps = FREE_MODE
-  ? onboardingSteps.filter((step) => step.key !== "subscription_choice")
-  : onboardingSteps;
+  ? ONBOARDING_STEPS.filter((step) => step !== "subscription_choice")
+  : ONBOARDING_STEPS;
 
 function visibleStep(step: EmployerOnboardingStep): EmployerOnboardingStep {
   return FREE_MODE && step === "subscription_choice" ? "trust_completion" : step;
@@ -95,10 +74,47 @@ function coerceEmployerPlan(plan: EmployerOnboarding["selectedPlan"]) {
   return "EMPLOYER_FREE";
 }
 
+type PlanKey = "EMPLOYER_FREE" | "EMPLOYER_BASIC" | "EMPLOYER_PREMIUM";
+
+const PLANS: Array<{ plan: PlanKey; title: EmployerMessageKey; blurb: EmployerMessageKey; points: EmployerMessageKey[] }> = [
+  {
+    plan: "EMPLOYER_FREE",
+    title: "onb.planFree",
+    blurb: "onb.planFreeBlurb",
+    points: ["onb.planFree1", "onb.planFree2", "onb.planFree3"],
+  },
+  {
+    plan: "EMPLOYER_BASIC",
+    title: "onb.planBasic",
+    blurb: "onb.planBasicBlurb",
+    points: ["onb.planBasic1", "onb.planBasic2", "onb.planBasic3"],
+  },
+  {
+    plan: "EMPLOYER_PREMIUM",
+    title: "onb.planPremium",
+    blurb: "onb.planPremiumBlurb",
+    points: ["onb.planPremium1", "onb.planPremium2", "onb.planPremium3"],
+  },
+];
+
+function BulletList({ items, dotClass = "bg-fg-muted" }: { items: string[]; dotClass?: string }) {
+  return (
+    <ul className="mt-3 space-y-2 text-sm text-fg-secondary">
+      {items.map((item) => (
+        <li key={item} className="flex gap-2">
+          <span aria-hidden="true" className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function EmployerOnboardingPage() {
   const locale = useLocale();
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t, tn, tv, ts } = useEmployerI18n();
 
   const [onboarding, setOnboarding] = useState<EmployerOnboarding | null>(null);
   const [activeStep, setActiveStep] = useState<EmployerOnboardingStep>("company_setup");
@@ -114,13 +130,14 @@ export default function EmployerOnboardingPage() {
   const [filterMinExperience, setFilterMinExperience] = useState("");
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [visaPreference, setVisaPreference] = useState<EmployerCandidateFilters["visaPreference"]>("ANY");
-  const [selectedPlan, setSelectedPlan] = useState<"EMPLOYER_FREE" | "EMPLOYER_BASIC" | "EMPLOYER_PREMIUM">("EMPLOYER_FREE");
+  const [selectedPlan, setSelectedPlan] = useState<PlanKey>("EMPLOYER_FREE");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // "" = failed without a server message (rendered with a translated fallback).
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-  const activeIndex = visibleSteps.findIndex((step) => step.key === activeStep);
+  const activeIndex = visibleSteps.findIndex((step) => step === activeStep);
 
   const hydrateState = (data: EmployerOnboarding) => {
     setOnboarding(data);
@@ -161,7 +178,7 @@ export default function EmployerOnboardingPage() {
         });
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "Failed to load onboarding");
+        setError(err instanceof Error ? err.message : "");
       })
       .finally(() => setLoading(false));
   }, [user]);
@@ -184,7 +201,7 @@ export default function EmployerOnboardingPage() {
   const saveProgress = async (nextStep?: EmployerOnboardingStep) => {
     setSaving(true);
     setError(null);
-    setSuccess(null);
+    setSuccess(false);
 
     try {
       await employerAnalytics.updateOnboarding({
@@ -204,7 +221,7 @@ export default function EmployerOnboardingPage() {
         currentStep: nextStep || activeStep,
       });
       setActiveStep(visibleStep(nextStep || activeStep));
-      setSuccess("Progress saved.");
+      setSuccess(true);
 
       employerOnboardingEvents.stepCompleted({
         step: activeStep,
@@ -220,7 +237,7 @@ export default function EmployerOnboardingPage() {
         });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save onboarding");
+      setError(err instanceof Error && err.message ? err.message : t("onb.errSave"));
     } finally {
       setSaving(false);
     }
@@ -228,105 +245,100 @@ export default function EmployerOnboardingPage() {
 
   const goToStep = (step: EmployerOnboardingStep) => {
     setActiveStep(step);
-    setSuccess(null);
+    setSuccess(false);
     employerOnboardingEvents.onboardingViewed({ step });
   };
 
   const goNext = async () => {
     const next = visibleSteps[activeIndex + 1];
     if (!next) return;
-    await saveProgress(next.key);
+    await saveProgress(next);
   };
 
-  const currentStepMeta = visibleSteps[activeIndex] || visibleSteps[0];
+  const currentStep = visibleSteps[activeIndex] || visibleSteps[0];
 
   if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="mb-8 flex flex-col gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-700">
-          Guided employer onboarding
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
-          Move from signup to first qualified shortlist
-        </h1>
-        <p className="max-w-3xl text-sm leading-6 text-fg-secondary sm:text-base">
-          This flow is designed around the first employer success moment: a credible job, a real candidate view, and a shortlist worth acting on.
-        </p>
-      </div>
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <header className="mb-8 flex flex-col gap-3">
+        <Eyebrow className="text-primary-text">{t("onb.eyebrow")}</Eyebrow>
+        <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">{t("onb.title")}</h1>
+        <p className="max-w-3xl text-sm leading-6 text-fg-secondary sm:text-base">{t("onb.subtitle")}</p>
+      </header>
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
+          <Spinner />
         </div>
-      ) : onboarding ? (
+      ) : !onboarding ? (
+        <Notice tone="danger" role="alert" title={t("onb.loadErrorTitle")}>
+          {error || t("onb.errLoad")}
+        </Notice>
+      ) : (
         <div className="space-y-8">
-          <EmployerMilestones
-            milestones={onboarding.milestones}
-            activationState={onboarding.activationState}
-          />
+          <EmployerMilestones milestones={onboarding.milestones} activationState={onboarding.activationState} />
 
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="space-y-6">
-              <Card className="overflow-hidden border-line">
-                <CardHeader className="border-b border-line bg-surface-sunken">
+            <div className="min-w-0 space-y-6">
+              <Card className="overflow-hidden">
+                <CardHeader className="bg-surface-sunken">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
-                        Current step
-                      </p>
-                      <h2 className="mt-2 text-2xl font-semibold text-fg">
-                        {currentStepMeta.title}
-                      </h2>
-                      <p className="mt-2 max-w-2xl text-sm text-fg-secondary">
-                        {currentStepMeta.subtitle}
-                      </p>
+                      <Eyebrow>{t("onb.currentStep", { n: activeIndex + 1, total: visibleSteps.length })}</Eyebrow>
+                      <h2 className="mt-2 text-2xl font-semibold text-fg">{tv("step", currentStep)}</h2>
+                      <p className="mt-2 max-w-2xl text-sm text-fg-secondary">{t(`onb.sub.${currentStep}` as EmployerMessageKey)}</p>
                     </div>
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                      <p className="font-semibold">{onboarding.completionPct}% complete</p>
-                      <p className="mt-1 text-emerald-800">
-                        {onboarding.stats.publishedJobs} published job{onboarding.stats.publishedJobs === 1 ? "" : "s"} • {onboarding.stats.qualifiedApplicants} qualified applicant{onboarding.stats.qualifiedApplicants === 1 ? "" : "s"}
+                    <div className="shrink-0 rounded-2xl border border-success-line bg-primary-soft px-4 py-3 text-sm">
+                      <p className="font-semibold text-primary-text">{t("checklist.complete", { pct: onboarding.completionPct })}</p>
+                      <p className="mt-1 text-fg-secondary">
+                        {tn("onb.publishedJobs", onboarding.stats.publishedJobs)} •{" "}
+                        {tn("onb.qualifiedApplicants", onboarding.stats.qualifiedApplicants)}
                       </p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <div className="mb-6 grid gap-2 md:grid-cols-3 xl:grid-cols-7">
-                    {visibleSteps.map((step, index) => (
-                      <button
-                        key={step.key}
-                        type="button"
-                        onClick={() => goToStep(step.key)}
-                        className={`rounded-2xl border px-3 py-3 text-left transition ${
-                          activeStep === step.key
-                            ? "border-emerald-300 bg-emerald-50"
-                            : "border-line bg-surface hover:border-emerald-200 hover:bg-emerald-50/50"
-                        }`}
-                      >
-                        <p className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
-                          Step {index + 1}
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-fg">{step.title}</p>
-                      </button>
-                    ))}
-                  </div>
+                  <nav aria-label={t("onb.stepsLabel")}>
+                    <ol className="mb-6 grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+                      {visibleSteps.map((step, index) => {
+                        const done = onboarding.checklist.find((item) => item.key === step)?.done;
+                        const active = activeStep === step;
+                        return (
+                          <li key={step}>
+                            <button
+                              type="button"
+                              aria-current={active ? "step" : undefined}
+                              onClick={() => goToStep(step)}
+                              className={`h-full w-full rounded-xl border px-3 py-3 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                                active
+                                  ? "border-success-line bg-primary-soft"
+                                  : "border-line bg-surface hover:border-line-strong hover:bg-surface-muted"
+                              }`}
+                            >
+                              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                                {done && <span aria-hidden="true" className="text-success">✓</span>}
+                                {t("onb.stepN", { n: index + 1 })}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-fg">{tv("step", step)}</p>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </nav>
 
-                  {error && (
-                    <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                      {error}
-                    </div>
+                  {error !== null && (
+                    <Notice tone="danger" role="alert" className="mb-4">
+                      {error || t("onb.errSave")}
+                    </Notice>
                   )}
                   {success && (
-                    <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                      {success}
-                    </div>
+                    <Notice tone="success" role="status" className="mb-4">
+                      {t("onb.saved")}
+                    </Notice>
                   )}
 
                   {activeStep === "company_setup" && (
@@ -334,87 +346,82 @@ export default function EmployerOnboardingPage() {
                       <div className="grid gap-4 md:grid-cols-2">
                         <Input
                           id="companyName"
-                          label="Company name"
+                          label={t("analytics.companyName")}
                           value={companyForm.companyName}
                           onChange={(event) => setCompanyForm((prev) => ({ ...prev, companyName: event.target.value }))}
-                          placeholder="AfriTalent Labs"
+                          placeholder={t("analytics.companyNamePlaceholder")}
                         />
                         <Input
                           id="website"
-                          label="Company website"
+                          type="url"
+                          label={t("trust.companyWebsite")}
                           value={companyForm.website}
                           onChange={(event) => setCompanyForm((prev) => ({ ...prev, website: event.target.value }))}
-                          placeholder="https://company.com"
+                          placeholder={EXAMPLE.website}
                         />
                       </div>
                       <Input
                         id="location"
-                        label="Hiring location"
+                        label={t("onb.hiringLocation")}
                         value={companyForm.location}
                         onChange={(event) => setCompanyForm((prev) => ({ ...prev, location: event.target.value }))}
-                        placeholder="Lagos, Nigeria"
+                        placeholder={t("onb.hiringLocationPlaceholder")}
                       />
                       <div>
-                        <label htmlFor="bio" className="mb-1 block text-sm font-medium text-fg-secondary">
-                          Company story
+                        <label htmlFor="bio" className={labelClass}>
+                          {t("onb.companyStory")}
                         </label>
                         <textarea
                           id="bio"
-                          className="min-h-[180px] w-full rounded-lg border border-line-strong px-4 py-3 text-sm text-fg outline-none transition focus:border-transparent focus:ring-2 focus:ring-emerald-500"
-                          placeholder="What does your company do, who do you hire, and why should strong candidates trust this opportunity?"
+                          className={`${controlClass} min-h-[180px]`}
+                          placeholder={t("onb.companyStoryPlaceholder")}
                           value={companyForm.bio}
                           onChange={(event) => setCompanyForm((prev) => ({ ...prev, bio: event.target.value }))}
                         />
                       </div>
-                      <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-950">
-                        Strong company setup improves moderation speed and candidate confidence. The best early listings explain team mission, market, and what success looks like in the role.
-                      </div>
+                      <Notice tone="info">{t("onb.companyTip")}</Notice>
                     </div>
                   )}
 
                   {activeStep === "verification" && (
                     <div className="space-y-5">
                       <div className="flex flex-wrap gap-2">
-                        <TrustBadge
-                          label={onboarding.trust.badge}
-                          riskLevel={onboarding.trust.riskLevel}
-                          variant="success"
-                        />
+                        <TrustBadge label={ts(onboarding.trust.badge)} riskLevel={onboarding.trust.riskLevel} variant="success" />
                         {onboarding.trust.verifiedDomain && (
-                          <TrustBadge label={`Verified domain: ${onboarding.trust.verifiedDomain}`} variant="info" />
+                          <TrustBadge label={t("trust.verifiedDomain", { domain: onboarding.trust.verifiedDomain })} variant="info" />
                         )}
                         {onboarding.trust.requiresEnhancedVerification && (
-                          <TrustBadge label="Enhanced verification required" riskLevel="MEDIUM" variant="warning" />
+                          <TrustBadge label={t("onb.enhancedRequired")} riskLevel="MEDIUM" variant="warning" />
                         )}
                       </div>
-                      <Card className="border-line bg-surface-sunken">
-                        <CardContent className="p-5">
-                          <p className="text-sm text-fg-secondary">
-                            Verification determines whether jobs publish publicly, how fast moderation clears new listings, and how credible your brand looks to cross-border candidates.
-                          </p>
-                          <ul className="mt-4 space-y-2 text-sm text-fg-secondary">
-                            {onboarding.trust.checklist.map((item) => (
-                              <li key={item.key}>• {item.label}: {item.done ? "Complete" : "Pending"}</li>
-                            ))}
-                          </ul>
-                          {onboarding.trust.warnings.length > 0 && (
-                            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
-                              <p className="text-sm font-semibold text-amber-900">Attention before scale</p>
-                              <ul className="mt-2 space-y-2 text-sm text-amber-800">
-                                {onboarding.trust.warnings.map((warning) => (
-                                  <li key={warning}>• {warning}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
+                      <div className="rounded-2xl border border-line bg-surface-sunken p-5">
+                        <p className="text-sm text-fg-secondary">{t("onb.verificationBody")}</p>
+                        <ul className="mt-4 space-y-2 text-sm">
+                          {onboarding.trust.checklist.map((item) => (
+                            <li key={item.key} className="flex items-start justify-between gap-3">
+                              <span className="text-fg-secondary">{ts(item.label)}</span>
+                              <span className={`shrink-0 font-medium ${item.done ? "text-success" : "text-warning"}`}>
+                                {item.done ? t("onb.complete") : t("common.pending")}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                        {onboarding.trust.warnings.length > 0 && (
+                          <Notice tone="warning" className="mt-4" title={t("onb.attention")}>
+                            <ul className="list-disc space-y-1 ps-5">
+                              {onboarding.trust.warnings.map((warning) => (
+                                <li key={warning}>{ts(warning)}</li>
+                              ))}
+                            </ul>
+                          </Notice>
+                        )}
+                      </div>
                       <div className="flex flex-wrap gap-3">
                         <Link href={localizePath("/employer/trust", locale)}>
-                          <Button>Open trust center</Button>
+                          <Button>{t("common.openTrustCenter")}</Button>
                         </Link>
                         <Link href={localizePath("/trust", locale)}>
-                          <Button variant="outline">See what badges mean</Button>
+                          <Button variant="outline">{t("onb.badgesMeaning")}</Button>
                         </Link>
                       </div>
                     </div>
@@ -423,65 +430,54 @@ export default function EmployerOnboardingPage() {
                   {activeStep === "team_setup" && (
                     <div className="space-y-5">
                       <div>
-                        <label htmlFor="teamMemberEmails" className="mb-1 block text-sm font-medium text-fg-secondary">
-                          Hiring teammate emails
+                        <label htmlFor="teamMemberEmails" className={labelClass}>
+                          {t("onb.teamEmails")}
                         </label>
                         <textarea
                           id="teamMemberEmails"
-                          className="min-h-[180px] w-full rounded-lg border border-line-strong px-4 py-3 text-sm text-fg outline-none transition focus:border-transparent focus:ring-2 focus:ring-emerald-500"
-                          placeholder={"recruiter@company.com\nhiring-manager@company.com"}
+                          aria-describedby="teamMemberEmails-hint"
+                          className={`${controlClass} min-h-[180px]`}
+                          placeholder={EXAMPLE.teamEmails}
                           value={teamMemberEmails}
                           onChange={(event) => setTeamMemberEmails(event.target.value)}
                         />
-                        <p className="mt-2 text-sm text-fg-muted">
-                          Separate each email with a comma or a new line. This captures the hiring team setup even before invite workflows are fully automated.
+                        <p id="teamMemberEmails-hint" className="mt-2 text-sm text-fg-muted">
+                          {t("onb.teamHint")}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-line bg-surface-sunken px-4 py-4 text-sm text-fg-secondary">
-                        Teams that add a reviewer early tend to move faster from first candidate view to first qualified shortlist because follow-up does not bottleneck on one person.
-                      </div>
+                      <Notice>{t("onb.teamTip")}</Notice>
                     </div>
                   )}
 
                   {activeStep === "first_job_post" && (
                     <div className="space-y-5">
-                      <div className="rounded-3xl bg-slate-950 px-5 py-5 text-white">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                          First success milestone
-                        </p>
-                        <h3 className="mt-2 text-xl font-semibold">Aim for the first approved job, not just the first draft</h3>
-                        <p className="mt-3 text-sm text-slate-300">
-                          Approved jobs create the fastest path to candidate trust, talent search visibility, and the first meaningful shortlist.
-                        </p>
+                      <div className="rounded-2xl border border-success-line bg-primary-soft px-5 py-5">
+                        <Eyebrow className="text-primary-text">{t("onb.firstSuccess")}</Eyebrow>
+                        <h3 className="mt-2 text-xl font-semibold text-fg">{t("onb.firstJobTitle")}</h3>
+                        <p className="mt-3 text-sm text-fg-secondary">{t("onb.firstJobBody")}</p>
                         <div className="mt-4 flex flex-wrap gap-3">
                           <Link href={localizePath("/employer/jobs/new", locale)}>
-                            <Button>Create job with quality preview</Button>
+                            <Button>{t("onb.createWithPreview")}</Button>
                           </Link>
                           <Link href={localizePath("/employer/analytics", locale)}>
-                            <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 hover:text-white">
-                              View shortlist metrics
-                            </Button>
+                            <Button variant="outline">{t("onb.viewMetrics")}</Button>
                           </Link>
                         </div>
                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
-                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-                          <p className="font-semibold text-emerald-900">What strong jobs include</p>
-                          <ul className="mt-3 space-y-2 text-sm text-emerald-900">
-                            <li>• Clear role scope and outcomes</li>
-                            <li>• Salary transparency where possible</li>
-                            <li>• Specific location, remote, or visa guidance</li>
-                            <li>• Real application path with low scam risk</li>
-                          </ul>
+                        <div className="rounded-2xl border border-success-line bg-success-soft px-4 py-4">
+                          <p className="font-semibold text-success">{t("onb.strongJobs")}</p>
+                          <BulletList
+                            dotClass="bg-success"
+                            items={[t("onb.strong1"), t("onb.strong2"), t("onb.strong3"), t("onb.strong4")]}
+                          />
                         </div>
-                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
-                          <p className="font-semibold text-amber-900">What slows first shortlist</p>
-                          <ul className="mt-3 space-y-2 text-sm text-amber-900">
-                            <li>• Thin job descriptions</li>
-                            <li>• No compensation guidance</li>
-                            <li>• Vague location or hiring region</li>
-                            <li>• Incomplete employer verification</li>
-                          </ul>
+                        <div className="rounded-2xl border border-warning-line bg-warning-soft px-4 py-4">
+                          <p className="font-semibold text-warning">{t("onb.slowJobs")}</p>
+                          <BulletList
+                            dotClass="bg-warning"
+                            items={[t("onb.slow1"), t("onb.slow2"), t("onb.slow3"), t("onb.slow4")]}
+                          />
                         </div>
                       </div>
                     </div>
@@ -491,193 +487,175 @@ export default function EmployerOnboardingPage() {
                     <div className="space-y-5">
                       <Input
                         id="filterSkills"
-                        label="Skills to prioritize"
+                        label={t("onb.filterSkills")}
                         value={filterSkills}
                         onChange={(event) => setFilterSkills(event.target.value)}
-                        placeholder="React, TypeScript, Backend APIs"
+                        placeholder={t("onb.filterSkillsPlaceholder")}
                       />
                       <div className="grid gap-4 md:grid-cols-2">
                         <Input
                           id="filterLocation"
-                          label="Preferred location or timezone"
+                          label={t("onb.filterLocation")}
                           value={filterLocation}
                           onChange={(event) => setFilterLocation(event.target.value)}
-                          placeholder="Remote within GMT+1 to GMT+3"
+                          placeholder={t("onb.filterLocationPlaceholder")}
                         />
                         <Input
                           id="filterMinExperience"
-                          label="Minimum years of experience"
+                          label={t("onb.filterExperience")}
                           type="number"
+                          inputMode="numeric"
+                          min={0}
                           value={filterMinExperience}
                           onChange={(event) => setFilterMinExperience(event.target.value)}
                           placeholder="3"
                         />
                       </div>
                       <div className="grid gap-4 md:grid-cols-2">
-                        <label className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-900">
+                        <label
+                          htmlFor="verifiedOnly"
+                          className="flex cursor-pointer items-start gap-3 rounded-2xl border border-line bg-surface-sunken px-4 py-4 text-sm text-fg-secondary"
+                        >
                           <input
+                            id="verifiedOnly"
                             type="checkbox"
-                            className="mr-2"
+                            className={`mt-0.5 ${checkboxClass}`}
                             checked={verifiedOnly}
                             onChange={(event) => setVerifiedOnly(event.target.checked)}
                           />
-                          Only show verified candidates when premium filters are available
+                          {FREE_MODE ? t("onb.verifiedOnlyFree") : t("onb.verifiedOnly")}
                         </label>
                         <div>
-                          <label htmlFor="visaPreference" className="mb-1 block text-sm font-medium text-fg-secondary">
-                            Visa or relocation preference
+                          <label htmlFor="visaPreference" className={labelClass}>
+                            {t("onb.visaPreference")}
                           </label>
                           <select
                             id="visaPreference"
-                            className="w-full rounded-lg border border-line-strong px-4 py-2 text-sm text-fg outline-none transition focus:border-transparent focus:ring-2 focus:ring-emerald-500"
+                            className={controlClass}
                             value={visaPreference}
                             onChange={(event) => setVisaPreference(event.target.value as EmployerCandidateFilters["visaPreference"])}
                           >
-                            <option value="ANY">Any candidate</option>
-                            <option value="SPONSORED_ONLY">Only candidates needing sponsorship support</option>
+                            <option value="ANY">{t("onb.visaAny")}</option>
+                            <option value="SPONSORED_ONLY">{t("onb.visaSponsored")}</option>
                           </select>
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-line bg-surface-sunken px-4 py-4 text-sm text-fg-secondary">
-                        Filters improve shortlist quality most when they are specific enough to reduce noise but not so narrow that they kill early discovery.
-                      </div>
+                      <Notice>{t("onb.filtersTip")}</Notice>
                     </div>
                   )}
 
                   {activeStep === "subscription_choice" && !FREE_MODE && (
                     <div className="space-y-5">
-                      <div className="grid gap-4 lg:grid-cols-3">
-                        {[
-                          {
-                            plan: "EMPLOYER_FREE" as const,
-                            title: "Free",
-                            blurb: "Best for getting the first job live and learning where trust or quality friction exists.",
-                            points: ["First credible posting", "Baseline trust workflow", "Start with employer verification"],
-                          },
-                          {
-                            plan: "EMPLOYER_BASIC" as const,
-                            title: "Basic",
-                            blurb: "Adds better visibility once candidate flow starts and you want stronger signal on what converts.",
-                            points: ["Talent search access", "Hiring analytics", "Faster shortlist insight"],
-                          },
-                          {
-                            plan: "EMPLOYER_PREMIUM" as const,
-                            title: "Premium",
-                            blurb: "Best when you need verified-candidate filters and tighter ROI control across multiple roles.",
-                            points: ["Verified-candidate filters", "Advanced funnel analytics", "Higher-confidence shortlist workflows"],
-                          },
-                        ].map((plan) => {
+                      <div className="grid gap-4 lg:grid-cols-3" role="radiogroup" aria-label={t("onb.planLabel")}>
+                        {PLANS.map((plan) => {
                           const selected = selectedPlan === plan.plan;
                           return (
                             <button
                               key={plan.plan}
                               type="button"
+                              role="radio"
+                              aria-checked={selected}
                               onClick={() => setSelectedPlan(plan.plan)}
-                              className={`rounded-3xl border px-5 py-5 text-left transition ${
-                                selected ? "border-emerald-300 bg-emerald-50 shadow-sm" : "border-line bg-surface hover:border-emerald-200"
+                              className={`rounded-2xl border px-5 py-5 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                                selected ? "border-success-line bg-primary-soft shadow-xs" : "border-line bg-surface hover:border-line-strong"
                               }`}
                             >
-                              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">{plan.title}</p>
-                              <p className="mt-3 text-sm text-fg-secondary">{plan.blurb}</p>
-                              <ul className="mt-4 space-y-2 text-sm text-fg-secondary">
-                                {plan.points.map((point) => (
-                                  <li key={point}>• {point}</li>
-                                ))}
-                              </ul>
+                              <Eyebrow className={selected ? "text-primary-text" : undefined}>{t(plan.title)}</Eyebrow>
+                              <p className="mt-3 text-sm text-fg-secondary">{t(plan.blurb)}</p>
+                              <BulletList items={plan.points.map((point) => t(point))} />
                             </button>
                           );
                         })}
                       </div>
-                      <div className="rounded-2xl border border-line bg-slate-950 px-5 py-5 text-white">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">Plan framing</p>
-                        <h3 className="mt-2 text-lg font-semibold">{onboarding.upgradeJourney.headline}</h3>
-                        <p className="mt-2 text-sm text-slate-300">{onboarding.upgradeJourney.body}</p>
-                        <div className="mt-4">
-                          <Link href={localizePath("/billing", locale)}>
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                employerOnboardingEvents.upgradeCtaClicked({
-                                  current_plan: selectedPlan,
-                                  target_plan: onboarding.upgradeJourney.targetPlan || "none",
-                                  source: "employer_onboarding",
-                                })
-                              }
-                            >
-                              {onboarding.upgradeJourney.ctaLabel}
-                            </Button>
-                          </Link>
-                        </div>
+                      <div className="rounded-2xl border border-line bg-surface-sunken px-5 py-5">
+                        <Eyebrow className="text-primary-text">{t("onb.planFraming")}</Eyebrow>
+                        <h3 className="mt-2 text-lg font-semibold text-fg">{ts(onboarding.upgradeJourney.headline)}</h3>
+                        <p className="mt-2 text-sm text-fg-secondary">{ts(onboarding.upgradeJourney.body)}</p>
+                        {onboarding.upgradeJourney.ctaLabel && (
+                          <div className="mt-4">
+                            <Link href={localizePath("/billing", locale)}>
+                              <Button
+                                size="sm"
+                                onClick={() =>
+                                  employerOnboardingEvents.upgradeCtaClicked({
+                                    current_plan: selectedPlan,
+                                    target_plan: onboarding.upgradeJourney.targetPlan || "none",
+                                    source: "employer_onboarding",
+                                  })
+                                }
+                              >
+                                {ts(onboarding.upgradeJourney.ctaLabel)}
+                              </Button>
+                            </Link>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
 
                   {activeStep === "trust_completion" && (
                     <div className="space-y-5">
-                      <Card className="border-emerald-200 bg-emerald-50/70">
-                        <CardContent className="p-5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <TrustBadge
-                              label={onboarding.trust.badge}
-                              riskLevel={onboarding.trust.riskLevel}
-                              variant="success"
-                            />
-                            <TrustBadge
-                              label={onboarding.trust.postingEligibility ? "Posting unlocked" : "Posting limited"}
-                              variant={onboarding.trust.postingEligibility ? "success" : "warning"}
-                            />
-                          </div>
-                          <p className="mt-3 text-sm text-fg-secondary">
-                            Finish the remaining trust tasks so candidates see a credible employer, jobs publish with less friction, and moderation holds stay rare.
-                          </p>
-                          <ul className="mt-4 space-y-2 text-sm text-fg-secondary">
-                            {onboarding.trust.checklist.map((item) => (
-                              <li key={item.key}>• {item.label}: {item.done ? "Complete" : "Still pending"}</li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
+                      <div className="rounded-2xl border border-success-line bg-success-soft p-5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <TrustBadge label={ts(onboarding.trust.badge)} riskLevel={onboarding.trust.riskLevel} variant="success" />
+                          <TrustBadge
+                            label={onboarding.trust.postingEligibility ? t("onb.postingUnlocked") : t("onb.postingLimited")}
+                            variant={onboarding.trust.postingEligibility ? "success" : "warning"}
+                          />
+                        </div>
+                        <p className="mt-3 text-sm text-fg-secondary">{t("onb.trustBody")}</p>
+                        <ul className="mt-4 space-y-2 text-sm">
+                          {onboarding.trust.checklist.map((item) => (
+                            <li key={item.key} className="flex items-start justify-between gap-3">
+                              <span className="text-fg-secondary">{ts(item.label)}</span>
+                              <span className={`shrink-0 font-medium ${item.done ? "text-success" : "text-warning"}`}>
+                                {item.done ? t("onb.complete") : t("onb.stillPending")}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                       <div className="flex flex-wrap gap-3">
                         <Link href={localizePath("/employer/trust", locale)}>
-                          <Button>Finish trust profile</Button>
+                          <Button>{t("onb.finishTrust")}</Button>
                         </Link>
                         <Link href={localizePath("/employer/jobs/new", locale)}>
-                          <Button variant="outline">Create first job</Button>
+                          <Button variant="outline">{t("common.createFirstJob")}</Button>
                         </Link>
                         <Link href={localizePath("/employer/talent", locale)}>
-                          <Button variant="outline">Search talent</Button>
+                          <Button variant="outline">{t("common.searchTalent")}</Button>
                         </Link>
                       </div>
                     </div>
                   )}
 
                   <div className="mt-8 flex flex-wrap justify-between gap-3 border-t border-line pt-6">
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3">
                       <Button
                         type="button"
                         variant="outline"
                         disabled={activeIndex === 0 || saving}
-                        onClick={() => setActiveStep(visibleSteps[Math.max(activeIndex - 1, 0)].key)}
+                        onClick={() => setActiveStep(visibleSteps[Math.max(activeIndex - 1, 0)])}
                       >
-                        Previous step
+                        {t("onb.previous")}
                       </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={saving}
-                        onClick={() => saveProgress()}
-                      >
-                        {saving ? "Saving..." : "Save progress"}
+                      <Button type="button" variant="ghost" disabled={saving} onClick={() => saveProgress()}>
+                        {saving ? t("common.saving") : t("onb.saveProgress")}
                       </Button>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3">
                       {activeStep === "first_job_post" && (
                         <Link href={localizePath("/employer/jobs/new", locale)}>
-                          <Button variant="outline">Open job composer</Button>
+                          <Button variant="outline">{t("onb.openComposer")}</Button>
                         </Link>
                       )}
-                      <Button type="button" disabled={saving || activeIndex === visibleSteps.length - 1} onClick={goNext}>
-                        {activeIndex === visibleSteps.length - 1 ? "All set" : "Save and continue"}
+                      <Button
+                        type="button"
+                        isLoading={saving}
+                        disabled={saving || activeIndex === visibleSteps.length - 1}
+                        onClick={goNext}
+                      >
+                        {activeIndex === visibleSteps.length - 1 ? t("onb.allSet") : t("onb.saveContinue")}
                       </Button>
                     </div>
                   </div>
@@ -685,34 +663,28 @@ export default function EmployerOnboardingPage() {
               </Card>
             </div>
 
-            <div className="space-y-6">
+            <aside className="space-y-6">
               <EmployerActivationChecklist
                 checklist={onboarding.checklist}
                 completionPct={onboarding.completionPct}
                 currentStep={activeStep}
                 nextAction={onboarding.nextAction}
-                subtitle="Every completed step should make publishing easier, applicant quality higher, or shortlist speed faster."
+                subtitle={t("onb.checklistSubtitle")}
               />
 
-              <Card className="border-blue-200 bg-blue-50/70">
+              <Card className="border-info-line">
                 <CardHeader>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">
-                    Milestone target
-                  </p>
-                  <h2 className="mt-2 text-lg font-semibold text-blue-950">
-                    Reach the first qualified shortlist as fast as possible
-                  </h2>
+                  <Eyebrow className="text-info">{t("onb.targetEyebrow")}</Eyebrow>
+                  <h2 className="mt-2 text-lg font-semibold text-fg">{t("onb.targetTitle")}</h2>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-blue-900">
-                    Focus sequence: get verified, publish a strong job, review candidates in-platform, then shortlist quickly while apply quality is highest.
-                  </p>
+                  <p className="text-sm text-fg-secondary">{t("onb.targetBody")}</p>
                 </CardContent>
               </Card>
-            </div>
+            </aside>
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

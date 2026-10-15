@@ -20,29 +20,46 @@ import { TrustBadge } from "@/components/trust/trust-badge";
 import { TrustExplainerModal, type TrustExplainerItem } from "@/components/trust/trust-explainer-modal";
 import { TrustStatusBanner } from "@/components/trust/trust-status-banner";
 import { TrustSupportCard } from "@/components/trust/trust-support-card";
-import { localizePath, useLocale } from "@/lib/i18n/client";
-import { FREE_MODE } from "@/lib/free-mode";
 import { MessageCandidateButton } from "@/components/employer/message-candidate-button";
+import {
+  EmptyPanel,
+  Eyebrow,
+  Notice,
+  PageSpinner,
+  Spinner,
+  checkboxClass,
+  controlClass,
+} from "@/components/employer/employer-ui";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { useEmployerI18n, type EmployerMessageKey, type EmployerVars } from "@/lib/i18n/employer-messages";
+import { FREE_MODE } from "@/lib/free-mode";
 
 const TALENT_STAGES = ["SOURCED", "REVIEWING", "PRIORITY", "CONTACTED"];
+const EXPERIENCE_OPTIONS = ["1", "2", "3", "5", "8", "10"];
 
-function candidateTrustReasons(candidate: TalentProfile): TrustExplainerItem[] {
+type T = (key: EmployerMessageKey, vars?: EmployerVars) => string;
+
+/** Match reasons arrive as English sentences; translate the known shapes. */
+function translateReason(reason: string, t: T, ts: (text: string) => string): string {
+  const semantic = reason.match(/^Strong role-intent match \((\d+)\/100\)\.$/);
+  if (semantic) return t("talent.reasonSemantic", { score: semantic[1] });
+  const skills = reason.match(/^Skills overlap is high \((\d+)\/100\)\.$/);
+  if (skills) return t("talent.reasonSkills", { score: skills[1] });
+  return ts(reason);
+}
+
+function signalStatus(status: string, t: T): Pick<TrustExplainerItem, "statusLabel" | "statusVariant"> {
+  if (status === "verified") return { statusLabel: t("talent.signalVerified"), statusVariant: "success" };
+  if (status === "needs_attention") return { statusLabel: t("talent.signalNeedsAttention"), statusVariant: "warning" };
+  return { statusLabel: t("talent.signalStrengthening"), statusVariant: "info" };
+}
+
+function candidateTrustReasons(candidate: TalentProfile, t: T, ts: (text: string) => string): TrustExplainerItem[] {
   if (candidate.trust?.explainability?.length) {
     return candidate.trust.explainability.slice(0, 3).map((signal) => ({
-      title: signal.label,
-      description: signal.detail,
-      statusLabel:
-        signal.status === "verified"
-          ? "Verified"
-          : signal.status === "needs_attention"
-            ? "Needs attention"
-            : "Strengthening",
-      statusVariant:
-        signal.status === "verified"
-          ? ("success" as const)
-          : signal.status === "needs_attention"
-            ? ("warning" as const)
-            : ("info" as const),
+      title: ts(signal.label),
+      description: ts(signal.detail),
+      ...signalStatus(signal.status, t),
     }));
   }
 
@@ -50,70 +67,62 @@ function candidateTrustReasons(candidate: TalentProfile): TrustExplainerItem[] {
 
   if (candidate.trust?.maskedPhone) {
     fallback.push({
-      title: "Phone verification",
-      description: `AfriTalent has a verified phone signal on file: ${candidate.trust.maskedPhone}.`,
-      statusLabel: "Verified",
-      statusVariant: "info" as const,
+      title: t("talent.phoneTitle"),
+      description: t("talent.phoneBody", { phone: candidate.trust.maskedPhone }),
+      statusLabel: t("talent.signalVerified"),
+      statusVariant: "info",
     });
   }
 
   if (candidate.verifiedSkills?.length) {
     fallback.push({
-      title: "Verified skills",
-      description: `${candidate.verifiedSkills.length} skill signal${candidate.verifiedSkills.length === 1 ? "" : "s"} passed evidence-based review.`,
-      statusLabel: "Evidence-backed",
-      statusVariant: "success" as const,
+      title: t("talent.verifiedSkillsTitle"),
+      description:
+        candidate.verifiedSkills.length === 1
+          ? t("talent.verifiedSkillsBody.one")
+          : t("talent.verifiedSkillsBody.other", { count: candidate.verifiedSkills.length }),
+      statusLabel: t("talent.evidenceBacked"),
+      statusVariant: "success",
     });
   }
 
   if (candidate.partnerMarkers?.length) {
     fallback.push({
-      title: "Partner-issued trust marker",
-      description: "An approved university, training, or scholarship partner has added a trust marker to this profile.",
-      statusLabel: "Partner backed",
-      statusVariant: "info" as const,
+      title: t("talent.partnerTitle"),
+      description: t("talent.partnerBody"),
+      statusLabel: t("talent.partnerBacked"),
+      statusVariant: "info",
     });
   }
 
   if (candidate.profileCompleteness >= 80) {
     fallback.push({
-      title: "Complete profile",
-      description: "This candidate has supplied a strong amount of employer-facing profile detail.",
-      statusLabel: "High completeness",
-      statusVariant: "success" as const,
+      title: t("talent.completeTitle"),
+      description: t("talent.completeBody"),
+      statusLabel: t("talent.highCompleteness"),
+      statusVariant: "success",
     });
   }
 
   return fallback.slice(0, 3);
 }
 
-function candidateTrustExplainerItems(candidate: TalentProfile): TrustExplainerItem[] {
+function candidateTrustExplainerItems(candidate: TalentProfile, t: T, ts: (text: string) => string): TrustExplainerItem[] {
   if (candidate.trust?.explainability?.length) {
     return candidate.trust.explainability.map((signal) => ({
-      title: signal.label,
-      description: signal.detail,
-      statusLabel:
-        signal.status === "verified"
-          ? "Verified"
-          : signal.status === "needs_attention"
-            ? "Needs attention"
-            : "Strengthening",
-      statusVariant:
-        signal.status === "verified"
-          ? ("success" as const)
-          : signal.status === "needs_attention"
-            ? ("warning" as const)
-            : ("info" as const),
+      title: ts(signal.label),
+      description: ts(signal.detail),
+      ...signalStatus(signal.status, t),
     }));
   }
-
-  return candidateTrustReasons(candidate);
+  return candidateTrustReasons(candidate, t, ts);
 }
 
 export default function TalentMarketplacePage() {
   const locale = useLocale();
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t, tn, tv, ts, fmt } = useEmployerI18n();
 
   const [data, setData] = useState<TalentSearchResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -157,6 +166,8 @@ export default function TalentMarketplacePage() {
     }
   }, [user, isLoading, router, locale]);
 
+  // Error fallbacks are stored as "" and rendered through t() at paint time,
+  // so these callbacks never depend on the active locale.
   const refreshPools = useCallback(async () => {
     if (!user || user.role !== "EMPLOYER") return;
     setPoolLoading(true);
@@ -171,7 +182,7 @@ export default function TalentMarketplacePage() {
         return response.pools[0]?.id ?? "";
       });
     } catch (err) {
-      setPoolError(err instanceof Error ? err.message : "Failed to load talent pools");
+      setPoolError(err instanceof Error ? err.message : "");
     } finally {
       setPoolLoading(false);
     }
@@ -208,7 +219,7 @@ export default function TalentMarketplacePage() {
         location: location || null,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load candidates");
+      setError(err instanceof Error ? err.message : "");
     } finally {
       setLoading(false);
     }
@@ -223,6 +234,18 @@ export default function TalentMarketplacePage() {
       return () => clearTimeout(debounce);
     }
   }, [fetchTalent, refreshPools, user]);
+
+  const resetFilters = () => {
+    setQuery("");
+    setSkills("");
+    setLocation("");
+    setMinExperience("");
+    setVerifiedOnly(false);
+    setVerifiedSkillsOnly(false);
+    setFullyCompletedOnly(false);
+    setAssessmentBackedOnly(false);
+    setPage(1);
+  };
 
   const toggleCompare = (candidateUserId: string) => {
     setCompareIds((current) => {
@@ -249,7 +272,7 @@ export default function TalentMarketplacePage() {
       });
       setComparison(response);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to compare candidates");
+      setError(err instanceof Error && err.message ? err.message : t("talent.errCompare"));
     } finally {
       setComparisonLoading(false);
     }
@@ -268,7 +291,7 @@ export default function TalentMarketplacePage() {
       setNewPoolDescription("");
       await refreshPools();
     } catch (err) {
-      setPoolError(err instanceof Error ? err.message : "Failed to create talent pool");
+      setPoolError(err instanceof Error && err.message ? err.message : t("talent.errCreatePool"));
     } finally {
       setCreatingPool(false);
     }
@@ -276,7 +299,7 @@ export default function TalentMarketplacePage() {
 
   const saveCandidateToActivePool = async (candidate: TalentProfile) => {
     if (!activePool) {
-      setPoolError("Create or select a talent pool before saving candidates.");
+      setPoolError(t("talent.errNoPool"));
       return;
     }
 
@@ -291,7 +314,7 @@ export default function TalentMarketplacePage() {
       });
       await Promise.all([refreshPools(), fetchTalent()]);
     } catch (err) {
-      setPoolError(err instanceof Error ? err.message : "Failed to add candidate to pool");
+      setPoolError(err instanceof Error && err.message ? err.message : t("talent.errAddToPool"));
     } finally {
       setSavingCandidateId(null);
     }
@@ -309,76 +332,95 @@ export default function TalentMarketplacePage() {
       await talent.updatePoolCandidate(membership.poolId, candidate.user.id, { stage });
       await Promise.all([refreshPools(), fetchTalent()]);
     } catch (err) {
-      setPoolError(err instanceof Error ? err.message : "Failed to update pool stage");
+      setPoolError(err instanceof Error && err.message ? err.message : t("talent.errStage"));
     } finally {
       setSavingCandidateId(null);
     }
   };
 
   if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+    return <PageSpinner />;
   }
 
+  const trustFilters = [
+    {
+      id: "filter-verified",
+      checked: verifiedOnly,
+      onChange: setVerifiedOnly,
+      title: t("talent.filterVerified"),
+      body: FREE_MODE ? t("talent.filterVerifiedBodyFree") : t("talent.filterVerifiedBody"),
+    },
+    {
+      id: "filter-verified-skills",
+      checked: verifiedSkillsOnly,
+      onChange: setVerifiedSkillsOnly,
+      title: t("talent.filterSkills"),
+      body: t("talent.filterSkillsBody"),
+    },
+    {
+      id: "filter-assessment",
+      checked: assessmentBackedOnly,
+      onChange: setAssessmentBackedOnly,
+      title: t("talent.filterAssessment"),
+      body: t("talent.filterAssessmentBody"),
+    },
+    {
+      id: "filter-complete",
+      checked: fullyCompletedOnly,
+      onChange: setFullyCompletedOnly,
+      title: t("talent.filterComplete"),
+      body: t("talent.filterCompleteBody"),
+    },
+  ];
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-fg mb-2">Talent Marketplace</h1>
-        <p className="max-w-3xl text-fg-secondary">
-          Search talent by role intent, trust evidence, and mobility clarity so the shortlist feels smaller, sharper, and safer to act on.
-        </p>
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <header className="mb-8">
+        <Eyebrow className="text-primary-text">{t("talent.eyebrow")}</Eyebrow>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-fg sm:text-4xl">{t("talent.title")}</h1>
+        <p className="mt-3 max-w-3xl text-fg-secondary">{t("talent.subtitle")}</p>
         <div className="mt-4 flex flex-wrap gap-3">
           <Link href={localizePath("/employer/trust", locale)}>
-            <Button variant="outline" size="sm">Employer Trust Profile</Button>
+            <Button variant="outline" size="sm">{t("talent.trustProfile")}</Button>
           </Link>
           <TrustExplainerModal
-            title="How verified candidate filters work"
-            description={
-              FREE_MODE
-                ? "Verified filters help you narrow the market, but candidates only qualify for these filters when they have real approved signals behind them."
-                : "Premium filters help you narrow the market, but candidates only qualify for these filters when they have real approved signals behind them."
-            }
+            title={t("talent.explainerTitle")}
+            description={FREE_MODE ? t("talent.explainerBodyFree") : t("talent.explainerBody")}
             items={[
               {
-                title: "Verified candidates",
-                description: "These profiles passed stronger trust thresholds such as phone, identity, skills, profile consistency, or partner evidence.",
-                statusLabel: "Evidence required",
+                title: t("talent.explainerVerifiedTitle"),
+                description: t("talent.explainerVerifiedBody"),
+                statusLabel: t("talent.evidenceRequired"),
                 statusVariant: "success",
               },
               {
-                title: "Verified skills",
-                description: "Skill badges appear only after certificate, portfolio, assessment, partner, or manual review evidence is accepted.",
-                statusLabel: "Not self-claimed",
+                title: t("talent.verifiedSkillsTitle"),
+                description: t("talent.explainerSkillsBody"),
+                statusLabel: t("talent.notSelfClaimed"),
                 statusVariant: "success",
               },
               {
-                title: "Assessment-backed and complete profiles",
-                description: "These filters highlight candidates with stronger proof and enough profile context to support faster hiring decisions.",
-                statusLabel: "Higher confidence",
+                title: t("talent.explainerAssessmentTitle"),
+                description: t("talent.explainerAssessmentBody"),
+                statusLabel: t("talent.higherConfidence"),
                 statusVariant: "info",
               },
             ]}
-            triggerLabel="How trust filters work"
+            triggerLabel={t("talent.explainerTrigger")}
           />
         </div>
-      </div>
+      </header>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-        <div className="space-y-6">
-          <TrustStatusBanner
-            tone="info"
-            title="Filter for proof, not just keywords"
-            body="AfriTalent now blends semantic role intent, trust signals, and mobility context so recruiters can move from search to a real shortlist faster."
-          />
+        <div className="min-w-0 space-y-6">
+          <TrustStatusBanner tone="info" title={t("talent.bannerTitle")} body={t("talent.bannerBody")} />
 
           <Card>
             <CardContent className="p-6">
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[1.4fr_1fr_1fr_0.8fr]">
                 <Input
-                  placeholder="Describe the role or hiring brief"
+                  aria-label={t("talent.queryLabel")}
+                  placeholder={t("talent.queryPlaceholder")}
                   value={query}
                   onChange={(event) => {
                     setQuery(event.target.value);
@@ -386,7 +428,8 @@ export default function TalentMarketplacePage() {
                   }}
                 />
                 <Input
-                  placeholder="Skills (e.g. React, Python)"
+                  aria-label={t("talent.skillsLabel")}
+                  placeholder={t("talent.skillsPlaceholder")}
                   value={skills}
                   onChange={(event) => {
                     setSkills(event.target.value);
@@ -394,7 +437,8 @@ export default function TalentMarketplacePage() {
                   }}
                 />
                 <Input
-                  placeholder="Target country or market"
+                  aria-label={t("talent.locationLabel")}
+                  placeholder={t("talent.locationPlaceholder")}
                   value={location}
                   onChange={(event) => {
                     setLocation(event.target.value);
@@ -402,122 +446,92 @@ export default function TalentMarketplacePage() {
                   }}
                 />
                 <select
-                  className="w-full rounded-lg border border-line-strong px-4 py-2 transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  aria-label={t("talent.minExperience")}
+                  className={controlClass}
                   value={minExperience}
                   onChange={(event) => {
                     setMinExperience(event.target.value);
                     setPage(1);
                   }}
                 >
-                  <option value="">Min Experience</option>
-                  <option value="1">1+ years</option>
-                  <option value="2">2+ years</option>
-                  <option value="3">3+ years</option>
-                  <option value="5">5+ years</option>
-                  <option value="8">8+ years</option>
-                  <option value="10">10+ years</option>
+                  <option value="">{t("talent.minExperience")}</option>
+                  {EXPERIENCE_OPTIONS.map((years) => (
+                    <option key={years} value={years}>
+                      {t("talent.yearsPlus", { years })}
+                    </option>
+                  ))}
                 </select>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setQuery("");
-                    setSkills("");
-                    setLocation("");
-                    setMinExperience("");
-                    setVerifiedOnly(false);
-                    setVerifiedSkillsOnly(false);
-                    setFullyCompletedOnly(false);
-                    setAssessmentBackedOnly(false);
-                    setPage(1);
-                    setComparison(null);
-                    setCompareIds([]);
-                  }}
-                >
-                  Clear Filters
-                </Button>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 space-y-3">
-                {[
-                  {
-                    checked: verifiedOnly,
-                    onChange: (checked: boolean) => setVerifiedOnly(checked),
-                    title: "Show verified candidates only",
-                    body: FREE_MODE
-                      ? "Employers can filter for verified candidates with stronger verification and authenticity signals."
-                      : "Premium employers can filter for candidates with stronger verification and authenticity signals.",
-                  },
-                  {
-                    checked: verifiedSkillsOnly,
-                    onChange: (checked: boolean) => setVerifiedSkillsOnly(checked),
-                    title: "Require verified skills",
-                    body: "Only show candidates with at least one employer-facing verified skill badge.",
-                  },
-                  {
-                    checked: assessmentBackedOnly,
-                    onChange: (checked: boolean) => setAssessmentBackedOnly(checked),
-                    title: "Assessment-backed candidates",
-                    body: "Prioritize candidates whose trust profile includes verified assessment signals.",
-                  },
-                  {
-                    checked: fullyCompletedOnly,
-                    onChange: (checked: boolean) => setFullyCompletedOnly(checked),
-                    title: "Fully completed profiles",
-                    body: "Show candidates with complete employer-facing trust and profile data.",
-                  },
-                ].map((filter) => (
-                  <label key={filter.title} className="flex items-start gap-3 text-sm text-blue-900">
+              <fieldset className="mt-4 grid gap-3 rounded-2xl border border-line bg-surface-sunken p-4 sm:grid-cols-2">
+                <legend className="sr-only">{t("talent.trustFiltersLegend")}</legend>
+                {trustFilters.map((filter) => (
+                  <label
+                    key={filter.id}
+                    htmlFor={filter.id}
+                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors ${
+                      filter.checked ? "border-success-line bg-primary-soft" : "border-transparent hover:bg-surface"
+                    }`}
+                  >
                     <input
+                      id={filter.id}
                       type="checkbox"
                       checked={filter.checked}
                       onChange={(event) => {
                         filter.onChange(event.target.checked);
                         setPage(1);
                       }}
-                      className="mt-0.5 h-4 w-4 rounded border-blue-300 text-primary-text focus:ring-emerald-500"
+                      className={`mt-0.5 ${checkboxClass}`}
                     />
-                    <span>
-                      <span className="block font-semibold">{filter.title}</span>
-                      <span className="block text-blue-800">{filter.body}</span>
+                    <span className="text-fg-secondary">
+                      <span className="mb-0.5 block font-semibold text-fg">{filter.title}</span>
+                      {filter.body}
                     </span>
                   </label>
                 ))}
-              </div>
+              </fieldset>
 
-              <div className="mt-4 grid gap-3 rounded-2xl border border-line bg-surface-sunken p-4 md:grid-cols-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Semantic search</p>
-                  <p className="mt-2 text-sm text-fg-secondary">
-                    Search by a recruiter brief, not just exact keywords.
-                  </p>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="grid flex-1 gap-3 md:grid-cols-3">
+                  {[
+                    [t("talent.semanticTitle"), t("talent.semanticBody")],
+                    [t("talent.rankingTitle"), t("talent.rankingBody")],
+                    [t("talent.mobilityTitle"), t("talent.mobilityBody")],
+                  ].map(([title, body]) => (
+                    <div key={title}>
+                      <Eyebrow className="tracking-[0.14em]">{title}</Eyebrow>
+                      <p className="mt-1 text-sm text-fg-secondary">{body}</p>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Trust-aware ranking</p>
-                  <p className="mt-2 text-sm text-fg-secondary">
-                    Fit score blends verified skill proof, profile strength, and authenticity posture.
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Mobility clarity</p>
-                  <p className="mt-2 text-sm text-fg-secondary">
-                    Surface relocation and visa readiness before you spend shortlist time.
-                  </p>
-                </div>
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      resetFilters();
+                      setComparison(null);
+                      setCompareIds([]);
+                    }}
+                  >
+                    {t("talent.clearFilters")}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {comparison && (
-            <Card className="border-emerald-200 bg-emerald-50/70">
+            <Card className="border-success-line">
               <CardContent className="p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Comparison summary</p>
-                    <h2 className="mt-2 text-xl font-semibold text-emerald-950">Shortlist comparison deck</h2>
-                    <p className="mt-2 max-w-2xl text-sm text-emerald-900/80">{comparison.comparison.summary}</p>
+                    <Eyebrow className="text-primary-text">{t("talent.comparisonEyebrow")}</Eyebrow>
+                    <h2 className="mt-2 text-xl font-semibold text-fg">{t("talent.comparisonTitle")}</h2>
+                    <p className="mt-2 max-w-2xl text-sm text-fg-secondary">{ts(comparison.comparison.summary)}</p>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => setComparison(null)}>
-                    Clear comparison
+                    {t("talent.clearComparison")}
                   </Button>
                 </div>
                 {comparison.comparison.commonSkills.length > 0 && (
@@ -533,18 +547,18 @@ export default function TalentMarketplacePage() {
 
           {loading && (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+              <Spinner label={t("talent.searching")} />
             </div>
           )}
 
-          {error && (
+          {error !== null && (
             <TrustStatusBanner
               tone="danger"
-              title="We couldn't load talent results"
-              body={error}
+              title={t("talent.errorTitle")}
+              body={error || t("talent.errLoad")}
               actions={
                 <Button size="sm" variant="outline" onClick={() => void fetchTalent()}>
-                  Retry search
+                  {t("talent.retry")}
                 </Button>
               }
             />
@@ -555,99 +569,85 @@ export default function TalentMarketplacePage() {
               {data.semantic?.query && (
                 <TrustStatusBanner
                   tone="success"
-                  title={`Semantic shortlist active for "${data.semantic.query}"`}
-                  body={`${data.semantic.hitCount} indexed semantic signals reinforced these results. Use compare mode before you message finalists.`}
+                  title={t("talent.semanticActive", { query: data.semantic.query })}
+                  body={t("talent.semanticHits", { count: data.semantic.hitCount })}
                 />
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-3 text-fg-secondary">
-                <span>
-                  {data.pagination.total} candidate{data.pagination.total !== 1 ? "s" : ""} found
+                <span className="font-medium text-fg" aria-live="polite">
+                  {tn("talent.found", data.pagination.total)}
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-fg-muted">{compareIds.length}/4 selected for comparison</span>
+                  <span className="text-sm text-fg-muted">{t("talent.selectedForCompare", { count: compareIds.length })}</span>
                   <Button
                     size="sm"
                     variant="outline"
                     disabled={compareIds.length < 2 || comparisonLoading}
                     onClick={() => void runComparison()}
                   >
-                    {comparisonLoading ? "Comparing..." : "Compare Selected"}
+                    {comparisonLoading ? t("talent.comparing") : t("talent.compareSelected")}
                   </Button>
                 </div>
               </div>
 
               {data.candidates.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-line-strong bg-surface-sunken px-6 py-12 text-center">
-                  <div className="w-16 h-16 bg-surface rounded-full flex items-center justify-center mx-auto mb-4 border border-line">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-fg mb-2 font-semibold">No candidates match your current filters</p>
-                  <p className="text-fg-secondary text-sm max-w-xl mx-auto">
-                    Try broadening the brief, location, or trust filters. The best recruiter flow usually starts with a role narrative, then narrows with proof and mobility.
-                  </p>
-                  <div className="mt-5 flex flex-wrap justify-center gap-3">
-                    {hasActiveFilters && (
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setQuery("");
-                          setSkills("");
-                          setLocation("");
-                          setMinExperience("");
-                          setVerifiedOnly(false);
-                          setVerifiedSkillsOnly(false);
-                          setFullyCompletedOnly(false);
-                          setAssessmentBackedOnly(false);
-                          setPage(1);
-                        }}
-                      >
-                        Reset filters
-                      </Button>
-                    )}
-                    <Link href={localizePath("/trust", locale)}>
-                      <Button size="sm">Open trust center</Button>
-                    </Link>
-                  </div>
-                </div>
+                <EmptyPanel title={t("talent.emptyTitle")} description={t("talent.emptyBody")}>
+                  {hasActiveFilters && (
+                    <Button variant="outline" onClick={resetFilters}>
+                      {t("talent.resetFilters")}
+                    </Button>
+                  )}
+                  <Link href={localizePath("/trust", locale)}>
+                    <Button>{t("common.openTrustCenter")}</Button>
+                  </Link>
+                </EmptyPanel>
               ) : (
                 <div className="grid gap-6 md:grid-cols-2">
                   {data.candidates.map((candidate) => {
                     const activeMembership = candidate.poolMemberships.find((membership) => membership.poolId === activePoolId);
                     const selectedForCompare = compareIds.includes(candidate.user.id);
+                    const compareId = `compare-${candidate.user.id}`;
 
                     return (
-                      <Card key={candidate.user.id} className="h-full border border-line bg-white/95 shadow-sm">
-                        <CardContent className="p-6">
+                      <Card
+                        key={candidate.user.id}
+                        className={`h-full transition-shadow hover:shadow-raised ${selectedForCompare ? "ring-2 ring-focus" : ""}`}
+                      >
+                        <CardContent className="flex h-full flex-col p-6">
                           <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <div className="flex flex-wrap items-start gap-2">
-                                <h3 className="font-semibold text-fg text-lg">{candidate.user.name}</h3>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-lg font-semibold text-fg">{candidate.user.name}</h3>
                                 {candidate.trust && (
                                   <TrustBadge
-                                    label={candidate.trust.badge}
+                                    label={ts(candidate.trust.badge)}
                                     riskLevel={candidate.trust.riskLevel}
                                     variant="success"
                                   />
                                 )}
-                                <Badge variant="default">Fit {candidate.match.score}/100</Badge>
                               </div>
-                              {candidate.headline && (
-                                <p className="text-sm text-fg-secondary mt-1">{candidate.headline}</p>
-                              )}
+                              {candidate.headline && <p className="mt-1 text-sm text-fg-secondary">{candidate.headline}</p>}
                             </div>
-                            <label className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-fg-muted">
-                              <input
-                                type="checkbox"
-                                checked={selectedForCompare}
-                                onChange={() => toggleCompare(candidate.user.id)}
-                                className="h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
-                              />
-                              Compare
-                            </label>
+                            <div className="shrink-0 text-end">
+                              <p className="text-2xl font-semibold tabular-nums text-primary-text">{candidate.match.score}</p>
+                              <p className="text-[11px] font-medium uppercase tracking-wide text-fg-muted">{t("talent.fit")}</p>
+                            </div>
                           </div>
+
+                          <label
+                            htmlFor={compareId}
+                            className="mt-3 inline-flex w-fit cursor-pointer items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-fg-muted"
+                          >
+                            <input
+                              id={compareId}
+                              type="checkbox"
+                              checked={selectedForCompare}
+                              onChange={() => toggleCompare(candidate.user.id)}
+                              className={checkboxClass}
+                            />
+                            {t("talent.compare")}
+                          </label>
 
                           {candidate.skills?.length > 0 && (
                             <div className="mt-4 flex flex-wrap gap-1.5">
@@ -662,71 +662,89 @@ export default function TalentMarketplacePage() {
 
                           <div className="mt-4 grid gap-3 sm:grid-cols-2">
                             <div className="rounded-2xl border border-line bg-surface-sunken p-4">
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-fg-muted">Why this matched</p>
-                              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-fg-secondary">
-                                <div className="rounded-xl bg-surface px-3 py-2">Semantic {candidate.match.semanticScore}</div>
-                                <div className="rounded-xl bg-surface px-3 py-2">Skills {candidate.match.skillScore}</div>
-                                <div className="rounded-xl bg-surface px-3 py-2">Trust {candidate.match.trustScore}</div>
-                                <div className="rounded-xl bg-surface px-3 py-2">Mobility {candidate.match.mobilityScore}</div>
-                              </div>
-                              <div className="mt-3 space-y-2">
+                              <Eyebrow className="tracking-[0.14em]">{t("talent.whyMatched")}</Eyebrow>
+                              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                {[
+                                  [t("talent.scoreSemantic"), candidate.match.semanticScore],
+                                  [t("talent.scoreSkills"), candidate.match.skillScore],
+                                  [t("talent.scoreTrust"), candidate.match.trustScore],
+                                  [t("talent.scoreMobility"), candidate.match.mobilityScore],
+                                ].map(([label, value]) => (
+                                  <div key={label} className="rounded-lg bg-surface px-2.5 py-2">
+                                    <dt className="text-fg-muted">{label}</dt>
+                                    <dd className="font-semibold tabular-nums text-fg">{value}</dd>
+                                  </div>
+                                ))}
+                              </dl>
+                              <div className="mt-3 space-y-1.5">
                                 {candidate.match.reasons.map((reason) => (
                                   <p key={`${candidate.user.id}-${reason}`} className="text-xs leading-5 text-fg-secondary">
-                                    {reason}
+                                    {translateReason(reason, t, ts)}
                                   </p>
                                 ))}
                               </div>
                             </div>
 
-                            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">Mobility readiness</p>
+                            <div className="rounded-2xl border border-success-line bg-success-soft p-4">
+                              <Eyebrow className="tracking-[0.14em] text-success">{t("talent.mobilityReadiness")}</Eyebrow>
                               <div className="mt-3 flex items-center justify-between">
-                                <span className="text-sm font-semibold text-emerald-950">{candidate.mobility.label}</span>
-                                <span className="text-sm text-emerald-900">{candidate.mobility.score}/100</span>
+                                <span className="text-sm font-semibold text-fg">{tv("mobility.label", candidate.mobility.label)}</span>
+                                <span className="text-sm tabular-nums text-fg-secondary">{candidate.mobility.score}/100</span>
                               </div>
-                              <div className="mt-3 space-y-2 text-xs leading-5 text-emerald-900">
+                              <div className="mt-3 space-y-1.5 text-xs leading-5 text-fg-secondary">
                                 {candidate.mobility.factors.length > 0 ? (
                                   candidate.mobility.factors.map((factor) => (
                                     <p key={`${candidate.user.id}-${factor}`}>{factor}</p>
                                   ))
                                 ) : (
-                                  <p>Mobility context is still thin. Review the profile before assuming cross-border readiness.</p>
+                                  <p>{t("talent.mobilityThin")}</p>
                                 )}
                               </div>
                               {candidate.mobility.activeProcess && (
-                                <div className="mt-3 rounded-xl bg-surface px-3 py-3 text-xs text-emerald-900">
-                                  Active process: {candidate.mobility.activeProcess.visaType} for {candidate.mobility.activeProcess.targetCountry} ({candidate.mobility.activeProcess.status.toLowerCase().replaceAll("_", " ")})
+                                <div className="mt-3 rounded-lg bg-surface px-3 py-2 text-xs text-fg-secondary">
+                                  {t("talent.activeProcess", {
+                                    visa: candidate.mobility.activeProcess.visaType,
+                                    country: candidate.mobility.activeProcess.targetCountry,
+                                    status: tv("visaProcess", candidate.mobility.activeProcess.status),
+                                  })}
                                 </div>
                               )}
                             </div>
                           </div>
 
-                          <div className="mt-4 space-y-1.5 text-sm text-fg-secondary">
+                          <dl className="mt-4 space-y-1 text-sm text-fg-secondary">
                             {candidate.yearsExperience != null && (
-                              <p>Experience: {candidate.yearsExperience} years</p>
+                              <div className="flex gap-1.5">
+                                <dt className="text-fg-muted">{t("talent.experience")}</dt>
+                                <dd>{tn("common.years", candidate.yearsExperience)}</dd>
+                              </div>
                             )}
                             {candidate.targetCountries?.length > 0 && (
-                              <p>Target markets: {candidate.targetCountries.join(", ")}</p>
+                              <div className="flex gap-1.5">
+                                <dt className="text-fg-muted">{t("talent.targetMarkets")}</dt>
+                                <dd>{candidate.targetCountries.join(", ")}</dd>
+                              </div>
                             )}
                             {candidate.visaStatus && (
-                              <p>Visa note: {candidate.visaStatus}</p>
+                              <div className="flex gap-1.5">
+                                <dt className="text-fg-muted">{t("talent.visaNote")}</dt>
+                                <dd>{candidate.visaStatus}</dd>
+                              </div>
                             )}
-                          </div>
+                          </dl>
 
                           {candidate.trust && (
                             <div className="mt-4 rounded-2xl border border-line bg-surface-sunken p-4">
                               <div className="flex flex-wrap gap-2">
                                 {candidate.trust.premiumFilterEligible && (
-                                  <TrustBadge label="Eligible for verified filters" variant="success" />
+                                  <TrustBadge label={t("talent.badgeEligible")} variant="success" />
                                 )}
-                                {candidate.trust.maskedPhone && (
-                                  <TrustBadge label="Phone verified" variant="info" />
-                                )}
+                                {candidate.trust.maskedPhone && <TrustBadge label={t("talent.badgePhone")} variant="info" />}
                                 {candidate.trust.assessmentBacked && (
-                                  <TrustBadge label="Assessment verified" variant="success" />
+                                  <TrustBadge label={t("talent.badgeAssessment")} variant="success" />
                                 )}
                                 {candidate.trust.fullyCompletedProfile && (
-                                  <TrustBadge label="Complete profile" variant="success" />
+                                  <TrustBadge label={t("talent.badgeComplete")} variant="success" />
                                 )}
                               </div>
 
@@ -735,7 +753,7 @@ export default function TalentMarketplacePage() {
                                   {candidate.verifiedSkills?.slice(0, 3).map((skill) => (
                                     <TrustBadge
                                       key={skill.id}
-                                      label={`${skill.skillName} verified`}
+                                      label={t("talent.skillVerified", { skill: skill.skillName })}
                                       variant="success"
                                     />
                                   ))}
@@ -751,7 +769,7 @@ export default function TalentMarketplacePage() {
                               )}
 
                               <div className="mt-3 space-y-2">
-                                {candidateTrustReasons(candidate).map((reason) => (
+                                {candidateTrustReasons(candidate, t, ts).map((reason) => (
                                   <div key={`${candidate.user.id}-${reason.title}`} className="rounded-xl bg-surface px-3 py-3">
                                     <p className="text-sm font-medium text-fg">{reason.title}</p>
                                     <p className="mt-1 text-xs leading-5 text-fg-secondary">{reason.description}</p>
@@ -761,10 +779,10 @@ export default function TalentMarketplacePage() {
 
                               <div className="mt-3">
                                 <TrustExplainerModal
-                                  title={`Why ${candidate.user.name} looks credible`}
-                                  description="AfriTalent explains trust using multiple evidence-backed signals so you can understand more than just a badge label."
-                                  items={candidateTrustExplainerItems(candidate)}
-                                  triggerLabel="See full trust breakdown"
+                                  title={t("talent.whyCredible", { name: candidate.user.name })}
+                                  description={t("talent.whyCredibleBody")}
+                                  items={candidateTrustExplainerItems(candidate, t, ts)}
+                                  triggerLabel={t("talent.fullBreakdown")}
                                 />
                               </div>
                             </div>
@@ -772,18 +790,18 @@ export default function TalentMarketplacePage() {
 
                           {candidate.poolMemberships.length > 0 && (
                             <div className="mt-4">
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-fg-muted">Current recruiter pools</p>
+                              <Eyebrow className="tracking-[0.14em]">{t("talent.currentPools")}</Eyebrow>
                               <div className="mt-2 flex flex-wrap gap-2">
                                 {candidate.poolMemberships.map((membership) => (
                                   <Badge key={membership.id} variant="default">
-                                    {membership.poolName}: {membership.stage}
+                                    {membership.poolName}: {tv("status.stage", membership.stage)}
                                   </Badge>
                                 ))}
                               </div>
                             </div>
                           )}
 
-                          <div className="mt-5 space-y-3">
+                          <div className="mt-auto space-y-3 pt-5">
                             <div className="flex flex-wrap gap-2">
                               <Button
                                 size="sm"
@@ -791,17 +809,22 @@ export default function TalentMarketplacePage() {
                                 disabled={!activePool || savingCandidateId === candidate.user.id}
                                 onClick={() => void saveCandidateToActivePool(candidate)}
                               >
-                                {activeMembership ? `Refresh ${activePool?.name}` : activePool ? `Save to ${activePool.name}` : "Create a pool first"}
+                                {activeMembership && activePool
+                                  ? t("talent.refreshIn", { pool: activePool.name })
+                                  : activePool
+                                    ? t("talent.saveTo", { pool: activePool.name })
+                                    : t("talent.createPoolFirst")}
                               </Button>
                               {activeMembership && (
                                 <select
-                                  className="rounded-lg border border-line-strong px-3 py-2 text-sm"
+                                  aria-label={t("talent.stageLabel")}
+                                  className={`${controlClass} w-auto py-2`}
                                   value={activeMembership.stage}
                                   onChange={(event) => void updateCandidateStage(candidate, event.target.value)}
                                   disabled={savingCandidateId === candidate.user.id}
                                 >
                                   {TALENT_STAGES.map((stage) => (
-                                    <option key={stage} value={stage}>{stage}</option>
+                                    <option key={stage} value={stage}>{tv("status.stage", stage)}</option>
                                   ))}
                                 </select>
                               )}
@@ -810,7 +833,7 @@ export default function TalentMarketplacePage() {
                             <div className="flex flex-wrap gap-2">
                               <Link href={localizePath(`/employer/talent/${candidate.user.id}`, locale)} className="flex-1">
                                 <Button variant="outline" size="sm" className="w-full">
-                                  View Profile
+                                  {t("talent.viewProfile")}
                                 </Button>
                               </Link>
                               <div className="flex-1">
@@ -830,55 +853,52 @@ export default function TalentMarketplacePage() {
               )}
 
               {data.pagination.totalPages > 1 && (
-                <div className="flex justify-center gap-2">
-                  <Button
-                    variant="outline"
-                    disabled={page === 1}
-                    onClick={() => setPage((current) => current - 1)}
-                  >
-                    Previous
+                <nav className="flex items-center justify-center gap-2" aria-label={t("talent.pagination")}>
+                  <Button variant="outline" disabled={page === 1} onClick={() => setPage((current) => current - 1)}>
+                    {t("common.previous")}
                   </Button>
-                  <span className="flex items-center px-4 text-fg-secondary">
-                    Page {page} of {data.pagination.totalPages}
+                  <span className="px-4 text-sm text-fg-secondary">
+                    {t("talent.pageOf", { page: fmt.number(page), total: fmt.number(data.pagination.totalPages) })}
                   </span>
                   <Button
                     variant="outline"
                     disabled={page === data.pagination.totalPages}
                     onClick={() => setPage((current) => current + 1)}
                   >
-                    Next
+                    {t("common.next")}
                   </Button>
-                </div>
+                </nav>
               )}
             </>
           )}
         </div>
 
-        <div className="space-y-6">
+        <aside className="space-y-6">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Recruiter workspace</p>
-                  <h2 className="mt-2 text-xl font-semibold text-fg">Talent pools</h2>
-                  <p className="mt-2 text-sm text-fg-secondary">
-                    Save strong candidates into reusable pools and move them through a simple sourcing stage flow.
-                  </p>
+                  <Eyebrow>{t("talent.workspaceEyebrow")}</Eyebrow>
+                  <h2 className="mt-2 text-xl font-semibold text-fg">{t("talent.poolsTitle")}</h2>
+                  <p className="mt-2 text-sm text-fg-secondary">{t("talent.poolsBody")}</p>
                 </div>
-                <Badge variant="default">{pools.length} pool{pools.length === 1 ? "" : "s"}</Badge>
+                <Badge variant="default">{tn("talent.poolCount", pools.length)}</Badge>
               </div>
 
-              {poolError && (
-                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  {poolError}
-                </div>
+              {poolError !== null && (
+                <Notice tone="warning" role="alert" className="mt-4">
+                  {poolError || t("talent.errPools")}
+                </Notice>
               )}
 
               {poolLoading ? (
-                <div className="mt-4 text-sm text-fg-muted">Loading pools...</div>
+                <div className="mt-4 flex items-center gap-2 text-sm text-fg-muted">
+                  <Spinner label={t("talent.loadingPools")} />
+                  <span aria-hidden="true">{t("talent.loadingPools")}</span>
+                </div>
               ) : pools.length === 0 ? (
                 <div className="mt-4 rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary">
-                  Create your first talent pool to start capturing semantic shortlist winners.
+                  {t("talent.poolsEmpty")}
                 </div>
               ) : (
                 <div className="mt-4 space-y-3">
@@ -886,19 +906,18 @@ export default function TalentMarketplacePage() {
                     <button
                       key={pool.id}
                       type="button"
+                      aria-pressed={activePoolId === pool.id}
                       onClick={() => setActivePoolId(pool.id)}
-                      className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                      className={`w-full rounded-2xl border px-4 py-4 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                         activePoolId === pool.id
-                          ? "border-emerald-300 bg-emerald-50"
+                          ? "border-success-line bg-primary-soft"
                           : "border-line bg-surface hover:border-line-strong"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-fg">{pool.name}</p>
-                          {pool.description && (
-                            <p className="mt-1 text-sm text-fg-secondary">{pool.description}</p>
-                          )}
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-fg">{pool.name}</p>
+                          {pool.description && <p className="mt-1 text-sm text-fg-secondary">{pool.description}</p>}
                         </div>
                         <Badge variant="default">{pool.candidateCount}</Badge>
                       </div>
@@ -906,7 +925,7 @@ export default function TalentMarketplacePage() {
                         <div className="mt-3 flex flex-wrap gap-2">
                           {pool.recentCandidates.map((candidate) => (
                             <Badge key={candidate.id} variant="default">
-                              {candidate.candidateName} · {candidate.stage}
+                              {candidate.candidateName} · {tv("status.stage", candidate.stage)}
                             </Badge>
                           ))}
                         </div>
@@ -916,50 +935,52 @@ export default function TalentMarketplacePage() {
                 </div>
               )}
 
-              <div className="mt-6 space-y-3 border-t border-line pt-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Create a pool</p>
+              <form
+                className="mt-6 space-y-3 border-t border-line pt-5"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void createPool();
+                }}
+              >
+                <Eyebrow>{t("talent.createPoolEyebrow")}</Eyebrow>
                 <Input
-                  placeholder="Pool name"
+                  aria-label={t("talent.poolName")}
+                  placeholder={t("talent.poolName")}
                   value={newPoolName}
                   onChange={(event) => setNewPoolName(event.target.value)}
                 />
                 <Input
-                  placeholder="What this pool is for"
+                  aria-label={t("talent.poolPurpose")}
+                  placeholder={t("talent.poolPurpose")}
                   value={newPoolDescription}
                   onChange={(event) => setNewPoolDescription(event.target.value)}
                 />
-                <Button
-                  size="sm"
-                  disabled={creatingPool || !newPoolName.trim()}
-                  onClick={() => void createPool()}
-                >
-                  {creatingPool ? "Creating..." : "Create Pool"}
+                <Button type="submit" size="sm" disabled={creatingPool || !newPoolName.trim()}>
+                  {creatingPool ? t("talent.creating") : t("talent.createPool")}
                 </Button>
-              </div>
+              </form>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Comparison flow</p>
-              <h2 className="mt-2 text-xl font-semibold text-fg">Shortlist review</h2>
-              <p className="mt-2 text-sm text-fg-secondary">
-                Select up to four candidates, then compare trust, skills, and mobility context before starting outreach.
-              </p>
+              <Eyebrow>{t("talent.flowEyebrow")}</Eyebrow>
+              <h2 className="mt-2 text-xl font-semibold text-fg">{t("talent.flowTitle")}</h2>
+              <p className="mt-2 text-sm text-fg-secondary">{t("talent.flowBody")}</p>
               <div className="mt-4 rounded-2xl border border-line bg-surface-sunken px-4 py-4 text-sm text-fg-secondary">
-                <p>{compareIds.length} candidate{compareIds.length === 1 ? "" : "s"} selected.</p>
-                <p className="mt-2">Recommended workflow: semantic search, save to pool, compare finalists, then message.</p>
+                <p className="font-medium text-fg">{tn("talent.selectedCount", compareIds.length)}</p>
+                <p className="mt-2">{t("talent.flowTip")}</p>
               </div>
             </CardContent>
           </Card>
-        </div>
+        </aside>
       </div>
 
       <div className="mt-8">
         <TrustSupportCard
           reportHref={localizePath("/trust/report", locale)}
-          title="Need to flag a suspicious profile or hiring interaction?"
-          description="If a candidate seems impersonated, inconsistent, or unsafe, file a trust report. Our moderation team uses those reports together with behavior and verification evidence."
+          title={t("talent.supportTitle")}
+          description={t("talent.supportBody")}
         />
       </div>
     </div>

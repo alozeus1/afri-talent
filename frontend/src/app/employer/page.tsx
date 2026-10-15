@@ -16,24 +16,40 @@ import {
 import * as Tabs from "@radix-ui/react-tabs";
 import { EmployerActivationChecklist } from "@/components/employer/activation-checklist";
 import { EmployerMilestones } from "@/components/employer/activation-milestones";
+import {
+  EmployerHero,
+  EmployerLoadError,
+  EmptyPanel,
+  Eyebrow,
+  Notice,
+  PageSpinner,
+  Spinner,
+  StatCard,
+  StatusPill,
+  heroLinkClass,
+} from "@/components/employer/employer-ui";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { LoadErrorCard } from "@/components/ui/load-error-card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { useEmployerI18n } from "@/lib/i18n/employer-messages";
 import { FREE_MODE } from "@/lib/free-mode";
 
-const statusVariants: Record<string, string> = {
-  DRAFT: "bg-surface-muted text-fg-secondary",
-  PENDING_REVIEW: "bg-amber-100 text-amber-800",
-  PUBLISHED: "bg-emerald-100 text-emerald-800",
-  REJECTED: "bg-rose-100 text-rose-800",
+const statusTones: Record<string, "neutral" | "warning" | "success" | "danger"> = {
+  DRAFT: "neutral",
+  PENDING_REVIEW: "warning",
+  PUBLISHED: "success",
+  REJECTED: "danger",
 };
+
+const TAB_ITEMS = ["overview", "jobs"] as const;
+type DashboardTab = (typeof TAB_ITEMS)[number];
 
 export default function EmployerDashboard() {
   const locale = useLocale();
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t, tn, tv, ts, fmt } = useEmployerI18n();
 
   const [myJobs, setMyJobs] = useState<Job[]>([]);
   const [onboarding, setOnboarding] = useState<EmployerOnboarding | null>(null);
@@ -43,9 +59,7 @@ export default function EmployerDashboard() {
   const [loadError, setLoadError] = useState<unknown>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [jobActionError, setJobActionError] = useState<string | null>(null);
-
-  const [selectedTab, setSelectedTab] = useState("Overview");
-  const tabItems = ["Overview", "Jobs"];
+  const [selectedTab, setSelectedTab] = useState<DashboardTab>("overview");
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "EMPLOYER")) {
@@ -93,368 +107,337 @@ export default function EmployerDashboard() {
       const updated = await jobs.update(jobId, { status: open ? "PUBLISHED" : "DRAFT" });
       setMyJobs((prev) => prev.map((job) => (job.id === jobId ? { ...job, status: updated.status } : job)));
     } catch (err) {
-      setJobActionError(err instanceof Error ? err.message : "Failed to update job status");
+      setJobActionError(err instanceof Error && err.message ? err.message : t("dash.jobStatusFailed"));
     } finally {
       setStatusUpdatingId(null);
     }
   };
 
   if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   const publishedJobs = analytics?.publishedJobs ?? myJobs.filter((job) => job.status === "PUBLISHED").length;
   const totalApplications = analytics?.totalApplications ?? myJobs.reduce((sum, job) => sum + (job._count?.applications || 0), 0);
+  const companyName = user.employer?.companyName;
+  const trustEligible = Boolean(trustDashboard?.trust.postingEligibility);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="rounded-[2rem] bg-[linear-gradient(135deg,#052e2b_0%,#0f766e_58%,#d1fae5_140%)] px-6 py-8 text-white shadow-xl sm:px-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-200">
-              Employer activation cockpit
-            </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              {user.employer?.companyName || "Employer"} hiring command center
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-50/90 sm:text-base">
-              Move from signup to a trusted, high-signal shortlist as quickly as possible. AfriTalent now shows the next action, trust posture, and early ROI signals in one place.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {trustDashboard && (
-                <TrustBadge
-                  label={trustDashboard.trust.badge}
-                  riskLevel={trustDashboard.trust.riskLevel}
-                  variant="success"
-                />
-              )}
-              {trustDashboard?.trust.verifiedDomain && (
-                <TrustBadge label={`Domain verified: ${trustDashboard.trust.verifiedDomain}`} variant="info" />
-              )}
-              {onboarding && (
-                <TrustBadge
-                  label={onboarding.activationState.label}
-                  variant={onboarding.activationState.state === "activated" ? "success" : "info"}
-                />
-              )}
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[320px]">
-            <Link href={localizePath(onboarding?.nextAction.href || "/employer/onboarding", locale)}>
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <EmployerHero
+        eyebrow={t("dash.eyebrow")}
+        title={companyName ? t("dash.titleNamed", { company: companyName }) : t("dash.title")}
+        description={t("dash.subtitle")}
+        aside={
+          <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[340px]">
+            <Link href={localizePath(onboarding?.nextAction.href || "/employer/onboarding", locale)} className="sm:col-span-2">
               <Button className="w-full" size="lg">
-                {onboarding?.nextAction.ctaLabel || "Continue onboarding"}
+                {onboarding?.nextAction.ctaLabel ? ts(onboarding.nextAction.ctaLabel) : t("dash.continueOnboarding")}
               </Button>
             </Link>
-            <Link href={localizePath("/employer/jobs/new", locale)}>
-              <Button className="w-full border-white/30 text-white hover:bg-white/10 hover:text-white" variant="outline" size="lg">
-                Post first credible job
-              </Button>
+            <Link href={localizePath("/employer/jobs/new", locale)} className={heroLinkClass}>
+              {t("dash.postJob")}
             </Link>
-            <Link href={localizePath("/employer/onboarding", locale)}>
-              <Button className="w-full border-white/20 text-white hover:bg-white/10 hover:text-white" variant="outline">
-                Open guided onboarding
-              </Button>
+            <Link href={localizePath("/employer/talent", locale)} className={heroLinkClass}>
+              {t("common.searchTalent")}
             </Link>
-            <Link href={localizePath("/employer/analytics", locale)}>
-              <Button className="w-full border-white/20 text-white hover:bg-white/10 hover:text-white" variant="outline">
-                View hiring ROI
-              </Button>
+            <Link href={localizePath("/employer/analytics", locale)} className={heroLinkClass}>
+              {t("common.viewRoi")}
             </Link>
-            <Link href={localizePath("/employer/integrations", locale)}>
-              <Button className="w-full border-white/20 text-white hover:bg-white/10 hover:text-white" variant="outline">
-                ATS integrations
-              </Button>
+            <Link href={localizePath("/employer/integrations", locale)} className={heroLinkClass}>
+              {t("dash.atsIntegrations")}
             </Link>
           </div>
+        }
+      >
+        <div className="mt-5 flex flex-wrap gap-2">
+          {trustDashboard && (
+            <TrustBadge
+              label={ts(trustDashboard.trust.badge)}
+              riskLevel={trustDashboard.trust.riskLevel}
+              variant="success"
+            />
+          )}
+          {trustDashboard?.trust.verifiedDomain && (
+            <TrustBadge label={t("dash.domainVerified", { domain: trustDashboard.trust.verifiedDomain })} variant="info" />
+          )}
+          {onboarding && (
+            <TrustBadge
+              label={ts(onboarding.activationState.label)}
+              variant={onboarding.activationState.state === "activated" ? "success" : "info"}
+            />
+          )}
         </div>
-      </div>
+      </EmployerHero>
 
       {loadError ? (
-        <LoadErrorCard className="mt-8" error={loadError} subject="your jobs and hiring stats" onRetry={retryLoadDashboard} />
+        <EmployerLoadError className="mt-8" subject={t("dash.loadSubject")} onRetry={retryLoadDashboard} />
       ) : null}
 
       <Tabs.Root
         className="mt-8"
         value={selectedTab}
         orientation="horizontal"
-        onValueChange={(val) => setSelectedTab(val)}
+        onValueChange={(val) => setSelectedTab(val as DashboardTab)}
       >
-        <div className="mb-8 border-b border-line dark:border-zinc-800">
-          <Tabs.List
-            className="flex -mb-px space-x-8 overflow-x-auto hide-scrollbar"
-            aria-label="Employer Dashboard Tabs"
-          >
-            {tabItems.map((item, idx) => (
+        <div className="mb-8 border-b border-line">
+          <Tabs.List className="-mb-px flex gap-8 overflow-x-auto hide-scrollbar" aria-label={t("dash.tabsLabel")}>
+            {TAB_ITEMS.map((item) => (
               <Tabs.Trigger
-                key={idx}
-                className="data-[state=active]:border-emerald-600 data-[state=active]:text-primary-text border-transparent text-fg-muted hover:text-fg-secondary hover:border-line-strong dark:text-gray-400 dark:hover:text-gray-300 dark:data-[state=active]:text-emerald-400 dark:data-[state=active]:border-emerald-400 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+                key={item}
+                className="whitespace-nowrap border-b-2 border-transparent px-1 py-4 text-sm font-medium text-fg-muted transition-colors hover:border-line-strong hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus data-[state=active]:border-primary-text data-[state=active]:text-primary-text"
                 value={item}
               >
-                {item}
+                {item === "overview" ? t("dash.tabOverview") : t("dash.tabJobs", { count: myJobs.length })}
               </Tabs.Trigger>
             ))}
           </Tabs.List>
         </div>
 
-        <Tabs.Content value="Overview">
-          <div className="mt-2 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {[
-          {
-            label: "Published jobs",
-            value: publishedJobs,
-            helper: onboarding?.milestones.firstApprovedJobAt
-              ? `First approved ${new Date(onboarding.milestones.firstApprovedJobAt).toLocaleDateString()}`
-              : "No approved jobs yet",
-          },
-          {
-            label: "Applications received",
-            value: totalApplications,
-            helper: analytics ? `${analytics.shortlistRate}% shortlist rate` : "Monitor early conversion",
-          },
-          {
-            label: "Qualified applicants",
-            value: analytics?.qualifiedApplicants ?? onboarding?.stats.qualifiedApplicants ?? 0,
-            helper: "Shortlisted or accepted talent",
-          },
-          {
-            label: "Time to first qualified shortlist",
-            value:
-              analytics?.timeToFirstQualifiedApplicantHours == null
-                ? "Pending"
-                : `${analytics.timeToFirstQualifiedApplicantHours}h`,
-            helper: "Measured from first approved job",
-          },
-        ].map((stat) => (
-          <Card key={stat.label} className="border-line bg-surface">
-            <CardContent className="p-5">
-              <p className="text-sm text-fg-muted">{stat.label}</p>
-              <p className="mt-2 text-3xl font-semibold text-fg">{stat.value}</p>
-              <p className="mt-2 text-sm text-fg-secondary">{stat.helper}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {onboarding && (
-        <div className="mt-10 space-y-8">
-          <EmployerMilestones
-            milestones={onboarding.milestones}
-            activationState={onboarding.activationState}
-          />
-
-          <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
-            <EmployerActivationChecklist
-              checklist={onboarding.checklist}
-              completionPct={onboarding.completionPct}
-              currentStep={onboarding.currentStep}
-              nextAction={onboarding.nextAction}
+        <Tabs.Content value="overview" className="focus-visible:outline-none">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label={t("stats.publishedJobs")}
+              value={fmt.number(publishedJobs)}
+              helper={
+                onboarding?.milestones.firstApprovedJobAt
+                  ? t("dash.firstApproved", { date: fmt.date(onboarding.milestones.firstApprovedJobAt) })
+                  : t("dash.noApprovedJobs")
+              }
             />
-
-            <div className="space-y-6">
-              <Card className={trustDashboard?.trust.postingEligibility ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/70"}>
-                <CardHeader>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
-                    Trust status
-                  </p>
-                  <h2 className="mt-2 text-lg font-semibold text-fg">
-                    {trustDashboard?.trust.postingEligibility
-                      ? "Public posting is unlocked"
-                      : "Verification still blocks public posting"}
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  {trustDashboard ? (
-                    <>
-                      <p className="text-sm text-fg-secondary">
-                        Authenticity score {trustDashboard.trust.authenticityScore} and risk score {trustDashboard.trust.riskScore}.
-                      </p>
-                      {trustDashboard.trust.warnings.length > 0 && (
-                        <ul className="mt-3 space-y-2 text-sm text-fg-secondary">
-                          {trustDashboard.trust.warnings.map((warning) => (
-                            <li key={warning}>• {warning}</li>
-                          ))}
-                        </ul>
-                      )}
-                      <div className="mt-4">
-                        <Link href={localizePath("/employer/trust", locale)}>
-                          <Button className="w-full">
-                            {trustDashboard.trust.postingEligibility ? "Strengthen trust profile" : "Complete verification"}
-                          </Button>
-                        </Link>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-sm text-fg-secondary">Trust profile unavailable right now.</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {!FREE_MODE && (
-                <Card className="border-line bg-slate-950 text-white">
-                  <CardHeader>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
-                      Upgrade journey
-                    </p>
-                    <h2 className="mt-2 text-lg font-semibold">{onboarding.upgradeJourney.headline}</h2>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-slate-300">{onboarding.upgradeJourney.body}</p>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <Link href={localizePath("/billing", locale)}>
-                        <Button size="sm">{onboarding.upgradeJourney.ctaLabel}</Button>
-                      </Link>
-                      <Link href={localizePath("/employer/talent", locale)}>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-white/20 text-white hover:bg-white/10 hover:text-white"
-                        >
-                          Search talent
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {analytics && (
-                <Card className="border-blue-200 bg-blue-50/70">
-                  <CardHeader>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">
-                      Verification impact
-                    </p>
-                    <h2 className="mt-2 text-lg font-semibold text-blue-950">
-                      {analytics.verificationImpact.qualifiedApplicantRate}% of applications are reaching shortlist quality
-                    </h2>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-blue-900">{analytics.verificationImpact.insight}</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+            <StatCard
+              label={t("stats.applications")}
+              value={fmt.number(totalApplications)}
+              helper={analytics ? t("stats.shortlistRate", { rate: analytics.shortlistRate }) : t("dash.monitorConversion")}
+            />
+            <StatCard
+              label={t("stats.qualifiedApplicants")}
+              value={fmt.number(analytics?.qualifiedApplicants ?? onboarding?.stats.qualifiedApplicants ?? 0)}
+              helper={t("dash.qualifiedHelper")}
+            />
+            <StatCard
+              accent
+              label={t("stats.timeToShortlist")}
+              value={
+                analytics?.timeToFirstQualifiedApplicantHours == null
+                  ? t("common.pending")
+                  : t("common.hours", { hours: analytics.timeToFirstQualifiedApplicantHours })
+              }
+              helper={t("stats.timeToShortlistHelper")}
+            />
           </div>
-        </div>
-        )}
-        </Tabs.Content>
 
-        <Tabs.Content value="Jobs">
-          <div className="mt-2">
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
-                  Live job board
-                </p>
-                <h2 className="mt-2 text-xl font-semibold text-fg">Current openings and trust posture</h2>
-              </div>
-              <Link href={localizePath("/employer/jobs/new", locale)}>
-                <Button>Post new job</Button>
-              </Link>
+          {loading && !onboarding && (
+            <div className="mt-10 flex justify-center">
+              <Spinner />
             </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-emerald-600" />
-              </div>
-            ) : loadError ? (
-              <LoadErrorCard error={loadError} subject="your jobs" onRetry={retryLoadDashboard} />
-            ) : myJobs.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-line-strong bg-surface-sunken px-6 py-10 text-center">
-                <p className="text-lg font-semibold text-fg">No jobs live yet</p>
-                <p className="mt-2 text-sm text-fg-secondary">
-                  Finish onboarding, preview quality, and publish the first role built to attract qualified applicants.
-                </p>
-                <div className="mt-5 flex justify-center gap-3">
-                  <Link href={localizePath("/employer/onboarding", locale)}>
-                    <Button variant="outline">Open onboarding</Button>
-                  </Link>
-                  <Link href={localizePath("/employer/jobs/new", locale)}>
-                    <Button>Create first job</Button>
-                  </Link>
+          )}
+
+          {onboarding && (
+            <div className="mt-10 space-y-8">
+              <EmployerMilestones milestones={onboarding.milestones} activationState={onboarding.activationState} />
+
+              <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
+                <EmployerActivationChecklist
+                  checklist={onboarding.checklist}
+                  completionPct={onboarding.completionPct}
+                  currentStep={onboarding.currentStep}
+                  nextAction={onboarding.nextAction}
+                />
+
+                <div className="space-y-6">
+                  <Card className={trustEligible ? "border-success-line" : "border-warning-line"}>
+                    <CardHeader>
+                      <Eyebrow>{t("dash.trustStatus")}</Eyebrow>
+                      <h2 className="mt-2 text-lg font-semibold text-fg">
+                        {trustEligible ? t("dash.postingUnlocked") : t("dash.postingBlocked")}
+                      </h2>
+                    </CardHeader>
+                    <CardContent>
+                      {trustDashboard ? (
+                        <>
+                          <p className="text-sm text-fg-secondary">
+                            {t("dash.scores", {
+                              authenticity: trustDashboard.trust.authenticityScore,
+                              risk: trustDashboard.trust.riskScore,
+                            })}
+                          </p>
+                          {trustDashboard.trust.warnings.length > 0 && (
+                            <ul className="mt-3 space-y-2 text-sm text-fg-secondary">
+                              {trustDashboard.trust.warnings.map((warning) => (
+                                <li key={warning} className="flex gap-2">
+                                  <span aria-hidden="true" className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
+                                  <span>{ts(warning)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          <div className="mt-4">
+                            <Link href={localizePath("/employer/trust", locale)}>
+                              <Button className="w-full" variant={trustEligible ? "outline" : "primary"}>
+                                {trustEligible ? t("dash.strengthenTrust") : t("common.completeVerification")}
+                              </Button>
+                            </Link>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm text-fg-secondary">{t("dash.trustUnavailable")}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {!FREE_MODE && (
+                    <Card>
+                      <CardHeader>
+                        <Eyebrow className="text-primary-text">{t("dash.upgradeJourney")}</Eyebrow>
+                        <h2 className="mt-2 text-lg font-semibold text-fg">{ts(onboarding.upgradeJourney.headline)}</h2>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-fg-secondary">{ts(onboarding.upgradeJourney.body)}</p>
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          {onboarding.upgradeJourney.ctaLabel && (
+                            <Link href={localizePath("/billing", locale)}>
+                              <Button size="sm">{ts(onboarding.upgradeJourney.ctaLabel)}</Button>
+                            </Link>
+                          )}
+                          <Link href={localizePath("/employer/talent", locale)}>
+                            <Button size="sm" variant="outline">
+                              {t("common.searchTalent")}
+                            </Button>
+                          </Link>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {analytics && (
+                    <Card className="border-info-line">
+                      <CardHeader>
+                        <Eyebrow className="text-info">{t("impact.eyebrow")}</Eyebrow>
+                        <h2 className="mt-2 text-lg font-semibold text-fg">
+                          {t("impact.title", { rate: analytics.verificationImpact.qualifiedApplicantRate })}
+                        </h2>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-fg-secondary">
+                          {analytics.verificationImpact.verified
+                            ? t("impact.verified", { rate: analytics.verificationImpact.qualifiedApplicantRate })
+                            : t("impact.unverified")}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {jobActionError && (
-                  <p role="alert" className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{jobActionError}</p>
-                )}
-                {myJobs.map((job) => (
-                  <div
-                    key={job.id}
-                    className="flex flex-col gap-4 rounded-3xl border border-line bg-surface px-5 py-5 lg:flex-row lg:items-center lg:justify-between"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold text-fg">{job.title}</h3>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusVariants[job.status] || "bg-surface-muted text-fg-secondary"}`}>
-                          {job.status.replace(/_/g, " ")}
-                        </span>
-                        {job.trust?.companyReviewed && (
-                          <TrustBadge label="Company reviewed" variant="info" />
-                        )}
-                        {job.trust?.jobQualityChecked && (
-                          <TrustBadge label="Quality checked" variant="success" />
-                        )}
-                        {job.trust?.newEmployerCaution && (
-                          <TrustBadge label="New employer caution" riskLevel="MEDIUM" variant="warning" />
-                        )}
-                      </div>
-                      <p className="mt-2 text-sm text-fg-secondary">
-                        {job.location} • {job.type} • {job.seniority}
-                      </p>
-                      <p className="mt-1 text-sm text-fg-muted">
-                        {job._count?.applications || 0} application(s) • Created {new Date(job.createdAt).toLocaleDateString()}
-                      </p>
-                      {job.trust?.guidance && (
-                        <p className="mt-3 text-sm text-fg-secondary">{job.trust.guidance}</p>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                      {(job.status === "PUBLISHED" || (job._count?.applications ?? 0) > 0) && (
-                        <Link href={localizePath(`/employer/jobs/${job.id}/applications`, locale)}>
-                          <Button variant="outline">View applications</Button>
-                        </Link>
-                      )}
-                      <Link href={localizePath(`/employer/jobs/${job.id}/edit`, locale)}>
-                        <Button variant="outline">Edit</Button>
-                      </Link>
-                      {job.status === "PUBLISHED" && (
-                        <Button
-                          variant="outline"
-                          disabled={statusUpdatingId === job.id}
-                          onClick={() => void setJobOpen(job.id, false)}
-                        >
-                          {statusUpdatingId === job.id ? "Closing..." : "Close job"}
-                        </Button>
-                      )}
-                      {job.status === "DRAFT" && (
-                        <Button
-                          variant="outline"
-                          disabled={statusUpdatingId === job.id}
-                          onClick={() => void setJobOpen(job.id, true)}
-                        >
-                          {statusUpdatingId === job.id ? "Reopening..." : "Reopen job"}
-                        </Button>
-                      )}
-                      <Link href={localizePath("/employer/analytics", locale)}>
-                        <Button variant="outline">View ROI</Button>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
+            </div>
+          )}
+        </Tabs.Content>
+
+        <Tabs.Content value="jobs" className="focus-visible:outline-none">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <Eyebrow>{t("dash.jobsEyebrow")}</Eyebrow>
+                  <h2 className="mt-2 text-xl font-semibold text-fg">{t("dash.jobsTitle")}</h2>
+                </div>
+                <Link href={localizePath("/employer/jobs/new", locale)}>
+                  <Button>{t("dash.postNewJob")}</Button>
+                </Link>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <Spinner />
+                </div>
+              ) : loadError ? (
+                <EmployerLoadError subject={t("dash.loadJobsSubject")} onRetry={retryLoadDashboard} />
+              ) : myJobs.length === 0 ? (
+                <EmptyPanel title={t("dash.emptyTitle")} description={t("dash.emptyBody")}>
+                  <Link href={localizePath("/employer/onboarding", locale)}>
+                    <Button variant="outline">{t("dash.openOnboarding")}</Button>
+                  </Link>
+                  <Link href={localizePath("/employer/jobs/new", locale)}>
+                    <Button>{t("common.createFirstJob")}</Button>
+                  </Link>
+                </EmptyPanel>
+              ) : (
+                <div className="space-y-4">
+                  {jobActionError && (
+                    <Notice tone="danger" role="alert">
+                      {jobActionError}
+                    </Notice>
+                  )}
+                  <ul className="space-y-4">
+                    {myJobs.map((job) => {
+                      const applicationCount = job._count?.applications || 0;
+                      return (
+                        <li
+                          key={job.id}
+                          className="flex flex-col gap-4 rounded-2xl border border-line bg-surface px-5 py-5 transition-shadow hover:shadow-card lg:flex-row lg:items-center lg:justify-between"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-lg font-semibold text-fg">{job.title}</h3>
+                              <StatusPill tone={statusTones[job.status] ?? "neutral"}>{tv("status.job", job.status)}</StatusPill>
+                              {job.trust?.companyReviewed && <TrustBadge label={t("dash.companyReviewed")} variant="info" />}
+                              {job.trust?.jobQualityChecked && <TrustBadge label={t("dash.qualityChecked")} variant="success" />}
+                              {job.trust?.newEmployerCaution && (
+                                <TrustBadge label={t("dash.newEmployerCaution")} riskLevel="MEDIUM" variant="warning" />
+                              )}
+                            </div>
+                            <p className="mt-2 text-sm text-fg-secondary">
+                              {[job.location, tv("opt.jobType", job.type), tv("opt.seniority", job.seniority)]
+                                .filter(Boolean)
+                                .join(" • ")}
+                            </p>
+                            <p className="mt-1 text-sm text-fg-muted">
+                              {tn("dash.applicationCount", applicationCount)} •{" "}
+                              {t("dash.createdOn", { date: fmt.date(job.createdAt) })}
+                            </p>
+                            {job.trust?.guidance && <p className="mt-3 text-sm text-fg-secondary">{ts(job.trust.guidance)}</p>}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {(job.status === "PUBLISHED" || applicationCount > 0) && (
+                              <Link href={localizePath(`/employer/jobs/${job.id}/applications`, locale)}>
+                                <Button size="sm">{t("dash.viewApplications")}</Button>
+                              </Link>
+                            )}
+                            <Link href={localizePath(`/employer/jobs/${job.id}/edit`, locale)}>
+                              <Button size="sm" variant="outline">
+                                {t("common.edit")}
+                              </Button>
+                            </Link>
+                            {job.status === "PUBLISHED" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={statusUpdatingId === job.id}
+                                onClick={() => void setJobOpen(job.id, false)}
+                              >
+                                {statusUpdatingId === job.id ? t("dash.closing") : t("dash.closeJob")}
+                              </Button>
+                            )}
+                            {job.status === "DRAFT" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={statusUpdatingId === job.id}
+                                onClick={() => void setJobOpen(job.id, true)}
+                              >
+                                {statusUpdatingId === job.id ? t("dash.reopening") : t("dash.reopenJob")}
+                              </Button>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </Tabs.Content>
       </Tabs.Root>
     </div>

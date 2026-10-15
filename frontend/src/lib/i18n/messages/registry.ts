@@ -6,6 +6,11 @@ import auth from "./auth";
 import candidate from "./candidate";
 import common from "./common";
 import companies from "./companies";
+import employer from "./employer";
+import employerInsights from "./employerInsights";
+import employerJobs from "./employerJobs";
+import employerSetup from "./employerSetup";
+import employerTalent from "./employerTalent";
 import home from "./home";
 import interviews from "./interviews";
 import jobs from "./jobs";
@@ -30,8 +35,16 @@ export const SITE_NAMESPACES = {
   companies,
 } as const;
 
-/** Area namespaces with their own hooks (useAdminT, useSupportT). */
-export const AREA_NAMESPACES = { admin, support } as const;
+/** Area namespaces with their own hooks (useAdminT, useSupportT, useEmployerI18n). */
+export const AREA_NAMESPACES = {
+  admin,
+  support,
+  employer,
+  employerJobs,
+  employerTalent,
+  employerSetup,
+  employerInsights,
+} as const;
 
 export const ALL_NAMESPACES: Record<string, Record<SupportedLocale, Record<string, string>>> = {
   ...SITE_NAMESPACES,
