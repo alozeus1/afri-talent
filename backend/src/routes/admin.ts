@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { checkPermission, createAuditLog, enforceAdminRbac } from "../middleware/admin-rbac.js";
+import { moderationData, updateCompanyRatings } from "../lib/reviews/ratings.js";
 import {
   AbuseReportStatus,
   AccountRestrictionStatus,
@@ -768,11 +769,23 @@ router.put("/resources/:id/publish", async (req: Request, res: Response) => {
 // GET /api/admin/reviews - List all company reviews with filters
 router.get("/reviews", async (req: Request, res: Response) => {
   try {
-    const { isApproved, page = "1", limit = "20" } = req.query;
+    const { page = "1", limit = "20" } = req.query;
+    // `status` (pending|approved|rejected) is preferred; `isApproved` /
+    // `approved` are accepted for older clients.
+    const status = typeof req.query.status === "string" ? req.query.status.toLowerCase() : undefined;
+    const approvedParam = req.query.isApproved ?? req.query.approved;
 
     const where: any = {};
-    if (isApproved !== undefined) {
-      where.isApproved = isApproved === "true";
+    if (status === "pending") {
+      where.isApproved = false;
+      where.rejectedAt = null;
+    } else if (status === "approved") {
+      where.isApproved = true;
+    } else if (status === "rejected") {
+      where.isApproved = false;
+      where.rejectedAt = { not: null };
+    } else if (approvedParam !== undefined) {
+      where.isApproved = approvedParam === "true";
     }
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
@@ -797,7 +810,17 @@ router.get("/reviews", async (req: Request, res: Response) => {
     ]);
 
     res.json({
-      reviews,
+      // Flattened fields keep the moderation UI simple; raw fields stay for
+      // any existing consumer.
+      reviews: reviews.map((review) => ({
+        ...review,
+        companyName: review.company?.name ?? "Unknown company",
+        reviewerName: review.user?.name ?? "Anonymous",
+        reviewerEmail: review.user?.email ?? null,
+        rating: review.overallRating,
+        approved: review.isApproved,
+        moderationStatus: review.isApproved ? "APPROVED" : review.rejectedAt ? "REJECTED" : "PENDING",
+      })),
       pagination: {
         page: parseInt(page as string),
         limit: parseInt(limit as string),
@@ -831,10 +854,11 @@ router.put("/reviews/:id/moderate", async (req: Request, res: Response) => {
 
     const updatedReview = await prisma.companyReview.update({
       where: { id: req.params.id },
-      data: {
-        isApproved: data.action === "approve",
-      },
+      data: moderationData(data.action === "approve"),
     });
+
+    // Keep /companies/:id ratings in step with moderation decisions.
+    await updateCompanyRatings(updatedReview.companyId);
 
     res.json(updatedReview);
   } catch (error) {

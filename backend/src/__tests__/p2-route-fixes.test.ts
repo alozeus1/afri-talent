@@ -59,7 +59,10 @@ vi.mock("../lib/prisma.js", () => ({
       update: vi.fn(),
       updateMany: vi.fn(),
       findMany: vi.fn(),
+      findFirst: vi.fn(),
     },
+    companyReviewHelpfulVote: { create: vi.fn() },
+    $transaction: vi.fn(async (ops: unknown) => (Array.isArray(ops) ? Promise.all(ops) : ops)),
     companyRatingAggregate: {
       upsert: vi.fn(),
       deleteMany: vi.fn(),
@@ -258,21 +261,25 @@ describe("company review moderation", () => {
 
 describe("helpful endpoints", () => {
   it("scopes company review votes to the company and approved reviews", async () => {
-    db.companyReview.updateMany.mockResolvedValueOnce({ count: 1 });
+    db.companyReview.findFirst.mockResolvedValueOnce({ id: "rev_1", userId: "someone_else", helpfulCount: 0 });
+    db.companyReviewHelpfulVote.create.mockResolvedValueOnce({ id: "vote_1" });
+    db.companyReview.update.mockResolvedValueOnce({ helpfulCount: 1 });
 
     const res = await request(app)
       .post("/api/companies/co_1/reviews/rev_1/helpful")
       .set("Authorization", `Bearer ${candidateToken()}`);
 
     expect(res.status).toBe(200);
-    expect(db.companyReview.updateMany).toHaveBeenCalledWith({
-      where: { id: "rev_1", companyId: "co_1", isApproved: true },
-      data: { helpfulCount: { increment: 1 } },
-    });
+    expect(db.companyReview.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "rev_1", companyId: "co_1", isApproved: true } }),
+    );
+    expect(db.companyReview.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "rev_1" }, data: { helpfulCount: { increment: 1 } } }),
+    );
   });
 
   it("returns 404 when the company review does not match", async () => {
-    db.companyReview.updateMany.mockResolvedValueOnce({ count: 0 });
+    db.companyReview.findFirst.mockResolvedValueOnce(null);
 
     const res = await request(app)
       .post("/api/companies/co_1/reviews/nope/helpful")

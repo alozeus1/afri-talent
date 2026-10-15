@@ -3,11 +3,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Router } from "express";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { authenticate, authorize } from "../middleware/auth.js";
+import { authenticate, authorize, optionalAuth } from "../middleware/auth.js";
 import prisma from "../lib/prisma.js";
 import { employerBadgeLabel } from "../lib/trust/risk.js";
 import { helpfulVoteLimiter } from "../middleware/security.js";
+import { moderationData, updateCompanyRatings } from "../lib/reviews/ratings.js";
 
 const router = Router();
 
@@ -32,6 +34,55 @@ const CompanyReviewSchema = z.object({
   jobTitle: z.string().max(100).optional(),
   yearsAtCompany: z.number().int().min(0).max(50).optional(),
 });
+
+// Fields a public review card needs. Never exposes the reviewer identity.
+const publicReviewSelect = {
+  id: true,
+  overallRating: true,
+  cultureRating: true,
+  salaryRating: true,
+  workLifeRating: true,
+  managementRating: true,
+  growthRating: true,
+  title: true,
+  pros: true,
+  cons: true,
+  advice: true,
+  isCurrentEmployee: true,
+  employmentStatus: true,
+  jobTitle: true,
+  yearsAtCompany: true,
+  helpfulCount: true,
+  createdAt: true,
+} satisfies Prisma.CompanyReviewSelect;
+
+// Employer profiles (self-serve hiring accounts) have no Company row of their
+// own. Reviews for them are stored against a "shadow" Company that shares the
+// employer's id, created lazily on the first review. The list and detail
+// endpoints below merge that shadow row back into the employer profile.
+async function resolveReviewableCompanyId(id: string): Promise<string | null> {
+  const company = await prisma.company.findUnique({ where: { id }, select: { id: true } });
+  if (company) return company.id;
+
+  const employer = await prisma.employer.findUnique({
+    where: { id },
+    select: { id: true, companyName: true, website: true, location: true },
+  });
+  if (!employer) return null;
+
+  const shadow = await prisma.company.upsert({
+    where: { id: employer.id },
+    create: {
+      id: employer.id,
+      name: employer.companyName,
+      website: employer.website,
+      headquarters: employer.location,
+    },
+    update: {},
+    select: { id: true },
+  });
+  return shadow.id;
+}
 
 // GET /api/companies - List companies with ratings
 router.get("/", async (req, res) => {
@@ -101,7 +152,14 @@ router.get("/", async (req, res) => {
       : [];
     const africaEmployerIds = new Set(africaGroups.map((g) => g.employerId));
 
-    const normalizedCompanies = companies.map((company) => ({
+    // Shadow companies (same id as an employer) only carry reviews; surface
+    // their ratings on the employer card instead of listing them twice.
+    const employerIds = new Set(employers.map((e) => e.id));
+    const shadowById = new Map(
+      companies.filter((c) => employerIds.has(c.id)).map((c) => [c.id, c]),
+    );
+
+    const normalizedCompanies = companies.filter((c) => !employerIds.has(c.id)).map((company) => ({
       ...company,
       companyName: company.name,
       headquarters: company.headquarters,
@@ -123,7 +181,8 @@ router.get("/", async (req, res) => {
       trustBadge: employer.trustProfile
         ? employerBadgeLabel(employer.trustProfile.verificationLevel)
         : "Unverified employer",
-      ratingAggregate: null,
+      ratingAggregate: shadowById.get(employer.id)?.ratingAggregate ?? null,
+      _count: { reviews: shadowById.get(employer.id)?._count.reviews ?? 0 },
       profileType: "EMPLOYER" as const,
       jobCount: employer._count.jobs,
       logoUrl: employer.logoUrl,
@@ -158,45 +217,29 @@ router.get("/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
-    const company = await prisma.company.findUnique({
-      where: { id },
-      include: {
-        ratingAggregate: true,
-        reviews: {
-          where: { isApproved: true },
-          orderBy: { createdAt: "desc" },
-          take: 10,
-          select: {
-            id: true,
-            overallRating: true,
-            cultureRating: true,
-            salaryRating: true,
-            workLifeRating: true,
-            title: true,
-            pros: true,
-            cons: true,
-            isCurrentEmployee: true,
-            jobTitle: true,
-            helpfulCount: true,
-            createdAt: true,
+    const [company, employer] = await Promise.all([
+      prisma.company.findUnique({
+        where: { id },
+        include: {
+          ratingAggregate: true,
+          reviews: {
+            where: { isApproved: true },
+            orderBy: { createdAt: "desc" },
+            take: 10,
+            select: publicReviewSelect,
           },
         },
-      },
-    });
-
-    if (!company) {
-      const employer = await prisma.employer.findUnique({
+      }),
+      prisma.employer.findUnique({
         where: { id },
         include: {
           trustProfile: true,
           _count: { select: { jobs: { where: { status: "PUBLISHED" } } } },
         },
-      });
+      }),
+    ]);
 
-      if (!employer) {
-        return res.status(404).json({ error: "Company not found" });
-      }
-
+    if (employer) {
       const africaJobCount = await prisma.job.count({
         where: { employerId: employer.id, status: "PUBLISHED", hiresFromAfrica: true },
       });
@@ -216,8 +259,9 @@ router.get("/:id", async (req, res) => {
           trustBadge: employer.trustProfile
             ? employerBadgeLabel(employer.trustProfile.verificationLevel)
             : "Unverified employer",
-          ratingAggregate: null,
-          reviews: [],
+          // Reviews live on the employer's shadow Company row, if any.
+          ratingAggregate: company?.ratingAggregate ?? null,
+          reviews: company?.reviews ?? [],
           jobCount: employer._count.jobs,
           profileType: "EMPLOYER",
           logoUrl: employer.logoUrl,
@@ -225,6 +269,10 @@ router.get("/:id", async (req, res) => {
           accentColor: employer.accentColor,
         },
       });
+    }
+
+    if (!company) {
+      return res.status(404).json({ error: "Company not found" });
     }
 
     // Get job count from this company
@@ -255,7 +303,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // GET /api/companies/:id/reviews - Get paginated reviews for a company
-router.get("/:id/reviews", async (req, res) => {
+router.get("/:id/reviews", optionalAuth, async (req, res) => {
   const { id } = req.params;
   const page = parseInt(req.query.page as string) || 1;
   const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
@@ -272,31 +320,23 @@ router.get("/:id/reviews", async (req, res) => {
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
-        select: {
-          id: true,
-          overallRating: true,
-          cultureRating: true,
-          salaryRating: true,
-          workLifeRating: true,
-          managementRating: true,
-          growthRating: true,
-          title: true,
-          pros: true,
-          cons: true,
-          advice: true,
-          isCurrentEmployee: true,
-          employmentStatus: true,
-          jobTitle: true,
-          yearsAtCompany: true,
-          helpfulCount: true,
-          createdAt: true,
-        },
+        select: publicReviewSelect,
       }),
       prisma.companyReview.count({ where: { companyId: id, isApproved: true } }),
     ]);
 
+    // Let a signed-in reader see which reviews they already marked helpful.
+    let votedIds = new Set<string>();
+    if (req.user && reviews.length > 0) {
+      const votes = await prisma.companyReviewHelpfulVote.findMany({
+        where: { userId: req.user.userId, reviewId: { in: reviews.map((r) => r.id) } },
+        select: { reviewId: true },
+      });
+      votedIds = new Set(votes.map((v) => v.reviewId));
+    }
+
     res.json({
-      reviews,
+      reviews: reviews.map((r) => ({ ...r, votedByViewer: votedIds.has(r.id) })),
       pagination: {
         page,
         limit,
@@ -320,24 +360,24 @@ router.post("/:id/reviews", authenticate, authorize("CANDIDATE"), async (req, re
   }
 
   try {
-    // Check if company exists
-    const company = await prisma.company.findUnique({ where: { id: companyId } });
-    if (!company) {
+    // Directory company, or an employer profile (reviewed via its shadow row).
+    const reviewableId = await resolveReviewableCompanyId(companyId);
+    if (!reviewableId) {
       return res.status(404).json({ error: "Company not found" });
     }
 
     // Check if user already reviewed this company
     const existingReview = await prisma.companyReview.findFirst({
-      where: { companyId, userId },
+      where: { companyId: reviewableId, userId },
     });
     if (existingReview) {
-      return res.status(400).json({ error: "You have already reviewed this company" });
+      return res.status(409).json({ error: "You have already reviewed this company" });
     }
 
     // Create review (requires approval)
     const review = await prisma.companyReview.create({
       data: {
-        companyId,
+        companyId: reviewableId,
         userId,
         ...parsed.data,
         isApproved: false, // Requires moderation
@@ -354,25 +394,79 @@ router.post("/:id/reviews", authenticate, authorize("CANDIDATE"), async (req, re
 });
 
 // POST /api/companies/:id/reviews/:reviewId/helpful - Mark review as helpful
+// One vote per user per review (CompanyReviewHelpfulVote unique userId+reviewId).
+// Re-voting is idempotent: it returns the current count with alreadyVoted.
 router.post("/:id/reviews/:reviewId/helpful", authenticate, helpfulVoteLimiter, async (req, res) => {
   const { id: companyId, reviewId } = req.params;
+  const userId = req.user!.userId;
 
   try {
-    // Scope to the company in the URL and to approved reviews only; updateMany
-    // returns count 0 (instead of throwing P2025) when nothing matches.
-    const result = await prisma.companyReview.updateMany({
+    // Scope to the company in the URL and to approved reviews only.
+    const review = await prisma.companyReview.findFirst({
       where: { id: reviewId, companyId, isApproved: true },
-      data: { helpfulCount: { increment: 1 } },
+      select: { id: true, userId: true, helpfulCount: true },
     });
+    if (!review) {
+      res.status(404).json({ error: "Review not found" });
+      return;
+    }
+    if (review.userId === userId) {
+      res.status(400).json({ error: "You can't mark your own review as helpful" });
+      return;
+    }
 
-    if (result.count === 0) {
+    try {
+      const [, updated] = await prisma.$transaction([
+        prisma.companyReviewHelpfulVote.create({ data: { userId, reviewId } }),
+        prisma.companyReview.update({
+          where: { id: reviewId },
+          data: { helpfulCount: { increment: 1 } },
+          select: { helpfulCount: true },
+        }),
+      ]);
+      res.json({ success: true, voted: true, alreadyVoted: false, helpfulCount: updated.helpfulCount });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        res.json({ success: true, voted: true, alreadyVoted: true, helpfulCount: review.helpfulCount });
+        return;
+      }
+      throw error;
+    }
+  } catch (error) {
+    res.status(500).json({ error: "Failed to mark review as helpful" });
+  }
+});
+
+// DELETE /api/companies/:id/reviews/:reviewId/helpful - Withdraw a helpful vote
+router.delete("/:id/reviews/:reviewId/helpful", authenticate, helpfulVoteLimiter, async (req, res) => {
+  const { id: companyId, reviewId } = req.params;
+  const userId = req.user!.userId;
+
+  try {
+    const review = await prisma.companyReview.findFirst({
+      where: { id: reviewId, companyId },
+      select: { id: true },
+    });
+    if (!review) {
       res.status(404).json({ error: "Review not found" });
       return;
     }
 
-    res.json({ success: true });
+    const helpfulCount = await prisma.$transaction(async (tx) => {
+      const removed = await tx.companyReviewHelpfulVote.deleteMany({ where: { userId, reviewId } });
+      if (removed.count > 0) {
+        await tx.companyReview.updateMany({
+          where: { id: reviewId, helpfulCount: { gt: 0 } },
+          data: { helpfulCount: { decrement: 1 } },
+        });
+      }
+      const current = await tx.companyReview.findUnique({ where: { id: reviewId }, select: { helpfulCount: true } });
+      return current?.helpfulCount ?? 0;
+    });
+
+    res.json({ success: true, voted: false, helpfulCount });
   } catch (error) {
-    res.status(500).json({ error: "Failed to mark review as helpful" });
+    res.status(500).json({ error: "Failed to remove helpful vote" });
   }
 });
 
@@ -388,7 +482,7 @@ router.patch("/:id/reviews/:reviewId/moderate", authenticate, authorize("ADMIN")
   try {
     const review = await prisma.companyReview.update({
       where: { id: reviewId },
-      data: { isApproved: parsed.data.approved },
+      data: moderationData(parsed.data.approved),
     });
 
     // Recompute on both approve and reject so un-approving a review removes
@@ -404,39 +498,5 @@ router.patch("/:id/reviews/:reviewId/moderate", authenticate, authorize("ADMIN")
     res.status(500).json({ error: "Failed to moderate review" });
   }
 });
-
-// Helper: Update company rating aggregates
-async function updateCompanyRatings(companyId: string) {
-  const reviews = await prisma.companyReview.findMany({
-    where: { companyId, isApproved: true },
-  });
-
-  if (reviews.length === 0) {
-    await prisma.companyRatingAggregate.deleteMany({ where: { companyId } });
-    return;
-  }
-
-  const avg = (arr: (number | null)[]) => {
-    const valid = arr.filter((v): v is number => v !== null);
-    return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : null;
-  };
-
-  const aggregates = {
-    totalReviews: reviews.length,
-    averageOverall: avg(reviews.map((r) => r.overallRating)),
-    averageCulture: avg(reviews.map((r) => r.cultureRating)),
-    averageSalary: avg(reviews.map((r) => r.salaryRating)),
-    averageWorkLife: avg(reviews.map((r) => r.workLifeRating)),
-    averageManagement: avg(reviews.map((r) => r.managementRating)),
-    averageGrowth: avg(reviews.map((r) => r.growthRating)),
-    recommendationPct: (reviews.filter((r) => r.overallRating >= 4).length / reviews.length) * 100,
-  };
-
-  await prisma.companyRatingAggregate.upsert({
-    where: { companyId },
-    create: { companyId, ...aggregates },
-    update: aggregates,
-  });
-}
 
 export default router;

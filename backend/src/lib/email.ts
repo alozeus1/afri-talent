@@ -36,7 +36,7 @@ function getSES(): SESClient {
   return _ses;
 }
 
-interface SendEmailOptions {
+export interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
@@ -44,7 +44,7 @@ interface SendEmailOptions {
   templateName?: string;
 }
 
-async function sendEmail(opts: SendEmailOptions): Promise<void> {
+export async function sendEmail(opts: SendEmailOptions): Promise<void> {
   const recipientDomain = opts.to.includes("@") ? opts.to.split("@")[1] : "unknown";
 
   // No SES_FROM_EMAIL configured: log loudly and record a SKIP — never a
