@@ -13,6 +13,9 @@ interface EarlyTesterFeedbackProps {
   showApprovedFeedback?: boolean;
 }
 
+// Mirrors the backend submitFeedbackSchema (comment min 10).
+const MIN_COMMENT_LENGTH = 10;
+
 function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
@@ -86,7 +89,7 @@ export function EarlyTesterFeedback({
   }, [resolvedAreaSlug, showApprovedFeedback]);
 
   async function handleSubmit() {
-    if (!rating) return;
+    if (!rating || comment.trim().length < MIN_COMMENT_LENGTH) return;
 
     setLoading(true);
     setError(null);
@@ -146,7 +149,7 @@ export function EarlyTesterFeedback({
               <input
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
-                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 placeholder="First name"
                 autoComplete="given-name"
               />
@@ -156,7 +159,7 @@ export function EarlyTesterFeedback({
               <input
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
-                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 placeholder="Last name"
                 autoComplete="family-name"
               />
@@ -190,9 +193,18 @@ export function EarlyTesterFeedback({
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             rows={4}
-            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            maxLength={2000}
+            aria-describedby="early-tester-feedback-hint"
+            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             placeholder="Tell us what was useful, confusing, or missing."
           />
+          <p id="early-tester-feedback-hint" className="-mt-2 text-xs text-emerald-800">
+            {!rating
+              ? "Pick a star rating, then add at least 10 characters."
+              : comment.trim().length < MIN_COMMENT_LENGTH
+                ? `Add at least ${MIN_COMMENT_LENGTH - comment.trim().length} more character${MIN_COMMENT_LENGTH - comment.trim().length === 1 ? "" : "s"}.`
+                : "Ready to submit."}
+          </p>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <label className="flex items-center gap-2 text-xs text-emerald-800">
@@ -208,7 +220,7 @@ export function EarlyTesterFeedback({
             <Button
               size="sm"
               onClick={handleSubmit}
-              disabled={!hydrated || !rating || loading}
+              disabled={!hydrated || !rating || loading || comment.trim().length < MIN_COMMENT_LENGTH}
             >
               {loading ? "Submitting..." : "Submit feedback"}
             </Button>

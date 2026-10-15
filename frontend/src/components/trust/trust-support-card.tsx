@@ -25,11 +25,18 @@ export function TrustSupportCard({
         <Link href={reportHref}>
           <Button size="sm">Report suspicious activity</Button>
         </Link>
-        <a
-          href={`mailto:${supportEmail}?subject=AfriTalent%20Trust%20Support`}
+        <Link
+          href="/contact?topic=TRUST_SAFETY"
+          prefetch={false}
           className="inline-flex items-center justify-center rounded-lg border-2 border-emerald-600 px-3 py-1.5 text-sm font-medium text-emerald-600 transition-colors hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
         >
           Contact support
+        </Link>
+        <a
+          href={`mailto:${supportEmail}?subject=AfriTalent%20Trust%20Support`}
+          className="inline-flex items-center px-1 text-sm font-medium text-slate-600 underline-offset-2 hover:underline"
+        >
+          {supportEmail}
         </a>
       </CardContent>
     </Card>

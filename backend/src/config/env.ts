@@ -56,6 +56,10 @@ export function validateRuntimeEnv(): void {
     // is mandatory. Without it the emitter cannot sign requests and the inbound
     // callback rejects everything (fail closed). Fail the deploy instead of
     // shipping an unauthenticated approval path.
+    // Same for the support-ticket hand-off: never ship unsigned events.
+    if (process.env.N8N_SUPPORT_WEBHOOK_URL?.trim()) {
+      requireEnv("N8N_SUPPORT_HMAC_SECRET");
+    }
     if (process.env.N8N_APPROVAL_WEBHOOK_URL?.trim()) {
       requireEnv("N8N_APPROVAL_HMAC_SECRET");
     }

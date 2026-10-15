@@ -18,7 +18,8 @@ function shouldLocalize(pathname: string): boolean {
     pathname.startsWith("/reset-password") ||
     pathname.startsWith("/pricing") ||
     pathname.startsWith("/candidate") ||
-    pathname.startsWith("/jobs")
+    pathname.startsWith("/jobs") ||
+    pathname.startsWith("/contact")
   );
 }
 

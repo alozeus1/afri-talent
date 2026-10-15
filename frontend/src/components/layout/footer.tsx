@@ -133,6 +133,7 @@ export function Footer() {
 
           {/* Legal nav */}
           <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+            <Link href="/contact" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Contact us</Link>
             <Link href="/privacy-policy" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="/terms-of-service" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Terms of Service</Link>
             <Link href="/cookies-policy" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Cookies Policy</Link>

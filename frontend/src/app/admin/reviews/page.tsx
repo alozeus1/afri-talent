@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { adminReviews } from "@/lib/api/support";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -19,8 +20,11 @@ interface CompanyReview {
   pros: string;
   cons: string;
   approved: boolean;
+  moderationStatus?: "PENDING" | "APPROVED" | "REJECTED";
   createdAt: string;
 }
+
+type ReviewFilter = "ALL" | "PENDING" | "APPROVED" | "REJECTED";
 
 interface ReviewsResponse {
   reviews: CompanyReview[];
@@ -41,7 +45,7 @@ export default function AdminReviewsPage() {
   const [moderating, setModerating] = useState<string | null>(null);
 
   // Filters
-  const [filter, setFilter] = useState<"ALL" | "PENDING" | "APPROVED">("ALL");
+  const [filter, setFilter] = useState<ReviewFilter>("PENDING");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -63,8 +67,7 @@ export default function AdminReviewsPage() {
     setError(null);
     try {
       const params = new URLSearchParams();
-      if (filter === "PENDING") params.set("approved", "false");
-      if (filter === "APPROVED") params.set("approved", "true");
+      if (filter !== "ALL") params.set("status", filter.toLowerCase());
       params.set("page", page.toString());
       const query = params.toString();
 
@@ -88,22 +91,14 @@ export default function AdminReviewsPage() {
 
   const moderateReview = async (id: string, action: "approve" | "reject") => {
     setModerating(id);
+    setError(null);
     try {
-      const res = await fetch(`${API_URL}/api/admin/reviews/${id}/moderate`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ action }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Moderation failed");
-      }
-
-      // Refresh list
+      // Shared client: attaches the CSRF token (raw fetch was rejected).
+      await adminReviews.moderate(id, action);
+      // Refresh list (approval also recomputes the company's ratings server-side)
       await loadReviews();
     } catch (err) {
-      console.error("Failed to moderate review:", err);
+      setError(err instanceof Error ? `Moderation failed: ${err.message}` : "Moderation failed");
     } finally {
       setModerating(null);
     }
@@ -144,19 +139,19 @@ export default function AdminReviewsPage() {
       <div className="mb-6 flex">
         <Tabs.Root
           value={filter}
-          onValueChange={(val) => { setFilter(val as "ALL" | "PENDING" | "APPROVED"); setPage(1); }}
+          onValueChange={(val) => { setFilter(val as ReviewFilter); setPage(1); }}
         >
           <Tabs.List
             className="flex items-center gap-x-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm text-sm"
             aria-label="Filter Reviews"
           >
-            {(["ALL", "PENDING", "APPROVED"] as const).map((f) => (
+            {(["PENDING", "APPROVED", "REJECTED", "ALL"] as const).map((f) => (
               <Tabs.Trigger
                 key={f}
                 value={f}
                 className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-gray-500 hover:text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-medium"
               >
-                {f === "ALL" ? "All Reviews" : f === "PENDING" ? "Pending" : "Approved"}
+                {f === "ALL" ? "All Reviews" : f === "PENDING" ? "Pending" : f === "APPROVED" ? "Approved" : "Rejected"}
               </Tabs.Trigger>
             ))}
           </Tabs.List>
@@ -186,6 +181,8 @@ export default function AdminReviewsPage() {
                   ? "No pending reviews to moderate"
                   : filter === "APPROVED"
                   ? "No approved reviews yet"
+                  : filter === "REJECTED"
+                  ? "No rejected reviews"
                   : "No reviews found"}
               </p>
             </div>
@@ -200,8 +197,12 @@ export default function AdminReviewsPage() {
                   <div>
                     <div className="flex items-center gap-3 mb-1">
                       <h3 className="font-semibold text-gray-900 text-lg">{review.companyName}</h3>
-                      <Badge variant={review.approved ? "success" : "warning"}>
-                        {review.approved ? "Approved" : "Pending"}
+                      <Badge
+                        variant={
+                          review.approved ? "success" : review.moderationStatus === "REJECTED" ? "danger" : "warning"
+                        }
+                      >
+                        {review.approved ? "Approved" : review.moderationStatus === "REJECTED" ? "Rejected" : "Pending"}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 mb-1">
@@ -227,8 +228,8 @@ export default function AdminReviewsPage() {
                   </div>
                 </div>
 
-                {!review.approved && (
-                  <div className="flex gap-3 pt-3 border-t border-gray-100">
+                <div className="flex gap-3 pt-3 border-t border-gray-100 dark:border-zinc-800">
+                  {!review.approved && (
                     <Button
                       size="sm"
                       onClick={() => moderateReview(review.id, "approve")}
@@ -236,16 +237,18 @@ export default function AdminReviewsPage() {
                     >
                       {moderating === review.id ? "Processing..." : "Approve"}
                     </Button>
+                  )}
+                  {review.moderationStatus !== "REJECTED" && (
                     <Button
                       size="sm"
                       variant="danger"
                       onClick={() => moderateReview(review.id, "reject")}
                       disabled={moderating === review.id}
                     >
-                      Reject
+                      {review.approved ? "Unpublish" : "Reject"}
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}

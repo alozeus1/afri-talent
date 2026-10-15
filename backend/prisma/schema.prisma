@@ -164,6 +164,7 @@ enum NotificationType {
   NEW_APPLICATION
   JOB_PUBLISHED
   ADMIN_MESSAGE
+  SUPPORT_REPLY
 }
 
 enum NotificationStatus {
@@ -823,6 +824,10 @@ model User {
   savedSearches                 SavedSearch[]
   jobAlerts                     JobAlert[]
   companyReviews                CompanyReview[]
+  companyReviewHelpfulVotes     CompanyReviewHelpfulVote[]
+  supportTickets                SupportTicket[]               @relation("SupportTicketSubmitter")
+  assignedSupportTickets        SupportTicket[]               @relation("SupportTicketAssignee")
+  supportTicketReplies          SupportTicketReply[]          @relation("SupportTicketReplyAuthor")
   learningFeedbackSubmissions   LearningFeedback[]            @relation("LearningFeedbackSubmitter")
   moderatedLearningFeedback     LearningFeedback[]            @relation("LearningFeedbackModerator")
   skillAssessments              SkillAssessment[]
@@ -2592,12 +2597,31 @@ model CompanyReview {
   isVerified        Boolean  @default(false)
   isApproved        Boolean  @default(false)
   helpfulCount      Int      @default(0)
+  // Moderation trail (additive). Pending = !isApproved && rejectedAt == null.
+  moderatedAt       DateTime?
+  rejectedAt        DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  helpfulVotes CompanyReviewHelpfulVote[]
 
   @@index([companyId, isApproved])
   @@index([userId])
   @@index([createdAt(sort: Desc)])
+}
+
+// One "helpful" vote per user per review; CompanyReview.helpfulCount is the
+// denormalized counter kept in step inside the same transaction.
+model CompanyReviewHelpfulVote {
+  id        String        @id @default(uuid())
+  reviewId  String
+  review    CompanyReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@unique([userId, reviewId])
+  @@index([reviewId])
 }
 
 model CompanyRatingAggregate {
@@ -3434,4 +3458,80 @@ model SavedJob {
 
   @@unique([userId, jobId])
   @@index([userId, createdAt(sort: Desc)])
+}
+
+// ──────────────── Customer Support ────────────────
+
+enum SupportTicketStatus {
+  OPEN // new, awaiting first response
+  PENDING // answered, awaiting the customer (or a third party)
+  RESOLVED
+}
+
+enum SupportTicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum SupportTicketTopic {
+  GENERAL
+  ACCOUNT
+  JOBS
+  EMPLOYER
+  TRUST_SAFETY
+  TECHNICAL
+  FEEDBACK
+  PARTNERSHIP
+  PRIVACY
+  OTHER
+}
+
+model SupportTicket {
+  id              String                @id @default(uuid())
+  reference       String                @unique @db.VarChar(20) // human-friendly, e.g. AT-7K3F9Q
+  name            String                @db.VarChar(120)
+  email           String                @db.VarChar(255)
+  topic           SupportTicketTopic    @default(GENERAL)
+  subject         String?               @db.VarChar(200)
+  message         String                @db.Text
+  status          SupportTicketStatus   @default(OPEN)
+  priority        SupportTicketPriority @default(NORMAL)
+  userId          String?
+  user            User?                 @relation("SupportTicketSubmitter", fields: [userId], references: [id], onDelete: SetNull)
+  userRole        String?               @db.VarChar(20)
+  assigneeId      String?
+  assignee        User?                 @relation("SupportTicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  internalNotes   String?               @db.Text
+  locale          String?               @db.VarChar(10)
+  pageUrl         String?               @db.VarChar(500)
+  userAgent       String?               @db.VarChar(500)
+  firstResponseAt DateTime?
+  lastReplyAt     DateTime?
+  resolvedAt      DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  replies SupportTicketReply[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([priority])
+  @@index([topic])
+  @@index([assigneeId])
+  @@index([userId])
+  @@index([email])
+}
+
+model SupportTicketReply {
+  id        String        @id @default(uuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?         @relation("SupportTicketReplyAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  body      String        @db.Text
+  emailSent Boolean       @default(false)
+  createdAt DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
 }
