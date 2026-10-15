@@ -14,6 +14,7 @@ import type { JobQuery } from "../lib/jobs/aggregator/sources/base.js";
 import type { CompanyCareerProvider, CompanyCareerSourceConfig } from "../lib/jobs/aggregator/sources/company-careers.js";
 import { redisClient } from "../lib/redis.js";
 import { recordOpsSnapshotMetric } from "../lib/ops/events.js";
+import { runIngestion, toAggregationDiagnostics, useLegacyAggregator } from "../lib/jobs/aggregator/engine/index.js";
 
 const LAST_SYNC_KEY = "aggregator:last_sync"; // legacy key kept for compatibility
 const LAST_SUCCESS_KEY = "aggregator:last_successful_ingestion";
@@ -297,7 +298,17 @@ async function persistIngestionReliabilityState(
   };
 }
 
-export async function runAggregatorCycle(): Promise<void> {
+interface CycleSyncResult {
+  total: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
+  bySource: Partial<Record<JobSource, number>> | Record<string, unknown>;
+  byRegion: Record<string, number>;
+  diagnostics: AggregationDiagnostics;
+}
+
+async function runLegacySync(): Promise<CycleSyncResult> {
   const dbCompanySources = await loadActiveCompanyCareerSources();
   const aggregator = dbCompanySources.length > 0
     ? new JobAggregator(prisma, dbCompanySources)
@@ -311,7 +322,27 @@ export async function runAggregatorCycle(): Promise<void> {
     remote: REMOTE_ONLY_SYNC ? true : undefined,
   };
 
-  const result = await aggregator.syncJobsToDatabase(query);
+  return aggregator.syncJobsToDatabase(query);
+}
+
+// Aggregator engine (default). Africa-eligible postings only; unchanged
+// postings are touched, not rewritten. AGGREGATOR_ENGINE=legacy reverts.
+async function runEngineSync(): Promise<CycleSyncResult> {
+  const report = await runIngestion({ prisma, trigger: "cron" });
+  const persisted = report.totals.inserted + report.totals.updated + report.totals.unchanged;
+  return {
+    total: persisted,
+    inserted: report.totals.inserted,
+    updated: report.totals.updated,
+    skipped: report.totals.unchanged,
+    bySource: Object.fromEntries(report.sources.map((metric) => [metric.source, metric.eligible])),
+    byRegion: {},
+    diagnostics: toAggregationDiagnostics(report),
+  };
+}
+
+export async function runAggregatorCycle(): Promise<void> {
+  const result = useLegacyAggregator() ? await runLegacySync() : await runEngineSync();
   const criticalSources = resolveCriticalSources(result.diagnostics.sourceDiagnostics.map((entry) => entry.source));
   const evaluation = evaluateIngestionCycle({
     jobsIngested: result.total,

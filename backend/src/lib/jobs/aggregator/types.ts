@@ -73,6 +73,16 @@ export type JobSource =
   | "GREENHOUSE"
   | "LEVER"
   | "WORKABLE"
+  // Aggregator engine feeds (official/public APIs and RSS)
+  | "REMOTIVE"
+  | "HIMALAYAS"
+  | "ARBEITNOW"
+  | "JOBICY"
+  | "WORKINGNOMADS"
+  | "ASHBY"
+  | "SMARTRECRUITERS"
+  | "RECRUITEE"
+  | "ADZUNA"
   // Direct Company Feeds
   | "COMPANY_RSS"
   | "COMPANY_API"

@@ -361,6 +361,14 @@ async function classifyJobFieldInner(input: ClassifierInput): Promise<Classifica
   };
 }
 
+// Aggregator engine: deterministic first pass. The engine only escalates to
+// classifyJobField (LLM) when this confidence is below MIN_LLM_CONFIDENCE and
+// its per-run LLM budget allows — never once per upsert.
+export const CLASSIFIER_MIN_LLM_CONFIDENCE = MIN_LLM_CONFIDENCE;
+export function classifyJobFieldDeterministic(input: ClassifierInput): ClassificationResult {
+  return classifyByKeywordsForTesting(input);
+}
+
 // Exposed for the eval test — exercises the deterministic path without
 // touching the network.
 export function classifyByKeywordsForTesting(input: ClassifierInput): ClassificationResult {
