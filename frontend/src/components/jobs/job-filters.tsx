@@ -105,7 +105,6 @@ export function JobFilters({
         <select
           className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by job type"
-          aria-expanded={false}
           value={type}
           onChange={(e) => onTypeChange(e.target.value)}
         >
@@ -119,7 +118,6 @@ export function JobFilters({
         <select
           className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by job field"
-          aria-expanded={false}
           value={jobField}
           onChange={(e) => onJobFieldChange(e.target.value)}
         >
@@ -133,7 +131,6 @@ export function JobFilters({
         <select
           className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by workplace type"
-          aria-expanded={false}
           value={workplaceType}
           onChange={(e) => onWorkplaceTypeChange(e.target.value)}
         >
@@ -147,7 +144,6 @@ export function JobFilters({
         <select
           className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by seniority"
-          aria-expanded={false}
           value={seniority}
           onChange={(e) => onSeniorityChange(e.target.value)}
         >

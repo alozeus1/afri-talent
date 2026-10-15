@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -19,6 +19,7 @@ import { EmployerMilestones } from "@/components/employer/activation-milestones"
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { LoadErrorCard } from "@/components/ui/load-error-card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { FREE_MODE } from "@/lib/free-mode";
 
@@ -39,6 +40,7 @@ export default function EmployerDashboard() {
   const [trustDashboard, setTrustDashboard] = useState<EmployerTrustDashboard | null>(null);
   const [analytics, setAnalytics] = useState<EmployerAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [jobActionError, setJobActionError] = useState<string | null>(null);
 
@@ -51,11 +53,7 @@ export default function EmployerDashboard() {
     }
   }, [user, isLoading, router, locale]);
 
-  useEffect(() => {
-    if (user?.role !== "EMPLOYER") {
-      return;
-    }
-
+  const loadDashboard = useCallback(() => {
     Promise.all([
       jobs.myJobs(),
       employerAnalytics.onboarding().catch(() => null),
@@ -68,9 +66,23 @@ export default function EmployerDashboard() {
         setAnalytics(analyticsData);
         setTrustDashboard(trustData);
       })
-      .catch(console.error)
+      .catch((err) => setLoadError(err))
       .finally(() => setLoading(false));
-  }, [user]);
+  }, []);
+
+  const retryLoadDashboard = () => {
+    setLoading(true);
+    setLoadError(null);
+    loadDashboard();
+  };
+
+  const isEmployer = user?.role === "EMPLOYER";
+  useEffect(() => {
+    if (!isEmployer) {
+      return;
+    }
+    loadDashboard();
+  }, [isEmployer, loadDashboard]);
 
   // Close (unpublish) or reopen a job. Reopening re-runs trust checks, so the
   // returned status may be PENDING_REVIEW rather than PUBLISHED.
@@ -161,6 +173,10 @@ export default function EmployerDashboard() {
           </div>
         </div>
       </div>
+
+      {loadError ? (
+        <LoadErrorCard className="mt-8" error={loadError} subject="your jobs and hiring stats" onRetry={retryLoadDashboard} />
+      ) : null}
 
       <Tabs.Root
         className="mt-8"
@@ -348,6 +364,8 @@ export default function EmployerDashboard() {
               <div className="flex justify-center py-8">
                 <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-emerald-600" />
               </div>
+            ) : loadError ? (
+              <LoadErrorCard error={loadError} subject="your jobs" onRetry={retryLoadDashboard} />
             ) : myJobs.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center">
                 <p className="text-lg font-semibold text-gray-900">No jobs live yet</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -10,6 +10,7 @@ import { employerOnboardingEvents } from "@/lib/analytics";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { LoadErrorCard } from "@/components/ui/load-error-card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { FREE_MODE } from "@/lib/free-mode";
 
@@ -96,6 +97,8 @@ export default function JobApplicationsPage() {
   const [jobApplications, setJobApplications] = useState<Application[]>([]);
   const [candidateAccessLocked, setCandidateAccessLocked] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [statusErrors, setStatusErrors] = useState<Record<string, string>>({});
   const [updating, setUpdating] = useState<string | null>(null);
   const [messagingId, setMessagingId] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState("");
@@ -112,33 +115,54 @@ export default function JobApplicationsPage() {
     }
   }, [user, isLoading, router, locale]);
 
+  const jobId = params.id as string;
+  const loadApplications = useCallback(() => {
+    applications
+      .forJob(jobId)
+      .then((response) => {
+        setJobApplications(response);
+        setCandidateAccessLocked(response.some((application) => Boolean(application.locked)));
+        employerOnboardingEvents.candidateListViewed({
+          job_id: jobId,
+          applicant_count: response.length,
+        });
+      })
+      .catch((err) => setLoadError(err))
+      .finally(() => setLoading(false));
+  }, [jobId]);
+
+  const retryLoadApplications = () => {
+    setLoading(true);
+    setLoadError(null);
+    loadApplications();
+  };
+
+  const isEmployer = user?.role === "EMPLOYER";
   useEffect(() => {
-    if (user?.role === "EMPLOYER") {
-      applications
-        .forJob(params.id as string)
-        .then((response) => {
-          setJobApplications(response);
-          setCandidateAccessLocked(response.some((application) => Boolean(application.locked)));
-          employerOnboardingEvents.candidateListViewed({
-            job_id: params.id as string,
-            applicant_count: response.length,
-          });
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false));
+    if (isEmployer) {
+      loadApplications();
     }
-  }, [user, params.id]);
+  }, [isEmployer, loadApplications]);
 
   const updateStatus = async (applicationId: string, status: string) => {
     if (!user) return;
     setUpdating(applicationId);
+    setStatusErrors((prev) => {
+      const next = { ...prev };
+      delete next[applicationId];
+      return next;
+    });
     try {
       const updated = await applications.updateStatus(applicationId, { status });
       setJobApplications((prev) =>
         prev.map((a) => (a.id === applicationId ? { ...a, status: updated.status } : a))
       );
     } catch (err) {
-      console.error("Failed to update status:", err);
+      const friendly = toFriendlyError(err);
+      setStatusErrors((prev) => ({
+        ...prev,
+        [applicationId]: `Status not updated. ${friendly.description}`,
+      }));
     } finally {
       setUpdating(null);
     }
@@ -283,13 +307,17 @@ export default function JobApplicationsPage() {
       <Card>
         <CardHeader>
           <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
-          <p className="text-gray-600">{jobApplications.length} candidate(s) applied</p>
+          {!loadError && (
+            <p className="text-gray-600">{jobApplications.length} candidate(s) applied</p>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
             </div>
+          ) : loadError ? (
+            <LoadErrorCard error={loadError} subject="applications for this job" onRetry={retryLoadApplications} />
           ) : jobApplications.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-600">No applications yet</p>
@@ -390,6 +418,11 @@ export default function JobApplicationsPage() {
                       Reject
                     </Button>
                   </div>
+                  {statusErrors[application.id] && (
+                    <p role="alert" className="mt-2 text-sm text-red-600">
+                      {statusErrors[application.id]}
+                    </p>
+                  )}
 
                   {!candidateAccessLocked && application.candidate?.id && (
                     <div className="mt-4 pt-4 border-t border-gray-100">

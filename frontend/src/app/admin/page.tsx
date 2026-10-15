@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TrustBadge } from "@/components/trust/trust-badge";
+import { LoadErrorCard } from "@/components/ui/load-error-card";
+import { toFriendlyError } from "@/lib/friendly-error";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -17,7 +19,9 @@ export default function AdminDashboard() {
   const [trustOverview, setTrustOverview] = useState<AdminTrustDashboard | null>(null);
   const [pendingJobs, setPendingJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [reviewing, setReviewing] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "ADMIN")) {
@@ -25,22 +29,34 @@ export default function AdminDashboard() {
     }
   }, [user, isLoading, router]);
 
+  const loadDashboard = useCallback(() => {
+    Promise.all([admin.stats(), admin.pendingJobs(), adminTrust.dashboard().catch(() => null)])
+      .then(([statsData, jobsData, trustData]) => {
+        setStats(statsData);
+        setPendingJobs(jobsData);
+        setTrustOverview(trustData);
+      })
+      .catch((err) => setLoadError(err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const retryLoadDashboard = () => {
+    setLoading(true);
+    setLoadError(null);
+    loadDashboard();
+  };
+
+  const isAdmin = user?.role === "ADMIN";
   useEffect(() => {
-    if (user?.role === "ADMIN") {
-      Promise.all([admin.stats(), admin.pendingJobs(), adminTrust.dashboard().catch(() => null)])
-        .then(([statsData, jobsData, trustData]) => {
-          setStats(statsData);
-          setPendingJobs(jobsData);
-          setTrustOverview(trustData);
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false));
+    if (isAdmin) {
+      loadDashboard();
     }
-  }, [user]);
+  }, [isAdmin, loadDashboard]);
 
   const reviewJob = async (jobId: string, status: "APPROVED" | "REJECTED") => {
     if (!user) return;
     setReviewing(jobId);
+    setReviewError(null);
     try {
       await admin.reviewJob(jobId, { status });
       setPendingJobs((prev) => prev.filter((j) => j.id !== jobId));
@@ -48,7 +64,7 @@ export default function AdminDashboard() {
         setStats({ ...stats, pendingJobs: stats.pendingJobs - 1 });
       }
     } catch (err) {
-      console.error("Review failed:", err);
+      setReviewError(`Review not saved. ${toFriendlyError(err).description}`);
     } finally {
       setReviewing(null);
     }
@@ -104,10 +120,18 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {reviewError && (
+        <p role="alert" className="mb-4 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {reviewError}
+        </p>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
         </div>
+      ) : loadError ? (
+        <LoadErrorCard error={loadError} subject="admin stats and the moderation queue" onRetry={retryLoadDashboard} />
       ) : (
         <>
           <div className="grid md:grid-cols-5 gap-6 mb-8">

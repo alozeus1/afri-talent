@@ -66,7 +66,7 @@ async function fetchServerPublicApi<T>(
   return response.json();
 }
 
-function buildJobsQuery(params: JobListParams) {
+export function buildJobsQuery(params: JobListParams) {
   const searchParams = new URLSearchParams();
   if (params.search) searchParams.set("search", params.search);
   if (params.location) searchParams.set("location", params.location);
@@ -76,7 +76,9 @@ function buildJobsQuery(params: JobListParams) {
   if (params.seniority) searchParams.set("seniority", params.seniority);
   if (params.visaSponsorship) searchParams.set("visaSponsorship", params.visaSponsorship);
   if (params.relocationAssistance) searchParams.set("relocationAssistance", params.relocationAssistance);
+  if (params.hiresFromAfrica) searchParams.set("hiresFromAfrica", params.hiresFromAfrica);
   if (params.remote) searchParams.set("remote", params.remote);
+  if (params.sortBy && params.sortBy !== "relevance") searchParams.set("sortBy", params.sortBy);
   if (params.salaryMin) searchParams.set("salaryMin", params.salaryMin.toString());
   if (params.salaryMax) searchParams.set("salaryMax", params.salaryMax.toString());
   if (params.country) searchParams.set("country", params.country);

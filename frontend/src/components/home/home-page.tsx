@@ -94,10 +94,10 @@ export function HomePageContent() {
                 )}
 
                 <div className="mt-8 flex flex-wrap gap-3 text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                  <Link href="/jobs?filter=remote" prefetch={false} className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                  <Link href={localizePath("/jobs?remote=true", locale)} prefetch={false} className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     {t("home.hero.remoteFirstRoles")}
                   </Link>
-                  <Link href="/jobs?filter=visa" prefetch={false} className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                  <Link href={localizePath("/jobs?visaSponsorship=YES", locale)} prefetch={false} className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     {t("home.hero.visaSupported")}
                   </Link>
                   <Link href="/trust" prefetch={false} className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">

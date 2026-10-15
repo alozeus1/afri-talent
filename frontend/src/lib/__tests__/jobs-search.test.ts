@@ -25,6 +25,7 @@ describe("jobs-search helpers", () => {
       relocationAssistance: "",
       hiresFromAfrica: "",
       remote: "true",
+      sortBy: "relevance",
       page: 3,
       limit: 12,
     });
@@ -65,5 +66,31 @@ describe("jobs-search helpers", () => {
       page: 2,
       limit: 24,
     });
+  });
+
+  it("maps the legacy filter=remote|visa alias onto real filters", () => {
+    expect(parseJobSearchState({ filter: "remote" })).toMatchObject({ remote: "true", visaSponsorship: "" });
+    expect(parseJobSearchState({ filter: "visa" })).toMatchObject({ visaSponsorship: "YES", remote: "" });
+    // Explicit params win over the alias.
+    expect(parseJobSearchState({ filter: "visa", visaSponsorship: "NO" }).visaSponsorship).toBe("NO");
+    expect(parseJobSearchState({ filter: "unknown" })).toMatchObject({ remote: "", visaSponsorship: "" });
+  });
+
+  it("parses, serializes and forwards sortBy, dropping the relevance default", () => {
+    expect(parseJobSearchState({ sortBy: "newest" }).sortBy).toBe("newest");
+    expect(parseJobSearchState({ sortBy: "salary" }).sortBy).toBe("salary");
+    expect(parseJobSearchState({ sortBy: "bogus" }).sortBy).toBe("relevance");
+    expect(parseJobSearchState({}).sortBy).toBe("relevance");
+
+    expect(buildJobsHref({ search: "go", sortBy: "newest" })).toBe("/jobs?search=go&sortBy=newest");
+    expect(buildJobsHref({ search: "go", sortBy: "relevance" })).toBe("/jobs?search=go");
+
+    expect(toJobListParams(parseJobSearchState({ sortBy: "salary" })).sortBy).toBe("salary");
+    expect(toJobListParams(parseJobSearchState({})).sortBy).toBeUndefined();
+  });
+
+  it("forwards hiresFromAfrica to API params", () => {
+    expect(toJobListParams(parseJobSearchState({ hiresFromAfrica: "true" })).hiresFromAfrica).toBe("true");
+    expect(buildJobsHref({ hiresFromAfrica: "true" })).toBe("/jobs?hiresFromAfrica=true");
   });
 });

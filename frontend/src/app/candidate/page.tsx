@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -17,6 +17,7 @@ import {
   emailVerification,
   onboarding,
   InstantMatch,
+  profile as profileApi,
   trust,
 } from "@/lib/api";
 import { candidateRetentionEvents } from "@/lib/analytics";
@@ -26,12 +27,12 @@ import { PlanBadge } from "@/components/ui/plan-badge";
 import { FREE_MODE } from "@/lib/free-mode";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
+import { LoadErrorCard } from "@/components/ui/load-error-card";
 import { PushOptInCard } from "@/components/notifications/push-opt-in";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 interface CandidateProfile {
   id: string;
@@ -131,7 +132,9 @@ export default function CandidateDashboard() {
   const { user, isLoading } = useAuth();
   const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [applicationsError, setApplicationsError] = useState<unknown>(null);
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
+  const [profileError, setProfileError] = useState<unknown>(null);
   const [openToWork, setOpenToWork] = useState(false);
   const [togglingOtw, setTogglingOtw] = useState(false);
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
@@ -152,29 +155,38 @@ export default function CandidateDashboard() {
     }
   }, [user, isLoading, router, locale]);
 
+  const loadApplications = useCallback(() => {
+    applications
+      .my()
+      .then(setMyApplications)
+      .catch((err) => setApplicationsError(err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // profile.get() throws ApiError on 4xx/5xx, so an error body is never stored
+  // as the profile. The backend returns null for brand-new candidates.
+  const loadProfile = useCallback(() => {
+    profileApi
+      .get()
+      .then((data) => {
+        if (!data) return;
+        // The dashboard's local view type treats nullable text fields as optional strings.
+        setProfile(data as unknown as CandidateProfile);
+        setOpenToWork(Boolean(data.openToWork));
+      })
+      .catch((err) => setProfileError(err));
+  }, []);
+
   useEffect(() => {
     if (user?.role === "CANDIDATE") {
-      applications
-        .my()
-        .then(setMyApplications)
-        .catch(console.error)
-        .finally(() => setLoading(false));
+      loadApplications();
+      loadProfile();
 
-      // Fetch profile (backend returns null for newly registered candidates with no profile yet)
-      fetch(`${API_URL}/api/profile`, { credentials: "include" })
-        .then((res) => res.json())
-        .then((data: CandidateProfile | null) => {
-          if (!data) return;
-          setProfile(data);
-          setOpenToWork(Boolean(data.openToWork));
-        })
-        .catch(console.error);
-
-      // Fetch billing status
+      // Fetch billing status (non-critical: the card falls back to the free plan copy)
       billing
         .status()
         .then(setBillingStatus)
-        .catch(console.error);
+        .catch(() => setBillingStatus(null));
 
       // First-look instant matches (free for every plan)
       onboarding
@@ -212,18 +224,13 @@ export default function CandidateDashboard() {
         .then((status) => setEmailVerified(status.verified))
         .catch(() => setEmailVerified(true));
     }
-  }, [user, locale]);
+  }, [user, locale, loadApplications, loadProfile]);
 
   const toggleOpenToWork = async () => {
     setTogglingOtw(true);
     const newValue = !openToWork;
     try {
-      await fetch(`${API_URL}/api/profile`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ openToWork: newValue }),
-      });
+      await profileApi.update({ openToWork: newValue });
       setOpenToWork(newValue);
     } catch (err) {
       console.error("Failed to update open-to-work status", err);
@@ -270,6 +277,13 @@ export default function CandidateDashboard() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">{t("candidate.dashboard")}: {user.name}</h1>
         <p className="text-gray-600">Track your job applications and career progress</p>
       </div>
+
+      {profileError ? (
+        <LoadErrorCard className="mb-6" error={profileError} subject="your profile" onRetry={() => {
+          setProfileError(null);
+          loadProfile();
+        }} />
+      ) : null}
 
       <Tabs.Root
         className="mt-2"
@@ -783,6 +797,12 @@ export default function CandidateDashboard() {
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
               <span className="ml-3 text-sm font-medium">Loading your applications...</span>
             </div>
+          ) : applicationsError ? (
+            <LoadErrorCard error={applicationsError} subject="your applications" onRetry={() => {
+              setLoading(true);
+              setApplicationsError(null);
+              loadApplications();
+            }} />
           ) : myApplications.length === 0 ? (
             <div className="text-center py-12 px-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 dark:bg-zinc-900/50 dark:border-zinc-800">
               <div className="flex justify-center mb-4 text-gray-400 dark:text-zinc-500">

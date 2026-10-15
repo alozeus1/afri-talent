@@ -1,15 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Job, JobListResponse } from "@/lib/api";
+import { Job, JobListResponse, savedJobs } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { JobCard } from "@/components/jobs/job-card";
+import { rememberJobSearch } from "@/components/jobs/job-detail-links";
 import { JobsSearchShell } from "@/components/jobs/jobs-search-shell";
 import { Button } from "@/components/ui/button";
 import { RetryButton } from "@/components/ui/retry-button";
 import { JobResultsSkeletonGrid } from "@/components/ui/skeleton";
-import { JobSearchState, buildJobsHref, hasActiveJobFilters } from "@/lib/jobs-search";
+import {
+  DEFAULT_JOB_SORT,
+  JOB_SORT_OPTIONS,
+  JobSearchState,
+  JobSortOption,
+  buildJobsHref,
+  hasActiveJobFilters,
+} from "@/lib/jobs-search";
+
+const SORT_LABELS: Record<JobSortOption, string> = {
+  relevance: "Relevance",
+  newest: "Newest",
+  salary: "Highest salary",
+};
 
 interface JobsBrowseExperienceProps {
   filters: JobSearchState;
@@ -51,6 +66,28 @@ export function JobsBrowseExperience({
   const resultsRef = useRef<HTMLElement | null>(null);
   const shouldScrollToResultsRef = useRef(false);
   const hasResults = jobs.length > 0;
+  const { user } = useAuth();
+  const isCandidate = user?.role === "CANDIDATE";
+  const [savedJobIds, setSavedJobIds] = useState<Set<string>>(() => new Set());
+
+  // One saved-ids request for the whole grid (not one per card).
+  useEffect(() => {
+    if (!isCandidate) {
+      return;
+    }
+    let cancelled = false;
+    savedJobs
+      .ids()
+      .then((data) => {
+        if (!cancelled) setSavedJobIds(new Set(data.jobIds));
+      })
+      .catch(() => {
+        // Non-blocking: hearts fall back to unsaved; toggling still works.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isCandidate]);
 
   const navigateToState = (nextState: JobSearchState, options?: { scrollToResults?: boolean }) => {
     const nextHref = buildPathAwareJobsHref(pathname, nextState);
@@ -70,6 +107,10 @@ export function JobsBrowseExperience({
   };
 
   useEffect(() => {
+    rememberJobSearch(buildPathAwareJobsHref(pathname, filters));
+  }, [pathname, filters]);
+
+  useEffect(() => {
     if (!isPending && shouldScrollToResultsRef.current) {
       resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       shouldScrollToResultsRef.current = false;
@@ -85,7 +126,9 @@ export function JobsBrowseExperience({
     seniority: "",
     visaSponsorship: "",
     relocationAssistance: "",
+    hiresFromAfrica: "",
     remote: "",
+    sortBy: filters.sortBy,
     page: 1,
     limit: filters.limit,
   });
@@ -119,6 +162,27 @@ export function JobsBrowseExperience({
             </p>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+              <span>Sort</span>
+              <select
+                value={filters.sortBy || DEFAULT_JOB_SORT}
+                onChange={(event) =>
+                  navigateToState(
+                    { ...filters, sortBy: event.target.value as JobSortOption, page: 1 },
+                    { scrollToResults: false },
+                  )
+                }
+                className="rounded-full border border-[var(--border-soft)] bg-white/80 px-3 py-1.5 text-sm text-gray-900 dark:bg-[rgba(7,17,29,0.58)] dark:text-gray-100"
+                aria-label="Sort jobs"
+              >
+                {JOB_SORT_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {SORT_LABELS[option]}
+                  </option>
+                ))}
+              </select>
+            </label>
           {resultMetrics && !error && (
             <div className="flex flex-wrap gap-2">
               <StatPill label="showing now" value={resultMetrics.visibleResults} />
@@ -126,6 +190,7 @@ export function JobsBrowseExperience({
               <StatPill label="recently refreshed" value={resultMetrics.freshResults} />
             </div>
           )}
+          </div>
         </div>
 
         {hasResults && !error && (
@@ -159,7 +224,7 @@ export function JobsBrowseExperience({
               }`}
             >
               {jobs.map((job) => (
-                <JobCard key={job.id} job={job} />
+                <JobCard key={job.id} job={job} initialSaved={isCandidate && savedJobIds.has(job.id)} />
               ))}
             </div>
 

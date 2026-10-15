@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, FormEvent } from "react";
+import { useCallback, useEffect, useState, useRef, FormEvent } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -9,6 +9,7 @@ import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { LoadErrorCard } from "@/components/ui/load-error-card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 
 function formatTime(dateStr: string): string {
@@ -42,6 +43,7 @@ export default function ThreadDetailPage() {
     tips: string[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [sending, setSending] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
@@ -53,21 +55,38 @@ export default function ThreadDetailPage() {
     }
   }, [user, isLoading, locale, router]);
 
+  const loadThread = useCallback(() => {
+    Promise.all([
+      messages.thread(threadId),
+      trust.messagingGuidance().catch(() => null),
+    ])
+      .then(([threadResponse, guidanceResponse]) => {
+        setThread(threadResponse.thread);
+        setThreadMessages(threadResponse.messages);
+        setGuidance(guidanceResponse);
+      })
+      .catch((err) => {
+        // A missing thread keeps the "Thread not found" state; anything else
+        // (network, 5xx) is a real load failure with a retry.
+        if ((err as { status?: number })?.status !== 404) {
+          setLoadError(err);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [threadId]);
+
+  const retryLoadThread = () => {
+    setLoading(true);
+    setLoadError(null);
+    loadThread();
+  };
+
+  const userId = user?.id;
   useEffect(() => {
-    if (user && threadId) {
-      Promise.all([
-        messages.thread(threadId),
-        trust.messagingGuidance().catch(() => null),
-      ])
-        .then(([threadResponse, guidanceResponse]) => {
-          setThread(threadResponse.thread);
-          setThreadMessages(threadResponse.messages);
-          setGuidance(guidanceResponse);
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false));
+    if (userId && threadId) {
+      loadThread();
     }
-  }, [user, threadId]);
+  }, [userId, threadId, loadThread]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -105,6 +124,20 @@ export default function ThreadDetailPage() {
         <div className="flex justify-center py-24">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
         </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <LoadErrorCard error={loadError} subject="this conversation" onRetry={retryLoadThread} />
+        <Link
+          href={localizePath("/messages", locale)}
+          className="mt-4 inline-block text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+        >
+          ← Back to Messages
+        </Link>
       </div>
     );
   }

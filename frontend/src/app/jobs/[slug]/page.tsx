@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +18,38 @@ import {
 import { ReportJobButton } from "@/components/jobs/report-job-button";
 import { JobFitPanel } from "@/components/jobs/job-fit-panel";
 import { SaveJobButton } from "@/components/jobs/save-job-button";
+import { BackToJobs, CompanyLink } from "@/components/jobs/job-detail-links";
+import { formatPostedLong } from "@/lib/posted-age";
+import type { Job, TrustRiskLevel } from "@/lib/api";
+
+type HeaderBadge = {
+  label: string;
+  variant: "success" | "info" | "warning";
+  riskLevel?: TrustRiskLevel;
+};
+
+const MAX_HEADER_BADGES = 3;
+
+/** At most three header badges: a caution (if any) always survives the cut. */
+function selectHeaderBadges(job: Job): HeaderBadge[] {
+  const trust: HeaderBadge[] = [];
+  if (job.hiresFromAfrica) trust.push({ label: "Hires from Africa", variant: "success" });
+  if (job.employer?.trust) {
+    trust.push({ label: job.employer.trust.badge, riskLevel: job.employer.trust.riskLevel, variant: "success" });
+  }
+  if (job.discovery?.trustedJob) trust.push({ label: "Trusted job", variant: "success" });
+  if (job.trust?.companyReviewed) trust.push({ label: "Company reviewed", variant: "info" });
+  if (job.trust?.jobQualityChecked) trust.push({ label: "Job quality checked", variant: "success" });
+  if (job.discovery?.sourceCount && job.discovery.sourceCount > 1) {
+    trust.push({ label: `Cross-checked x${job.discovery.sourceCount}`, variant: "info" });
+  }
+  const caution: HeaderBadge | null = job.trust?.newEmployerCaution
+    ? { label: "New employer review", riskLevel: "MEDIUM", variant: "warning" }
+    : null;
+  return caution
+    ? [...trust.slice(0, MAX_HEADER_BADGES - 1), caution]
+    : trust.slice(0, MAX_HEADER_BADGES);
+}
 
 const AFRICA_STATUS_STYLES: Record<AfricaEligibilityStatus, { box: string; dot: string }> = {
   confirmed: {
@@ -60,9 +91,9 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
         </div>
         <div className="flex flex-wrap gap-3">
           <RetryButton />
-          <Link href="..">
+          <BackToJobs>
             <Button variant="outline">Back to jobs</Button>
-          </Link>
+          </BackToJobs>
         </div>
       </div>
     );
@@ -123,75 +154,64 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
     statusVariant: "success" | "info";
   }>;
 
+  const headerBadges = selectHeaderBadges(job);
+  const postedLabel = formatPostedLong(job.publishedAt || job.createdAt);
+  const verdict = africaEligibility(job);
+  const verdictStyle = AFRICA_STATUS_STYLES[verdict.status];
+  const verdictLabels = deriveJobTrustLabels(job);
+  const verifiedDateLabel = job.lastCheckedAt
+    ? `Last verified ${new Date(job.lastCheckedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+    : job.publishedAt
+      ? `Published ${new Date(job.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+      : null;
+  const hasMobilityDetails =
+    job.visaSponsorship === "YES" ||
+    job.relocationAssistance ||
+    (job.eligibleCountries && job.eligibleCountries.length > 0);
+  const hasTrustSignals = Boolean(job.discovery) || trustReasons.length > 0;
+
   return (
     <>
       <JobJsonLd job={job} />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Link href=".." className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
-          <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <BackToJobs className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
+          <svg className="w-4 h-4 mr-2 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Back to jobs
-        </Link>
+        </BackToJobs>
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl border border-gray-200 p-8 mb-6 dark:bg-gray-900 dark:border-gray-800">
+              {/* 1. Header: title, company, location, salary, posted */}
               <div className="flex justify-between items-start mb-4 gap-4">
                 <div>
                   <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2 dark:text-gray-100">{job.title}</h1>
                   <p className="text-emerald-600 font-semibold text-lg">
                     {job.employer?.id ? (
-                      <Link href={`/companies/${job.employer.id}`} className="hover:underline">
-                        {job.employer.companyName}
-                      </Link>
+                      <CompanyLink companyId={job.employer.id}>{job.employer.companyName}</CompanyLink>
                     ) : (
                       job.employer?.companyName || job.sourceName || "Company"
                     )}
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {job.employer?.trust && (
-                      <TrustBadge
-                        label={job.employer.trust.badge}
-                        riskLevel={job.employer.trust.riskLevel}
-                        variant="success"
-                      />
-                    )}
-                    {job.hiresFromAfrica && <TrustBadge label="Hires from Africa" variant="success" />}
-                    {job.trust?.companyReviewed && <TrustBadge label="Company reviewed" variant="info" />}
-                    {job.trust?.jobQualityChecked && <TrustBadge label="Job quality checked" variant="success" />}
-                    {job.trust?.newEmployerCaution && (
-                      <TrustBadge label="New employer review" riskLevel="MEDIUM" variant="warning" />
-                    )}
-                    {job.discovery?.trustedJob && <TrustBadge label="Trusted job" variant="success" />}
-                    {job.discovery?.sourceCount && job.discovery.sourceCount > 1 && (
-                      <TrustBadge label={`Cross-checked x${job.discovery.sourceCount}`} variant="info" />
-                    )}
-                  </div>
+                  {headerBadges.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {headerBadges.map((badge) => (
+                        <TrustBadge
+                          key={badge.label}
+                          label={badge.label}
+                          riskLevel={badge.riskLevel}
+                          variant={badge.variant}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <Badge variant="success" className="text-sm">
                   {job.type}
                 </Badge>
               </div>
-
-              {job.discovery?.stale && (
-                <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
-                  <p className="font-semibold text-amber-900">Aging listing</p>
-                  <p className="mt-2 text-sm text-amber-900">
-                    This job has not been refreshed recently, so AfriTalent downranks it and recommends extra caution before applying.
-                  </p>
-                </div>
-              )}
-
-              {job.trust &&
-                (job.trust.newEmployerCaution ||
-                  job.trust.riskLevel === "MEDIUM" ||
-                  job.trust.riskLevel === "HIGH") && (
-                  <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
-                    <p className="font-semibold text-amber-900">Trust guidance</p>
-                    <p className="mt-2 text-sm text-amber-900">{job.trust.guidance}</p>
-                  </div>
-                )}
 
               <div className="flex flex-wrap gap-4 mb-6 text-gray-600 dark:text-gray-300">
                 <span className="inline-flex items-center">
@@ -215,6 +235,14 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                     {salary}
                   </span>
                 )}
+                {postedLabel && (
+                  <span className="inline-flex items-center" data-testid="job-posted-age">
+                    <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {postedLabel}
+                  </span>
+                )}
               </div>
 
               {job.tags.length > 0 && (
@@ -227,12 +255,69 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                 </div>
               )}
 
-              {(job.visaSponsorship === "YES" ||
-                job.relocationAssistance ||
-                (job.eligibleCountries && job.eligibleCountries.length > 0)) && (
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6 border border-blue-100">
-                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {job.discovery?.stale && (
+                <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 dark:border-amber-900 dark:bg-amber-950/30">
+                  <p className="font-semibold text-amber-900 dark:text-amber-200">Aging listing</p>
+                  <p className="mt-2 text-sm text-amber-900 dark:text-amber-200">
+                    This job has not been refreshed recently, so AfriTalent downranks it and recommends extra caution before applying.
+                  </p>
+                </div>
+              )}
+
+              {job.trust &&
+                (job.trust.newEmployerCaution ||
+                  job.trust.riskLevel === "MEDIUM" ||
+                  job.trust.riskLevel === "HIGH") && (
+                  <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 dark:border-amber-900 dark:bg-amber-950/30">
+                    <p className="font-semibold text-amber-900 dark:text-amber-200">Trust guidance</p>
+                    <p className="mt-2 text-sm text-amber-900 dark:text-amber-200">{job.trust.guidance}</p>
+                  </div>
+                )}
+
+              {/* 2. Africa eligibility verdict (truth-first, never a guess) */}
+              <div className={`mb-6 rounded-2xl border p-6 ${verdictStyle.box}`}>
+                <h3 className="mb-2 flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100">
+                  <span className={`inline-block h-2.5 w-2.5 rounded-full ${verdictStyle.dot}`} aria-hidden />
+                  Can I apply from Africa?
+                </h3>
+                <p className="font-medium text-gray-900 dark:text-gray-100">{verdict.headline}</p>
+                <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                  {verdict.reasons.map((reason) => (
+                    <li key={reason}>• {reason}</li>
+                  ))}
+                </ul>
+                {verdictLabels.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-200/70 pt-3 dark:border-zinc-700">
+                    {verdictLabels.map((l) => (
+                      <TrustBadge key={l.label} label={l.label} variant={l.variant === "default" ? "info" : l.variant} />
+                    ))}
+                  </div>
+                )}
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <span>
+                    Source: {job.sourceName ?? job.employer?.companyName ?? "Unknown"}
+                    {verifiedDateLabel && ` · ${verifiedDateLabel}`}
+                  </span>
+                  <span className="flex items-center gap-3"><SaveJobButton jobId={job.id} /><ReportJobButton jobId={job.id} /></span>
+                </div>
+              </div>
+
+              {/* 3. Job description */}
+              <div className="prose max-w-none dark:prose-invert mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 dark:text-gray-100">Job description</h2>
+                <div className="space-y-4 text-gray-600 dark:text-gray-300">
+                  {descriptionSections.map((section, index) => (
+                    <p key={`${job.id}-description-${index}`} className="whitespace-pre-line leading-8">
+                      {section}
+                    </p>
+                  ))}
+                </div>
+              </div>
+
+              {hasMobilityDetails && (
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6 border border-blue-100 dark:from-blue-950/30 dark:to-purple-950/30 dark:border-blue-900/60">
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2 dark:text-gray-100">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     International opportunities
@@ -240,31 +325,31 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                   <div className="grid sm:grid-cols-2 gap-4">
                     {job.visaSponsorship === "YES" && (
                       <div className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">&#10003;</span>
+                        <span className="text-green-600 mt-0.5 dark:text-green-400">&#10003;</span>
                         <div>
-                          <p className="font-medium text-gray-900">Visa sponsorship</p>
-                          <p className="text-sm text-gray-600">Employer provides visa support.</p>
+                          <p className="font-medium text-gray-900 dark:text-gray-100">Visa sponsorship</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-300">Employer provides visa support.</p>
                         </div>
                       </div>
                     )}
                     {job.relocationAssistance && (
                       <div className="flex items-start gap-2">
-                        <span className="text-green-600 mt-0.5">&#10003;</span>
+                        <span className="text-green-600 mt-0.5 dark:text-green-400">&#10003;</span>
                         <div>
-                          <p className="font-medium text-gray-900">Relocation assistance</p>
-                          <p className="text-sm text-gray-600">Help with moving and settling in.</p>
+                          <p className="font-medium text-gray-900 dark:text-gray-100">Relocation assistance</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-300">Help with moving and settling in.</p>
                         </div>
                       </div>
                     )}
                   </div>
                   {job.eligibleCountries && job.eligibleCountries.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-blue-200">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Eligible countries</p>
+                    <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-900/60">
+                      <p className="text-sm font-medium text-gray-700 mb-2 dark:text-gray-200">Eligible countries</p>
                       <div className="flex flex-wrap gap-1.5">
                         {job.eligibleCountries.map((country) => (
                           <span
                             key={country}
-                            className="px-2 py-0.5 bg-white rounded text-xs font-medium text-gray-700 border border-gray-200"
+                            className="px-2 py-0.5 bg-white rounded text-xs font-medium text-gray-700 border border-gray-200 dark:bg-zinc-900 dark:text-gray-200 dark:border-zinc-700"
                           >
                             {country}
                           </span>
@@ -275,119 +360,77 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                 </div>
               )}
 
-              {/* Phase 1 — Africa eligibility verdict (truth-first, never a guess) */}
-              {(() => {
-                const verdict = africaEligibility(job);
-                const style = AFRICA_STATUS_STYLES[verdict.status];
-                const labels = deriveJobTrustLabels(job);
-                const dateLabel = job.lastCheckedAt
-                  ? `Last verified ${new Date(job.lastCheckedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-                  : job.publishedAt
-                    ? `Published ${new Date(job.publishedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-                    : null;
-                return (
-                  <div className={`mb-6 rounded-2xl border p-6 ${style.box}`}>
-                    <h3 className="mb-2 flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100">
-                      <span className={`inline-block h-2.5 w-2.5 rounded-full ${style.dot}`} aria-hidden />
-                      Can I apply from Africa?
-                    </h3>
-                    <p className="font-medium text-gray-900 dark:text-gray-100">{verdict.headline}</p>
-                    <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
-                      {verdict.reasons.map((reason) => (
-                        <li key={reason}>• {reason}</li>
-                      ))}
-                    </ul>
-                    <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-200/70 pt-3 dark:border-zinc-700">
-                      {labels.map((l) => (
-                        <TrustBadge key={l.label} label={l.label} variant={l.variant === "default" ? "info" : l.variant} />
-                      ))}
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <span>
-                        Source: {job.sourceName ?? job.employer?.companyName ?? "Unknown"}
-                        {dateLabel && ` · ${dateLabel}`}
-                      </span>
-                      <span className="flex items-center gap-3"><SaveJobButton jobId={job.id} /><ReportJobButton jobId={job.id} /></span>
-                    </div>
-                  </div>
-                );
-              })()}
-
               <JobFitPanel jobTags={job.tags} />
 
-              {job.discovery && (
-                <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Signal quality</h3>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl bg-white px-4 py-3">
-                      <p className="text-xs font-medium text-slate-500">Freshness</p>
-                      <p className="mt-1 text-base font-semibold text-slate-900">{job.discovery.freshnessLabel}</p>
-                    </div>
-                    <div className="rounded-xl bg-white px-4 py-3">
-                      <p className="text-xs font-medium text-slate-500">Quality</p>
-                      <p className="mt-1 text-base font-semibold text-slate-900">{job.discovery.qualityLabel}</p>
-                    </div>
-                    <div className="rounded-xl bg-white px-4 py-3">
-                      <p className="text-xs font-medium text-slate-500">Salary clarity</p>
-                      <p className="mt-1 text-base font-semibold text-slate-900">
-                        {job.discovery.salaryTransparent ? "Disclosed" : "Not disclosed"}
-                      </p>
-                    </div>
-                    <div className="rounded-xl bg-white px-4 py-3">
-                      <p className="text-xs font-medium text-slate-500">Application path</p>
-                      <p className="mt-1 text-base font-semibold text-slate-900">
-                        {job.discovery.validApplicationPath ? "Verified" : "Needs caution"}
-                      </p>
-                    </div>
-                  </div>
-                  {job.rankingExplanation?.summary && (
-                    <p className="mt-4 text-sm text-slate-700">Why this ranks well: {job.rankingExplanation.summary}</p>
-                  )}
-                  {job.discovery.sourceCount > 1 && (
-                    <p className="mt-2 text-sm text-slate-600">
-                      AfriTalent merged this listing from {job.discovery.sourceCount} sources to reduce duplicates and preserve the strongest application path.
-                    </p>
-                  )}
-                </div>
-              )}
+              {/* 4. Trust & signals (collapsed by default; the header already carries the top cues) */}
+              {hasTrustSignals && (
+                <details className="group mb-2 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 dark:border-zinc-700 dark:bg-zinc-900/60">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold text-slate-800 dark:text-slate-100">
+                    <span>Trust &amp; signals</span>
+                    <svg className="h-4 w-4 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </summary>
 
-              {trustReasons.length > 0 && (
-                <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-5">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-emerald-950">Why this employer or job looks trusted</h3>
-                      <p className="mt-2 text-sm leading-6 text-emerald-900">
-                        AfriTalent shows trust cues when there is concrete context behind them, not just a label.
-                      </p>
-                    </div>
-                    <TrustExplainerModal
-                      title="Why this job looks credible"
-                      description="These are the main signals AfriTalent is surfacing for this role right now."
-                      items={trustReasons}
-                      triggerLabel="See trust breakdown"
-                    />
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    {trustReasons.slice(0, 3).map((reason) => (
-                      <div key={reason.title} className="rounded-2xl bg-white px-4 py-3">
-                        <p className="font-medium text-gray-900">{reason.title}</p>
-                        <p className="mt-1 text-sm text-gray-600">{reason.description}</p>
+                  {job.discovery && (
+                    <div className="mt-4">
+                      <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700 dark:text-slate-300">Signal quality</h3>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-xl bg-white px-4 py-3 dark:bg-zinc-950">
+                          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Freshness</p>
+                          <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">{job.discovery.freshnessLabel}</p>
+                        </div>
+                        <div className="rounded-xl bg-white px-4 py-3 dark:bg-zinc-950">
+                          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Quality</p>
+                          <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">{job.discovery.qualityLabel}</p>
+                        </div>
+                        <div className="rounded-xl bg-white px-4 py-3 dark:bg-zinc-950">
+                          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Salary clarity</p>
+                          <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+                            {job.discovery.salaryTransparent ? "Disclosed" : "Not disclosed"}
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-white px-4 py-3 dark:bg-zinc-950">
+                          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Application path</p>
+                          <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+                            {job.discovery.validApplicationPath ? "Verified" : "Needs caution"}
+                          </p>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                      {job.rankingExplanation?.summary && (
+                        <p className="mt-4 text-sm text-slate-700 dark:text-slate-300">Why this ranks well: {job.rankingExplanation.summary}</p>
+                      )}
+                    </div>
+                  )}
 
-              <div className="prose max-w-none dark:prose-invert">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 dark:text-gray-100">Job description</h2>
-                <div className="space-y-4 text-gray-600 dark:text-gray-300">
-                  {descriptionSections.map((section, index) => (
-                    <p key={`${job.id}-description-${index}`} className="whitespace-pre-line leading-8">
-                      {section}
-                    </p>
-                  ))}
-                </div>
-              </div>
+                  {trustReasons.length > 0 && (
+                    <div className="mt-5">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Why this employer or job looks trusted</h3>
+                          <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                            AfriTalent shows trust cues when there is concrete context behind them, not just a label.
+                          </p>
+                        </div>
+                        <TrustExplainerModal
+                          title="Why this job looks credible"
+                          description="These are the main signals AfriTalent is surfacing for this role right now."
+                          items={trustReasons}
+                          triggerLabel="See trust breakdown"
+                        />
+                      </div>
+                      <div className="mt-3 space-y-3">
+                        {trustReasons.map((reason) => (
+                          <div key={reason.title} className="rounded-2xl bg-white px-4 py-3 dark:bg-zinc-950">
+                            <p className="font-medium text-gray-900 dark:text-gray-100">{reason.title}</p>
+                            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{reason.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </details>
+              )}
             </div>
           </div>
 

@@ -112,4 +112,27 @@ describe("Employer job applications page", () => {
     await waitFor(() => expect(openSpy).toHaveBeenCalledWith("https://s3.example.com/signed", "_blank"));
     openSpy.mockRestore();
   });
+
+  it("shows a retry card instead of the empty state when loading fails", async () => {
+    forJobMock.mockReset().mockRejectedValueOnce(Object.assign(new Error("boom"), { status: 500 }));
+    forJobMock.mockResolvedValueOnce([application]);
+    const user = userEvent.setup();
+    render(<JobApplicationsPage />);
+
+    expect(await screen.findByText("We couldn't load applications for this job.")).toBeInTheDocument();
+    expect(screen.queryByText("No applications yet")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Senior backend engineer")).toBeInTheDocument();
+    expect(forJobMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows inline feedback when a status update fails", async () => {
+    updateStatusMock.mockReset().mockRejectedValue(Object.assign(new Error("boom"), { status: 500 }));
+    const user = userEvent.setup();
+    render(<JobApplicationsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "Shortlist" }));
+    expect(await screen.findByText(/Status not updated\./)).toBeInTheDocument();
+  });
 });

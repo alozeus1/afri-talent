@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { messages, MessageThread, trust } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { LoadErrorCard } from "@/components/ui/load-error-card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 
 function timeAgo(dateStr: string): string {
@@ -34,6 +35,7 @@ export default function MessagesPage() {
     tips: string[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -41,20 +43,31 @@ export default function MessagesPage() {
     }
   }, [user, isLoading, locale, router]);
 
+  const loadThreads = useCallback(() => {
+    Promise.all([
+      messages.threads(),
+      trust.messagingGuidance().catch(() => null),
+    ])
+      .then(([threadData, guidanceData]) => {
+        setThreads(threadData.threads);
+        setGuidance(guidanceData);
+      })
+      .catch((err) => setLoadError(err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const retryLoadThreads = () => {
+    setLoading(true);
+    setLoadError(null);
+    loadThreads();
+  };
+
+  const userId = user?.id;
   useEffect(() => {
-    if (user) {
-      Promise.all([
-        messages.threads(),
-        trust.messagingGuidance().catch(() => null),
-      ])
-        .then(([threadData, guidanceData]) => {
-          setThreads(threadData.threads);
-          setGuidance(guidanceData);
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false));
+    if (userId) {
+      loadThreads();
     }
-  }, [user]);
+  }, [userId, loadThreads]);
 
   if (isLoading || !user) {
     return (
@@ -102,6 +115,8 @@ export default function MessagesPage() {
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
             </div>
+          ) : loadError ? (
+            <LoadErrorCard error={loadError} subject="your conversations" onRetry={retryLoadThreads} />
           ) : threads.length === 0 ? (
             <div className="text-center py-12">
               <svg

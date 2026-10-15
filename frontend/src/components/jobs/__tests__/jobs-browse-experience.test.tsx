@@ -1,9 +1,26 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { JobsBrowseExperience } from "../jobs-browse-experience";
 import { Job, JobListResponse } from "@/lib/api";
 
 const replace = jest.fn();
 const useNetworkProfileMock = jest.fn();
+const useAuthMock = jest.fn();
+const savedIdsMock = jest.fn();
+
+jest.mock("@/lib/auth-context", () => ({
+  useAuth: () => useAuthMock(),
+}));
+
+jest.mock("@/lib/api", () => {
+  const actual = jest.requireActual("@/lib/api");
+  return {
+    ...actual,
+    savedJobs: {
+      ...actual.savedJobs,
+      ids: () => savedIdsMock(),
+    },
+  };
+});
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -108,6 +125,9 @@ describe("JobsBrowseExperience", () => {
   beforeEach(() => {
     replace.mockReset();
     resultsLoaded.mockReset();
+    useAuthMock.mockReturnValue({ user: null, isLoading: false });
+    savedIdsMock.mockReset();
+    savedIdsMock.mockResolvedValue({ jobIds: [] });
     useNetworkProfileMock.mockReturnValue({
       online: true,
       saveData: false,
@@ -128,7 +148,8 @@ describe("JobsBrowseExperience", () => {
           seniority: "",
           visaSponsorship: "",
           relocationAssistance: "",
-    hiresFromAfrica: "",
+          hiresFromAfrica: "",
+          sortBy: "relevance",
           remote: "true",
           page: 1,
           limit: 12,
@@ -164,7 +185,8 @@ describe("JobsBrowseExperience", () => {
           seniority: "",
           visaSponsorship: "",
           relocationAssistance: "",
-    hiresFromAfrica: "",
+          hiresFromAfrica: "",
+          sortBy: "relevance",
           remote: "",
           page: 1,
           limit: 12,
@@ -193,7 +215,8 @@ describe("JobsBrowseExperience", () => {
           seniority: "",
           visaSponsorship: "",
           relocationAssistance: "",
-    hiresFromAfrica: "",
+          hiresFromAfrica: "",
+          sortBy: "relevance",
           remote: "",
           page: 1,
           limit: 12,
@@ -226,7 +249,8 @@ describe("JobsBrowseExperience", () => {
           seniority: "",
           visaSponsorship: "",
           relocationAssistance: "",
-    hiresFromAfrica: "",
+          hiresFromAfrica: "",
+          sortBy: "relevance",
           remote: "true",
           page: 1,
           limit: 12,
@@ -249,5 +273,67 @@ describe("JobsBrowseExperience", () => {
       "/en/jobs?search=manager&remote=true&page=2",
     );
     expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+  });
+
+  const baseFilters = {
+    search: "",
+    location: "",
+    type: "",
+    jobField: "",
+    workplaceType: "",
+    seniority: "",
+    visaSponsorship: "",
+    relocationAssistance: "",
+    hiresFromAfrica: "",
+    sortBy: "relevance" as const,
+    remote: "",
+    page: 1,
+    limit: 12,
+  };
+
+  it("navigates with sortBy when the sort control changes", () => {
+    render(
+      <JobsBrowseExperience
+        filters={baseFilters}
+        jobs={[job]}
+        pagination={{ ...pagination, total: 1, totalPages: 1 }}
+        error={null}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort jobs" }), { target: { value: "newest" } });
+    expect(replace).toHaveBeenCalledWith("/en/jobs?sortBy=newest", { scroll: false });
+  });
+
+  it("does not fetch saved ids for anonymous visitors", () => {
+    render(
+      <JobsBrowseExperience
+        filters={baseFilters}
+        jobs={[job]}
+        pagination={{ ...pagination, total: 1, totalPages: 1 }}
+        error={null}
+      />,
+    );
+    expect(savedIdsMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Save job" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("fetches saved ids once for candidates and marks saved cards", async () => {
+    useAuthMock.mockReturnValue({ user: { id: "u1", role: "CANDIDATE" }, isLoading: false });
+    savedIdsMock.mockResolvedValue({ jobIds: ["job-1"] });
+
+    render(
+      <JobsBrowseExperience
+        filters={baseFilters}
+        jobs={[job]}
+        pagination={{ ...pagination, total: 1, totalPages: 1 }}
+        error={null}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Remove saved job" })).toHaveAttribute("aria-pressed", "true"),
+    );
+    expect(savedIdsMock).toHaveBeenCalledTimes(1);
   });
 });

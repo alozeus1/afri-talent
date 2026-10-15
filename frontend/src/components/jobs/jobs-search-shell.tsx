@@ -117,6 +117,7 @@ export function JobsSearchShell({ filters, isPending = false, onNavigate, result
             relocationAssistance: "",
             hiresFromAfrica: "",
             remote: "",
+            sortBy: draft.sortBy,
             page: 1,
             limit: filters.limit,
           })
