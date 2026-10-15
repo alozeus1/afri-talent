@@ -145,6 +145,7 @@ export default {
   "discover.filters.eyebrow": "Explorer le marché",
   "discover.filters.title": "Trouvez des postes adaptés à vos critères de confiance, de mobilité et de mode de travail.",
   "discover.filters.clear": "Effacer les filtres",
+  "discover.filters.more": "Plus de filtres",
   "discover.filters.searchLabel": "Rechercher des offres",
   "discover.filters.searchPlaceholder": "Poste, compétence ou entreprise",
   "discover.filters.locationLabel": "Filtrer par lieu",
@@ -190,6 +191,7 @@ export default {
   "discover.card.via": "via {source}",
   "discover.card.visa": "Visa parrainé",
   "discover.card.relocation": "Aide à la relocalisation",
+  "discover.card.newListing": "Nouveau",
   "discover.card.verifiedPath": "Parcours de candidature vérifié",
   "discover.card.externalListing": "Annonce externe, à vérifier avant de postuler",
 

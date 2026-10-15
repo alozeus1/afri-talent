@@ -148,6 +148,7 @@ export default {
   "discover.filters.eyebrow": "Search the market",
   "discover.filters.title": "Find roles that match your trust, mobility, and work style.",
   "discover.filters.clear": "Clear filters",
+  "discover.filters.more": "More filters",
   "discover.filters.searchLabel": "Search jobs",
   "discover.filters.searchPlaceholder": "Title, skill or company",
   "discover.filters.locationLabel": "Filter by location",
@@ -193,6 +194,7 @@ export default {
   "discover.card.via": "via {source}",
   "discover.card.visa": "Visa sponsored",
   "discover.card.relocation": "Relocation support",
+  "discover.card.newListing": "New",
   "discover.card.verifiedPath": "Verified application path",
   "discover.card.externalListing": "External listing, verify before applying",
 

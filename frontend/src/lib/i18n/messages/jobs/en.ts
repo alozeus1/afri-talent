@@ -13,6 +13,8 @@ export default {
   "jobs.hero.description": "Explore remote and international roles ranked by relevance, recency, trust cues, salary transparency, and mobility fit.",
   "jobs.hero.rankingSignals": "Ranking signals",
   "jobs.hero.rankingDesc": "Trust, freshness, semantic intent, and cross-border readiness.",
+  "jobs.hero.compactTitle": "Find jobs open to African talent",
+  "jobs.hero.rankingInfo": "How ranking works",
   "jobs.searchMarket": "Find roles that match your trust, mobility, and work style.",
   "jobs.searchMarketDesc": "Search the market",
   "jobs.resultsUpdating": "Results update in the background as you refine your search.",

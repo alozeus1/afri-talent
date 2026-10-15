@@ -45,15 +45,6 @@ function buildPathAwareJobsHref(pathname: string, state: Partial<JobSearchState>
   return href.startsWith("/jobs") ? href.replace("/jobs", pathname || "/jobs") : href;
 }
 
-function StatPill({ label, value }: { label: string; value: number }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface-raised px-3 py-1.5 text-xs font-semibold text-fg-secondary shadow-xs">
-      <span className="font-display text-sm text-fg">{value}</span>
-      {label}
-    </span>
-  );
-}
-
 export function JobsBrowseExperience({
   filters,
   jobs,
@@ -154,50 +145,31 @@ export function JobsBrowseExperience({
         className="rounded-[2rem]"
         id="jobs-results"
       >
-        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-2">
-            <p className="font-display text-2xl font-bold text-fg">
-              {tp("discover.results.count", { count: pagination.total })}
-            </p>
-            <p className="text-sm text-fg-secondary">{tp("discover.results.anchored")}</p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center gap-2 text-sm font-medium text-fg-secondary">
-              <span>{tp("discover.sort.label")}</span>
-              <select
-                value={filters.sortBy || DEFAULT_JOB_SORT}
-                onChange={(event) =>
-                  navigateToState(
-                    { ...filters, sortBy: event.target.value as JobSortOption, page: 1 },
-                    { scrollToResults: false },
-                  )
-                }
-                className="rounded-full border border-line-strong bg-surface-raised px-3 py-1.5 text-sm text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-                aria-label={tp("discover.sort.aria")}
-              >
-                {JOB_SORT_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {tp(SORT_LABELS[option])}
-                  </option>
-                ))}
-              </select>
-            </label>
-          {resultMetrics && !error && (
-            <div className="flex flex-wrap gap-2">
-              <StatPill label={tp("discover.results.showing")} value={resultMetrics.visibleResults} />
-              <StatPill label={tp("discover.results.trusted")} value={resultMetrics.trustedResults} />
-              <StatPill label={tp("discover.results.fresh")} value={resultMetrics.freshResults} />
-            </div>
-          )}
-          </div>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className="font-display text-lg font-semibold text-fg md:text-xl">
+            {tp("discover.results.count", { count: pagination.total })}
+          </p>
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-fg-secondary">
+            <span className="hidden sm:inline">{tp("discover.sort.label")}</span>
+            <select
+              value={filters.sortBy || DEFAULT_JOB_SORT}
+              onChange={(event) =>
+                navigateToState(
+                  { ...filters, sortBy: event.target.value as JobSortOption, page: 1 },
+                  { scrollToResults: false },
+                )
+              }
+              className="rounded-full border border-line-strong bg-surface-raised px-3 py-1.5 text-sm text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              aria-label={tp("discover.sort.aria")}
+            >
+              {JOB_SORT_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {tp(SORT_LABELS[option])}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
-
-        {hasResults && !error && (
-          <div className="mb-6 rounded-[1.5rem] border border-success-line bg-success-soft px-4 py-4 text-sm text-fg-secondary">
-            {tp("discover.results.rankingNote")}
-          </div>
-        )}
 
         {error ? (
           <div role="alert" className="surface-panel-strong rounded-[1.75rem] border border-danger-line px-6 py-8">
@@ -215,7 +187,7 @@ export function JobsBrowseExperience({
         ) : hasResults ? (
           <div className="relative">
             <div
-              className={`grid gap-6 transition-opacity duration-200 md:grid-cols-2 lg:grid-cols-3 ${
+              className={`grid grid-cols-1 gap-4 transition-opacity duration-200 md:gap-5 md:grid-cols-2 lg:grid-cols-3 ${
                 isPending ? "opacity-35" : "opacity-100"
               }`}
             >

@@ -1,8 +1,8 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { CheckCircle2, Check } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, Check, SlidersHorizontal } from "lucide-react";
 import { JOB_FIELDS, WORKPLACE_TYPES } from "@/lib/job-options";
 import { usePublicT } from "@/lib/i18n/public-messages";
 import { usePublicLabel } from "@/lib/i18n/public-labels";
@@ -10,7 +10,7 @@ import { usePublicLabel } from "@/lib/i18n/public-labels";
 const SELECT_CLASS =
   "w-full rounded-xl border border-line-strong bg-surface-raised px-4 py-3 text-fg shadow-xs focus:outline-none focus:ring-2 focus:ring-focus";
 const chipClass = (active: boolean, activeClass: string) =>
-  `flex items-center justify-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+  `flex shrink-0 items-center whitespace-nowrap justify-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
     active ? activeClass : "border-line-strong bg-surface-raised text-fg-secondary hover:border-primary hover:text-fg"
   }`;
 
@@ -69,21 +69,15 @@ export function JobFilters({
   const tp = usePublicT();
   const label = usePublicLabel();
   const hasFilters = search || location || type || jobField || workplaceType || seniority || visaSponsorship || relocationAssistance || hiresFromAfrica || remote;
+  // On phones the four dropdowns fold behind "More filters" so results stay
+  // above the fold; from md up they are always visible.
+  const [showMore, setShowMore] = useState(false);
+  const activeSelects = [type, jobField, workplaceType, seniority].filter(Boolean).length;
+  const selectVisibility = showMore ? "" : "hidden md:block";
 
   return (
-    <div className="surface-panel-strong gloss-card mb-8 rounded-[2rem] p-6">
-      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary-text">{tp("discover.filters.eyebrow")}</p>
-          <h2 className="font-display mt-2 text-2xl font-bold text-fg">{tp("discover.filters.title")}</h2>
-        </div>
-        {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={onClear}>
-            {tp("discover.filters.clear")}
-          </Button>
-        )}
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="surface-panel-strong gloss-card mb-4 rounded-2xl p-4 md:mb-6 md:rounded-[2rem] md:p-6">
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-4 lg:grid-cols-4">
         <div className="relative">
           <Input
             type="search"
@@ -114,7 +108,7 @@ export function JobFilters({
           )}
         </div>
         <select
-          className={SELECT_CLASS}
+          className={`${SELECT_CLASS} ${selectVisibility}`}
           aria-label={tp("discover.filters.typeLabel")}
           value={type}
           onChange={(e) => onTypeChange(e.target.value)}
@@ -127,7 +121,7 @@ export function JobFilters({
           ))}
         </select>
         <select
-          className={SELECT_CLASS}
+          className={`${SELECT_CLASS} ${selectVisibility}`}
           aria-label={tp("discover.filters.fieldLabel")}
           value={jobField}
           onChange={(e) => onJobFieldChange(e.target.value)}
@@ -140,7 +134,7 @@ export function JobFilters({
           ))}
         </select>
         <select
-          className={SELECT_CLASS}
+          className={`${SELECT_CLASS} ${selectVisibility}`}
           aria-label={tp("discover.filters.workplaceLabel")}
           value={workplaceType}
           onChange={(e) => onWorkplaceTypeChange(e.target.value)}
@@ -153,7 +147,7 @@ export function JobFilters({
           ))}
         </select>
         <select
-          className={SELECT_CLASS}
+          className={`${SELECT_CLASS} ${selectVisibility}`}
           aria-label={tp("discover.filters.seniorityLabel")}
           value={seniority}
           onChange={(e) => onSeniorityChange(e.target.value)}
@@ -166,7 +160,19 @@ export function JobFilters({
           ))}
         </select>
       </div>
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="hide-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 md:mx-0 md:mt-5 md:flex-wrap md:overflow-visible md:px-0">
+        <button
+          type="button"
+          onClick={() => setShowMore((value) => !value)}
+          aria-expanded={showMore}
+          className={`md:hidden ${chipClass(showMore, "border-primary bg-primary-soft text-primary-text")}`}
+        >
+          <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
+          {tp("discover.filters.more")}
+          {activeSelects > 0 && (
+            <span className="rounded-full bg-primary px-1.5 text-xs font-bold tabular-nums text-primary-fg">{activeSelects}</span>
+          )}
+        </button>
         <button
           type="button"
           onClick={() => onRemoteChange(remote ? "" : "true")}
@@ -207,6 +213,15 @@ export function JobFilters({
           {hiresFromAfrica && <Check aria-hidden="true" className="w-4 h-4" />}
           {tp("discover.badge.hiresFromAfrica")}
         </button>
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-sm font-semibold text-primary-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            {tp("discover.filters.clear")}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -2,19 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Job, TrustRiskLevel, savedJobs } from "@/lib/api";
+import { Job, savedJobs } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrustBadge } from "@/components/trust/trust-badge";
 import { africaPill } from "@/lib/job-trust-labels";
 import { jobSourceDisplayName } from "@/lib/job-source";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { formatSalaryRange } from "@/lib/salary";
 import { jobDiscoveryEvents } from "@/lib/analytics";
 import { formatPostedShort } from "@/lib/posted-age";
-import { MapPin, Briefcase, Globe, Plane, Heart, Clock } from "lucide-react";
-import { Coachmark } from "@/components/ui/coachmark";
-import { usePublicT } from "@/lib/i18n/public-messages";
+import { MapPin, Briefcase, Heart, Clock } from "lucide-react";
+import { usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
 import { usePublicLabel, useLocationLabel } from "@/lib/i18n/public-labels";
 
 interface JobCardProps {
@@ -23,74 +21,63 @@ interface JobCardProps {
   initialSaved?: boolean;
 }
 
-type CardBadge = {
+export type CardSignal = {
   key: string;
-  label: string;
+  messageKey: PublicMessageKey;
   variant: "success" | "info" | "warning" | "danger";
-  riskLevel?: TrustRiskLevel;
-  coachmark?: { title: string; description: string };
 };
 
-const MAX_TRUST_BADGES = 2;
+/** At most three signals per card; the disclosed salary counts as one. */
+export const MAX_CARD_SIGNALS = 3;
 
 /**
- * Fixed priority so a card shows at most two trust badges plus one caution
- * badge. The detail page carries the full trust breakdown.
+ * Picks the few signals a list card shows, in a fixed priority:
+ * a caution (expired, region-restricted, new employer) always wins a slot,
+ * then the Africa-mobility signal (Hires from Africa > visa > open to
+ * Africa), then freshness, then trust, then relocation. A disclosed salary
+ * is rendered as its own line and takes one of the three slots. The detail
+ * page carries the full trust breakdown.
  */
-export function selectCardBadges(job: Job): { trust: CardBadge[]; caution: CardBadge | null } {
+export function selectCardSignals(job: Job, options: { hasSalary: boolean }): CardSignal[] {
   const africa = africaPill(job);
-  const trustCandidates: Array<CardBadge | null> = [
-    job.hiresFromAfrica
-      ? {
-          key: "hires-from-africa",
-          label: "Hires from Africa",
-          variant: "success",
-          coachmark: {
-            title: "Hires from Africa",
-            description:
-              "This role is verified as open to applicants based in Africa — located in Africa, remote-worldwide, or offering visa sponsorship.",
-          },
-        }
-      : null,
-    africa && africa.variant !== "warning"
-      ? { key: "africa", label: africa.label, variant: africa.variant === "success" ? "success" : "info" }
-      : null,
-    job.employer?.trust
-      ? {
-          key: "employer-trust",
-          label: job.employer.trust.badge,
-          riskLevel: job.employer.trust.riskLevel,
-          variant: "success",
-          coachmark: {
-            title: "Verified Trust Standard",
-            description:
-              "This employer has passed strict vetting criteria to ensure a transparent and credible hiring process for global talent.",
-          },
-        }
-      : null,
-    job.discovery?.trustedJob ? { key: "trusted", label: "Trusted job", variant: "success" } : null,
-    job.trust?.companyReviewed ? { key: "company-reviewed", label: "Company reviewed", variant: "info" } : null,
-    job.trust?.jobQualityChecked ? { key: "quality", label: "Job quality checked", variant: "success" } : null,
-    job.discovery?.sourceVerification === "DIRECT_EMPLOYER"
-      ? { key: "direct", label: "Direct employer source", variant: "success" }
-      : null,
-    job.discovery?.sourceVerification === "ATS_PRIMARY"
-      ? { key: "ats", label: "Verified ATS path", variant: "info" }
-      : null,
-  ];
+  const freshness = job.discovery?.freshnessLabel;
 
-  const cautionCandidates: Array<CardBadge | null> = [
-    job.isExpired ? { key: "expired", label: "Expired", variant: "danger" } : null,
-    africa && africa.variant === "warning" ? { key: "africa", label: africa.label, variant: "warning" } : null,
-    job.trust?.newEmployerCaution
-      ? { key: "new-employer", label: "New employer review", variant: "warning", riskLevel: "MEDIUM" }
-      : null,
-  ];
+  const caution: CardSignal | null = job.isExpired || freshness === "EXPIRED"
+    ? { key: "expired", messageKey: "discover.badge.expired", variant: "danger" }
+    : africa?.variant === "warning"
+      ? { key: "africa", messageKey: "discover.label.regionRestricted", variant: "warning" }
+      : job.trust?.newEmployerCaution
+        ? { key: "new-employer", messageKey: "discover.badge.newEmployer", variant: "warning" }
+        : null;
 
-  return {
-    trust: trustCandidates.filter((badge): badge is CardBadge => badge !== null).slice(0, MAX_TRUST_BADGES),
-    caution: cautionCandidates.find((badge): badge is CardBadge => badge !== null) ?? null,
-  };
+  const mobility: CardSignal | null = job.hiresFromAfrica
+    ? { key: "hires-from-africa", messageKey: "discover.badge.hiresFromAfrica", variant: "success" }
+    : job.visaSponsorship === "YES"
+      ? { key: "visa", messageKey: "discover.card.visa", variant: "info" }
+      : africa?.variant === "success"
+        ? { key: "africa", messageKey: "discover.label.openToAfrica", variant: "success" }
+        : africa?.variant === "info"
+          ? { key: "africa", messageKey: "discover.label.possiblyOpen", variant: "info" }
+          : null;
+
+  const fresh: CardSignal | null =
+    !job.isExpired && (freshness === "FRESH" || freshness === "RECENT")
+      ? { key: "fresh", messageKey: "discover.card.newListing", variant: "info" }
+      : null;
+
+  const trusted: CardSignal | null =
+    job.discovery?.trustedJob || job.employer?.trust
+      ? { key: "trusted", messageKey: "discover.badge.trustedJob", variant: "success" }
+      : null;
+
+  const relocation: CardSignal | null = job.relocationAssistance
+    ? { key: "relocation", messageKey: "discover.card.relocation", variant: "info" }
+    : null;
+
+  const slots = MAX_CARD_SIGNALS - (options.hasSalary ? 1 : 0);
+  return [caution, mobility, fresh, trusted, relocation]
+    .filter((signal): signal is CardSignal => signal !== null)
+    .slice(0, slots);
 }
 
 export function JobCard({ job, initialSaved = false }: JobCardProps) {
@@ -103,19 +90,21 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
   // Relative dates depend on "now", so compute after mount to keep server and
   // client markup identical (no hydration mismatch).
   const [postedLabel, setPostedLabel] = useState<string | null>(null);
-  const tags = Array.isArray(job.tags) ? job.tags : [];
   const salary = formatSalaryRange({
     salaryMin: job.salaryMin,
     salaryMax: job.salaryMax,
     currency: job.currency,
     salaryPeriod: job.salaryPeriod,
   });
-  const freshnessLabel = job.discovery?.freshnessLabel?.toLowerCase() ?? null;
-  const discoverySummary = job.rankingExplanation?.summary || job.trust?.guidance;
   const companyName = job.employer?.companyName || job.sourceName || null;
   const sourceName = jobSourceDisplayName(job);
-  const { trust: trustBadges, caution: cautionBadge } = selectCardBadges(job);
-  const cardBadges = cautionBadge ? [...trustBadges, cautionBadge] : trustBadges;
+  const signals = selectCardSignals(job, { hasSalary: Boolean(salary) });
+  const locationLine = job.workplaceType
+    ? `${locationLabel(job.location)} · ${label(job.workplaceType)}`
+    : locationLabel(job.location);
+  const roleLine = [job.type ? label(job.type) : null, job.seniority ? label(job.seniority) : null]
+    .filter(Boolean)
+    .join(" · ");
 
   useEffect(() => {
     setIsSaved(initialSaved);
@@ -152,7 +141,7 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
   return (
     <Link
       href={localizePath(`/jobs/${job.slug}`, locale)}
-      className="group block h-full"
+      className="group block h-full rounded-2xl focus-visible:outline-none"
       prefetch={false}
       onClick={() => {
         jobDiscoveryEvents.resultClicked({
@@ -165,166 +154,80 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
         });
       }}
     >
-      <Card className="isolate relative h-full cursor-pointer overflow-hidden border border-line bg-surface shadow-xs transition-all duration-300 group-hover:-translate-y-0.5 group-hover:border-emerald-300 group-hover:shadow-raised group-focus-visible:ring-2 group-focus-visible:ring-focus dark:group-hover:border-emerald-700">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/0 to-emerald-500/0 group-hover:via-emerald-500/5 transition-all duration-500 rounded-xl pointer-events-none" />
-        <CardContent className="relative z-10 flex h-full flex-col p-6">
-          <div className="flex justify-between items-start mb-3">
-            <div className="flex-1 pr-4">
-              <h3 className="font-display text-lg font-bold text-fg mb-1 line-clamp-2">
+      <Card className="relative h-full cursor-pointer border border-line bg-surface shadow-xs transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-raised group-focus-visible:ring-2 group-focus-visible:ring-focus motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
+        <CardContent className="flex h-full flex-col gap-3 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="font-display text-base font-semibold leading-snug text-fg line-clamp-2 group-hover:text-primary-text">
                 {job.title}
               </h3>
               {companyName && (
-                <p className="font-medium text-primary-text">{companyName}</p>
-              )}
-              {sourceName && (
-                <p data-testid="job-source-badge" className="mt-0.5 text-xs font-medium text-fg-muted">
-                  {tp("discover.card.via", { source: sourceName })}
-                </p>
-              )}
-              {cardBadges.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {cardBadges.map((badge) =>
-                    badge.coachmark ? (
-                      <Coachmark
-                        key={badge.key}
-                        title={label(badge.coachmark.title)}
-                        description={label(badge.coachmark.description)}
-                      >
-                        <TrustBadge label={label(badge.label)} riskLevel={badge.riskLevel} variant={badge.variant} />
-                      </Coachmark>
-                    ) : (
-                      <TrustBadge
-                        key={badge.key}
-                        label={label(badge.label)}
-                        riskLevel={badge.riskLevel}
-                        variant={badge.variant}
-                      />
-                    ),
-                  )}
-                </div>
+                <p className="mt-1 truncate text-sm font-medium text-fg-secondary">{companyName}</p>
               )}
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  void toggleSaved();
-                }}
-                disabled={isSaving}
-                className={`p-2 rounded-full transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70 ${
-                  isSaved 
-                    ? "bg-rose-50 text-rose-500 shadow-sm ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-500/30"
-                    : "bg-surface-sunken text-fg-muted hover:bg-surface-muted hover:text-fg-secondary"
-                }`}
-                aria-pressed={isSaved}
-                aria-label={isSaved ? tp("discover.card.unsave") : tp("discover.card.save")}
-              >
-                <Heart aria-hidden="true" className={`w-5 h-5 transition-transform duration-300 ${isSaved ? "fill-current scale-110" : "scale-100 active:scale-90"}`} />
-              </button>
-              <Badge variant="success">{label(job.type)}</Badge>
-              {job.jobField && <Badge variant="default">{label(job.jobField)}</Badge>}
-            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void toggleSaved();
+              }}
+              disabled={isSaving}
+              className={`-me-1 -mt-1 shrink-0 rounded-full p-2 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-70 ${
+                isSaved
+                  ? "bg-rose-50 text-rose-600 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30"
+                  : "text-fg-muted hover:bg-surface-muted hover:text-fg"
+              }`}
+              aria-pressed={isSaved}
+              aria-label={isSaved ? tp("discover.card.unsave") : tp("discover.card.save")}
+            >
+              <Heart aria-hidden="true" className={`h-5 w-5 ${isSaved ? "fill-current" : ""}`} />
+            </button>
           </div>
 
-          <div className="flex flex-wrap gap-4 mb-4">
-            <span className="inline-flex items-center text-sm font-medium text-fg-secondary">
-              <MapPin aria-hidden="true" className="w-4 h-4 me-1.5 text-primary-text" />
-              {job.workplaceType ? `${locationLabel(job.location)} · ${label(job.workplaceType).toLowerCase()}` : locationLabel(job.location)}
-            </span>
-            <span className="inline-flex items-center text-sm font-medium text-fg-secondary">
-              <Briefcase aria-hidden="true" className="w-4 h-4 me-1.5 text-primary-text" />
-              {label(job.seniority)}
-            </span>
+          <div className="space-y-1 text-sm text-fg-secondary">
+            <p className="flex min-w-0 items-center gap-1.5">
+              <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-fg-muted" />
+              <span className="truncate">{locationLine}</span>
+            </p>
+            {roleLine && (
+              <p className="flex min-w-0 items-center gap-1.5">
+                <Briefcase aria-hidden="true" className="h-4 w-4 shrink-0 text-fg-muted" />
+                <span className="truncate">{roleLine}</span>
+              </p>
+            )}
           </div>
 
           {salary && (
-            <p className="mb-4 font-display text-lg font-bold text-fg group-hover:text-primary-text transition-colors duration-200">{label(salary)}</p>
+            <p className="font-display text-base font-semibold tabular-nums text-fg">{label(salary)}</p>
           )}
 
-          {job.discovery && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {job.discovery.freshnessLabel && job.discovery.freshnessLabel !== "ACTIVE" && freshnessLabel && (
-                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/30 dark:text-emerald-300">
-                  {label(freshnessLabel)}
-                </span>
-              )}
-              {job.discovery.salaryTransparent && (
-                <span className="inline-flex items-center rounded-full border border-line bg-surface-muted px-2.5 py-1 text-xs font-semibold text-fg-secondary">
-                  {tp("discover.card.salaryDisclosed")}
-                </span>
-              )}
-              {job.discovery.verifiedApplyPath && job.discovery.applyPathType === "ATS" && (
-                <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-900/30 dark:text-indigo-300">
-                  {tp("discover.card.directAts")}
-                </span>
-              )}
-              {job.discovery.deliveryModel === "ON_PLATFORM" && (
-                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/30 dark:text-emerald-300">
-                  {tp("discover.label.applyOnAfriTalent")}
-                </span>
-              )}
-            </div>
-          )}
-
-          {discoverySummary && (
-            <p className="mb-4 text-sm leading-6 text-fg-secondary">
-              {discoverySummary}
-            </p>
-          )}
-
-          {(job.visaSponsorship === "YES" || job.relocationAssistance) && (
-            <div className="flex flex-wrap gap-2 mb-3">
-              {job.visaSponsorship === "YES" && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50/80 border border-blue-100 dark:border-blue-900/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-semibold shadow-sm">
-                  <Globe aria-hidden="true" className="w-3.5 h-3.5" />
-                  {tp("discover.card.visa")}
-                </span>
-              )}
-              {job.relocationAssistance && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50/80 border border-purple-100 dark:border-purple-900/50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-semibold shadow-sm">
-                  <Plane aria-hidden="true" className="w-3.5 h-3.5" />
-                  {tp("discover.card.relocation")}
-                </span>
-              )}
-            </div>
-          )}
-
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {tags.slice(0, 3).map((tag) => (
-                <Badge key={tag} variant="default">
-                  {tag}
+          {signals.length > 0 && (
+            <div className="flex flex-wrap gap-1.5" data-testid="job-card-signals">
+              {signals.map((signal) => (
+                <Badge key={signal.key} variant={signal.variant}>
+                  {tp(signal.messageKey)}
                 </Badge>
               ))}
-              {tags.length > 3 && (
-                <Badge variant="default">+{tags.length - 3}</Badge>
-              )}
             </div>
           )}
 
-          <div className="mt-auto" />
-
-          <div className="mt-4 flex items-center justify-between text-xs text-fg-muted border-t border-line pt-4">
-            <span className="flex items-center gap-1.5 font-medium">
-              <svg aria-hidden="true" className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-              {job.discovery?.verifiedApplyPath ? tp("discover.card.verifiedPath") : tp("discover.card.externalListing")}
-            </span>
-            <span className="flex items-center gap-2">
-              {job.discovery?.sourceCount && job.discovery.sourceCount > 1 ? (
-                <span>{tp("discover.badge.crossChecked", { count: job.discovery.sourceCount })}</span>
-              ) : null}
-              {postedLabel && (
-                <span className="inline-flex items-center gap-1" data-testid="job-card-posted">
-                  <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                  {label(postedLabel)}
-                </span>
-              )}
-            </span>
+          <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-3 text-xs text-fg-muted">
+            {sourceName ? (
+              <span data-testid="job-source-badge" className="truncate font-medium">
+                {tp("discover.card.via", { source: sourceName })}
+              </span>
+            ) : job.discovery?.deliveryModel === "ON_PLATFORM" ? (
+              <span className="truncate font-medium text-primary-text">{tp("discover.label.applyOnAfriTalent")}</span>
+            ) : (
+              <span />
+            )}
+            {postedLabel && (
+              <span className="inline-flex shrink-0 items-center gap-1" data-testid="job-card-posted">
+                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                {label(postedLabel)}
+              </span>
+            )}
           </div>
         </CardContent>
       </Card>

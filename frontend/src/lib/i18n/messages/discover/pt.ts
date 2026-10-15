@@ -145,6 +145,7 @@ export default {
   "discover.filters.eyebrow": "Explore o mercado",
   "discover.filters.title": "Encontre vagas que combinam com seus critérios de confiança, mobilidade e estilo de trabalho.",
   "discover.filters.clear": "Limpar filtros",
+  "discover.filters.more": "Mais filtros",
   "discover.filters.searchLabel": "Buscar vagas",
   "discover.filters.searchPlaceholder": "Cargo, habilidade ou empresa",
   "discover.filters.locationLabel": "Filtrar por local",
@@ -190,6 +191,7 @@ export default {
   "discover.card.via": "via {source}",
   "discover.card.visa": "Visto patrocinado",
   "discover.card.relocation": "Apoio à mudança",
+  "discover.card.newListing": "Nova",
   "discover.card.verifiedPath": "Caminho de candidatura verificado",
   "discover.card.externalListing": "Vaga externa, verifique antes de se candidatar",
 

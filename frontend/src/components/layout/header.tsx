@@ -328,7 +328,7 @@ function SiteHeader() {
                     aria-label={tp("site.header.accountMenu")}
                     className="inline-flex h-10 max-w-[13rem] items-center gap-2 rounded-full border border-line bg-surface ps-1 pe-2.5 text-sm font-medium text-fg-secondary transition-colors hover:bg-surface-muted hover:text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   >
-                    <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white">
+                    <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-xs font-semibold text-white">
                       {initialsOf(user.name)}
                     </span>
                     <span className="truncate whitespace-nowrap">{user.name}</span>

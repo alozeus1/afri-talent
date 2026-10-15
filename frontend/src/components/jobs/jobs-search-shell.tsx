@@ -85,7 +85,7 @@ export function JobsSearchShell({ filters, isPending = false, onNavigate, result
   };
 
   return (
-    <div className="mb-8">
+    <div className="mb-4 md:mb-6">
       <JobFilters
         search={draft.search}
         location={draft.location}
@@ -125,14 +125,12 @@ export function JobsSearchShell({ filters, isPending = false, onNavigate, result
           })
         }
       />
-      <div className="mt-3 flex flex-col gap-2 text-sm text-fg-muted sm:flex-row sm:items-center sm:justify-between">
-        <p>
-          {isLowBandwidth
-            ? tp("discover.shell.lite")
-            : tp("discover.shell.live")}
-        </p>
-        {isPending && <p role="status" className="font-semibold text-primary-text">{tp("discover.shell.refreshing")}</p>}
-      </div>
+      {(isLowBandwidth || isPending) && (
+        <div className="-mt-2 mb-2 flex flex-col gap-1 text-sm text-fg-muted sm:flex-row sm:items-center sm:justify-between">
+          {isLowBandwidth && <p>{tp("discover.shell.lite")}</p>}
+          {isPending && <p role="status" className="font-semibold text-primary-text">{tp("discover.shell.refreshing")}</p>}
+        </div>
+      )}
     </div>
   );
 }

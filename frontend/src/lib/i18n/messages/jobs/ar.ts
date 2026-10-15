@@ -12,6 +12,8 @@ export default {
   "jobs.hero.description": "استكشف أدواراً عن بُعد ودولية مصنّفة حسب الصلة والحداثة وإشارات الثقة وشفافية الرواتب والتنقل.",
   "jobs.hero.rankingSignals": "إشارات التصنيف",
   "jobs.hero.rankingDesc": "الثقة والحداثة والنية الدلالية والاستعداد العابر للحدود.",
+  "jobs.hero.compactTitle": "اعثر على وظائف مفتوحة للمواهب الأفريقية",
+  "jobs.hero.rankingInfo": "كيف يعمل الترتيب",
   "jobs.searchMarket": "اعثر على أدوار تتناسب مع ثقتك وتنقلك وأسلوب عملك.",
   "jobs.searchMarketDesc": "ابحث في السوق",
   "jobs.resultsUpdating": "تتحدث النتائج في الخلفية أثناء تحسين بحثك.",

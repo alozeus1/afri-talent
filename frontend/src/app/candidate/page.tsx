@@ -114,6 +114,31 @@ const workspaceLinks: WorkspaceLink[] = [
   { href: "/candidate/settings", key: "settings" },
 ];
 
+/** "$60K – $90K" in the viewer's locale; null when no salary is disclosed. */
+function formatCompactSalary(
+  min: number | null,
+  max: number | null,
+  currency: string | null,
+  locale: string,
+): string | null {
+  const values = [min, max].filter((v): v is number => v != null && v > 0);
+  if (values.length === 0) return null;
+  const intlLocale = locale === "en" ? "en-GB" : locale;
+  const format = (value: number) => {
+    try {
+      return new Intl.NumberFormat(intlLocale, {
+        style: "currency",
+        currency: currency || "USD",
+        notation: "compact",
+        maximumFractionDigits: 0,
+      }).format(value);
+    } catch {
+      return `${currency || "USD"} ${Math.round(value / 1000)}k`;
+    }
+  };
+  return values.map(format).join(" – ");
+}
+
 type NextAction = { id: string; href: string };
 
 function buildFallbackNextActions(params: {
@@ -454,7 +479,7 @@ export default function CandidateDashboard() {
           )}
 
           {retentionSummary ? (
-            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
               <Card>
                 <CardHeader>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -510,44 +535,65 @@ export default function CandidateDashboard() {
                   <p className="mt-1 text-sm text-fg-secondary">{bt(retentionSummary.weeklyDigest.headline)}</p>
                 </CardHeader>
                 <CardContent>
-                  <div className="mb-4 grid grid-cols-2 gap-3">
-                    <div className="rounded-xl border border-line bg-surface-sunken p-3">
-                      <p className="text-xs uppercase tracking-wide text-fg-muted">{t("dash.matches.trustedRoles")}</p>
-                      <p className="mt-1 text-lg font-semibold tabular-nums text-fg">
-                        {fmt.number(retentionSummary.weeklyDigest.trustedJobCount)}
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-line bg-surface-sunken p-3">
-                      <p className="text-xs uppercase tracking-wide text-fg-muted">{t("dash.matches.verifiedEmployers")}</p>
-                      <p className="mt-1 text-lg font-semibold tabular-nums text-fg">
-                        {fmt.number(retentionSummary.weeklyDigest.verifiedEmployerCount)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    {retentionSummary.recommendations.slice(0, 3).map((job) => (
-                      <div key={job.id} className="rounded-2xl border border-line bg-surface-sunken p-4">
-                        <Link
-                          href={href(`/jobs/${job.slug}`)}
-                          className="text-sm font-semibold text-fg hover:text-primary-text"
-                          onClick={() =>
-                            candidateRetentionEvents.recommendationClicked({
-                              source: "candidate_dashboard",
-                              job_id: job.id,
-                            })
-                          }
-                        >
-                          {job.title}
+                  {retentionSummary.recommendations.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken p-5">
+                      <Search className="mb-3 h-6 w-6 text-primary-text" aria-hidden="true" />
+                      <p className="text-sm font-semibold text-fg">{t("dash.matches.emptyTitle")}</p>
+                      <p className="mt-1 text-sm leading-6 text-fg-secondary">{t("dash.matches.emptyBody")}</p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Link href={href("/candidate/preferences")}>
+                          <Button size="sm">{t("dash.matches.setPreferences")}</Button>
                         </Link>
-                        <p className="mt-1 text-xs text-fg-muted">
-                          {[job.employer?.companyName, locationLabel(job.location)].filter(Boolean).join(" · ")}
-                        </p>
-                        {job.rankingExplanation?.summary ? (
-                          <p className="mt-2 text-xs text-fg-secondary">{job.rankingExplanation.summary}</p>
-                        ) : null}
+                        <Link href={href("/candidate/saved-searches")}>
+                          <Button size="sm" variant="outline">
+                            <Bell className="h-4 w-4" aria-hidden="true" />
+                            {t("dash.matches.createAlert")}
+                          </Button>
+                        </Link>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    <>
+                      {(retentionSummary.weeklyDigest.trustedJobCount > 0 ||
+                        retentionSummary.weeklyDigest.verifiedEmployerCount > 0) && (
+                        <div className="mb-4 grid grid-cols-2 gap-3">
+                          <div className="rounded-xl border border-line bg-surface-sunken p-3">
+                            <p className="text-xs uppercase tracking-wide text-fg-muted">{t("dash.matches.trustedRoles")}</p>
+                            <p className="mt-1 text-lg font-semibold tabular-nums text-fg">
+                              {fmt.number(retentionSummary.weeklyDigest.trustedJobCount)}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-line bg-surface-sunken p-3">
+                            <p className="text-xs uppercase tracking-wide text-fg-muted">{t("dash.matches.verifiedEmployers")}</p>
+                            <p className="mt-1 text-lg font-semibold tabular-nums text-fg">
+                              {fmt.number(retentionSummary.weeklyDigest.verifiedEmployerCount)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      <ul className="space-y-3">
+                        {retentionSummary.recommendations.slice(0, 3).map((job) => (
+                          <li key={job.id} className="rounded-2xl border border-line bg-surface-sunken p-4">
+                            <Link
+                              href={href(`/jobs/${job.slug}`)}
+                              className="text-sm font-semibold text-fg hover:text-primary-text"
+                              onClick={() =>
+                                candidateRetentionEvents.recommendationClicked({
+                                  source: "candidate_dashboard",
+                                  job_id: job.id,
+                                })
+                              }
+                            >
+                              {job.title}
+                            </Link>
+                            <p className="mt-1 text-xs text-fg-muted">
+                              {[job.employer?.companyName, locationLabel(job.location)].filter(Boolean).join(" · ")}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -738,55 +784,57 @@ export default function CandidateDashboard() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="hide-scrollbar flex snap-x gap-4 overflow-x-auto pb-4">
-                {instantMatches.map((job) => (
-                  <Link
-                    key={job.id}
-                    href={href(`/jobs/${job.slug}`)}
-                    className="group min-w-[280px] snap-start sm:min-w-[340px]"
-                  >
-                    <Card className="h-full transition-all duration-300 group-hover:-translate-y-1 group-hover:border-line-strong group-hover:shadow-raised">
-                      <CardContent className="p-5">
-                        <div className="mb-3 flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <h3 className="line-clamp-1 font-semibold text-fg">{job.title}</h3>
-                            <p className="text-sm font-medium text-primary-text">{job.companyName}</p>
-                          </div>
-                          <Badge variant="success">{enumLabel(t, "jobType", job.type)}</Badge>
-                        </div>
-                        <div className="mb-3 mt-4 flex flex-wrap items-center gap-3 text-xs text-fg-muted">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3.5 w-3.5" aria-hidden="true" /> {locationLabel(job.location)}
-                          </span>
-                          {job.hiresFromAfrica && (
-                            <span className="font-medium text-primary-text">{t("dash.recommended.hiresFromAfrica")}</span>
-                          )}
-                        </div>
-                        {(job.salaryMin != null || job.salaryMax != null) && (
-                          <div className="border-t border-line pt-3 font-semibold tabular-nums text-fg">
-                            {[job.salaryMin, job.salaryMax]
-                              .filter((v): v is number => v != null)
-                              .map((v) => `${job.currency ?? "$"}${Math.round(v / 1000)}k`)
-                              .join(" – ")}
-                          </div>
-                        )}
-                        {job.matchedSkills.length > 0 && (
-                          <div className="mt-3 flex flex-wrap gap-1.5">
-                            {job.matchedSkills.map((skill) => (
-                              <span
-                                key={skill}
-                                className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary-text"
-                              >
-                                {skill}
+              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="recommended-grid">
+                {instantMatches.slice(0, 6).map((job) => {
+                  const salary = formatCompactSalary(job.salaryMin, job.salaryMax, job.currency, fmt.locale);
+                  return (
+                    <li key={job.id} className="min-w-0">
+                      <Link
+                        href={href(`/jobs/${job.slug}`)}
+                        className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                      >
+                        <Card className="h-full transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-raised motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
+                          <CardContent className="flex h-full flex-col gap-3 p-5">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <h3 className="line-clamp-2 font-semibold leading-snug text-fg group-hover:text-primary-text">
+                                  {job.title}
+                                </h3>
+                                <p className="mt-0.5 truncate text-sm text-fg-secondary">{job.companyName}</p>
+                              </div>
+                              <Badge variant="default" className="shrink-0">{enumLabel(t, "jobType", job.type)}</Badge>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-muted">
+                              <span className="flex min-w-0 items-center gap-1">
+                                <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span className="truncate">{locationLabel(job.location)}</span>
                               </span>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
+                              {job.hiresFromAfrica && (
+                                <span className="font-medium text-primary-text">{t("dash.recommended.hiresFromAfrica")}</span>
+                              )}
+                            </div>
+                            {job.matchedSkills.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {job.matchedSkills.slice(0, 4).map((skill) => (
+                                  <span
+                                    key={skill}
+                                    className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary-text"
+                                  >
+                                    {skill}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {salary && (
+                              <p className="mt-auto border-t border-line pt-3 text-sm font-semibold tabular-nums text-fg">{salary}</p>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </section>
         </Tabs.Content>

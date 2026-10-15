@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { JobCard, selectCardBadges } from "../job-card";
+import { JobCard, MAX_CARD_SIGNALS, selectCardSignals } from "../job-card";
 import { ApiError, Job } from "@/lib/api";
 
 const saveMock = jest.fn();
@@ -118,29 +118,38 @@ describe("JobCard", () => {
     unsaveMock.mockReset();
   });
 
-  it("renders a compact set of trust and discovery indicators", () => {
+  it("shows at most three signals, counting the salary line as one", () => {
     render(<JobCard job={job} />);
 
-    // Africa pill first, then the next trust badge by priority — max two.
-    expect(screen.getByText("Open to Africa")).toBeInTheDocument();
-    expect(screen.getByText("Trusted job")).toBeInTheDocument();
-    expect(screen.queryByText("Company reviewed")).not.toBeInTheDocument();
-    expect(screen.queryByText("Verified ATS path")).not.toBeInTheDocument();
-    expect(screen.getByText("Cross-checked x2")).toBeInTheDocument();
-    expect(screen.getByText("Salary disclosed")).toBeInTheDocument();
-    expect(screen.getByText("Direct ATS apply")).toBeInTheDocument();
-    expect(screen.getByText(/Recently refreshed job listing/i)).toBeInTheDocument();
+    // Salary + visa (mobility) + freshness = three signals.
+    expect(screen.getByText(/USD/)).toBeInTheDocument();
+    expect(screen.getByText("Visa sponsored")).toBeInTheDocument();
+    expect(screen.getByText("New")).toBeInTheDocument();
+    const signals = screen.getByTestId("job-card-signals");
+    expect(signals.children).toHaveLength(MAX_CARD_SIGNALS - 1);
+    expect(screen.queryByText("Trusted job")).not.toBeInTheDocument();
+    expect(screen.queryByText("Relocation support")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Senior Backend Engineer/i })).toHaveAttribute(
       "href",
       "/en/jobs/senior-backend-engineer",
     );
   });
 
-  it("drops the duplicate visa pill, the credibility line and the raw ISO date", () => {
+  it("drops the boilerplate ranking sentence, tags and discovery pills", () => {
     render(<JobCard job={job} />);
-    expect(screen.getAllByText(/visa/i)).toHaveLength(1);
+    expect(screen.queryByText(/Recently refreshed job listing/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Salary disclosed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Direct ATS apply")).not.toBeInTheDocument();
+    expect(screen.queryByText("Node.js")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cross-checked/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Why this looks credible/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/2026-01-02/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the company and location line", () => {
+    render(<JobCard job={job} />);
+    expect(screen.getByText("AfriTalent Labs")).toBeInTheDocument();
+    expect(screen.getByText(/Remote - Europe/)).toBeInTheDocument();
   });
 
   it("shows a relative posted label after mount", async () => {
@@ -154,13 +163,14 @@ describe("JobCard", () => {
     expect(screen.queryByText("AfriTalent Labs")).not.toBeInTheDocument();
   });
 
-  it("suppresses the Africa pill when the Hires from Africa badge already renders", () => {
+  it("prefers Hires from Africa over the visa signal", () => {
     render(<JobCard job={{ ...job, hiresFromAfrica: true }} />);
     expect(screen.getByText("Hires from Africa")).toBeInTheDocument();
+    expect(screen.queryByText("Visa sponsored")).not.toBeInTheDocument();
     expect(screen.queryByText("Open to Africa")).not.toBeInTheDocument();
   });
 
-  it("shows a single caution badge (Expired wins) without pulsing", () => {
+  it("always keeps a caution signal (Expired wins) without pulsing", () => {
     const { container } = render(
       <JobCard
         job={{
@@ -174,18 +184,26 @@ describe("JobCard", () => {
     expect(screen.getByText("Expired")).toBeInTheDocument();
     expect(screen.queryByText("Region-restricted")).not.toBeInTheDocument();
     expect(screen.queryByText("New employer review")).not.toBeInTheDocument();
+    expect(screen.queryByText("New")).not.toBeInTheDocument();
     expect(container.querySelector(".animate-pulse")).toBeNull();
   });
 
-  it("caps badges at two trust plus one caution", () => {
-    const { trust, caution } = selectCardBadges({
-      ...job,
-      hiresFromAfrica: true,
-      eligibleCountries: ["DE"],
-      trust: { ...job.trust!, newEmployerCaution: true },
-    });
-    expect(trust.map((b) => b.label)).toEqual(["Hires from Africa", "Trusted job"]);
-    expect(caution?.label).toBe("New employer review");
+  it("fills three badge slots by priority when no salary is disclosed", () => {
+    const signals = selectCardSignals(
+      {
+        ...job,
+        hiresFromAfrica: true,
+        eligibleCountries: ["DE"],
+        trust: { ...job.trust!, newEmployerCaution: true },
+      },
+      { hasSalary: false },
+    );
+    expect(signals.map((s) => s.key)).toEqual(["new-employer", "hires-from-africa", "fresh"]);
+  });
+
+  it("uses only two badge slots when the salary line is shown", () => {
+    const signals = selectCardSignals(job, { hasSalary: true });
+    expect(signals.map((s) => s.key)).toEqual(["visa", "fresh"]);
   });
 
   it("persists the heart optimistically via savedJobs", async () => {

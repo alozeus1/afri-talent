@@ -145,6 +145,7 @@ export default {
   "discover.filters.eyebrow": "استكشف السوق",
   "discover.filters.title": "اعثر على وظائف تناسب معايير الثقة والتنقل وأسلوب العمل لديك.",
   "discover.filters.clear": "مسح عوامل التصفية",
+  "discover.filters.more": "مزيد من الفلاتر",
   "discover.filters.searchLabel": "البحث عن وظائف",
   "discover.filters.searchPlaceholder": "المسمى الوظيفي أو المهارة أو الشركة",
   "discover.filters.locationLabel": "التصفية حسب الموقع",
@@ -190,6 +191,7 @@ export default {
   "discover.card.via": "عبر {source}",
   "discover.card.visa": "رعاية التأشيرة",
   "discover.card.relocation": "دعم الانتقال",
+  "discover.card.newListing": "جديد",
   "discover.card.verifiedPath": "مسار تقديم موثّق",
   "discover.card.externalListing": "إعلان خارجي، تحقق منه قبل التقديم",
 

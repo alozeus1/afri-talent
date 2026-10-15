@@ -12,6 +12,8 @@ export default {
   "jobs.hero.description": "Explora roles remotos e internacionales clasificados por relevancia, actualidad, señales de confianza, transparencia salarial y movilidad.",
   "jobs.hero.rankingSignals": "Señales de clasificación",
   "jobs.hero.rankingDesc": "Confianza, actualidad, intención semántica y preparación transfronteriza.",
+  "jobs.hero.compactTitle": "Encuentra empleos abiertos al talento africano",
+  "jobs.hero.rankingInfo": "Cómo funciona el orden",
   "jobs.searchMarket": "Encuentra roles que coincidan con tu confianza, movilidad y estilo de trabajo.",
   "jobs.searchMarketDesc": "Busca en el mercado",
   "jobs.resultsUpdating": "Los resultados se actualizan en segundo plano mientras refinas tu búsqueda.",

@@ -118,7 +118,18 @@ router.get("/", authenticate, authorize(Role.CANDIDATE), async (req: Request, re
       return;
     }
 
-    res.json(profile);
+    // The stored score is only refreshed by PUT /profile and resume uploads,
+    // so profiles filled through other paths (quick apply, resume parsing,
+    // seeding, imports) could read 0%. Always report the live score and
+    // backfill the column when it has drifted (fire-and-forget).
+    const completeness = computeProfileCompleteness(profile);
+    if (completeness !== profile.profileCompleteness) {
+      void prisma.candidateProfile
+        .update({ where: { id: profile.id }, data: { profileCompleteness: completeness } })
+        .catch((err: unknown) => console.error("Profile completeness backfill error:", err));
+    }
+
+    res.json({ ...profile, profileCompleteness: completeness });
   } catch (error) {
     console.error("Get profile error:", error);
     res.status(500).json({ error: "Internal server error" });

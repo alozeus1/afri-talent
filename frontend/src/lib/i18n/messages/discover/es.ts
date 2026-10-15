@@ -145,6 +145,7 @@ export default {
   "discover.filters.eyebrow": "Explora el mercado",
   "discover.filters.title": "Encuentra puestos que encajen con tus criterios de confianza, movilidad y forma de trabajo.",
   "discover.filters.clear": "Borrar filtros",
+  "discover.filters.more": "Más filtros",
   "discover.filters.searchLabel": "Buscar empleos",
   "discover.filters.searchPlaceholder": "Puesto, habilidad o empresa",
   "discover.filters.locationLabel": "Filtrar por ubicación",
@@ -190,6 +191,7 @@ export default {
   "discover.card.via": "vía {source}",
   "discover.card.visa": "Visado patrocinado",
   "discover.card.relocation": "Ayuda para reubicación",
+  "discover.card.newListing": "Nuevo",
   "discover.card.verifiedPath": "Ruta de postulación verificada",
   "discover.card.externalListing": "Oferta externa, verifícala antes de postular",
 
