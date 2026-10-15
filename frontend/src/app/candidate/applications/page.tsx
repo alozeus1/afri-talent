@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ClipboardList, MessageSquare } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
   applications,
@@ -13,96 +14,91 @@ import {
   MessageThread,
 } from "@/lib/api";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { enumLabel, useCandidateFormatters, useCandidateT } from "@/lib/i18n/candidate-messages";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
 import { APPLICATION_ASSISTANT_STATUSES } from "@/lib/early-tester-content";
+import {
+  CandidateBackLink,
+  CandidateLoadError,
+  CandidatePageHeader,
+  CandidateSpinner,
+  CandidateStat,
+  candidateFieldClass,
+} from "@/components/candidate/candidate-ui";
+import { applicationStatusVariants } from "@/components/candidate/application-status";
 
-const statusColors: Record<string, string> = {
-  PENDING: "bg-gray-400",
-  REVIEWING: "bg-blue-500",
-  SHORTLISTED: "bg-yellow-500",
-  ACCEPTED: "bg-emerald-500",
-  REJECTED: "bg-red-500",
-};
-
-const statusVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
-  PENDING: "default",
-  REVIEWING: "info",
-  SHORTLISTED: "warning",
-  ACCEPTED: "success",
-  REJECTED: "danger",
+const statusBar: Record<string, string> = {
+  PENDING: "bg-line-strong",
+  REVIEWING: "bg-info",
+  SHORTLISTED: "bg-warning",
+  INTERVIEW: "bg-info",
+  OFFERED: "bg-success",
+  ACCEPTED: "bg-success",
+  HIRED: "bg-success",
+  REJECTED: "bg-danger",
 };
 
 type SortKey = "newest" | "status";
 type LocalTrackerState = Record<string, { status: string; note: string; reminder: string }>;
-
-function timeAgo(dateStr: string): string {
-  const now = new Date();
-  const date = new Date(dateStr);
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 30) return `${diffDays}d ago`;
-  const diffMonths = Math.floor(diffDays / 30);
-  if (diffMonths < 12) return `${diffMonths}mo ago`;
-  return `${Math.floor(diffMonths / 12)}y ago`;
-}
+const TRACKER_STORAGE_KEY = "afritalent_application_tracker";
 
 export default function CandidateApplicationsPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const locale = useLocale();
+  const t = useCandidateT();
+  const fmt = useCandidateFormatters();
   const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [funnel, setFunnel] = useState<ApplicationFunnel | null>(null);
   const [threads, setThreads] = useState<MessageThread[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [sortBy, setSortBy] = useState<SortKey>("newest");
   const [localTracker, setLocalTracker] = useState<LocalTrackerState>(() => {
     if (typeof window === "undefined") return {};
     try {
-      const saved = window.localStorage.getItem("afritalent_application_tracker");
+      const saved = window.localStorage.getItem(TRACKER_STORAGE_KEY);
       return saved ? (JSON.parse(saved) as LocalTrackerState) : {};
     } catch {
       return {};
     }
   });
 
+  const href = (path: string) => localizePath(path, locale);
+
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "CANDIDATE")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      applications.my(),
+      candidateAnalytics.applicationFunnel(),
+      messages.threads().then((r) => r.threads).catch(() => [] as MessageThread[]),
+    ])
+      .then(([apps, funnelData, threadData]) => {
+        setMyApplications(apps);
+        setFunnel(funnelData);
+        setThreads(threadData);
+      })
+      .catch((err) => setError(err))
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
-    if (user?.role === "CANDIDATE") {
-      Promise.all([
-        applications.my(),
-        candidateAnalytics.applicationFunnel(),
-        messages.threads().then((r) => r.threads).catch(() => [] as MessageThread[]),
-      ])
-        .then(([apps, funnelData, threadData]) => {
-          setMyApplications(apps);
-          setFunnel(funnelData);
-          setThreads(threadData);
-        })
-        .catch((err) => setError(err instanceof Error ? err.message : "Failed to load data"))
-        .finally(() => setLoading(false));
-    }
-  }, [user]);
+    if (user?.role === "CANDIDATE") load();
+  }, [user, load]);
 
   if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+    return <CandidateSpinner className="py-24" />;
   }
 
   const sorted = [...myApplications].sort((a, b) => {
@@ -121,226 +117,213 @@ export default function CandidateApplicationsPage() {
           ...patch,
         },
       };
-      window.localStorage.setItem("afritalent_application_tracker", JSON.stringify(next));
+      try {
+        window.localStorage.setItem(TRACKER_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* storage unavailable: keep in-memory state */
+      }
       return next;
     });
   }
 
-  const funnelTotal = funnel
-    ? funnel.totalApplied + funnel.reviewing + funnel.shortlisted + funnel.accepted
-    : 0;
+  const funnelTotal = funnel ? funnel.totalApplied + funnel.reviewing + funnel.shortlisted + funnel.accepted : 0;
 
-  const funnelSegments = funnel && funnelTotal > 0
-    ? [
-        { label: "Applied", count: funnel.totalApplied, color: "bg-gray-400" },
-        { label: "Reviewing", count: funnel.reviewing, color: "bg-blue-500" },
-        { label: "Shortlisted", count: funnel.shortlisted, color: "bg-yellow-500" },
-        { label: "Accepted", count: funnel.accepted, color: "bg-emerald-500" },
-      ]
-    : [];
-
-  const statCards = funnel
-    ? [
-        { label: "Total Applied", value: funnel.totalApplied, color: "text-fg-secondary", bg: "bg-surface-sunken" },
-        { label: "In Review", value: funnel.reviewing, color: "text-blue-700", bg: "bg-blue-50" },
-        { label: "Shortlisted", value: funnel.shortlisted, color: "text-yellow-700", bg: "bg-yellow-50" },
-        { label: "Accepted", value: funnel.accepted, color: "text-emerald-700", bg: "bg-emerald-50" },
-        { label: "Rejected", value: funnel.rejected, color: "text-red-700", bg: "bg-red-50" },
-      ]
-    : [];
+  const funnelSegments =
+    funnel && funnelTotal > 0
+      ? [
+          { label: t("apps.pipeline.applied"), count: funnel.totalApplied, color: "bg-line-strong" },
+          { label: t("apps.pipeline.reviewing"), count: funnel.reviewing, color: "bg-info" },
+          { label: t("apps.pipeline.shortlisted"), count: funnel.shortlisted, color: "bg-warning" },
+          { label: t("apps.pipeline.accepted"), count: funnel.accepted, color: "bg-success" },
+        ]
+      : [];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Header */}
-      <div className="mb-8">
-        <Link href="/candidate" className="inline-flex items-center text-primary-text hover:text-emerald-700 mb-4">
-          <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Back to Dashboard
-        </Link>
-        <h1 className="text-3xl font-bold text-fg mb-2">My Applications</h1>
-        <p className="text-fg-secondary">Track the status of your job applications</p>
-        <p className="mt-2 text-sm text-amber-700">
-          Early tester mode: notes, follow-up reminders, and expanded statuses are saved locally until backend tracker persistence is added.
-        </p>
-      </div>
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+      <CandidateBackLink href={href("/candidate")}>{t("nav.backToDashboard")}</CandidateBackLink>
+      <CandidatePageHeader
+        title={t("apps.title")}
+        description={
+          <>
+            {t("apps.subtitle")}
+            <span className="mt-1 block text-xs text-fg-muted">{t("apps.localNote")}</span>
+          </>
+        }
+        actions={
+          <Link href={href("/jobs")}>
+            <Button>{t("apps.empty.cta")}</Button>
+          </Link>
+        }
+      />
 
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-6 text-sm">{error}</div>
-      )}
+      {error ? (
+        <CandidateLoadError className="mb-6" error={error} subject={t("ui.subject.applications")} onRetry={load} />
+      ) : null}
 
       {loading ? (
-        <div className="flex justify-center py-24">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-        </div>
-      ) : (
+        <CandidateSpinner label={t("dash.apps.loading")} className="py-24" />
+      ) : error ? null : (
         <>
-          {/* Summary Stat Cards */}
           {funnel && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-              {statCards.map((stat) => (
-                <Card key={stat.label} className={stat.bg}>
-                  <CardContent className="p-4 text-center">
-                    <div className={`text-2xl font-bold ${stat.color} mb-1`}>{stat.value}</div>
-                    <div className="text-sm text-fg-secondary">{stat.label}</div>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+              <CandidateStat label={t("apps.stat.totalApplied")} value={fmt.number(funnel.totalApplied)} />
+              <CandidateStat label={t("apps.stat.inReview")} value={fmt.number(funnel.reviewing)} tone="info" />
+              <CandidateStat label={t("apps.stat.shortlisted")} value={fmt.number(funnel.shortlisted)} tone="warning" />
+              <CandidateStat label={t("apps.stat.accepted")} value={fmt.number(funnel.accepted)} tone="success" />
+              <CandidateStat label={t("apps.stat.rejected")} value={fmt.number(funnel.rejected)} />
             </div>
           )}
 
-          {/* Pipeline Funnel Bar */}
-          {funnelSegments.length > 0 && funnelTotal > 0 && (
+          {funnelSegments.length > 0 && (
             <Card className="mb-8">
               <CardContent className="p-6">
-                <h2 className="text-lg font-semibold text-fg mb-4">Application Pipeline</h2>
-                <div className="flex h-8 rounded-full overflow-hidden bg-surface-muted">
+                <h2 className="mb-4 text-lg font-semibold text-fg">{t("apps.pipeline.title")}</h2>
+                <div className="flex h-3 overflow-hidden rounded-full bg-surface-muted" aria-hidden="true">
                   {funnelSegments.map((seg) =>
                     seg.count > 0 ? (
                       <div
                         key={seg.label}
-                        className={`${seg.color} flex items-center justify-center text-white text-xs font-medium transition-all`}
+                        className={`${seg.color} transition-all`}
                         style={{ width: `${(seg.count / funnelTotal) * 100}%` }}
-                        title={`${seg.label}: ${seg.count}`}
-                      >
-                        {seg.count}
-                      </div>
-                    ) : null
+                      />
+                    ) : null,
                   )}
                 </div>
-                <div className="flex flex-wrap gap-4 mt-3">
+                <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
                   {funnelSegments.map((seg) => (
-                    <div key={seg.label} className="flex items-center gap-2 text-sm text-fg-secondary">
-                      <span className={`w-3 h-3 rounded-full ${seg.color}`} />
-                      {seg.label} ({seg.count})
-                    </div>
+                    <li key={seg.label} className="flex items-center gap-2 text-sm text-fg-secondary">
+                      <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${seg.color}`} />
+                      {t("apps.pipeline.segment", { label: seg.label, count: fmt.number(seg.count) })}
+                    </li>
                   ))}
-                </div>
+                </ul>
               </CardContent>
             </Card>
           )}
 
-          {/* Sort Controls */}
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-fg">All Applications</h2>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-fg-muted">Sort by:</span>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-fg">{t("apps.list.title")}</h2>
+            <label className="flex items-center gap-2 text-sm text-fg-muted">
+              {t("apps.sort.label")}
               <select
-                className="px-3 py-1.5 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className={`${candidateFieldClass} w-auto py-1.5`}
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortKey)}
               >
-                <option value="newest">Newest First</option>
-                <option value="status">Status</option>
+                <option value="newest">{t("apps.sort.newest")}</option>
+                <option value="status">{t("apps.sort.status")}</option>
               </select>
-            </div>
+            </label>
           </div>
 
-          {/* Application List */}
           {sorted.length === 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <div className="text-4xl mb-4">📋</div>
-                <p className="text-fg-secondary mb-4">No applications yet. Start exploring jobs!</p>
-                <Link href="/jobs">
-                  <Button>Browse Jobs</Button>
-                </Link>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={<ClipboardList className="h-6 w-6" />}
+              title={t("apps.empty.title")}
+              description={t("apps.empty.body")}
+              primaryAction={{ label: t("apps.empty.cta"), href: href("/jobs") }}
+            />
           ) : (
-            <div className="space-y-4">
-              {sorted.map((app) => (
-                <Card key={app.id}>
-                  <CardContent className="p-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-1">
+            <ul className="space-y-4">
+              {sorted.map((app) => {
+                const thread = threads.find((th) => th.job?.id === app.job.id);
+                const tracker = localTracker[app.id];
+                return (
+                  <li key={app.id}>
+                    <Card className="overflow-hidden">
+                      <div aria-hidden="true" className={`h-1 ${statusBar[app.status] || "bg-line-strong"}`} />
+                      <CardContent className="p-6">
+                        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex flex-wrap items-center gap-3">
+                              <Link
+                                href={href(`/jobs/${app.job.slug}`)}
+                                className="truncate text-lg font-semibold text-fg hover:text-primary-text"
+                              >
+                                {app.job.title}
+                              </Link>
+                              <Badge variant={applicationStatusVariants[app.status] || "default"}>
+                                {enumLabel(t, "status", app.status)}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-fg-secondary">
+                              {[app.job.employer?.companyName, app.job.location, app.job.type ? enumLabel(t, "jobType", app.job.type) : null]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                            <p className="mt-1 text-xs text-fg-muted">
+                              <time dateTime={app.createdAt} title={fmt.dateTime(app.createdAt)}>
+                                {t("apps.applied", { time: fmt.relative(app.createdAt) })}
+                              </time>
+                            </p>
+                            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                              <label className="text-xs font-medium text-fg-secondary">
+                                {t("apps.tracker.status")}
+                                <select
+                                  value={tracker?.status || "Applied"}
+                                  onChange={(event) => updateLocalTracker(app.id, { status: event.target.value })}
+                                  className={`${candidateFieldClass} mt-1 text-xs`}
+                                >
+                                  {APPLICATION_ASSISTANT_STATUSES.map((status) => (
+                                    <option key={status} value={status}>
+                                      {enumLabel(t, "tracker", status)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label className="text-xs font-medium text-fg-secondary">
+                                {t("apps.tracker.reminder")}
+                                <input
+                                  type="date"
+                                  value={tracker?.reminder || ""}
+                                  onChange={(event) => updateLocalTracker(app.id, { reminder: event.target.value })}
+                                  className={`${candidateFieldClass} mt-1 text-xs`}
+                                />
+                              </label>
+                              <label className="text-xs font-medium text-fg-secondary">
+                                {t("apps.tracker.notes")}
+                                <input
+                                  type="text"
+                                  value={tracker?.note || ""}
+                                  onChange={(event) => updateLocalTracker(app.id, { note: event.target.value })}
+                                  placeholder={t("apps.tracker.notesPlaceholder")}
+                                  className={`${candidateFieldClass} mt-1 text-xs`}
+                                />
+                              </label>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap items-center gap-2">
+                            <Link href={href(`/jobs/${app.job.slug}`)}>
+                              <Button variant="outline" size="sm">
+                                {t("apps.viewJob")}
+                              </Button>
+                            </Link>
+                            <Link href={href("/candidate/calendar")}>
+                              <Button variant="ghost" size="sm">
+                                {t("apps.schedule")}
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                        {thread ? (
                           <Link
-                            href={`/jobs/${app.job.slug}`}
-                            className="text-lg font-semibold text-fg hover:text-primary-text truncate"
+                            href={href(`/messages/${thread.id}`)}
+                            className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-primary-text hover:underline"
                           >
-                            {app.job.title}
+                            <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
+                            {t("apps.messages")}
                           </Link>
-                          <Badge variant={statusVariants[app.status] || "default"}>
-                            {app.status}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-fg-secondary">
-                          {app.job.employer?.companyName}
-                          {app.job.location && ` • ${app.job.location}`}
-                          {app.job.type && ` • ${app.job.type}`}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          Applied {timeAgo(app.createdAt)}
-                        </p>
-                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                          <label className="text-xs text-fg-secondary">
-                            Tracker status
-                            <select
-                              value={localTracker[app.id]?.status || "Applied"}
-                              onChange={(event) => updateLocalTracker(app.id, { status: event.target.value })}
-                              className="mt-1 w-full rounded-md border border-line-strong px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            >
-                              {APPLICATION_ASSISTANT_STATUSES.map((status) => (
-                                <option key={status} value={status}>{status}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="text-xs text-fg-secondary">
-                            Follow-up reminder
-                            <input
-                              type="date"
-                              value={localTracker[app.id]?.reminder || ""}
-                              onChange={(event) => updateLocalTracker(app.id, { reminder: event.target.value })}
-                              className="mt-1 w-full rounded-md border border-line-strong px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            />
-                          </label>
-                          <label className="text-xs text-fg-secondary">
-                            Notes
-                            <input
-                              type="text"
-                              value={localTracker[app.id]?.note || ""}
-                              onChange={(event) => updateLocalTracker(app.id, { note: event.target.value })}
-                              placeholder="Recruiter, next step, concern..."
-                              className="mt-1 w-full rounded-md border border-line-strong px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                            />
-                          </label>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Link href={`/jobs/${app.job.slug}`}>
-                          <Button variant="outline" size="sm">View Job</Button>
-                        </Link>
-                        <Link href="/candidate/calendar">
-                          <Button variant="ghost" size="sm">Schedule Interview</Button>
-                        </Link>
-                      </div>
-                    </div>
-                    {/* Status indicator bar */}
-                    <div className={`mt-4 h-1 rounded-full ${statusColors[app.status] || "bg-gray-300"}`} />
-                    {(() => {
-                      const thread = threads.find((t) => t.job?.id === app.job.id);
-                      return thread ? (
-                        <Link
-                          href={localizePath(`/messages/${thread.id}`, locale)}
-                          className="inline-flex items-center gap-1 text-xs text-primary-text hover:text-emerald-700 mt-2"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3-3-3z" />
-                          </svg>
-                          View messages with employer
-                        </Link>
-                      ) : null;
-                    })()}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </>
       )}
-      <div className="mt-8">
+      <div className="mt-10">
         <EarlyTesterFeedback area="Application tracker usefulness" />
       </div>
     </div>

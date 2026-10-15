@@ -4,6 +4,9 @@ import type { SupportedLocale } from "../config";
 import admin from "./admin";
 import auth from "./auth";
 import candidate from "./candidate";
+import candidateAi from "./candidateAi";
+import candidateHome from "./candidateHome";
+import candidateProfile from "./candidateProfile";
 import common from "./common";
 import companies from "./companies";
 import home from "./home";
@@ -30,8 +33,8 @@ export const SITE_NAMESPACES = {
   companies,
 } as const;
 
-/** Area namespaces with their own hooks (useAdminT, useSupportT). */
-export const AREA_NAMESPACES = { admin, support } as const;
+/** Area namespaces with their own hooks (useAdminT, useSupportT, useCandidateT). */
+export const AREA_NAMESPACES = { admin, support, candidateHome, candidateProfile, candidateAi } as const;
 
 export const ALL_NAMESPACES: Record<string, Record<SupportedLocale, Record<string, string>>> = {
   ...SITE_NAMESPACES,
