@@ -7,8 +7,13 @@ import ReactMarkdown from "react-markdown";
 import type { Resource } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import FeedbackToast from "@/components/ui/feedback-toast";
+import { ArrowLeft } from "lucide-react";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { usePublicT } from "@/lib/i18n/public-messages";
 
 export default function ResourceArticle({ resource }: { resource: Resource }) {
+  const tp = usePublicT();
+  const locale = useLocale();
   const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => {
@@ -19,19 +24,17 @@ export default function ResourceArticle({ resource }: { resource: Resource }) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <Link href="/resources" className="inline-flex items-center text-primary-text hover:text-emerald-700 mb-6">
-        <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Resources
+      <Link href={localizePath("/resources", locale)} className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-primary-text hover:underline">
+        <ArrowLeft className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
+        {tp("site.error.backToResources")}
       </Link>
 
       <article className="bg-surface rounded-xl border border-line overflow-hidden">
         {resource.coverImage && (
-          <div className="relative h-64 md:h-80 bg-gray-200">
+          <div className="relative h-64 md:h-80 bg-surface-muted">
             <Image
               src={resource.coverImage}
-              alt={resource.title}
+              alt=""
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 896px"
@@ -43,16 +46,18 @@ export default function ResourceArticle({ resource }: { resource: Resource }) {
         <div className="p-8">
           <Badge variant="info" className="mb-4">{resource.category}</Badge>
 
-          <h1 className="text-3xl md:text-4xl font-bold text-fg mb-4">
+          <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight text-fg mb-4">
             {resource.title}
           </h1>
 
           {resource.publishedAt && (
             <p className="text-fg-muted mb-6">
-              Published on {new Date(resource.publishedAt).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric"
+              {tp("guides.resources.publishedOn", {
+                date: new Date(resource.publishedAt).toLocaleDateString(locale, {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                }),
               })}
             </p>
           )}
@@ -61,7 +66,7 @@ export default function ResourceArticle({ resource }: { resource: Resource }) {
             {resource.excerpt}
           </p>
 
-          <div className="prose prose-emerald max-w-none prose-headings:font-bold prose-headings:text-fg prose-p:text-fg-secondary prose-p:leading-relaxed prose-a:text-primary-text prose-a:no-underline hover:prose-a:underline prose-strong:text-fg prose-li:text-fg-secondary">
+          <div className="prose prose-emerald dark:prose-invert max-w-none prose-headings:font-bold prose-headings:text-fg prose-p:text-fg-secondary prose-p:leading-relaxed prose-a:text-primary-text prose-a:no-underline hover:prose-a:underline prose-strong:text-fg prose-li:text-fg-secondary">
             <ReactMarkdown>{resource.content}</ReactMarkdown>
           </div>
         </div>
@@ -70,9 +75,8 @@ export default function ResourceArticle({ resource }: { resource: Resource }) {
       <FeedbackToast
         visible={showFeedback}
         onClose={() => setShowFeedback(false)}
-        onFeedback={(type, reason) => {
-          console.log("Feedback received:", type, reason);
-          // Here you would normally send to your API
+        onFeedback={() => {
+          // Article feedback is not persisted yet; the toast only acknowledges it.
         }}
       />
     </div>

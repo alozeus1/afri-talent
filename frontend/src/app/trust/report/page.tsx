@@ -10,24 +10,29 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TrustStatusBanner } from "@/components/trust/trust-status-banner";
 import { TrustSupportCard } from "@/components/trust/trust-support-card";
-import { humanizeTrustValue } from "@/lib/trust-labels";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
 
-const reportReasons: AbuseReportInput["reason"][] = [
-  "SCAM",
-  "FAKE_JOB",
-  "IMPERSONATION",
-  "SPAM",
-  "OFF_PLATFORM_CONTACT",
-  "ADVANCE_FEE_REQUEST",
-  "HARASSMENT",
-  "FAKE_PROFILE",
-  "MISLEADING_SALARY",
-  "OTHER",
-];
+const REASON_LABELS: Record<AbuseReportInput["reason"], PublicMessageKey> = {
+  SCAM: "guides.report.reason.SCAM",
+  FAKE_JOB: "guides.report.reason.FAKE_JOB",
+  IMPERSONATION: "guides.report.reason.IMPERSONATION",
+  SPAM: "guides.report.reason.SPAM",
+  OFF_PLATFORM_CONTACT: "guides.report.reason.OFF_PLATFORM_CONTACT",
+  ADVANCE_FEE_REQUEST: "guides.report.reason.ADVANCE_FEE_REQUEST",
+  HARASSMENT: "guides.report.reason.HARASSMENT",
+  FAKE_PROFILE: "guides.report.reason.FAKE_PROFILE",
+  MISLEADING_SALARY: "guides.report.reason.MISLEADING_SALARY",
+  OTHER: "guides.report.reason.OTHER",
+};
+const reportReasons = Object.keys(REASON_LABELS) as AbuseReportInput["reason"][];
+
+const FIELD_CLASS =
+  "w-full rounded-xl border border-line-strong bg-surface-raised px-4 py-3 text-fg placeholder:text-fg-muted shadow-xs focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus";
 
 function ReportAbusePageContent() {
   const locale = useLocale();
+  const tp = usePublicT();
   const searchParams = useSearchParams();
   const { user } = useAuth();
 
@@ -47,19 +52,19 @@ function ReportAbusePageContent() {
   const activeTargets = useMemo(
     () =>
       [
-        { label: "Reported user", value: reportedUserId },
-        { label: "Employer", value: employerId },
-        { label: "Job", value: targetJobId },
-        { label: "Application", value: targetApplicationId },
-        { label: "Conversation", value: targetThreadId },
+        { label: tp("guides.report.target.user"), value: reportedUserId },
+        { label: tp("guides.report.target.employer"), value: employerId },
+        { label: tp("guides.report.target.job"), value: targetJobId },
+        { label: tp("guides.report.target.application"), value: targetApplicationId },
+        { label: tp("guides.report.target.conversation"), value: targetThreadId },
       ].filter((target) => Boolean(target.value)),
-    [employerId, reportedUserId, targetApplicationId, targetJobId, targetThreadId],
+    [employerId, reportedUserId, targetApplicationId, targetJobId, targetThreadId, tp],
   );
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!user) {
-      setError("You need to sign in before submitting a trust or abuse report.");
+      setError(tp("guides.report.signInError"));
       return;
     }
 
@@ -83,7 +88,7 @@ function ReportAbusePageContent() {
       setError(
         submissionError instanceof Error
           ? submissionError.message
-          : "Failed to submit your report.",
+          : tp("guides.report.submitError"),
       );
     } finally {
       setSubmitting(false);
@@ -92,24 +97,23 @@ function ReportAbusePageContent() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
-      <section className="rounded-3xl border border-red-200 bg-gradient-to-br from-red-50 via-white to-amber-50 p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700 mb-3">
-          Safety Report
-        </p>
-        <h1 className="text-4xl font-bold text-fg mb-4">Report scams, impersonation, or suspicious behavior</h1>
-        <p className="max-w-3xl text-lg text-fg-secondary">
-          AfriTalent uses reports to trigger risk scoring, moderation review, and account holds when needed. Give us enough detail to investigate quickly.
-        </p>
+      <section className="relative overflow-hidden rounded-3xl border border-line bg-surface p-8 shadow-xs">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-red-500/10 via-transparent to-amber-500/10" aria-hidden="true" />
+        <div className="relative">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-danger">{tp("guides.report.eyebrow")}</p>
+          <h1 className="font-display mb-4 text-4xl font-bold tracking-tight text-fg">{tp("guides.report.title")}</h1>
+          <p className="max-w-3xl text-lg text-fg-secondary">{tp("guides.report.subtitle")}</p>
+        </div>
       </section>
 
       {!user && (
         <TrustStatusBanner
           tone="warning"
-          title="Sign in to file a report"
-          body="We require authentication so moderators can follow up, connect your report to platform activity, and reduce abuse of the reporting system."
+          title={tp("guides.report.signInTitle")}
+          body={tp("guides.report.signInBody")}
           actions={
-            <Link href={localizePath("/login?redirect=/trust/report", locale)}>
-              <Button className="bg-amber-700 hover:bg-amber-800">Sign in</Button>
+            <Link href={`${localizePath("/login", locale)}?redirect=${encodeURIComponent(localizePath("/trust/report", locale))}`}>
+              <Button>{tp("guides.report.signIn")}</Button>
             </Link>
           }
         />
@@ -118,17 +122,15 @@ function ReportAbusePageContent() {
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-fg">Submit a report</h2>
-            <p className="text-sm text-fg-secondary">
-              Use one clear reason code. Include links, payment requests, off-platform contact requests, or identity concerns in the details.
-            </p>
+            <h2 className="text-xl font-semibold text-fg">{tp("guides.report.formTitle")}</h2>
+            <p className="text-sm text-fg-secondary">{tp("guides.report.formBody")}</p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
                 <TrustStatusBanner
                   tone="danger"
-                  title="We couldn't submit this report"
+                  title={tp("guides.report.errorTitle")}
                   body={error}
                 />
               )}
@@ -136,76 +138,81 @@ function ReportAbusePageContent() {
               {success && (
                 <TrustStatusBanner
                   tone="success"
-                  title="Report submitted"
-                  body={`${success.message} Report ID: ${success.reportId}. Case ID: ${success.caseId}.`}
+                  title={tp("guides.report.successTitle")}
+                  body={tp("guides.report.successBody", { message: success.message, reportId: success.reportId, caseId: success.caseId })}
                 />
               )}
 
               <div>
                 <label htmlFor="reason" className="block text-sm font-medium text-fg-secondary mb-1">
-                  Reason
+                  {tp("guides.report.reason")}
                 </label>
                 <select
                   id="reason"
                   value={reason}
                   onChange={(event) => setReason(event.target.value as AbuseReportInput["reason"])}
-                  className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className={FIELD_CLASS}
                 >
                   {reportReasons.map((value) => (
                     <option key={value} value={value}>
-                      {humanizeTrustValue(value)}
+                      {tp(REASON_LABELS[value])}
                     </option>
                   ))}
                 </select>
               </div>
 
               <Input
-                label="Reported user ID"
+                id="report-user"
+                label={tp("guides.report.userId")}
                 value={reportedUserId}
                 onChange={(event) => setReportedUserId(event.target.value)}
-                placeholder="Optional if you are reporting a profile"
+                placeholder={tp("guides.report.userIdHint")}
               />
               <Input
-                label="Employer ID"
+                id="report-employer"
+                label={tp("guides.report.employerId")}
                 value={employerId}
                 onChange={(event) => setEmployerId(event.target.value)}
-                placeholder="Optional if you are reporting a company account"
+                placeholder={tp("guides.report.employerIdHint")}
               />
               <Input
-                label="Job ID"
+                id="report-job"
+                label={tp("guides.report.jobId")}
                 value={targetJobId}
                 onChange={(event) => setTargetJobId(event.target.value)}
-                placeholder="Optional if you are reporting a job"
+                placeholder={tp("guides.report.jobIdHint")}
               />
               <Input
-                label="Application ID"
+                id="report-application"
+                label={tp("guides.report.applicationId")}
                 value={targetApplicationId}
                 onChange={(event) => setTargetApplicationId(event.target.value)}
-                placeholder="Optional if you are reporting an application"
+                placeholder={tp("guides.report.applicationIdHint")}
               />
               <Input
-                label="Conversation ID"
+                id="report-thread"
+                label={tp("guides.report.threadId")}
                 value={targetThreadId}
                 onChange={(event) => setTargetThreadId(event.target.value)}
-                placeholder="Optional if you are reporting a message thread"
+                placeholder={tp("guides.report.threadIdHint")}
               />
 
               <div>
                 <label htmlFor="details" className="block text-sm font-medium text-fg-secondary mb-1">
-                  What happened?
+                  {tp("guides.report.details")}
                 </label>
                 <textarea
                   id="details"
                   value={details}
                   onChange={(event) => setDetails(event.target.value)}
                   rows={8}
-                  placeholder="Describe the suspicious behavior, payment request, impersonation claim, or scam pattern you saw."
-                  className="w-full rounded-lg border border-line-strong bg-surface px-4 py-3 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder={tp("guides.report.detailsHint")}
+                  className={FIELD_CLASS}
                 />
               </div>
 
               <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
-                {submitting ? "Submitting report..." : "Submit report"}
+                {submitting ? tp("guides.report.submitting") : tp("discover.report.submit")}
               </Button>
             </form>
           </CardContent>
@@ -214,7 +221,7 @@ function ReportAbusePageContent() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <h2 className="text-xl font-semibold text-fg">Current targets</h2>
+              <h2 className="text-xl font-semibold text-fg">{tp("guides.report.targetsTitle")}</h2>
             </CardHeader>
             <CardContent className="space-y-3">
               {activeTargets.length ? (
@@ -227,27 +234,19 @@ function ReportAbusePageContent() {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-fg-secondary">
-                  No target IDs were prefilled. You can still submit a report if you provide at least one identifier above.
-                </p>
+                <p className="text-sm text-fg-secondary">{tp("guides.report.noTargets")}</p>
               )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <h2 className="text-xl font-semibold text-fg">What happens next</h2>
+              <h2 className="text-xl font-semibold text-fg">{tp("guides.report.nextTitle")}</h2>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-fg-secondary">
-              <p className="rounded-2xl border border-line bg-surface-sunken px-4 py-3">
-                Moderators use your report together with account behavior, verification evidence, and other trust signals before taking action.
-              </p>
-              <p className="rounded-2xl border border-line bg-surface-sunken px-4 py-3">
-                Screenshots are useful, but IDs, links, timestamps, and the exact off-platform request usually help moderators act faster.
-              </p>
-              <p className="rounded-2xl border border-line bg-surface-sunken px-4 py-3">
-                We use reports as one signal among many. A badge is never removed or granted based on a single self-assertion alone.
-              </p>
+              <p className="rounded-2xl border border-line bg-surface-sunken px-4 py-3">{tp("guides.report.next1")}</p>
+              <p className="rounded-2xl border border-line bg-surface-sunken px-4 py-3">{tp("guides.report.next2")}</p>
+              <p className="rounded-2xl border border-line bg-surface-sunken px-4 py-3">{tp("guides.report.next3")}</p>
             </CardContent>
           </Card>
         </div>
@@ -255,8 +254,8 @@ function ReportAbusePageContent() {
 
       <TrustSupportCard
         reportHref={localizePath("/trust/report", locale)}
-        title="Need urgent help instead?"
-        description="If you are unsure which reason code to choose or something feels actively unsafe, contact support and include the links, IDs, or payment request involved."
+        title={tp("guides.report.urgentTitle")}
+        description={tp("guides.report.urgentBody")}
       />
     </div>
   );
@@ -267,7 +266,7 @@ export default function ReportAbusePage() {
     <Suspense
       fallback={
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="h-48 animate-pulse rounded-3xl bg-surface-muted dark:bg-gray-800" />
+          <div className="h-48 animate-pulse rounded-3xl bg-surface-muted" />
         </div>
       }
     >

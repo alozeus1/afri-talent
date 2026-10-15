@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { usePublicT } from '@/lib/i18n/public-messages';
 
 type FeedbackType = 'up' | 'down';
 
@@ -21,6 +22,7 @@ type Props = {
 const FEEDBACK_CLOSE_DELAY = 1500; // ms
 
 export default function FeedbackToast({ visible, onClose, onFeedback, mode = 'feedback', title, message }: Props) {
+  const tp = usePublicT();
   const [selected, setSelected] = useState<FeedbackType | null>(null);
   const [showReasonInput, setShowReasonInput] = useState(false);
   const [reason, setReason] = useState('');
@@ -75,21 +77,23 @@ export default function FeedbackToast({ visible, onClose, onFeedback, mode = 'fe
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           transition={{ duration: 0.3, ease: 'easeInOut' }}
-          className="fixed right-4 bottom-4 z-50 w-full max-w-sm"
+          role="status"
+          aria-live="polite"
+          className="fixed end-4 bottom-4 z-50 w-[calc(100%-2rem)] max-w-sm"
         >
           <motion.div
             layout
-            className="bg-background border-border overflow-hidden rounded-xl border p-4 shadow-xl"
+            className="overflow-hidden rounded-xl border border-line bg-surface-raised p-4 shadow-overlay"
           >
             {mode === 'success' ? (
               <motion.div layout className="flex items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-primary-text">
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-success-soft text-primary-text">
+                  <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-foreground text-sm font-medium">{title || "Success!"}</p>
+                  <p className="text-foreground text-sm font-medium">{title || tp("site.toast.success")}</p>
                   {message && <p className="text-muted-foreground text-xs">{message}</p>}
                 </div>
               </motion.div>
@@ -97,25 +101,25 @@ export default function FeedbackToast({ visible, onClose, onFeedback, mode = 'fe
               <>
                 {selected === null && (
                   <motion.div layout className="flex items-center justify-between">
-                    <p className="text-foreground text-sm font-medium">{title || "Was this helpful?"}</p>
+                    <p className="text-foreground text-sm font-medium">{title || tp("site.toast.helpful")}</p>
                     <div className="flex gap-2">
                       <Button
                         variant="ghost"
                         size="sm"
-                        aria-label="Thumbs up"
+                        aria-label={tp("site.toast.up")}
                         onClick={() => handleThumb('up')}
                         className="cursor-pointer p-2"
                       >
-                        <ThumbsUp className="h-4 w-4 text-green-600" />
+                        <ThumbsUp aria-hidden="true" className="h-4 w-4 text-success" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        aria-label="Thumbs down"
+                        aria-label={tp("site.toast.down")}
                         onClick={() => handleThumb('down')}
                         className="cursor-pointer p-2"
                       >
-                        <ThumbsDown className="h-4 w-4 text-red-600" />
+                        <ThumbsDown aria-hidden="true" className="h-4 w-4 text-danger" />
                       </Button>
                     </div>
                   </motion.div>
@@ -124,11 +128,11 @@ export default function FeedbackToast({ visible, onClose, onFeedback, mode = 'fe
                 {selected === 'down' && showReasonInput && (
                   <motion.div layout className="mt-2 space-y-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-foreground text-sm font-medium">What could be better?</p>
+                      <p className="text-foreground text-sm font-medium">{tp("site.toast.better")}</p>
                       <Button
                         size="sm"
                         variant="ghost"
-                        aria-label="Close"
+                        aria-label={tp("site.trust.close")}
                         onClick={onClose}
                         className="text-muted-foreground hover:text-foreground cursor-pointer p-2"
                       >
@@ -137,7 +141,8 @@ export default function FeedbackToast({ visible, onClose, onFeedback, mode = 'fe
                     </div>
 
                     <Textarea
-                      placeholder="Share your reason (optional)"
+                      placeholder={tp("site.toast.reason")}
+                      aria-label={tp("site.toast.reason")}
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                       className="w-full resize-none"
@@ -149,11 +154,11 @@ export default function FeedbackToast({ visible, onClose, onFeedback, mode = 'fe
                         <Button
                           size="sm"
                           variant="ghost"
-                          aria-label="Back"
+                          aria-label={tp("site.toast.back")}
                           onClick={handleBack}
                           className="cursor-pointer p-2"
                         >
-                          <ArrowLeft className="h-4 w-4" />
+                          <ArrowLeft aria-hidden="true" className="h-4 w-4 rtl:rotate-180" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -161,11 +166,11 @@ export default function FeedbackToast({ visible, onClose, onFeedback, mode = 'fe
                           onClick={handleSkip}
                           className="text-muted-foreground cursor-pointer px-2"
                         >
-                          Skip
+                          {tp("site.toast.skip")}
                         </Button>
                       </div>
                       <Button onClick={handleSubmit} className="cursor-pointer">
-                        Submit
+                        {tp("site.toast.submit")}
                       </Button>
                     </div>
                   </motion.div>
@@ -173,7 +178,7 @@ export default function FeedbackToast({ visible, onClose, onFeedback, mode = 'fe
               </>
             ) : (
               <motion.p layout className="text-foreground text-sm">
-                Thanks — we appreciate your feedback!
+                {tp("site.toast.thanks")}
               </motion.p>
             )}
           </motion.div>

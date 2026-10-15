@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Check, ChevronDown, FileText, Globe2, Plus, X } from "lucide-react";
 import {
   immigration,
   ImmigrationProcess,
@@ -13,63 +15,59 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { usePublicT, type PublicMessageKey, type PublicT } from "@/lib/i18n/public-messages";
 
-const VISA_INFO: Record<
-  string,
-  { emoji: string; description: string }
-> = {
-  "UK Skilled Worker": {
-    emoji: "🇬🇧",
-    description:
-      "Work in the UK with a licensed employer sponsor. Requires a job offer and minimum salary threshold.",
-  },
-  "Canada Express Entry": {
-    emoji: "🇨🇦",
-    description:
-      "Points-based immigration system for skilled workers. Includes Federal Skilled Worker, CEC, and FST programs.",
-  },
-  "Germany Blue Card": {
-    emoji: "🇩🇪",
-    description:
-      "EU Blue Card for highly qualified professionals. Requires a university degree and job offer above salary threshold.",
-  },
-  "USA H-1B": {
-    emoji: "🇺🇸",
-    description:
-      "Specialty occupation visa for workers in fields requiring a bachelor's degree or higher. Subject to annual lottery.",
-  },
-  "Australia Skilled Worker": {
-    emoji: "🇦🇺",
-    description:
-      "Subclass 189/190 visas for skilled workers on the occupation list. Points-tested permanent residency pathway.",
-  },
-  "Netherlands HSM": {
-    emoji: "🇳🇱",
-    description:
-      "Highly Skilled Migrant visa. Fast-track work permit for professionals with salary above Dutch threshold.",
-  },
+// Visa routes shown before the API templates load (or when it returns none).
+// Descriptions are translated; the route names are official programme names.
+const VISA_INFO: Record<string, { emoji: string; description: PublicMessageKey }> = {
+  "UK Skilled Worker": { emoji: "🇬🇧", description: "guides.visa.ukSkilled" },
+  "Canada Express Entry": { emoji: "🇨🇦", description: "guides.visa.canadaExpress" },
+  "Germany Blue Card": { emoji: "🇩🇪", description: "guides.visa.germanyBlue" },
+  "USA H-1B": { emoji: "🇺🇸", description: "guides.visa.usaH1b" },
+  "Australia Skilled Worker": { emoji: "🇦🇺", description: "guides.visa.australiaSkilled" },
+  "Netherlands HSM": { emoji: "🇳🇱", description: "guides.visa.netherlandsHsm" },
 };
 
-function statusBadge(status: string) {
+const HOW_IT_WORKS: Array<{ title: PublicMessageKey; body: PublicMessageKey }> = [
+  { title: "guides.visa.how1Title", body: "guides.visa.how1Body" },
+  { title: "guides.visa.how2Title", body: "guides.visa.how2Body" },
+  { title: "guides.visa.how3Title", body: "guides.visa.how3Body" },
+];
+
+const FIELD_CLASS =
+  "w-full rounded-xl border border-line-strong bg-surface-raised px-4 py-3 text-fg placeholder:text-fg-muted shadow-xs focus:outline-none focus:ring-2 focus:ring-focus";
+
+function StatusBadge({ status, tp }: { status: string; tp: PublicT }) {
   switch (status.toUpperCase()) {
     case "IN_PROGRESS":
-      return <Badge variant="info">In Progress</Badge>;
+      return <Badge variant="info">{tp("guides.visa.status.inProgress")}</Badge>;
     case "APPROVED":
     case "COMPLETED":
-      return <Badge variant="success">Completed</Badge>;
+      return <Badge variant="success">{tp("guides.visa.status.completed")}</Badge>;
     case "PENDING":
-      return <Badge variant="warning">Pending</Badge>;
+      return <Badge variant="warning">{tp("guides.visa.status.pending")}</Badge>;
     case "REJECTED":
     case "DENIED":
-      return <Badge variant="danger">Denied</Badge>;
+      return <Badge variant="danger">{tp("guides.visa.status.denied")}</Badge>;
     default:
       return <Badge>{status}</Badge>;
   }
 }
 
+function Spinner({ label }: { label: string }) {
+  return (
+    <div className="flex justify-center py-8" role="status" aria-label={label}>
+      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+    </div>
+  );
+}
+
 export default function ImmigrationPage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const tp = usePublicT();
+  const locale = useLocale();
 
   // Templates
   const [templates, setTemplates] = useState<VisaTemplate[]>([]);
@@ -80,9 +78,11 @@ export default function ImmigrationPage() {
   const [processes, setProcesses] = useState<ImmigrationProcess[]>([]);
   const [processesLoading, setProcessesLoading] = useState(true);
   const [processesError, setProcessesError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  // Expanded process
+  // Expanded process / pending delete confirmation
   const [expandedProcessId, setExpandedProcessId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Create process dialog
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -109,9 +109,9 @@ export default function ImmigrationPage() {
   // Redirect non-candidates
   useEffect(() => {
     if (!authLoading && user && user.role !== "CANDIDATE" && user.role !== "ADMIN") {
-      router.push("/");
+      router.push(localizePath("/", locale));
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, user, router, locale]);
 
   // Load templates
   useEffect(() => {
@@ -120,12 +120,13 @@ export default function ImmigrationPage() {
         const data = await immigration.templates();
         setTemplates(data);
       } catch (err) {
-        setTemplatesError(err instanceof Error ? err.message : "Failed to load templates");
+        setTemplatesError(err instanceof Error ? err.message : tp("guides.visa.errTemplates"));
       } finally {
         setTemplatesLoading(false);
       }
     };
     loadTemplates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once; tp only formats fallback copy
   }, []);
 
   // Load processes
@@ -137,11 +138,11 @@ export default function ImmigrationPage() {
       const data = await immigration.processes();
       setProcesses(data);
     } catch (err) {
-      setProcessesError(err instanceof Error ? err.message : "Failed to load processes");
+      setProcessesError(err instanceof Error ? err.message : tp("guides.visa.errProcesses"));
     } finally {
       setProcessesLoading(false);
     }
-  }, [user]);
+  }, [user, tp]);
 
   useEffect(() => {
     if (user) {
@@ -151,14 +152,25 @@ export default function ImmigrationPage() {
     }
   }, [user, authLoading, loadProcesses]);
 
+  // Escape closes the create dialog.
+  useEffect(() => {
+    if (!showCreateForm) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowCreateForm(false);
+        setCreateError(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showCreateForm]);
+
   // Start from template
   const startFromTemplate = async (template: VisaTemplate) => {
-    if (!user) {
-      alert("Please log in to start tracking.");
-      return;
-    }
+    if (!user) return;
     setCreateLoading(true);
     setCreateError(null);
+    setActionError(null);
     try {
       await immigration.createProcess({
         visaType: template.visaType,
@@ -167,7 +179,7 @@ export default function ImmigrationPage() {
       await loadProcesses();
       setShowCreateForm(false);
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Failed to create process");
+      setActionError(err instanceof Error ? err.message : tp("guides.visa.errCreate"));
     } finally {
       setCreateLoading(false);
     }
@@ -196,32 +208,31 @@ export default function ImmigrationPage() {
         expectedEndDate: "",
       });
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Failed to create process");
+      setCreateError(err instanceof Error ? err.message : tp("guides.visa.errCreate"));
     } finally {
       setCreateLoading(false);
     }
   };
 
-  // Delete process
+  // Delete process (two-step confirmation inline, no browser dialog)
   const handleDeleteProcess = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this immigration process?")) return;
+    setActionError(null);
     try {
       await immigration.deleteProcess(id);
       setProcesses((prev) => prev.filter((p) => p.id !== id));
       if (expandedProcessId === id) setExpandedProcessId(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete process");
+      setActionError(err instanceof Error ? err.message : tp("guides.visa.errDelete"));
+    } finally {
+      setConfirmDeleteId(null);
     }
   };
 
   // Update step status
-  const handleToggleStep = async (
-    processId: string,
-    step: ImmigrationStep
-  ) => {
+  const handleToggleStep = async (processId: string, step: ImmigrationStep) => {
     const newStatus = step.status === "APPROVED" ? "PENDING" : "APPROVED";
-    const completedAt =
-      newStatus === "APPROVED" ? new Date().toISOString() : undefined;
+    const completedAt = newStatus === "APPROVED" ? new Date().toISOString() : undefined;
+    setActionError(null);
     try {
       await immigration.updateStep(processId, step.id, {
         status: newStatus,
@@ -234,15 +245,13 @@ export default function ImmigrationPage() {
           return {
             ...p,
             steps: p.steps.map((s) =>
-              s.id === step.id
-                ? { ...s, status: newStatus, completedAt: completedAt || null }
-                : s
+              s.id === step.id ? { ...s, status: newStatus, completedAt: completedAt || null } : s,
             ),
           };
-        })
+        }),
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update step");
+      setActionError(err instanceof Error ? err.message : tp("guides.visa.errStep"));
     }
   };
 
@@ -251,25 +260,24 @@ export default function ImmigrationPage() {
     e.preventDefault();
     if (!addStepProcessId) return;
     setAddStepLoading(true);
+    setActionError(null);
     try {
       const newStep = await immigration.addStep(addStepProcessId, {
         name: stepData.name,
         description: stepData.description || undefined,
         dueDate: stepData.dueDate || undefined,
-        documents: stepData.documents
-          ? stepData.documents.split(",").map((d) => d.trim())
-          : undefined,
+        documents: stepData.documents ? stepData.documents.split(",").map((d) => d.trim()) : undefined,
       });
       setProcesses((prev) =>
         prev.map((p) => {
           if (p.id !== addStepProcessId) return p;
           return { ...p, steps: [...p.steps, newStep] };
-        })
+        }),
       );
       setAddStepProcessId(null);
       setStepData({ name: "", description: "", dueDate: "", documents: "" });
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to add step");
+      setActionError(err instanceof Error ? err.message : tp("guides.visa.errAddStep"));
     } finally {
       setAddStepLoading(false);
     }
@@ -278,120 +286,111 @@ export default function ImmigrationPage() {
   // Auth loading
   if (authLoading) {
     return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+      <div className="py-24">
+        <Spinner label={tp("guides.visa.loading")} />
       </div>
     );
   }
 
-  // Redirect if not candidate
+  // Candidates only
   if (!user || (user.role !== "CANDIDATE" && user.role !== "ADMIN")) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-24 text-center">
-        <p className="text-fg-secondary dark:text-gray-400">
-          This page is available for candidates only. Please log in with a
-          candidate account.
-        </p>
-        <Button className="mt-4" onClick={() => router.push("/login")}>
-          Log In
-        </Button>
+      <div className="mx-auto max-w-xl px-4 py-24 text-center">
+        <Globe2 className="mx-auto mb-4 h-10 w-10 text-primary-text" aria-hidden="true" />
+        <h1 className="font-display mb-3 text-2xl font-bold text-fg">{tp("guides.visa.title")}</h1>
+        <p className="text-fg-secondary">{tp("guides.visa.candidatesOnly")}</p>
+        <Link href={`${localizePath("/login", locale)}?redirect=${encodeURIComponent(localizePath("/immigration", locale))}`}>
+          <Button className="mt-6">{tp("guides.visa.logIn")}</Button>
+        </Link>
       </div>
     );
   }
 
+  const templateCards: VisaTemplate[] =
+    templates.length > 0
+      ? templates
+      : Object.keys(VISA_INFO).map((key) => ({
+          visaType: key,
+          country: key.split(" ")[0],
+          description: "",
+          steps: [],
+        })) as VisaTemplate[];
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Header — what this page is for and how to use it */}
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-fg dark:text-gray-100 mb-4">
-          Visa &amp; Relocation Readiness
-        </h1>
-        <p className="text-lg text-fg-secondary dark:text-gray-300 max-w-2xl mx-auto">
-          Your personal tracker for the visa journey behind a job offer. Pick the
-          visa route you&apos;re pursuing, and AfriTalent gives you the full step-by-step
-          checklist for that country — mark each step as you complete it, keep your
-          documents list in one place, and always know exactly where you stand.
-        </p>
-        <div className="mx-auto mt-6 grid max-w-3xl grid-cols-1 gap-3 text-left sm:grid-cols-3">
-          {[
-            { n: "1", t: "Pick your route", d: "Choose a visa template for your target country — or build a custom process." },
-            { n: "2", t: "Work the checklist", d: "Each route comes with its real-world steps and document requirements." },
-            { n: "3", t: "Track your status", d: "Update steps as you go: researching → documents → submitted → waiting → approved." },
-          ].map((s) => (
-            <div key={s.n} className="rounded-xl border border-line bg-surface p-4 dark:border-zinc-800 dark:bg-zinc-950/50">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">{s.n}</span>
-              <p className="mt-2 text-sm font-semibold text-fg dark:text-gray-100">{s.t}</p>
-              <p className="mt-0.5 text-xs text-fg-muted dark:text-gray-400">{s.d}</p>
-            </div>
+    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      {/* Header: what this page is for and how to use it */}
+      <div className="mb-8 text-center">
+        <h1 className="font-display mb-4 text-4xl font-bold tracking-tight text-fg">{tp("guides.visa.title")}</h1>
+        <p className="mx-auto max-w-2xl text-lg text-fg-secondary">{tp("guides.visa.subtitle")}</p>
+        <ol className="mx-auto mt-6 grid max-w-3xl grid-cols-1 gap-3 text-start sm:grid-cols-3">
+          {HOW_IT_WORKS.map((step, index) => (
+            <li key={step.title} className="rounded-xl border border-line bg-surface p-4 shadow-xs">
+              <span
+                aria-hidden="true"
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-fg"
+              >
+                {index + 1}
+              </span>
+              <p className="mt-2 text-sm font-semibold text-fg">{tp(step.title)}</p>
+              <p className="mt-0.5 text-xs text-fg-muted">{tp(step.body)}</p>
+            </li>
           ))}
+        </ol>
+      </div>
+
+      {/* Not legal advice: required framing */}
+      <div className="mb-12 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-fg-secondary" role="note">
+        <strong className="text-fg">{tp("guides.visa.disclaimerTitle")}</strong> {tp("guides.visa.disclaimerBody")}
+      </div>
+
+      {actionError && (
+        <div role="alert" className="mb-6 flex items-start justify-between gap-3 rounded-lg border border-danger-line bg-danger-soft p-4 text-danger">
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            aria-label={tp("site.trust.close")}
+            className="rounded p-1 hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
-      </div>
+      )}
 
-      {/* Not legal advice — required framing */}
-      <div className="mb-12 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" role="note">
-        <strong>Informational only — not legal advice.</strong> Visa rules change
-        frequently and vary by nationality and circumstances. Always verify each
-        step against official government sources, and consult a qualified
-        immigration professional before making decisions.
-      </div>
-
-      {/* Visa Templates */}
-      <section className="mb-12">
-        <h2 className="text-2xl font-bold text-fg mb-6 dark:text-gray-100">
-          Visa Templates
+      {/* Visa templates */}
+      <section className="mb-12" aria-labelledby="visa-templates">
+        <h2 id="visa-templates" className="mb-6 text-2xl font-bold text-fg">
+          {tp("guides.visa.templates")}
         </h2>
 
-        {templatesLoading && (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-          </div>
-        )}
+        {templatesLoading && <Spinner label={tp("guides.visa.loading")} />}
 
         {templatesError && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
+          <div role="alert" className="mb-4 rounded-lg border border-danger-line bg-danger-soft p-4 text-danger">
             {templatesError}
           </div>
         )}
 
         {!templatesLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Show API templates first, then fill with defaults */}
-            {(templates.length > 0
-              ? templates
-              : Object.entries(VISA_INFO).map(([key, info]) => ({
-                  visaType: key,
-                  country: key.split(" ")[0],
-                  description: info.description,
-                  steps: [],
-                }))
-            ).map((template) => {
-              const info =
-                VISA_INFO[template.visaType] || { emoji: "🌍", description: template.description };
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {templateCards.map((template) => {
+              const info = VISA_INFO[template.visaType];
               return (
-                <Card
-                  key={template.visaType}
-                  className="hover:shadow-md transition-shadow"
-                >
-                  <CardContent className="p-6">
-                    <span className="text-4xl mb-3 block">{info.emoji}</span>
-                    <h3 className="text-lg font-bold text-fg mb-2 dark:text-gray-100">
-                      {template.visaType}
-                    </h3>
-                    <p className="text-sm text-fg-secondary mb-4 dark:text-gray-400">
-                      {info.description}
-                    </p>
+                <Card key={template.visaType} className="transition-shadow hover:shadow-raised">
+                  <CardContent className="flex h-full flex-col p-6">
+                    <span className="mb-3 block text-4xl" aria-hidden="true">
+                      {info?.emoji ?? "🌍"}
+                    </span>
+                    <h3 className="mb-2 text-lg font-bold text-fg">{template.visaType}</h3>
+                    <p className="mb-4 text-sm text-fg-secondary">{info ? tp(info.description) : template.description}</p>
                     {template.steps.length > 0 && (
-                      <p className="text-xs text-gray-400 mb-3">
-                        {template.steps.length} steps included
-                      </p>
+                      <p className="mb-3 text-xs text-fg-muted">{tp("guides.visa.stepsIncluded", { count: template.steps.length })}</p>
                     )}
-                    <Button
-                      size="sm"
-                      onClick={() => startFromTemplate(template)}
-                      disabled={createLoading}
-                    >
-                      Start Tracking
-                    </Button>
+                    <div className="mt-auto">
+                      <Button size="sm" onClick={() => startFromTemplate(template)} disabled={createLoading}>
+                        {tp("guides.visa.startTracking")}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               );
@@ -400,25 +399,22 @@ export default function ImmigrationPage() {
         )}
       </section>
 
-      {/* My Immigration Processes */}
-      <section className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-fg dark:text-gray-100">
-            My Immigration Processes
+      {/* My immigration processes */}
+      <section className="mb-12" aria-labelledby="my-processes">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="my-processes" className="text-2xl font-bold text-fg">
+            {tp("guides.visa.myProcesses")}
           </h2>
           <Button onClick={() => setShowCreateForm(true)}>
-            + Start New Process
+            <Plus className="me-1 h-4 w-4" aria-hidden="true" />
+            {tp("guides.visa.startNew")}
           </Button>
         </div>
 
-        {processesLoading && (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-          </div>
-        )}
+        {processesLoading && <Spinner label={tp("guides.visa.loading")} />}
 
         {processesError && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
+          <div role="alert" className="mb-4 rounded-lg border border-danger-line bg-danger-soft p-4 text-danger">
             {processesError}
           </div>
         )}
@@ -426,16 +422,10 @@ export default function ImmigrationPage() {
         {!processesLoading && processes.length === 0 && !processesError && (
           <Card>
             <CardContent className="p-12 text-center">
-              <p className="text-4xl mb-4">🌍</p>
-              <p className="text-fg-secondary mb-2 dark:text-gray-400">
-                Start tracking your visa application journey
-              </p>
-              <p className="text-sm text-gray-400 mb-6">
-                Pick a template above or create a custom process
-              </p>
-              <Button onClick={() => setShowCreateForm(true)}>
-                Start New Process
-              </Button>
+              <Globe2 className="mx-auto mb-4 h-10 w-10 text-primary-text" aria-hidden="true" />
+              <p className="mb-2 font-medium text-fg">{tp("guides.visa.emptyTitle")}</p>
+              <p className="mb-6 text-sm text-fg-muted">{tp("guides.visa.emptyBody")}</p>
+              <Button onClick={() => setShowCreateForm(true)}>{tp("guides.visa.startNew")}</Button>
             </CardContent>
           </Card>
         )}
@@ -444,179 +434,139 @@ export default function ImmigrationPage() {
           <div className="space-y-4">
             {processes.map((process) => {
               const isExpanded = expandedProcessId === process.id;
-              const completedSteps = process.steps.filter(
-                (s) => s.status === "APPROVED" || s.status === "COMPLETED"
-              ).length;
+              const completedSteps = process.steps.filter((s) => s.status === "APPROVED" || s.status === "COMPLETED").length;
               const totalSteps = process.steps.length;
-              const progressPercent =
-                totalSteps > 0
-                  ? Math.round((completedSteps / totalSteps) * 100)
-                  : 0;
+              const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+              const panelId = `process-panel-${process.id}`;
 
               return (
                 <Card key={process.id}>
                   <CardContent className="p-6">
-                    {/* Process Header */}
-                    <div
-                      className="flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer"
-                      onClick={() =>
-                        setExpandedProcessId(isExpanded ? null : process.id)
-                      }
+                    {/* Process header (disclosure button) */}
+                    <button
+                      type="button"
+                      aria-expanded={isExpanded}
+                      aria-controls={panelId}
+                      onClick={() => setExpandedProcessId(isExpanded ? null : process.id)}
+                      className="flex w-full flex-col justify-between gap-3 rounded-lg text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus md:flex-row md:items-center"
                     >
                       <div>
-                        <div className="flex items-center gap-3 mb-1">
-                          <h3 className="text-lg font-semibold text-fg dark:text-gray-100">
-                            {process.visaType}
-                          </h3>
-                          {statusBadge(process.status)}
+                        <div className="mb-1 flex flex-wrap items-center gap-3">
+                          <h3 className="text-lg font-semibold text-fg">{process.visaType}</h3>
+                          <StatusBadge status={process.status} tp={tp} />
                         </div>
-                        <p className="text-sm text-fg-muted dark:text-gray-400">
-                          Target: {process.targetCountry}
+                        <p className="text-sm text-fg-muted">
+                          {tp("guides.visa.target", { country: process.targetCountry })}
                           {process.startDate &&
-                            ` · Started ${new Date(process.startDate).toLocaleDateString()}`}
+                            ` · ${tp("guides.visa.started", { date: new Date(process.startDate).toLocaleDateString(locale) })}`}
                         </p>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="w-48">
-                          <div className="flex items-center justify-between text-sm mb-1">
-                            <span className="text-fg-muted dark:text-gray-400">Progress</span>
-                            <span className="font-medium text-fg dark:text-gray-100">
+                          <div className="mb-1 flex items-center justify-between text-sm">
+                            <span className="text-fg-muted">{tp("guides.visa.progress")}</span>
+                            <span className="font-medium text-fg">
                               {completedSteps}/{totalSteps}
                             </span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-emerald-500 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${progressPercent}%` }}
-                            />
+                          <div
+                            className="h-2 w-full rounded-full bg-surface-muted"
+                            role="progressbar"
+                            aria-valuenow={progressPercent}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-label={tp("guides.visa.progress")}
+                          >
+                            <div className="h-2 rounded-full bg-emerald-500 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
                           </div>
                         </div>
-                        <span className="text-gray-400 text-xl">
-                          {isExpanded ? "▲" : "▼"}
-                        </span>
+                        <ChevronDown
+                          className={`h-5 w-5 text-fg-muted transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                          aria-hidden="true"
+                        />
                       </div>
-                    </div>
+                    </button>
 
-                    {/* Expanded Steps */}
+                    {/* Expanded steps */}
                     {isExpanded && (
-                      <div className="mt-6 pt-4 border-t border-line">
-                        {process.notes && (
-                          <p className="text-sm text-fg-muted mb-4 italic dark:text-gray-400">
-                            {process.notes}
-                          </p>
-                        )}
+                      <div id={panelId} className="mt-6 border-t border-line pt-4">
+                        {process.notes && <p className="mb-4 text-sm italic text-fg-muted">{process.notes}</p>}
 
                         {process.steps.length === 0 ? (
-                          <p className="text-sm text-gray-400 text-center py-4">
-                            No steps yet. Add your first step below.
-                          </p>
+                          <p className="py-4 text-center text-sm text-fg-muted">{tp("guides.visa.noSteps")}</p>
                         ) : (
-                          <div className="space-y-3">
-                            {process.steps
+                          <ul className="space-y-3">
+                            {[...process.steps]
                               .sort((a, b) => a.sortOrder - b.sortOrder)
                               .map((step) => (
-                                <StepRow
-                                  key={step.id}
-                                  step={step}
-                                  onToggle={() =>
-                                    handleToggleStep(process.id, step)
-                                  }
-                                />
+                                <StepRow key={step.id} step={step} onToggle={() => handleToggleStep(process.id, step)} />
                               ))}
-                          </div>
+                          </ul>
                         )}
 
-                        {/* Add Step */}
+                        {/* Add step */}
                         {addStepProcessId === process.id ? (
-                          <form
-                            onSubmit={handleAddStep}
-                            className="mt-4 p-4 bg-surface-sunken rounded-lg space-y-3"
-                          >
+                          <form onSubmit={handleAddStep} className="mt-4 space-y-3 rounded-lg bg-surface-sunken p-4">
                             <Input
-                              label="Step Name"
+                              label={tp("guides.visa.stepName")}
                               id={`step-name-${process.id}`}
-                              placeholder="e.g. Submit biometrics"
+                              placeholder={tp("guides.visa.stepNamePlaceholder")}
                               value={stepData.name}
-                              onChange={(e) =>
-                                setStepData({
-                                  ...stepData,
-                                  name: e.target.value,
-                                })
-                              }
+                              onChange={(e) => setStepData({ ...stepData, name: e.target.value })}
                               required
                             />
                             <Input
-                              label="Description (optional)"
+                              label={tp("guides.visa.stepDescription")}
                               id={`step-desc-${process.id}`}
-                              placeholder="Additional details"
+                              placeholder={tp("guides.visa.stepDescriptionPlaceholder")}
                               value={stepData.description}
-                              onChange={(e) =>
-                                setStepData({
-                                  ...stepData,
-                                  description: e.target.value,
-                                })
-                              }
+                              onChange={(e) => setStepData({ ...stepData, description: e.target.value })}
                             />
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                               <Input
-                                label="Due Date (optional)"
+                                label={tp("guides.visa.stepDue")}
                                 id={`step-due-${process.id}`}
                                 type="date"
                                 value={stepData.dueDate}
-                                onChange={(e) =>
-                                  setStepData({
-                                    ...stepData,
-                                    dueDate: e.target.value,
-                                  })
-                                }
+                                onChange={(e) => setStepData({ ...stepData, dueDate: e.target.value })}
                               />
                               <Input
-                                label="Documents (comma-separated)"
+                                label={tp("guides.visa.stepDocuments")}
                                 id={`step-docs-${process.id}`}
-                                placeholder="e.g. Passport, Photo, Letter"
+                                placeholder={tp("guides.visa.stepDocumentsPlaceholder")}
                                 value={stepData.documents}
-                                onChange={(e) =>
-                                  setStepData({
-                                    ...stepData,
-                                    documents: e.target.value,
-                                  })
-                                }
+                                onChange={(e) => setStepData({ ...stepData, documents: e.target.value })}
                               />
                             </div>
                             <div className="flex gap-2">
-                              <Button
-                                type="submit"
-                                size="sm"
-                                disabled={addStepLoading}
-                              >
-                                {addStepLoading ? "Adding..." : "Add Step"}
+                              <Button type="submit" size="sm" disabled={addStepLoading}>
+                                {addStepLoading ? tp("guides.visa.adding") : tp("guides.visa.addStep")}
                               </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setAddStepProcessId(null)}
-                              >
-                                Cancel
+                              <Button type="button" variant="outline" size="sm" onClick={() => setAddStepProcessId(null)}>
+                                {tp("site.common.cancel")}
                               </Button>
                             </div>
                           </form>
                         ) : (
-                          <div className="mt-4 flex gap-3">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setAddStepProcessId(process.id)}
-                            >
-                              + Add Custom Step
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            <Button variant="outline" size="sm" onClick={() => setAddStepProcessId(process.id)}>
+                              <Plus className="me-1 h-4 w-4" aria-hidden="true" />
+                              {tp("guides.visa.addCustomStep")}
                             </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleDeleteProcess(process.id)}
-                            >
-                              Delete Process
-                            </Button>
+                            {confirmDeleteId === process.id ? (
+                              <>
+                                <Button variant="danger" size="sm" onClick={() => handleDeleteProcess(process.id)}>
+                                  {tp("guides.visa.confirmDelete")}
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(null)}>
+                                  {tp("site.common.cancel")}
+                                </Button>
+                              </>
+                            ) : (
+                              <Button variant="danger" size="sm" onClick={() => setConfirmDeleteId(process.id)}>
+                                {tp("guides.visa.deleteProcess")}
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -629,97 +579,87 @@ export default function ImmigrationPage() {
         )}
       </section>
 
-      {/* Create Process Modal */}
+      {/* Create process dialog */}
       {showCreateForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-10 px-4 overflow-y-auto">
-          <Card className="w-full max-w-lg mb-10">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 pt-10">
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={tp("site.trust.close")}
+            className="fixed inset-0 cursor-default bg-black/50"
+            onClick={() => {
+              setShowCreateForm(false);
+              setCreateError(null);
+            }}
+          />
+          <Card className="relative mb-10 w-full max-w-lg" role="dialog" aria-modal="true" aria-labelledby="create-process-title">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-fg dark:text-gray-100">
-                  Start New Process
+                <h2 id="create-process-title" className="text-xl font-bold text-fg">
+                  {tp("guides.visa.startNew")}
                 </h2>
                 <button
-                  className="text-gray-400 hover:text-fg-secondary text-2xl dark:text-gray-400"
+                  type="button"
+                  aria-label={tp("site.trust.close")}
+                  className="rounded p-1 text-fg-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   onClick={() => {
                     setShowCreateForm(false);
                     setCreateError(null);
                   }}
                 >
-                  ×
+                  <X className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
             </CardHeader>
             <CardContent>
               {createError && (
-                <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
+                <div role="alert" className="mb-4 rounded-lg border border-danger-line bg-danger-soft p-4 text-danger">
                   {createError}
                 </div>
               )}
               <form onSubmit={handleCreateProcess} className="space-y-4">
                 <Input
-                  label="Visa Type"
+                  label={tp("guides.visa.visaType")}
                   id="create-visaType"
-                  placeholder="e.g. UK Skilled Worker"
+                  placeholder={tp("guides.visa.visaTypePlaceholder")}
                   value={createData.visaType}
-                  onChange={(e) =>
-                    setCreateData({ ...createData, visaType: e.target.value })
-                  }
+                  onChange={(e) => setCreateData({ ...createData, visaType: e.target.value })}
                   required
                 />
                 <Input
-                  label="Target Country"
+                  label={tp("guides.visa.targetCountry")}
                   id="create-country"
-                  placeholder="e.g. United Kingdom"
+                  placeholder={tp("guides.visa.targetCountryPlaceholder")}
                   value={createData.targetCountry}
-                  onChange={(e) =>
-                    setCreateData({
-                      ...createData,
-                      targetCountry: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setCreateData({ ...createData, targetCountry: e.target.value })}
                   required
                 />
                 <div className="w-full">
-                  <label
-                    htmlFor="create-notes"
-                    className="block text-sm font-medium text-fg-secondary mb-1 dark:text-gray-300"
-                  >
-                    Notes (optional)
+                  <label htmlFor="create-notes" className="mb-1 block text-sm font-medium text-fg-secondary">
+                    {tp("guides.visa.notes")}
                   </label>
                   <textarea
                     id="create-notes"
-                    className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px] dark:border-zinc-700"
-                    placeholder="Any notes about your process..."
+                    className={`${FIELD_CLASS} min-h-[80px]`}
+                    placeholder={tp("guides.visa.notesPlaceholder")}
                     value={createData.notes}
-                    onChange={(e) =>
-                      setCreateData({ ...createData, notes: e.target.value })
-                    }
+                    onChange={(e) => setCreateData({ ...createData, notes: e.target.value })}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <Input
-                    label="Start Date"
+                    label={tp("guides.visa.startDate")}
                     id="create-startDate"
                     type="date"
                     value={createData.startDate}
-                    onChange={(e) =>
-                      setCreateData({
-                        ...createData,
-                        startDate: e.target.value,
-                      })
-                    }
+                    onChange={(e) => setCreateData({ ...createData, startDate: e.target.value })}
                   />
                   <Input
-                    label="Expected End Date"
+                    label={tp("guides.visa.endDate")}
                     id="create-endDate"
                     type="date"
                     value={createData.expectedEndDate}
-                    onChange={(e) =>
-                      setCreateData({
-                        ...createData,
-                        expectedEndDate: e.target.value,
-                      })
-                    }
+                    onChange={(e) => setCreateData({ ...createData, expectedEndDate: e.target.value })}
                   />
                 </div>
                 <div className="flex justify-end gap-3">
@@ -731,10 +671,10 @@ export default function ImmigrationPage() {
                       setCreateError(null);
                     }}
                   >
-                    Cancel
+                    {tp("site.common.cancel")}
                   </Button>
                   <Button type="submit" disabled={createLoading}>
-                    {createLoading ? "Creating..." : "Create Process"}
+                    {createLoading ? tp("guides.visa.creating") : tp("guides.visa.create")}
                   </Button>
                 </div>
               </form>
@@ -746,80 +686,49 @@ export default function ImmigrationPage() {
   );
 }
 
-function StepRow({
-  step,
-  onToggle,
-}: {
-  step: ImmigrationStep;
-  onToggle: () => void;
-}) {
-  const isCompleted =
-    step.status === "APPROVED" || step.status === "COMPLETED";
+function StepRow({ step, onToggle }: { step: ImmigrationStep; onToggle: () => void }) {
+  const tp = usePublicT();
+  const locale = useLocale();
+  const isCompleted = step.status === "APPROVED" || step.status === "COMPLETED";
 
   return (
-    <div
-      className={`flex items-start gap-3 p-3 rounded-lg ${
-        isCompleted ? "bg-emerald-50" : "bg-surface-sunken"
-      }`}
-    >
+    <li className={`flex items-start gap-3 rounded-lg p-3 ${isCompleted ? "border border-success-line bg-success-soft" : "bg-surface-sunken"}`}>
       <button
+        type="button"
+        role="checkbox"
+        aria-checked={isCompleted}
+        aria-label={tp(isCompleted ? "guides.visa.markIncomplete" : "guides.visa.markComplete", { step: step.name })}
         onClick={onToggle}
-        className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-          isCompleted
-            ? "bg-emerald-600 border-emerald-600 text-white"
-            : "border-line-strong hover:border-emerald-500"
+        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+          isCompleted ? "border-primary bg-primary text-primary-fg" : "border-line-strong hover:border-primary"
         }`}
       >
-        {isCompleted && (
-          <svg
-            className="w-3 h-3"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={3}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-        )}
+        {isCompleted && <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />}
       </button>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span
-            className={`font-medium text-sm ${
-              isCompleted ? "text-emerald-800 line-through" : "text-fg"
-            }`}
-          >
-            {step.name}
-          </span>
-          {!isCompleted && step.status !== "PENDING" && (
-            <Badge variant="info">{step.status}</Badge>
-          )}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`text-sm font-medium ${isCompleted ? "text-fg-secondary line-through" : "text-fg"}`}>{step.name}</span>
+          {!isCompleted && step.status !== "PENDING" && <Badge variant="info">{step.status}</Badge>}
         </div>
-        {step.description && (
-          <p className="text-xs text-fg-muted mt-0.5 dark:text-gray-400">{step.description}</p>
-        )}
-        <div className="flex flex-wrap items-center gap-3 mt-1">
+        {step.description && <p className="mt-0.5 text-xs text-fg-muted">{step.description}</p>}
+        <div className="mt-1 flex flex-wrap items-center gap-3">
           {step.dueDate && (
-            <span className="text-xs text-gray-400">
-              Due: {new Date(step.dueDate).toLocaleDateString()}
-            </span>
+            <span className="text-xs text-fg-muted">{tp("guides.visa.due", { date: new Date(step.dueDate).toLocaleDateString(locale) })}</span>
           )}
           {step.completedAt && (
-            <span className="text-xs text-primary-text">
-              ✓ {new Date(step.completedAt).toLocaleDateString()}
+            <span className="inline-flex items-center gap-1 text-xs text-primary-text">
+              <Check className="h-3 w-3" aria-hidden="true" />
+              {new Date(step.completedAt).toLocaleDateString(locale)}
             </span>
           )}
           {step.documents.length > 0 && (
-            <span className="text-xs text-gray-400">
-              📄 {step.documents.join(", ")}
+            <span className="inline-flex items-center gap-1 text-xs text-fg-muted">
+              <FileText className="h-3 w-3" aria-hidden="true" />
+              {step.documents.join(", ")}
             </span>
           )}
         </div>
       </div>
-    </div>
+    </li>
   );
 }

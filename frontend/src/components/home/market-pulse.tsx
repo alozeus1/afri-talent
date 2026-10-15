@@ -47,10 +47,10 @@ export function MarketPulse() {
         <div className="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-8 dark:border-emerald-900/60 dark:bg-emerald-950/20 md:p-12">
           <div className="mb-8 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+              <p className="text-sm font-semibold uppercase tracking-widest text-primary-text">
                 {tp("site.pulse.eyebrow")}
               </p>
-              <h2 className="font-display mt-2 text-2xl font-bold text-fg dark:text-zinc-50 md:text-3xl">
+              <h2 className="font-display mt-2 text-2xl font-bold text-fg md:text-3xl">
                 {tp("site.pulse.title", { count: data.totalOpenJobs.toLocaleString(locale) })}
               </h2>
             </div>
@@ -65,15 +65,15 @@ export function MarketPulse() {
           <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
             {stats.map((s) => (
               <div key={s.label}>
-                <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{s.value}</div>
-                <div className="mt-1 text-sm text-fg-secondary dark:text-zinc-400">{s.label}</div>
+                <div className="text-3xl font-bold text-primary-text">{s.value}</div>
+                <div className="mt-1 text-sm text-fg-secondary">{s.label}</div>
               </div>
             ))}
           </div>
 
           {data.topSkills.length > 0 && (
             <div className="mt-8 border-t border-emerald-100 pt-6 dark:border-emerald-900/60">
-              <p className="mb-3 text-sm font-medium text-fg-secondary dark:text-zinc-300">
+              <p className="mb-3 text-sm font-medium text-fg-secondary">
                 {tp("site.pulse.topSkills")}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -84,7 +84,7 @@ export function MarketPulse() {
                     className="rounded-full border border-emerald-200 bg-surface px-3 py-1 text-sm font-medium text-emerald-800 transition hover:border-emerald-400 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
                   >
                     {s.skill}
-                    <span className="ml-1.5 text-xs text-primary-text dark:text-emerald-500">{s.count}</span>
+                    <span className="ml-1.5 text-xs text-primary-text">{s.count}</span>
                   </Link>
                 ))}
               </div>

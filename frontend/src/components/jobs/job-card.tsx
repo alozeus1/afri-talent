@@ -243,7 +243,7 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
                 </span>
               )}
               {job.discovery.salaryTransparent && (
-                <span className="inline-flex items-center rounded-full border border-line bg-surface-muted px-2.5 py-1 text-xs font-semibold text-fg-secondary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <span className="inline-flex items-center rounded-full border border-line bg-surface-muted px-2.5 py-1 text-xs font-semibold text-fg-secondary">
                   {tp("discover.card.salaryDisclosed")}
                 </span>
               )}

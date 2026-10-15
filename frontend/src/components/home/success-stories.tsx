@@ -41,19 +41,19 @@ export function SuccessStories() {
     <section className="section-shell py-16">
       <div className="page-frame">
         <div className="mb-10 text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+          <p className="text-sm font-semibold uppercase tracking-widest text-primary-text">
             {tp("site.stories.eyebrow")}
           </p>
-          <h2 className="font-display mt-3 text-3xl font-bold text-fg dark:text-zinc-50 md:text-4xl">
+          <h2 className="font-display mt-3 text-3xl font-bold text-fg md:text-4xl">
             {tp("site.stories.title")}
           </h2>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
           {stories.map((story) => (
             <Link key={story.id} href={localizePath(`/resources/${story.slug}`, locale)} className="group">
-              <div className="h-full overflow-hidden rounded-2xl border border-line bg-surface transition hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-950/50">
+              <div className="h-full overflow-hidden rounded-2xl border border-line bg-surface transition hover:-translate-y-0.5 hover:shadow-lg">
                 {story.coverImage && (
-                  <div className="relative h-44 bg-surface-muted dark:bg-zinc-900">
+                  <div className="relative h-44 bg-surface-muted">
                     <Image
                       src={story.coverImage}
                       alt={story.title}
@@ -64,10 +64,10 @@ export function SuccessStories() {
                   </div>
                 )}
                 <div className="p-5">
-                  <h3 className="font-semibold text-fg group-hover:text-emerald-700 dark:text-zinc-100 dark:group-hover:text-emerald-400">
+                  <h3 className="font-semibold text-fg group-hover:text-emerald-700 dark:group-hover:text-emerald-400">
                     {story.title}
                   </h3>
-                  <p className="mt-2 text-sm text-fg-secondary line-clamp-3 dark:text-zinc-400">{story.excerpt}</p>
+                  <p className="mt-2 text-sm text-fg-secondary line-clamp-3">{story.excerpt}</p>
                   <span className="mt-3 inline-block text-sm font-medium text-emerald-700 group-hover:underline dark:text-emerald-400">
                     {tp("site.stories.read")} <span aria-hidden="true">→</span>
                   </span>

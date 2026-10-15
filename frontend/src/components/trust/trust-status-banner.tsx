@@ -11,20 +11,20 @@ interface TrustStatusBannerProps {
 
 const toneClasses: Record<TrustStatusTone, { wrapper: string; icon: string }> = {
   info: {
-    wrapper: "border-blue-200 bg-blue-50 text-blue-950",
-    icon: "bg-blue-100 text-blue-700",
+    wrapper: "border-info-line bg-info-soft text-fg",
+    icon: "bg-surface text-info",
   },
   success: {
-    wrapper: "border-emerald-200 bg-emerald-50 text-emerald-950",
-    icon: "bg-emerald-100 text-emerald-700",
+    wrapper: "border-success-line bg-success-soft text-fg",
+    icon: "bg-surface text-success",
   },
   warning: {
-    wrapper: "border-amber-200 bg-amber-50 text-amber-950",
-    icon: "bg-amber-100 text-amber-700",
+    wrapper: "border-warning-line bg-warning-soft text-fg",
+    icon: "bg-surface text-warning",
   },
   danger: {
-    wrapper: "border-red-200 bg-red-50 text-red-950",
-    icon: "bg-red-100 text-red-700",
+    wrapper: "border-danger-line bg-danger-soft text-fg",
+    icon: "bg-surface text-danger",
   },
 };
 
@@ -44,7 +44,7 @@ export function TrustStatusBanner({
   const palette = toneClasses[tone];
 
   return (
-    <div className={`rounded-2xl border px-4 py-4 ${palette.wrapper}`}>
+    <div role={tone === "danger" ? "alert" : undefined} className={`rounded-2xl border px-4 py-4 ${palette.wrapper}`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <span
@@ -55,7 +55,7 @@ export function TrustStatusBanner({
           </span>
           <div>
             <p className="font-semibold">{title}</p>
-            <p className="mt-1 text-sm leading-6 opacity-90">{body}</p>
+            <p className="mt-1 text-sm leading-6 text-fg-secondary">{body}</p>
           </div>
         </div>
         {actions ? <div className="flex flex-wrap gap-2 sm:justify-end">{actions}</div> : null}

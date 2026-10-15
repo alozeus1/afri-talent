@@ -91,12 +91,12 @@ export function HeroStats() {
         </div>
 
         {!hasLiveStats && (
-          <p className="mt-5 text-center text-sm text-fg-muted dark:text-gray-400">
+          <p className="mt-5 text-center text-sm text-fg-muted">
             {tp("site.stats.readinessNote")}
           </p>
         )}
         {hasLiveStats && (
-          <p className="mt-5 text-center text-sm text-fg-muted dark:text-gray-400">
+          <p className="mt-5 text-center text-sm text-fg-muted">
             {tp("site.stats.liveNote")}
           </p>
         )}

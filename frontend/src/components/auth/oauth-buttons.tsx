@@ -153,7 +153,7 @@ export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
             type="button"
             onClick={handleGithubLogin}
             disabled={loading !== null}
-            className="w-full flex items-center justify-center gap-3 rounded-lg border border-line-strong dark:border-gray-700 bg-gray-900 dark:bg-gray-100 px-4 py-2.5 text-sm font-medium text-white dark:text-gray-900 shadow-sm hover:bg-black dark:hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50 transition-colors"
+            className="w-full flex items-center justify-center gap-3 rounded-lg border border-line-strong bg-gray-900 dark:bg-gray-100 px-4 py-2.5 text-sm font-medium text-white dark:text-gray-900 shadow-sm hover:bg-black dark:hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50 transition-colors"
           >
             {loading === "github" ? (
               <div className="w-5 h-5 border-2 border-gray-500 border-t-white rounded-full animate-spin" />
