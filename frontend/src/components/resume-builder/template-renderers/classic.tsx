@@ -2,8 +2,10 @@
 
 import type { ReactNode } from "react";
 import type { ResumePreviewData } from "@/components/resume-builder/types";
+import { useCandidateT } from "@/lib/i18n/candidate-messages";
 
 export function ClassicTemplate({ data }: { data: ResumePreviewData }): ReactNode {
+  const t = useCandidateT();
   if (data.generatedRawText) {
     return (
       <pre className="whitespace-pre-wrap font-serif text-[13px] leading-relaxed text-fg">
@@ -14,24 +16,24 @@ export function ClassicTemplate({ data }: { data: ResumePreviewData }): ReactNod
   return (
     <div className="font-serif text-fg">
       <header className="border-b border-line-strong pb-3">
-        <h1 className="text-2xl font-semibold">{data.fullName || "Your Name"}</h1>
-        <p className="mt-1 text-sm text-fg-secondary">{data.targetRole || "Target role"}</p>
+        <h1 className="text-2xl font-semibold">{data.fullName || t("rb.doc.yourName")}</h1>
+        <p className="mt-1 text-sm text-fg-secondary">{data.targetRole || t("rb.doc.targetRole")}</p>
         <p className="mt-1 text-xs text-fg-muted">
           {[data.email, data.phone, data.location].filter(Boolean).join(" • ")}
         </p>
       </header>
       {data.summary && (
-        <Section title="Summary">
+        <Section title={t("rb.doc.summary")}>
           <p className="text-sm leading-relaxed">{data.summary}</p>
         </Section>
       )}
       {data.skills.length > 0 && (
-        <Section title="Skills">
+        <Section title={t("rb.doc.skills")}>
           <p className="text-sm">{data.skills.join(" • ")}</p>
         </Section>
       )}
       {data.workHistory.filter((w) => w.company || w.title).length > 0 && (
-        <Section title="Experience">
+        <Section title={t("rb.doc.experience")}>
           {data.workHistory
             .filter((w) => w.company || w.title)
             .map((w, i) => (
@@ -47,7 +49,7 @@ export function ClassicTemplate({ data }: { data: ResumePreviewData }): ReactNod
         </Section>
       )}
       {data.educationHistory.filter((e) => e.institution || e.degree).length > 0 && (
-        <Section title="Education">
+        <Section title={t("rb.doc.education")}>
           {data.educationHistory
             .filter((e) => e.institution || e.degree)
             .map((e, i) => (
@@ -60,7 +62,7 @@ export function ClassicTemplate({ data }: { data: ResumePreviewData }): ReactNod
         </Section>
       )}
       {data.certifications.length > 0 && (
-        <Section title="Certifications">
+        <Section title={t("rb.doc.certifications")}>
           <p className="text-sm">{data.certifications.join(" • ")}</p>
         </Section>
       )}

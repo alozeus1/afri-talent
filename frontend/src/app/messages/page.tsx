@@ -3,37 +3,25 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Flag, Inbox, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { messages, MessageThread, trust } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LoadErrorCard } from "@/components/ui/load-error-card";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { CandidateLoadError, CandidatePageHeader, CandidateSpinner } from "@/components/candidate/candidate-ui";
 import { localizePath, useLocale } from "@/lib/i18n/client";
-
-function timeAgo(dateStr: string): string {
-  const now = new Date();
-  const date = new Date(dateStr);
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString();
-}
+import { useCandidateFormatters, useCandidateT } from "@/lib/i18n/candidate-messages";
 
 export default function MessagesPage() {
   const locale = useLocale();
+  const t = useCandidateT();
+  const fmt = useCandidateFormatters();
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [threads, setThreads] = useState<MessageThread[]>([]);
-  const [guidance, setGuidance] = useState<{
-    headline: string;
-    tips: string[];
-  } | null>(null);
+  const [guidance, setGuidance] = useState<{ headline: string; tips: string[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
 
@@ -44,10 +32,7 @@ export default function MessagesPage() {
   }, [user, isLoading, locale, router]);
 
   const loadThreads = useCallback(() => {
-    Promise.all([
-      messages.threads(),
-      trust.messagingGuidance().catch(() => null),
-    ])
+    Promise.all([messages.threads(), trust.messagingGuidance().catch(() => null)])
       .then(([threadData, guidanceData]) => {
         setThreads(threadData.threads);
         setGuidance(guidanceData);
@@ -64,42 +49,37 @@ export default function MessagesPage() {
 
   const userId = user?.id;
   useEffect(() => {
-    if (userId) {
-      loadThreads();
-    }
+    if (userId) loadThreads();
   }, [userId, loadThreads]);
 
   if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+    return <CandidateSpinner className="py-24" />;
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-fg mb-2">Messages</h1>
-        <p className="text-fg-secondary">Your conversations</p>
-      </div>
+    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+      <CandidatePageHeader title={t("msg.title")} description={t("msg.subtitle")} />
 
       {guidance && (
-        <Card className="mb-8 border-blue-200 bg-blue-50/60">
+        <Card className="mb-8 border-info-line bg-info-soft">
           <CardContent className="p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-blue-900">{guidance.headline}</h2>
-                <ul className="mt-3 grid gap-2 text-sm text-blue-900 md:grid-cols-2">
-                  {guidance.tips.slice(0, 8).map((tip) => (
-                    <li key={tip}>• {tip}</li>
-                  ))}
-                </ul>
+              <div className="flex gap-3">
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-info" aria-hidden="true" />
+                <div>
+                  <h2 className="text-base font-semibold text-fg">{guidance.headline}</h2>
+                  <ul className="mt-3 grid list-disc gap-2 ps-5 text-sm text-fg-secondary md:grid-cols-2">
+                    {guidance.tips.slice(0, 8).map((tip) => (
+                      <li key={tip}>{tip}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-              <Link href={localizePath("/trust/report", locale)}>
-                <span className="inline-flex min-h-10 items-center rounded-lg border border-blue-300 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-100">
-                  Report suspicious behavior
-                </span>
+              <Link href={localizePath("/trust/report", locale)} className="shrink-0">
+                <Button variant="outline" size="sm">
+                  <Flag className="h-4 w-4" aria-hidden="true" />
+                  {t("msg.report")}
+                </Button>
               </Link>
             </div>
           </CardContent>
@@ -108,79 +88,57 @@ export default function MessagesPage() {
 
       <Card>
         <CardHeader>
-          <h2 className="text-xl font-semibold text-fg">All Conversations</h2>
+          <h2 className="text-lg font-semibold text-fg">{t("msg.all")}</h2>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
-            </div>
+            <CandidateSpinner className="py-8" />
           ) : loadError ? (
-            <LoadErrorCard error={loadError} subject="your conversations" onRetry={retryLoadThreads} />
+            <CandidateLoadError error={loadError} subject={t("msg.subject")} onRetry={retryLoadThreads} />
           ) : threads.length === 0 ? (
-            <div className="text-center py-12">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400 mb-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
-                />
-              </svg>
-              <p className="text-fg-secondary">No messages yet</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Messages from job applications will appear here
-              </p>
-            </div>
+            <EmptyState
+              className="border-0 bg-transparent"
+              icon={<Inbox className="h-6 w-6" />}
+              title={t("msg.empty")}
+              description={t("msg.emptyBody")}
+            />
           ) : (
-            <div className="divide-y divide-line">
+            <ul className="-mx-6 divide-y divide-line">
               {threads.map((thread) => {
-                const otherParticipants = thread.participants.filter(
-                  (p) => p.id !== user.id
-                );
-                const participantNames =
-                  otherParticipants.map((p) => p.name).join(", ") || "Unknown";
-
+                const otherParticipants = thread.participants.filter((p) => p.id !== user.id);
+                const participantNames = otherParticipants.map((p) => p.name).join(", ") || t("msg.unknown");
                 return (
-                  <Link
-                    key={thread.id}
-                    href={localizePath(`/messages/${thread.id}`, locale)}
-                    className="block py-4 hover:bg-surface-sunken -mx-6 px-6 transition-colors"
-                  >
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-fg truncate">
-                            {participantNames}
-                          </span>
-                          {thread.job && (
-                            <Badge variant="info">{thread.job.title}</Badge>
+                  <li key={thread.id}>
+                    <Link
+                      href={localizePath(`/messages/${thread.id}`, locale)}
+                      className="block px-6 py-4 transition-colors hover:bg-surface-sunken focus-visible:bg-surface-sunken focus-visible:outline-none"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-1 flex flex-wrap items-center gap-2">
+                            <span className="truncate font-medium text-fg">{participantNames}</span>
+                            {thread.job && <Badge variant="info">{thread.job.title}</Badge>}
+                          </div>
+                          {thread.lastMessage ? (
+                            <p className="truncate text-sm text-fg-secondary">
+                              {thread.lastMessage.sender.id === user.id && (
+                                <span className="text-fg-muted">{t("msg.you")} </span>
+                              )}
+                              {thread.lastMessage.body}
+                            </p>
+                          ) : (
+                            <p className="text-sm italic text-fg-muted">{t("msg.empty")}</p>
                           )}
                         </div>
-                        {thread.lastMessage ? (
-                          <p className="text-sm text-fg-secondary truncate">
-                            {thread.lastMessage.sender.id === user.id && (
-                              <span className="text-gray-400">You: </span>
-                            )}
-                            {thread.lastMessage.body}
-                          </p>
-                        ) : (
-                          <p className="text-sm text-gray-400 italic">No messages yet</p>
-                        )}
+                        <time dateTime={thread.updatedAt} className="shrink-0 whitespace-nowrap text-xs text-fg-muted">
+                          {fmt.relative(thread.updatedAt)}
+                        </time>
                       </div>
-                      <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
-                        {timeAgo(thread.updatedAt)}
-                      </span>
-                    </div>
-                  </Link>
+                    </Link>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
         </CardContent>
       </Card>

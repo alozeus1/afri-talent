@@ -2,8 +2,10 @@
 
 import type { ReactNode } from "react";
 import type { ResumePreviewData } from "@/components/resume-builder/types";
+import { useCandidateT } from "@/lib/i18n/candidate-messages";
 
 export function MinimalTemplate({ data }: { data: ResumePreviewData }): ReactNode {
+  const t = useCandidateT();
   if (data.generatedRawText) {
     return (
       <pre className="whitespace-pre-wrap font-mono text-[12.5px] leading-relaxed text-fg">
@@ -13,22 +15,22 @@ export function MinimalTemplate({ data }: { data: ResumePreviewData }): ReactNod
   }
   return (
     <div className="font-mono text-[13px] text-fg">
-      <h1 className="text-xl font-semibold">{data.fullName || "Your Name"}</h1>
-      <p className="mt-0.5 text-fg-secondary">{data.targetRole || "Target role"}</p>
+      <h1 className="text-xl font-semibold">{data.fullName || t("rb.doc.yourName")}</h1>
+      <p className="mt-0.5 text-fg-secondary">{data.targetRole || t("rb.doc.targetRole")}</p>
       <p className="mt-0.5 text-xs text-fg-muted">
         {[data.email, data.phone, data.location].filter(Boolean).join(" / ")}
       </p>
       <hr className="my-3 border-line" />
       {data.summary && (
-        <Row label="summary">
+        <Row label={t("rb.doc.summary")}>
           <p className="leading-relaxed">{data.summary}</p>
         </Row>
       )}
-      {data.skills.length > 0 && <Row label="skills">{data.skills.join(", ")}</Row>}
+      {data.skills.length > 0 && <Row label={t("rb.doc.skills")}>{data.skills.join(", ")}</Row>}
       {data.workHistory
         .filter((w) => w.company || w.title)
         .map((w, i) => (
-          <Row key={`w-${i}`} label={i === 0 ? "experience" : ""}>
+          <Row key={`w-${i}`} label={i === 0 ? t("rb.doc.experience") : ""}>
             <p>
               <strong>{w.title}</strong>
               {w.company && ` — ${w.company}`}
@@ -40,7 +42,7 @@ export function MinimalTemplate({ data }: { data: ResumePreviewData }): ReactNod
       {data.educationHistory
         .filter((e) => e.institution || e.degree)
         .map((e, i) => (
-          <Row key={`e-${i}`} label={i === 0 ? "education" : ""}>
+          <Row key={`e-${i}`} label={i === 0 ? t("rb.doc.education") : ""}>
             <p>
               <strong>{e.degree}</strong>
               {e.institution && ` — ${e.institution}`}
@@ -49,7 +51,7 @@ export function MinimalTemplate({ data }: { data: ResumePreviewData }): ReactNod
           </Row>
         ))}
       {data.certifications.length > 0 && (
-        <Row label="certifications">{data.certifications.join(", ")}</Row>
+        <Row label={t("rb.doc.certifications")}>{data.certifications.join(", ")}</Row>
       )}
     </div>
   );
@@ -57,8 +59,8 @@ export function MinimalTemplate({ data }: { data: ResumePreviewData }): ReactNod
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="mb-2 grid grid-cols-[80px_1fr] gap-3">
-      <span className="text-[10px] uppercase tracking-wider text-gray-400">{label}</span>
+    <div className="mb-2 grid grid-cols-[104px_1fr] gap-3">
+      <span className="break-words text-[10px] uppercase tracking-wider text-fg-muted">{label}</span>
       <div>{children}</div>
     </div>
   );

@@ -1,127 +1,120 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Menu, MessageSquarePlus, SendHorizontal, ShieldCheck, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import {
-  chat,
-  ChatConsentStatus,
-  ChatMessageData,
-  ChatConversation,
-} from "@/lib/api";
+import { chat, ChatConsentStatus, ChatMessageData, ChatConversation } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  CandidateBackLink,
+  CandidateLoadError,
+  CandidateNotice,
+  CandidatePageHeader,
+} from "@/components/candidate/candidate-ui";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { useCandidateFormatters, useCandidateT, type CandidateMessageKey } from "@/lib/i18n/candidate-messages";
 
-// ── Consent Modal ────────────────────────────────────────────────────────────
+type PolicyKey = "privacyNotice" | "termsOfUse" | "dataStorage";
+const POLICY_KEYS: PolicyKey[] = ["privacyNotice", "termsOfUse", "dataStorage"];
+const SUGGESTIONS: CandidateMessageKey[] = [
+  "chat.suggest.status",
+  "chat.suggest.profile",
+  "chat.suggest.next",
+  "chat.suggest.interview",
+];
 
-function ConsentModal({
+// ── Consent ──────────────────────────────────────────────────────────────────
+
+function ConsentPanel({
   consentData,
   onAccept,
   loading,
+  failed,
 }: {
   consentData: ChatConsentStatus;
   onAccept: () => void;
   loading: boolean;
+  failed: boolean;
 }) {
-  const [checks, setChecks] = useState({
+  const t = useCandidateT();
+  const locale = useLocale();
+  const [checks, setChecks] = useState<Record<PolicyKey, boolean>>({
     privacyNotice: false,
     termsOfUse: false,
     dataStorage: false,
   });
 
-  const allChecked = checks.privacyNotice && checks.termsOfUse && checks.dataStorage;
+  const allChecked = POLICY_KEYS.every((key) => checks[key]);
   const { policies } = consentData;
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="mx-auto max-w-2xl">
       <Card>
-        <CardContent className="p-8">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-fg mb-2">
-              Meet Mara, Your AI Job Assistant
-            </h2>
-            <p className="text-fg-secondary">
-              Before we get started, please review and accept the following agreements.
-              Your privacy matters to us.
-            </p>
+        <CardContent className="p-6 sm:p-8">
+          <div className="mb-8 text-center">
+            <span
+              aria-hidden="true"
+              className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-soft text-primary-text"
+            >
+              <ShieldCheck className="h-8 w-8" />
+            </span>
+            <h2 className="mb-2 text-2xl font-semibold text-fg">{t("chat.consent.title")}</h2>
+            <p className="text-fg-secondary">{t("chat.consent.body")}</p>
           </div>
 
-          <div className="space-y-4 mb-8">
-            {/* Privacy Notice */}
-            <label className="flex items-start gap-3 p-4 rounded-lg border border-line hover:border-emerald-300 transition-colors cursor-pointer">
-              <input
-                type="checkbox"
-                checked={checks.privacyNotice}
-                onChange={(e) => setChecks({ ...checks, privacyNotice: e.target.checked })}
-                className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
-              />
-              <div className="flex-1">
-                <p className="font-medium text-fg">{policies.privacyNotice.title}</p>
-                <p className="text-sm text-fg-secondary mt-1">{policies.privacyNotice.summary}</p>
-                <span className="text-xs text-gray-400 mt-1 block">Version {policies.privacyNotice.version}</span>
-              </div>
-            </label>
-
-            {/* Terms of Use */}
-            <label className="flex items-start gap-3 p-4 rounded-lg border border-line hover:border-emerald-300 transition-colors cursor-pointer">
-              <input
-                type="checkbox"
-                checked={checks.termsOfUse}
-                onChange={(e) => setChecks({ ...checks, termsOfUse: e.target.checked })}
-                className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
-              />
-              <div className="flex-1">
-                <p className="font-medium text-fg">{policies.termsOfUse.title}</p>
-                <p className="text-sm text-fg-secondary mt-1">{policies.termsOfUse.summary}</p>
-                <span className="text-xs text-gray-400 mt-1 block">Version {policies.termsOfUse.version}</span>
-              </div>
-            </label>
-
-            {/* Data Storage */}
-            <label className="flex items-start gap-3 p-4 rounded-lg border border-line hover:border-emerald-300 transition-colors cursor-pointer">
-              <input
-                type="checkbox"
-                checked={checks.dataStorage}
-                onChange={(e) => setChecks({ ...checks, dataStorage: e.target.checked })}
-                className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
-              />
-              <div className="flex-1">
-                <p className="font-medium text-fg">{policies.dataStorage.title}</p>
-                <p className="text-sm text-fg-secondary mt-1">{policies.dataStorage.summary}</p>
-                <span className="text-xs text-gray-400 mt-1 block">Version {policies.dataStorage.version}</span>
-              </div>
-            </label>
+          <div className="mb-8 space-y-3">
+            {POLICY_KEYS.map((key) => (
+              <label
+                key={key}
+                aria-label={policies[key].title}
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-4 transition-colors hover:border-line-strong has-[:checked]:border-success-line has-[:checked]:bg-success-soft"
+              >
+                <input
+                  type="checkbox"
+                  checked={checks[key]}
+                  onChange={(e) => setChecks({ ...checks, [key]: e.target.checked })}
+                  className="mt-1 h-4 w-4 rounded border-line-strong accent-[var(--primary)]"
+                />
+                <div className="flex-1">
+                  <p className="font-medium text-fg">{policies[key].title}</p>
+                  <p className="mt-1 text-sm text-fg-secondary">{policies[key].summary}</p>
+                  <span className="mt-1 block text-xs text-fg-muted">
+                    {t("chat.consent.version", { version: policies[key].version })}
+                  </span>
+                </div>
+              </label>
+            ))}
           </div>
 
-          <div className="flex items-center justify-between">
-            <Link href="/candidate" className="text-sm text-fg-muted hover:text-fg-secondary">
-              Back to dashboard
+          {failed ? <CandidateNotice className="mb-4">{t("chat.consent.failed")}</CandidateNotice> : null}
+
+          <div className="flex flex-col-reverse items-center justify-between gap-3 sm:flex-row">
+            <Link href={localizePath("/candidate", locale)} className="text-sm text-fg-muted hover:text-fg">
+              {t("ai.backToDashboard")}
             </Link>
             <Button onClick={onAccept} disabled={!allChecked || loading}>
-              {loading ? "Accepting..." : "Accept & Start Chatting"}
+              {loading ? t("chat.consent.accepting") : t("chat.consent.accept")}
             </Button>
           </div>
 
-          <p className="text-xs text-gray-400 text-center mt-4">
-            You can revoke consent at any time from the chat settings. This will delete all stored conversations.
-          </p>
+          <p className="mt-4 text-center text-xs text-fg-muted">{t("chat.consent.revokeNote")}</p>
         </CardContent>
       </Card>
     </div>
   );
 }
 
-// ── Chat Interface ───────────────────────────────────────────────────────────
+// ── Chat ─────────────────────────────────────────────────────────────────────
 
 function ChatInterface() {
+  const t = useCandidateT();
+  const fmt = useCandidateFormatters();
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -130,8 +123,8 @@ function ChatInterface() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [revoking, setRevoking] = useState(false);
+  const [newFailed, setNewFailed] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const previousMessageCountRef = useRef(0);
 
@@ -145,30 +138,37 @@ function ChatInterface() {
     const previousCount = previousMessageCountRef.current;
     const currentCount = messages.length;
     const behavior: ScrollBehavior = previousCount === 0 || currentCount < previousCount ? "auto" : "smooth";
-
-    const frame = requestAnimationFrame(() => {
-      scrollToBottom(behavior);
-      messagesEndRef.current?.scrollIntoView({ behavior });
-    });
-
+    const frame = requestAnimationFrame(() => scrollToBottom(behavior));
     previousMessageCountRef.current = currentCount;
     return () => cancelAnimationFrame(frame);
   }, [messages, sending, conversationId, scrollToBottom]);
 
-  // Load conversations list
   useEffect(() => {
-    chat.getHistory().then((res) => {
-      if (res.conversations) setConversations(res.conversations);
-    }).catch(() => {});
+    chat
+      .getHistory()
+      .then((res) => {
+        if (res.conversations) setConversations(res.conversations);
+      })
+      .catch(() => {});
   }, []);
 
-  // Load active conversation messages
   useEffect(() => {
     if (!conversationId) return;
-    chat.getHistory(conversationId).then((res) => {
-      if (res.messages) setMessages(res.messages);
-    }).catch(() => {});
+    chat
+      .getHistory(conversationId)
+      .then((res) => {
+        if (res.messages) setMessages(res.messages);
+      })
+      .catch(() => {});
   }, [conversationId]);
+
+  // Grow the composer with its content (up to ~5 lines).
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+  }, [input]);
 
   async function handleSend() {
     const text = input.trim();
@@ -187,14 +187,19 @@ function ChatInterface() {
 
     try {
       const res = await chat.sendMessage(text, conversationId || undefined);
-      setMessages((prev) => [...prev.filter((m) => m.id !== userMsg.id), { ...userMsg, id: `user-${Date.now()}` }, res.message]);
+      setMessages((prev) => [
+        ...prev.filter((m) => m.id !== userMsg.id),
+        { ...userMsg, id: `user-${Date.now()}` },
+        res.message,
+      ]);
       setConversationId(res.conversationId);
       setRemaining(res.remaining);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to send message";
+    } catch {
+      const errorId = `error-${Date.now()}`;
+      setFailedIds((prev) => new Set(prev).add(errorId));
       setMessages((prev) => [
         ...prev,
-        { id: `error-${Date.now()}`, role: "ASSISTANT", content: `Sorry, I encountered an error: ${errorMsg}`, createdAt: new Date().toISOString() },
+        { id: errorId, role: "ASSISTANT", content: t("chat.sendFailed"), createdAt: new Date().toISOString() },
       ]);
     } finally {
       setSending(false);
@@ -203,6 +208,7 @@ function ChatInterface() {
   }
 
   async function handleNewConversation() {
+    setNewFailed(false);
     try {
       const res = await chat.newConversation();
       setConversationId(res.conversation.id);
@@ -210,11 +216,11 @@ function ChatInterface() {
       setConversations((prev) => [res.conversation, ...prev]);
       setShowSidebar(false);
     } catch {
-      // ignore
+      setNewFailed(true);
     }
   }
 
-  async function handleSelectConversation(id: string) {
+  function handleSelectConversation(id: string) {
     setMessages([]);
     setInput("");
     setConversationId(id);
@@ -222,7 +228,7 @@ function ChatInterface() {
   }
 
   async function handleRevoke() {
-    if (!confirm("This will permanently delete all your chat data. Are you sure?")) return;
+    if (!window.confirm(t("chat.revokeConfirm"))) return;
     setRevoking(true);
     try {
       await chat.revokeConsent();
@@ -233,242 +239,252 @@ function ChatInterface() {
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   }
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] rounded-xl border border-line dark:border-gray-800 bg-surface dark:bg-gray-950 overflow-hidden">
-      {/* Sidebar */}
-      <div className={`${showSidebar ? "block" : "hidden"} md:block w-64 border-r border-line dark:border-gray-800 flex-shrink-0 flex flex-col`}>
-        <div className="p-3 border-b border-line dark:border-gray-800">
+    <div className="relative flex h-[calc(100dvh-13rem)] min-h-[480px] overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+      <aside
+        aria-label={t("chat.conversations")}
+        className={`${
+          showSidebar ? "flex" : "hidden"
+        } absolute inset-y-0 start-0 z-20 w-72 flex-col border-e border-line bg-surface shadow-raised md:static md:flex md:w-64 md:shadow-none`}
+      >
+        <div className="border-b border-line p-3">
           <Button onClick={handleNewConversation} size="sm" className="w-full">
-            + New Chat
+            <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
+            {t("chat.newChat")}
           </Button>
+          {newFailed ? <p className="mt-2 text-xs text-danger">{t("chat.newFailed")}</p> : null}
         </div>
         <div className="flex-1 overflow-y-auto">
           {conversations.map((conv) => (
             <button
               key={conv.id}
+              type="button"
               onClick={() => handleSelectConversation(conv.id)}
-              className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-50 dark:border-gray-800 hover:bg-surface-sunken dark:hover:bg-gray-900 transition-colors ${
-                conv.id === conversationId ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300" : "text-fg-secondary dark:text-gray-300"
+              aria-current={conv.id === conversationId ? "true" : undefined}
+              className={`w-full border-b border-line px-3 py-2.5 text-start text-sm transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus ${
+                conv.id === conversationId ? "bg-primary-soft text-primary-text" : "text-fg-secondary"
               }`}
             >
-              <p className="truncate font-medium">{conv.title || "New conversation"}</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                {new Date(conv.updatedAt).toLocaleDateString()}
-                {conv._count?.messages ? ` · ${conv._count.messages} msgs` : ""}
+              <p className="truncate font-medium">{conv.title || t("chat.untitled")}</p>
+              <p className="mt-0.5 text-xs text-fg-muted">
+                {fmt.date(conv.updatedAt)}
+                {conv._count?.messages ? ` · ${t("chat.msgCount", { count: conv._count.messages })}` : ""}
               </p>
             </button>
           ))}
-          {conversations.length === 0 && (
-            <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">No conversations yet</p>
-          )}
+          {conversations.length === 0 && <p className="py-8 text-center text-sm text-fg-muted">{t("chat.noConversations")}</p>}
         </div>
-        <div className="p-3 border-t border-line dark:border-gray-800">
+        <div className="border-t border-line p-3">
           <button
+            type="button"
             onClick={() => setShowSettings(!showSettings)}
-            className="text-xs text-gray-400 dark:text-gray-500 hover:text-fg-secondary dark:hover:text-gray-300 transition-colors"
+            aria-expanded={showSettings}
+            className="text-xs font-medium text-fg-muted transition-colors hover:text-fg"
           >
-            Settings & Privacy
+            {t("chat.settings")}
           </button>
           {showSettings && (
-            <div className="mt-2 p-2 bg-surface-sunken dark:bg-gray-900 rounded-lg">
-              <button
-                onClick={handleRevoke}
-                disabled={revoking}
-                className="text-xs text-red-500 hover:text-red-700 font-medium"
-              >
-                {revoking ? "Revoking..." : "Revoke Consent & Delete Data"}
+            <div className="mt-2 rounded-lg bg-surface-sunken p-2">
+              <button type="button" onClick={handleRevoke} disabled={revoking} className="text-xs font-medium text-danger hover:underline">
+                {revoking ? t("chat.revoking") : t("chat.revoke")}
               </button>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">This deletes all chat history permanently.</p>
+              <p className="mt-1 text-xs text-fg-muted">{t("chat.revokeNote")}</p>
             </div>
           )}
         </div>
-      </div>
+      </aside>
 
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <div className="px-4 py-3 border-b border-line dark:border-gray-800 flex items-center justify-between">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowSidebar(!showSidebar)} className="md:hidden text-fg-muted dark:text-gray-300">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+            <button
+              type="button"
+              onClick={() => setShowSidebar(!showSidebar)}
+              aria-expanded={showSidebar}
+              aria-label={t("chat.toggleSidebar")}
+              className="rounded-lg p-1.5 text-fg-muted hover:bg-surface-muted md:hidden"
+            >
+              <Menu className="h-5 w-5" aria-hidden="true" />
             </button>
-            <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
-              <span className="text-primary-text font-bold text-sm">M</span>
-            </div>
+            <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-soft text-primary-text">
+              <Sparkles className="h-4 w-4" />
+            </span>
             <div>
-              <p className="font-medium text-fg dark:text-gray-100 text-sm">Mara</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">AI Job Assistant</p>
+              <p className="text-sm font-semibold text-fg">{t("chat.mara")}</p>
+              <p className="text-xs text-fg-muted">{t("chat.maraRole")}</p>
             </div>
           </div>
-          {remaining !== null && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">{remaining} messages remaining today</span>
-          )}
+          {remaining !== null && <span className="text-xs text-fg-muted">{t("chat.remaining", { count: remaining })}</span>}
         </div>
 
-        {/* Messages */}
-        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 space-y-4 overflow-y-auto px-4 py-4"
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
+        >
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
-                <span className="text-3xl">👋</span>
-              </div>
-              <h3 className="text-lg font-semibold text-fg dark:text-gray-100 mb-1">Hi! I&apos;m Mara</h3>
-              <p className="text-fg-muted dark:text-gray-400 text-sm max-w-md mb-6">
-                Your personal AI job assistant. I know your profile, applications, and job searches.
-                Ask me anything about your career journey!
-              </p>
+            <div className="flex h-full flex-col items-center justify-center text-center">
+              <span aria-hidden="true" className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-soft text-primary-text">
+                <Sparkles className="h-7 w-7" />
+              </span>
+              <h3 className="mb-1 text-lg font-semibold text-fg">{t("chat.hi")}</h3>
+              <p className="mb-6 max-w-md text-sm text-fg-muted">{t("chat.intro")}</p>
               <div className="flex flex-wrap justify-center gap-2">
-                {[
-                  "What's the status of my applications?",
-                  "How can I improve my profile?",
-                  "What should I do next?",
-                  "Help me prepare for interviews",
-                ].map((q) => (
+                {SUGGESTIONS.map((key) => (
                   <button
-                    key={q}
-                    onClick={() => { setInput(q); inputRef.current?.focus(); }}
-                    className="px-3 py-1.5 text-xs bg-surface-muted dark:bg-gray-800 text-fg-secondary dark:text-gray-200 rounded-full hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setInput(t(key));
+                      inputRef.current?.focus();
+                    }}
+                    className="rounded-full border border-line bg-surface-sunken px-3 py-1.5 text-xs font-medium text-fg-secondary transition-colors hover:border-success-line hover:bg-primary-soft hover:text-primary-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   >
-                    {q}
+                    {t(key)}
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === "USER" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
-                msg.role === "USER"
-                  ? "bg-emerald-600 text-white"
-                  : "bg-surface-muted text-fg"
-              }`}>
-                <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                <p className={`text-xs mt-1 ${msg.role === "USER" ? "text-emerald-200" : "text-gray-400 dark:text-gray-500"}`}>
-                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </p>
+          {messages.map((msg) => {
+            const mine = msg.role === "USER";
+            const failed = failedIds.has(msg.id);
+            return (
+              <div key={msg.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 sm:max-w-[75%] ${
+                    mine
+                      ? "rounded-ee-md bg-primary text-primary-fg"
+                      : failed
+                        ? "rounded-es-md border border-danger-line bg-danger-soft text-fg"
+                        : "rounded-es-md bg-surface-muted text-fg"
+                  }`}
+                >
+                  <span className="sr-only">{mine ? t("chat.you") : t("chat.mara")}: </span>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed" dir="auto">
+                    {msg.content}
+                  </p>
+                  <p className={`mt-1 text-xs ${mine ? "text-primary-fg/80" : "text-fg-muted"}`}>{fmt.time(msg.createdAt)}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {sending && (
             <div className="flex justify-start">
-              <div className="bg-surface-muted rounded-2xl px-4 py-3">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              <div className="rounded-2xl bg-surface-muted px-4 py-3" role="status">
+                <span className="sr-only">{t("chat.typing")}</span>
+                <div className="flex gap-1" aria-hidden="true">
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-fg-muted" style={{ animationDelay: "0ms" }} />
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-fg-muted" style={{ animationDelay: "150ms" }} />
+                  <span className="h-2 w-2 animate-bounce rounded-full bg-fg-muted" style={{ animationDelay: "300ms" }} />
                 </div>
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
-        <div className="px-4 py-3 border-t border-line dark:border-gray-800">
-          <div className="flex items-end gap-2">
+        <div className="border-t border-line px-4 py-3">
+          <form
+            className="flex items-end gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSend();
+            }}
+          >
+            <label htmlFor="mara-input" className="sr-only">
+              {t("chat.inputLabel")}
+            </label>
             <textarea
+              id="mara-input"
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask Mara anything about your job search..."
+              placeholder={t("chat.placeholder")}
               rows={1}
-              className="flex-1 resize-none rounded-xl border border-line-strong dark:border-gray-700 bg-surface dark:bg-gray-900 text-fg dark:text-gray-100 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              style={{ maxHeight: "120px" }}
+              dir="auto"
+              className="flex-1 resize-none rounded-xl border border-line-strong bg-surface-raised px-4 py-2.5 text-sm text-fg placeholder:text-fg-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus"
             />
-            <Button onClick={handleSend} disabled={!input.trim() || sending} size="sm" className="shrink-0 rounded-xl px-4">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+            <Button type="submit" disabled={!input.trim() || sending} className="shrink-0 rounded-xl px-3.5" aria-label={t("chat.send")}>
+              <SendHorizontal className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
             </Button>
-          </div>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
-            Powered by <span className="font-semibold text-fg-muted dark:text-gray-300">Maralito Labs</span> · AI responses may not always be accurate
-          </p>
+          </form>
+          <p className="mt-2 text-center text-xs text-fg-muted">{t("chat.disclaimer", { brand: "Maralito Labs" })}</p>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Main Page ────────────────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ChatPage() {
   const router = useRouter();
+  const locale = useLocale();
+  const t = useCandidateT();
   const { user, isLoading } = useAuth();
   const [consentData, setConsentData] = useState<ChatConsentStatus | null>(null);
   const [consentLoading, setConsentLoading] = useState(true);
+  const [consentError, setConsentError] = useState<unknown>(null);
   const [accepting, setAccepting] = useState(false);
+  const [acceptFailed, setAcceptFailed] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "CANDIDATE")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
+
+  const loadConsent = useCallback(() => {
+    setConsentLoading(true);
+    setConsentError(null);
+    chat
+      .getConsent()
+      .then(setConsentData)
+      .catch((err) => setConsentError(err))
+      .finally(() => setConsentLoading(false));
+  }, []);
 
   useEffect(() => {
-    if (!user) return;
-    chat.getConsent()
-      .then((data) => { setConsentData(data); setConsentLoading(false); })
-      .catch(() => setConsentLoading(false));
-  }, [user]);
+    if (user) loadConsent();
+  }, [user, loadConsent]);
 
   async function handleAcceptConsent() {
     setAccepting(true);
+    setAcceptFailed(false);
     try {
       await chat.acceptConsent();
-      const updated = await chat.getConsent();
-      setConsentData(updated);
+      setConsentData(await chat.getConsent());
     } catch {
-      // ignore
+      setAcceptFailed(true);
     } finally {
       setAccepting(false);
     }
   }
 
-  if (isLoading || !user || consentLoading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-6 space-y-3">
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-8 w-56" />
-        </div>
-        <div className="rounded-xl border border-line dark:border-gray-800 p-4">
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <CandidateBackLink href={localizePath("/candidate", locale)}>{t("ai.backToDashboard")}</CandidateBackLink>
+      <CandidatePageHeader title={t("chat.title")} className="mb-6" />
+
+      {isLoading || !user || consentLoading ? (
+        <div className="rounded-2xl border border-line p-4">
           <Skeleton className="h-[50vh] w-full" />
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Breadcrumb */}
-      <div className="mb-6">
-        <Link
-          href="/candidate"
-          className="inline-flex items-center text-sm text-primary-text hover:text-emerald-700 mb-3"
-        >
-          <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Dashboard
-        </Link>
-        <h1 className="text-2xl font-bold text-fg dark:text-gray-100">AI Job Assistant</h1>
-      </div>
-
-      {/* Show consent or chat */}
-      {!consentData?.hasFullConsent ? (
-        <ConsentModal
-          consentData={consentData!}
-          onAccept={handleAcceptConsent}
-          loading={accepting}
-        />
+      ) : !consentData ? (
+        <CandidateLoadError error={consentError} subject={t("chat.consent.loadSubject")} onRetry={loadConsent} />
+      ) : !consentData.hasFullConsent ? (
+        <ConsentPanel consentData={consentData} onAccept={handleAcceptConsent} loading={accepting} failed={acceptFailed} />
       ) : (
         <ChatInterface />
       )}

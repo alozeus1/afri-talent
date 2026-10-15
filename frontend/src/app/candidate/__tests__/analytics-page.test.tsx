@@ -11,6 +11,7 @@ const weeklyDigestViewedMock = jest.fn();
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
+  usePathname: () => "/candidate/analytics",
 }));
 
 jest.mock("@/lib/auth-context", () => ({
@@ -200,7 +201,7 @@ describe("CandidateAnalyticsPage", () => {
   it("renders the retention analytics experience and fires analytics exposure events", async () => {
     render(<CandidateAnalyticsPage />);
 
-    expect(await screen.findByText("Retention control tower")).toBeInTheDocument();
+    expect(await screen.findByText("Your search momentum")).toBeInTheDocument();
     expect(screen.getByText("Weekly digest preview")).toBeInTheDocument();
     expect(screen.getByText("High-signal roles matched to your trust profile")).toBeInTheDocument();
     expect(screen.getByText("Platform Engineer")).toBeInTheDocument();

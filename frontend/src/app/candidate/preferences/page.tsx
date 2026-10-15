@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -12,9 +12,16 @@ import {
 } from "@/lib/api";
 import { candidateRetentionEvents } from "@/lib/analytics";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { PushOptInCard } from "@/components/notifications/push-opt-in";
 import { CandidatePreferenceCenter } from "@/components/notifications/candidate-preference-center";
+import {
+  CandidateBackLink,
+  CandidateLoadError,
+  CandidatePageHeader,
+  CandidateSpinner,
+} from "@/components/candidate/candidate-ui";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { useCandidateFormatters, useCandidateT, type CandidateMessageKey } from "@/lib/i18n/candidate-messages";
 
 type PreferenceKey =
   | "savedSearchAlerts"
@@ -28,25 +35,29 @@ type PreferenceKey =
 
 export default function CandidatePreferencesPage() {
   const router = useRouter();
+  const locale = useLocale();
+  const t = useCandidateT();
+  const fmt = useCandidateFormatters();
   const { user, isLoading } = useAuth();
   const [preferences, setPreferences] = useState<NotificationPreference | null>(null);
   const [summary, setSummary] = useState<CandidateRetentionSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<CandidateMessageKey | null>(null);
+  const [error, setError] = useState<CandidateMessageKey | null>(null);
+
+  const href = (path: string) => localizePath(path, locale);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "CANDIDATE")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
 
-  useEffect(() => {
-    if (user?.role !== "CANDIDATE") {
-      return;
-    }
-
+  const load = useCallback(() => {
+    setLoading(true);
+    setLoadError(null);
     Promise.all([pushNotifications.getPreferences(), candidateAnalytics.retentionSummary()])
       .then(([prefs, retentionSummary]) => {
         setPreferences(prefs);
@@ -62,16 +73,18 @@ export default function CandidatePreferencesPage() {
           });
         });
       })
-      .catch((loadError) =>
-        setError(loadError instanceof Error ? loadError.message : "Failed to load preferences"),
-      )
+      .catch((err) => setLoadError(err))
       .finally(() => setLoading(false));
-  }, [user]);
+  }, []);
+
+  useEffect(() => {
+    if (user?.role === "CANDIDATE") load();
+  }, [user, load]);
 
   const updatePreferences = async (updates: Partial<NotificationPreference>, key: string) => {
     if (!preferences) return;
-    const optimistic = { ...preferences, ...updates };
-    setPreferences(optimistic);
+    const previous = preferences;
+    setPreferences({ ...preferences, ...updates });
     setPendingKey(key);
     setMessage(null);
     setError(null);
@@ -79,109 +92,92 @@ export default function CandidatePreferencesPage() {
     try {
       const updated = await pushNotifications.updatePreferences(updates);
       setPreferences(updated);
-      setMessage("Preferences updated.");
+      setMessage("prefs.updated");
       candidateRetentionEvents.preferencesUpdated({
         changed_key: key,
       });
-    } catch (updateError) {
-      setPreferences(preferences);
-      setError(updateError instanceof Error ? updateError.message : "Failed to update preferences");
+    } catch {
+      setPreferences(previous);
+      setError("prefs.updateFailed");
     } finally {
       setPendingKey(null);
     }
   };
 
   if (isLoading || !user || loading) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-      </div>
-    );
+    return <CandidateSpinner className="py-24" />;
   }
 
   if (!preferences || !summary) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <p className="text-sm text-fg-secondary">
-              We could not load your retention settings right now.
-            </p>
-            <div className="mt-4">
-              <Link href="/candidate">
-                <Button variant="outline">Back to dashboard</Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+        <CandidateBackLink href={href("/candidate")}>{t("nav.backToDashboard")}</CandidateBackLink>
+        <CandidateLoadError error={loadError} subject={t("ui.subject.preferences")} onRetry={load} />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <Link href="/candidate" className="text-sm font-medium text-primary-text hover:text-emerald-700">
-            Back to dashboard
-          </Link>
-          <h1 className="mt-2 text-3xl font-bold text-fg">Alerts and retention preferences</h1>
-          <p className="mt-2 text-fg-secondary">
-            Control how AfriTalent keeps your search warm, trusted, and high-signal.
-          </p>
-        </div>
-        <Card className="border-emerald-200 bg-emerald-50/50 md:max-w-sm">
-          <CardContent className="p-5">
-            <p className="text-sm font-semibold text-emerald-800">
-              {summary.snapshot.notificationBudgetRemaining} of {summary.snapshot.maxNotificationsPerWeek} lifecycle nudges left this week
+    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+      <CandidateBackLink href={href("/candidate")}>{t("nav.backToDashboard")}</CandidateBackLink>
+      <CandidatePageHeader
+        title={t("prefs.title")}
+        description={t("prefs.subtitle")}
+        actions={
+          <div className="rounded-2xl border border-success-line bg-success-soft px-4 py-3 md:max-w-sm">
+            <p className="text-sm font-semibold text-fg">
+              {t("prefs.budget", {
+                remaining: fmt.number(summary.snapshot.notificationBudgetRemaining),
+                max: fmt.number(summary.snapshot.maxNotificationsPerWeek),
+              })}
             </p>
-            <p className="mt-1 text-xs text-emerald-700">
-              Minimum spacing is {summary.snapshot.notificationCadenceHours} hours between non-critical nudges.
+            <p className="mt-1 text-xs text-fg-secondary">
+              {t("prefs.cadence", { hours: fmt.number(summary.snapshot.notificationCadenceHours) })}
             </p>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        }
+      />
 
       <CandidatePreferenceCenter
         preferences={preferences}
         journeys={summary.journeys}
         pendingKey={pendingKey}
-        message={message}
-        error={error}
+        message={message ? t(message) : null}
+        error={error ? t(error) : null}
         onToggle={(key: PreferenceKey, value: boolean) => updatePreferences({ [key]: value }, key)}
-        onSetMaxNotifications={(value) =>
-          updatePreferences({ maxNotificationsPerWeek: value }, "maxNotificationsPerWeek")
-        }
+        onSetMaxNotifications={(value) => updatePreferences({ maxNotificationsPerWeek: value }, "maxNotificationsPerWeek")}
         onSetMinimumHours={(value) =>
           updatePreferences({ minimumHoursBetweenNotifications: value }, "minimumHoursBetweenNotifications")
         }
       />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card className="border-amber-200 bg-amber-50/40">
+        <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-fg">This week&apos;s digest preview</h2>
+            <h2 className="text-lg font-semibold text-fg">{t("prefs.digest.title")}</h2>
             <p className="text-sm text-fg-secondary">{summary.weeklyDigest.headline}</p>
           </CardHeader>
           <CardContent>
             <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-              {[
-                ["Trusted roles", summary.weeklyDigest.trustedJobCount],
-                ["Verified employers", summary.weeklyDigest.verifiedEmployerCount],
-                ["Salary disclosed", summary.weeklyDigest.salaryTransparentCount],
-                ["Visa-friendly", summary.weeklyDigest.visaFriendlyCount],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-surface p-3 shadow-sm">
-                  <p className="text-xs uppercase tracking-wide text-fg-muted">{label}</p>
-                  <p className="mt-1 text-lg font-semibold text-fg">{value}</p>
+              {(
+                [
+                  ["an.digest.trustedRoles", summary.weeklyDigest.trustedJobCount],
+                  ["an.digest.verifiedEmployers", summary.weeklyDigest.verifiedEmployerCount],
+                  ["an.digest.salaryDisclosed", summary.weeklyDigest.salaryTransparentCount],
+                  ["an.digest.visaFriendly", summary.weeklyDigest.visaFriendlyCount],
+                ] as Array<[CandidateMessageKey, number]>
+              ).map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-line bg-surface-sunken p-3">
+                  <p className="text-xs uppercase tracking-wide text-fg-muted">{t(label)}</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-fg">{fmt.number(value)}</p>
                 </div>
               ))}
             </div>
             <div className="space-y-3">
               {summary.weeklyDigest.jobs.slice(0, 3).map((job) => (
-                <div key={job.id} className="rounded-xl border border-white/70 bg-white/90 p-4 shadow-sm">
+                <div key={job.id} className="rounded-xl border border-line bg-surface-sunken p-4">
                   <Link
-                    href={`/jobs/${job.slug}`}
+                    href={href(`/jobs/${job.slug}`)}
                     className="text-sm font-semibold text-fg hover:text-primary-text"
                     onClick={() =>
                       candidateRetentionEvents.recommendationClicked({
@@ -193,11 +189,16 @@ export default function CandidatePreferencesPage() {
                     {job.title}
                   </Link>
                   <p className="mt-1 text-xs text-fg-muted">
-                    {job.employer?.companyName} • {job.location}
+                    {[job.employer?.companyName, job.location].filter(Boolean).join(" · ")}
                   </p>
-                  <p className="mt-2 text-xs text-fg-secondary">{job.rankingExplanation?.summary}</p>
+                  {job.rankingExplanation?.summary ? (
+                    <p className="mt-2 text-xs text-fg-secondary">{job.rankingExplanation.summary}</p>
+                  ) : null}
                 </div>
               ))}
+              {summary.weeklyDigest.jobs.length === 0 ? (
+                <p className="text-sm text-fg-muted">{t("an.digest.empty")}</p>
+              ) : null}
             </div>
           </CardContent>
         </Card>
@@ -207,12 +208,14 @@ export default function CandidatePreferencesPage() {
 
           <Card>
             <CardHeader>
-              <h2 className="text-lg font-semibold text-fg">Why these loops matter</h2>
+              <h2 className="text-base font-semibold text-fg">{t("prefs.why.title")}</h2>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm text-fg-secondary">
-              <p>Trusted jobs and verified employers are prioritized before anything reaches your digest.</p>
-              <p>Freshness and fit shape the order of recommendations so alerts stay useful.</p>
-              <p>Volume controls stop AfriTalent from turning every weak signal into a notification.</p>
+            <CardContent>
+              <ul className="list-disc space-y-2 ps-5 text-sm text-fg-secondary">
+                <li>{t("prefs.why.1")}</li>
+                <li>{t("prefs.why.2")}</li>
+                <li>{t("prefs.why.3")}</li>
+              </ul>
             </CardContent>
           </Card>
         </div>
