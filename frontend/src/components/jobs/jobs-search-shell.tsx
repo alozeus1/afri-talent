@@ -5,6 +5,7 @@ import { JobFilters } from "@/components/jobs/job-filters";
 import { JobSearchState, buildJobsHref } from "@/lib/jobs-search";
 import { useNetworkProfile } from "@/lib/network-profile";
 import { jobDiscoveryEvents } from "@/lib/analytics";
+import { usePublicT } from "@/lib/i18n/public-messages";
 
 interface JobsSearchShellProps {
   filters: JobSearchState;
@@ -19,6 +20,7 @@ interface JobsSearchShellProps {
 }
 export function JobsSearchShell({ filters, isPending = false, onNavigate, resultMetrics }: JobsSearchShellProps) {
   const { isLowBandwidth } = useNetworkProfile();
+  const tp = usePublicT();
   const [draft, setDraft] = useState<JobSearchState>(filters);
 
   const deferredSearch = useDeferredValue(draft.search);
@@ -126,10 +128,10 @@ export function JobsSearchShell({ filters, isPending = false, onNavigate, result
       <div className="mt-3 flex flex-col gap-2 text-sm text-fg-muted sm:flex-row sm:items-center sm:justify-between">
         <p>
           {isLowBandwidth
-            ? "Search is pacing requests more gently to save data on slower connections."
-            : "Results update in the background as you refine your search."}
+            ? tp("discover.shell.lite")
+            : tp("discover.shell.live")}
         </p>
-        {isPending && <p className="font-semibold text-emerald-700 dark:text-emerald-300">Refreshing results...</p>}
+        {isPending && <p role="status" className="font-semibold text-primary-text">{tp("discover.shell.refreshing")}</p>}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { useNetworkProfile } from "@/lib/network-profile";
 import FeedbackToast from "@/components/ui/feedback-toast";
+import { usePublicT } from "@/lib/i18n/public-messages";
 
 const QuickApplyModal = dynamic(
   () => import("@/components/jobs/quick-apply-modal").then((mod) => mod.QuickApplyModal),
@@ -30,16 +31,17 @@ function isAlreadyAppliedError(error: unknown): boolean {
   return message.toLowerCase().includes("already applied");
 }
 
-function formatAppliedDate(value: string | null): string {
+function formatAppliedDate(value: string | null, locale: string): string {
   if (!value) return "";
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? ""
-    : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    : date.toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
 }
 
 export function JobApplyPanel({ job }: JobApplyPanelProps) {
   const locale = useLocale();
+  const tp = usePublicT();
   const router = useRouter();
   const { user } = useAuth();
   const { online, isLowBandwidth } = useNetworkProfile();
@@ -85,7 +87,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
 
   const handleApply = async () => {
     if (!online) {
-      setApplyError("You appear to be offline. Reconnect and try again.");
+      setApplyError(tp("discover.apply.offlineError"));
       return;
     }
 
@@ -96,7 +98,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
     }
 
     if (user.role !== "CANDIDATE") {
-      setApplyError("Only candidates can apply to jobs");
+      setApplyError(tp("discover.apply.candidatesOnly"));
       return;
     }
 
@@ -104,7 +106,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
 
     if (!isOnPlatformApply) {
       if (!externalApplyUrl) {
-        setApplyError("This role does not have a verified application link yet.");
+        setApplyError(tp("discover.apply.noLink"));
         return;
       }
 
@@ -122,7 +124,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
           return;
         }
         if (!isAlreadyAppliedError(error)) {
-          setApplyError(message || "Failed to record this application");
+          setApplyError(message || tp("discover.apply.recordFailed"));
           setApplying(false);
           return;
         }
@@ -142,93 +144,89 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
     <>
       <Card className="sticky top-24">
         <CardContent className="p-6">
-          <h3 className="font-semibold text-fg mb-4 dark:text-gray-100">Apply for this position</h3>
+          <h2 className="mb-4 font-semibold text-fg">{tp("discover.apply.title")}</h2>
 
-          <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4">
-            <p className="text-sm font-semibold text-blue-900">Stay safe while applying</p>
-            <p className="mt-2 text-sm text-blue-900">
-              {isOnPlatformApply
-                ? "Keep interviews and file sharing on AfriTalent when possible, and never pay application or processing fees."
-                : "This role continues on the employer or ATS site. Only trust application links we have verified, and never pay application or processing fees."}
+          <div className="mb-4 rounded-2xl border border-info-line bg-info-soft px-4 py-4">
+            <p className="text-sm font-semibold text-info">{tp("discover.apply.safeTitle")}</p>
+            <p className="mt-2 text-sm text-fg-secondary">
+              {isOnPlatformApply ? tp("discover.apply.safeOnPlatform") : tp("discover.apply.safeExternal")}
             </p>
             <Link
               href={`${localizePath("/trust/report", locale)}?targetJobId=${job.id}`}
-              className="mt-3 inline-flex text-sm font-medium text-blue-900 underline-offset-2 hover:underline"
+              className="mt-3 inline-flex text-sm font-medium text-info underline-offset-2 hover:underline"
             >
-              Report this job
+              {tp("discover.apply.report")}
             </Link>
           </div>
 
           {!online && (
-            <div className="mb-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
-              You&apos;re offline. AfriTalent will keep this job available, but apply actions are paused until you reconnect.
+            <div role="status" className="mb-4 rounded-lg border border-warning-line bg-warning-soft p-4 text-sm text-fg-secondary">
+              {tp("discover.apply.offline")}
             </div>
           )}
 
           {isLowBandwidth && (
             <div className="mb-4 rounded-lg bg-surface-sunken p-4 text-sm text-fg-secondary">
-              Lite network mode is on, so quick apply checks may take a little longer on this connection.
+              {tp("discover.apply.lite")}
             </div>
           )}
 
           {user && user.role === "EMPLOYER" ? (
-            <div className="bg-blue-50 text-blue-700 p-4 rounded-lg mb-4 text-sm">
-              <p className="font-medium">You&apos;re logged in as an employer.</p>
-              <p className="mt-1">Only candidates can apply to jobs.</p>
+            <div className="mb-4 rounded-lg border border-info-line bg-info-soft p-4 text-sm text-fg-secondary">
+              <p className="font-medium text-fg">{tp("discover.apply.employerTitle")}</p>
+              <p className="mt-1">{tp("discover.apply.candidatesOnly")}</p>
             </div>
           ) : user && user.role === "ADMIN" ? (
             <div className="bg-surface-sunken text-fg-secondary p-4 rounded-lg mb-4 text-sm">
-              <p className="font-medium">You&apos;re logged in as an admin.</p>
-              <p className="mt-1">Admins cannot apply to jobs.</p>
+              <p className="font-medium text-fg">{tp("discover.apply.adminTitle")}</p>
+              <p className="mt-1">{tp("discover.apply.adminBody")}</p>
             </div>
           ) : (
             <>
               {emailVerifyNeeded && (
-                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                  <p className="font-semibold mb-1">Verify your email to apply</p>
-                  <p className="mb-3">We sent a verification link to your email address. Open it, then come back here to apply.</p>
-                  <Link href={localizePath("/candidate", locale)} className="text-emerald-700 underline font-medium">
-                    Go to dashboard to resend
+                <div role="alert" className="mb-4 rounded-lg border border-warning-line bg-warning-soft p-4 text-sm text-fg-secondary">
+                  <p className="mb-1 font-semibold text-fg">{tp("discover.apply.verifyTitle")}</p>
+                  <p className="mb-3">{tp("discover.apply.verifyBody")}</p>
+                  <Link href={localizePath("/candidate", locale)} className="font-medium text-primary-text underline">
+                    {tp("discover.apply.verifyResend")}
                   </Link>
                 </div>
               )}
               {applyError && (
-                <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
+                <div role="alert" className="mb-4 rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger">
                   {applyError}
                 </div>
               )}
               {!user && (
                 <div className="mb-4 rounded-lg bg-surface-sunken p-4 text-sm text-fg-secondary">
-                  {isOnPlatformApply
-                    ? "Sign in to apply and track your application from your candidate dashboard."
-                    : "Sign in to save this role and continue to the verified employer application page."}
+                  {isOnPlatformApply ? tp("discover.apply.signInOnPlatform") : tp("discover.apply.signInExternal")}
                 </div>
               )}
               {!isOnPlatformApply && (
-                <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
-                  AfriTalent verified this as an external application path. You will continue on the employer or ATS site to complete the application.
+                <div className="mb-4 rounded-lg border border-info-line bg-info-soft p-4 text-sm text-fg-secondary">
+                  {tp("discover.apply.externalVerified")}
                 </div>
               )}
               <div className="space-y-3">
                 {applied && isCandidate ? (
                   <>
                     <Button className="w-full" size="lg" disabled data-testid="job-applied-state">
-                      {appliedAt ? `Applied on ${formatAppliedDate(appliedAt)}` : "Applied"}
+                      {appliedAt ? tp("discover.apply.appliedOn", { date: formatAppliedDate(appliedAt, locale) }) : tp("discover.apply.applied")}
                     </Button>
                     <Link
                       href={localizePath("/candidate/applications", locale)}
-                      className="block text-center text-sm font-medium text-emerald-700 underline-offset-2 hover:underline"
+                      className="block text-center text-sm font-medium text-primary-text underline-offset-2 hover:underline"
                     >
-                      Track this application
+                      {tp("discover.apply.track")}
                     </Link>
                   </>
                 ) : (
                   <Button className="w-full" size="lg" onClick={handleApply} disabled={applying || !online}>
                     {applying
-                      ? "Applying..."
+                      ? tp("discover.apply.applying")
                       : isOnPlatformApply
-                        ? "Apply Now"
-                        : "Continue to Employer Site"}
+                        ? tp("discover.apply.applyNow")
+                        : tp("discover.apply.continueExternal")}
                   </Button>
                 )}
               </div>
@@ -250,8 +248,8 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
         visible={toastVisible}
         onClose={() => setToastVisible(false)}
         mode="success" 
-        title="Success!"
-        message={isOnPlatformApply ? "Application submitted successfully!" : "Employer application page opened."}
+        title={tp("discover.apply.successTitle")}
+        message={isOnPlatformApply ? tp("discover.apply.successOnPlatform") : tp("discover.apply.successExternal")}
       />
     </>
   );

@@ -47,7 +47,7 @@ export function translatePublic(locale: SupportedLocale, key: PublicMessageKey, 
 
 export type PublicT = (key: PublicMessageKey, vars?: PublicVars) => string;
 
-/** `tp("site.footer.tagline")`, `tp("discover.jobs.count", { count: 3 })`. */
+/** `tp("site.footer.tagline")`, `tp("discover.results.count", { count: 3 })`. */
 export function usePublicT(): PublicT {
   const locale = useLocale();
   return useCallback((key: PublicMessageKey, vars?: PublicVars) => translatePublic(locale, key, vars), [locale]);

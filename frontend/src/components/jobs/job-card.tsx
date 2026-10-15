@@ -13,6 +13,8 @@ import { jobDiscoveryEvents } from "@/lib/analytics";
 import { formatPostedShort } from "@/lib/posted-age";
 import { MapPin, Briefcase, Globe, Plane, Heart, Clock } from "lucide-react";
 import { Coachmark } from "@/components/ui/coachmark";
+import { usePublicT } from "@/lib/i18n/public-messages";
+import { usePublicLabel } from "@/lib/i18n/public-labels";
 
 interface JobCardProps {
   job: Job;
@@ -92,6 +94,8 @@ export function selectCardBadges(job: Job): { trust: CardBadge[]; caution: CardB
 
 export function JobCard({ job, initialSaved = false }: JobCardProps) {
   const locale = useLocale();
+  const tp = usePublicT();
+  const label = usePublicLabel();
   const [isSaved, setIsSaved] = useState(initialSaved);
   const [isSaving, setIsSaving] = useState(false);
   // Relative dates depend on "now", so compute after mount to keep server and
@@ -158,16 +162,16 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
         });
       }}
     >
-      <Card className="isolate h-full cursor-pointer transition-all duration-300 border border-[var(--border-soft)] bg-surface dark:bg-zinc-950 hover:bg-gradient-to-br hover:from-white hover:to-emerald-50/50 dark:hover:from-zinc-950 dark:hover:to-emerald-950/20 group-hover:-translate-y-1 hover:border-emerald-300 dark:hover:border-emerald-700 shadow-sm hover:shadow-[0_8px_24px_rgba(0,0,0,0.15)] relative overflow-hidden">
+      <Card className="isolate relative h-full cursor-pointer overflow-hidden border border-line bg-surface shadow-xs transition-all duration-300 group-hover:-translate-y-0.5 group-hover:border-emerald-300 group-hover:shadow-raised group-focus-visible:ring-2 group-focus-visible:ring-focus dark:group-hover:border-emerald-700">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/0 to-emerald-500/0 group-hover:via-emerald-500/5 transition-all duration-500 rounded-xl pointer-events-none" />
         <CardContent className="relative z-10 flex h-full flex-col p-6">
           <div className="flex justify-between items-start mb-3">
             <div className="flex-1 pr-4">
-              <h3 className="font-display text-lg font-bold text-fg dark:text-gray-100 mb-1 line-clamp-2">
+              <h3 className="font-display text-lg font-bold text-fg mb-1 line-clamp-2">
                 {job.title}
               </h3>
               {companyName && (
-                <p className="font-medium text-emerald-700 dark:text-emerald-300">{companyName}</p>
+                <p className="font-medium text-primary-text">{companyName}</p>
               )}
               {cardBadges.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -175,15 +179,15 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
                     badge.coachmark ? (
                       <Coachmark
                         key={badge.key}
-                        title={badge.coachmark.title}
-                        description={badge.coachmark.description}
+                        title={label(badge.coachmark.title)}
+                        description={label(badge.coachmark.description)}
                       >
-                        <TrustBadge label={badge.label} riskLevel={badge.riskLevel} variant={badge.variant} />
+                        <TrustBadge label={label(badge.label)} riskLevel={badge.riskLevel} variant={badge.variant} />
                       </Coachmark>
                     ) : (
                       <TrustBadge
                         key={badge.key}
-                        label={badge.label}
+                        label={label(badge.label)}
                         riskLevel={badge.riskLevel}
                         variant={badge.variant}
                       />
@@ -204,60 +208,60 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
                 className={`p-2 rounded-full transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70 ${
                   isSaved 
                     ? "bg-rose-50 text-rose-500 shadow-sm ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-500/30"
-                    : "bg-surface-sunken text-gray-400 hover:bg-surface-muted hover:text-fg-secondary dark:bg-zinc-800/50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                    : "bg-surface-sunken text-fg-muted hover:bg-surface-muted hover:text-fg-secondary"
                 }`}
                 aria-pressed={isSaved}
-                aria-label={isSaved ? "Remove saved job" : "Save job"}
+                aria-label={isSaved ? tp("discover.card.unsave") : tp("discover.card.save")}
               >
-                <Heart className={`w-5 h-5 transition-transform duration-300 ${isSaved ? "fill-current scale-110" : "scale-100 active:scale-90"}`} />
+                <Heart aria-hidden="true" className={`w-5 h-5 transition-transform duration-300 ${isSaved ? "fill-current scale-110" : "scale-100 active:scale-90"}`} />
               </button>
-              <Badge variant="success">{job.type}</Badge>
-              {job.jobField && <Badge variant="default">{job.jobField}</Badge>}
+              <Badge variant="success">{label(job.type)}</Badge>
+              {job.jobField && <Badge variant="default">{label(job.jobField)}</Badge>}
             </div>
           </div>
 
           <div className="flex flex-wrap gap-4 mb-4">
-            <span className="inline-flex items-center text-sm font-medium text-fg-secondary dark:text-gray-300">
-              <MapPin className="w-4 h-4 mr-1.5 text-primary-text dark:text-emerald-400" />
-              {job.workplaceType ? `${job.location} · ${job.workplaceType.toLowerCase()}` : job.location}
+            <span className="inline-flex items-center text-sm font-medium text-fg-secondary">
+              <MapPin aria-hidden="true" className="w-4 h-4 me-1.5 text-primary-text" />
+              {job.workplaceType ? `${job.location} · ${label(job.workplaceType).toLowerCase()}` : job.location}
             </span>
-            <span className="inline-flex items-center text-sm font-medium text-fg-secondary dark:text-gray-300">
-              <Briefcase className="w-4 h-4 mr-1.5 text-primary-text dark:text-emerald-400" />
-              {job.seniority}
+            <span className="inline-flex items-center text-sm font-medium text-fg-secondary">
+              <Briefcase aria-hidden="true" className="w-4 h-4 me-1.5 text-primary-text" />
+              {label(job.seniority)}
             </span>
           </div>
 
           {salary && (
-            <p className="mb-4 font-display text-lg font-bold text-fg dark:text-gray-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors duration-200">{salary}</p>
+            <p className="mb-4 font-display text-lg font-bold text-fg group-hover:text-primary-text transition-colors duration-200">{label(salary)}</p>
           )}
 
           {job.discovery && (
             <div className="mb-4 flex flex-wrap gap-2">
               {job.discovery.freshnessLabel && job.discovery.freshnessLabel !== "ACTIVE" && freshnessLabel && (
                 <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/30 dark:text-emerald-300">
-                  {freshnessLabel}
+                  {label(freshnessLabel)}
                 </span>
               )}
               {job.discovery.salaryTransparent && (
                 <span className="inline-flex items-center rounded-full border border-line bg-surface-muted px-2.5 py-1 text-xs font-semibold text-fg-secondary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                  Salary disclosed
+                  {tp("discover.card.salaryDisclosed")}
                 </span>
               )}
               {job.discovery.verifiedApplyPath && job.discovery.applyPathType === "ATS" && (
                 <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-900/30 dark:text-indigo-300">
-                  Direct ATS apply
+                  {tp("discover.card.directAts")}
                 </span>
               )}
               {job.discovery.deliveryModel === "ON_PLATFORM" && (
                 <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/30 dark:text-emerald-300">
-                  Apply on AfriTalent
+                  {tp("discover.label.applyOnAfriTalent")}
                 </span>
               )}
             </div>
           )}
 
           {discoverySummary && (
-            <p className="mb-4 text-sm leading-6 text-fg-secondary dark:text-gray-300">
+            <p className="mb-4 text-sm leading-6 text-fg-secondary">
               {discoverySummary}
             </p>
           )}
@@ -266,14 +270,14 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
             <div className="flex flex-wrap gap-2 mb-3">
               {job.visaSponsorship === "YES" && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50/80 border border-blue-100 dark:border-blue-900/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-semibold shadow-sm">
-                  <Globe className="w-3.5 h-3.5" />
-                  Visa Sponsored
+                  <Globe aria-hidden="true" className="w-3.5 h-3.5" />
+                  {tp("discover.card.visa")}
                 </span>
               )}
               {job.relocationAssistance && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50/80 border border-purple-100 dark:border-purple-900/50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-semibold shadow-sm">
-                  <Plane className="w-3.5 h-3.5" />
-                  Relocation Support
+                  <Plane aria-hidden="true" className="w-3.5 h-3.5" />
+                  {tp("discover.card.relocation")}
                 </span>
               )}
             </div>
@@ -294,22 +298,22 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
 
           <div className="mt-auto" />
 
-          <div className="mt-4 flex items-center justify-between text-xs text-fg-muted dark:text-gray-400 border-t border-line dark:border-zinc-800/60 pt-4">
+          <div className="mt-4 flex items-center justify-between text-xs text-fg-muted border-t border-line pt-4">
             <span className="flex items-center gap-1.5 font-medium">
-              <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg aria-hidden="true" className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
-              {job.discovery?.verifiedApplyPath ? "Verified application path" : "External listing, verify before applying"}
+              {job.discovery?.verifiedApplyPath ? tp("discover.card.verifiedPath") : tp("discover.card.externalListing")}
             </span>
             <span className="flex items-center gap-2">
               {job.discovery?.sourceCount && job.discovery.sourceCount > 1 ? (
-                <span>Cross-checked x{job.discovery.sourceCount}</span>
+                <span>{tp("discover.badge.crossChecked", { count: job.discovery.sourceCount })}</span>
               ) : null}
               {postedLabel && (
                 <span className="inline-flex items-center gap-1" data-testid="job-card-posted">
                   <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                  {postedLabel}
+                  {label(postedLabel)}
                 </span>
               )}
             </span>

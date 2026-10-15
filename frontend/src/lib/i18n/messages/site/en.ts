@@ -196,6 +196,13 @@ export default {
   "site.verify.failedTitle": "Verification failed",
   "site.verify.noToken": "No verification token provided.",
 
+  "site.trust.whyTrusted": "Why this is trusted",
+  "site.trust.explainer": "Trust explainer",
+  "site.trust.close": "Close",
+  "site.trust.supportTitle": "Need a human review?",
+  "site.trust.supportBody": "If a verification result looks wrong, a recruiter is pressuring you off-platform, or you need help understanding a trust state, contact support or file a trust report.",
+  "site.trust.reportActivity": "Report suspicious activity",
+
   "site.oauth.orContinue": "Or continue with",
   "site.oauth.signInWith": "Sign in with {provider}",
   "site.oauth.signUpWith": "Sign up with {provider}",

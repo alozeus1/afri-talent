@@ -194,6 +194,13 @@ export default {
   "site.verify.failedTitle": "Échec de la vérification",
   "site.verify.noToken": "Aucun jeton de vérification fourni.",
 
+  "site.trust.whyTrusted": "Pourquoi c'est fiable",
+  "site.trust.explainer": "Comprendre la confiance",
+  "site.trust.close": "Fermer",
+  "site.trust.supportTitle": "Besoin d'un examen humain ?",
+  "site.trust.supportBody": "Si un résultat de vérification semble erroné, si un recruteur vous pousse à quitter la plateforme ou si vous avez besoin d'aide pour comprendre un statut de confiance, contactez le support ou faites un signalement.",
+  "site.trust.reportActivity": "Signaler une activité suspecte",
+
   "site.oauth.orContinue": "Ou continuer avec",
   "site.oauth.signInWith": "Se connecter avec {provider}",
   "site.oauth.signUpWith": "S'inscrire avec {provider}",

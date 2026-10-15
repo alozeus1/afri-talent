@@ -4,6 +4,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { pricingEvents } from "@/lib/analytics";
 import { FREE_MODE } from "@/lib/free-mode";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { usePublicT } from "@/lib/i18n/public-messages";
+import { usePublicLabel } from "@/lib/i18n/public-labels";
 
 interface FeatureGateProps {
   feature: string;
@@ -54,7 +57,11 @@ interface UpgradeCtaProps {
 }
 
 export function UpgradeCta({ feature, requiredPlan, currentPlan, compact }: UpgradeCtaProps) {
-  const planName = PLAN_NAMES[requiredPlan] ?? requiredPlan;
+  const tp = usePublicT();
+  const label = usePublicLabel();
+  const locale = useLocale();
+  const planName = label(PLAN_NAMES[requiredPlan] ?? requiredPlan);
+  const billingHref = localizePath("/billing", locale);
 
   const handleClick = () => {
     pricingEvents.upgradeCtaClick(feature, currentPlan);
@@ -62,12 +69,12 @@ export function UpgradeCta({ feature, requiredPlan, currentPlan, compact }: Upgr
 
   if (compact) {
     return (
-      <Link href="/billing" onClick={handleClick}>
-        <span className="inline-flex items-center gap-1 text-xs text-primary-text hover:text-emerald-700 font-medium cursor-pointer">
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <Link href={billingHref} onClick={handleClick}>
+        <span className="inline-flex items-center gap-1 text-xs text-primary-text hover:underline font-medium cursor-pointer">
+          <svg aria-hidden="true" className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
           </svg>
-          Upgrade to {planName}
+          {tp("discover.gate.upgradeTo", { plan: planName })}
         </span>
       </Link>
     );
@@ -78,20 +85,20 @@ export function UpgradeCta({ feature, requiredPlan, currentPlan, compact }: Upgr
       className="flex flex-col items-center justify-center py-8 px-4 bg-surface-sunken rounded-xl border border-dashed border-line-strong"
       data-testid={`upgrade-cta-${feature}`}
     >
-      <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
-        <svg className="w-6 h-6 text-primary-text" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <div className="w-12 h-12 rounded-full bg-success-soft flex items-center justify-center mb-3">
+        <svg aria-hidden="true" className="w-6 h-6 text-primary-text" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
         </svg>
       </div>
       <h4 className="text-sm font-semibold text-fg mb-1">
-        {feature} requires {planName}
+        {tp("discover.gate.requires", { feature, plan: planName })}
       </h4>
       <p className="text-xs text-fg-muted text-center mb-4 max-w-xs">
-        Upgrade your plan to unlock {feature.toLowerCase()} and other premium features.
+        {tp("discover.gate.unlock", { feature: feature.toLowerCase() })}
       </p>
-      <Link href="/billing" onClick={handleClick}>
+      <Link href={billingHref} onClick={handleClick}>
         <Button variant="primary" size="sm">
-          Upgrade to {planName}
+          {tp("discover.gate.upgradeTo", { plan: planName })}
         </Button>
       </Link>
     </div>

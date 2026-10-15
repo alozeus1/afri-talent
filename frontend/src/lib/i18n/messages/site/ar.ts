@@ -194,6 +194,13 @@ export default {
   "site.verify.failedTitle": "فشل التحقق",
   "site.verify.noToken": "لم يتم تقديم رمز تحقق.",
 
+  "site.trust.whyTrusted": "لماذا يُعد هذا موثوقًا",
+  "site.trust.explainer": "شرح الثقة",
+  "site.trust.close": "إغلاق",
+  "site.trust.supportTitle": "هل تحتاج إلى مراجعة بشرية؟",
+  "site.trust.supportBody": "إذا بدت نتيجة التحقق خاطئة، أو كان مسؤول توظيف يضغط عليك للتواصل خارج المنصة، أو احتجت إلى مساعدة في فهم حالة الثقة، فتواصل مع الدعم أو قدّم بلاغًا.",
+  "site.trust.reportActivity": "الإبلاغ عن نشاط مريب",
+
   "site.oauth.orContinue": "أو تابع باستخدام",
   "site.oauth.signInWith": "تسجيل الدخول باستخدام {provider}",
   "site.oauth.signUpWith": "التسجيل باستخدام {provider}",

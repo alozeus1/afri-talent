@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { EarlyAccessProof } from "@/components/home/early-access-proof";
 import { HeroStats } from "@/components/home/hero-stats";
@@ -122,13 +123,13 @@ export function HomePageContent() {
 
                 <div className="surface-panel relative ml-auto w-full max-w-[36rem] rounded-3xl p-5 border border-line dark:border-zinc-800 bg-surface-sunken dark:bg-zinc-900">
                   <div className="relative flex h-[540px] items-center justify-center overflow-hidden rounded-2xl border border-line dark:border-zinc-800 bg-surface dark:bg-zinc-950">
-                    <img
+                    <Image
                       src="/images/hero/homepage-design-preview.webp"
                       alt={tp("site.home.previewAlt")}
                       width={190}
                       height={600}
                       className="h-full w-auto object-contain p-4"
-                      fetchPriority="high"
+                      priority
                     />
                   </div>
 
@@ -186,11 +187,12 @@ export function HomePageContent() {
           <div className="surface-panel overflow-hidden rounded-3xl border border-line bg-surface shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="grid items-stretch lg:grid-cols-[0.95fr_1.05fr]">
               <div className="relative min-h-[320px] overflow-hidden bg-zinc-950 lg:min-h-[420px]">
-                <img
+                <Image
                   src="/images/generated/afritalent-smart-search-workspace.webp"
                   alt={tp("site.home.searchImageAlt")}
-                  loading="lazy"
-                  className="absolute inset-0 h-full w-full object-cover opacity-90"
+                  fill
+                  sizes="(min-width: 1024px) 45vw, 100vw"
+                  className="object-cover opacity-90"
                 />
                 <div className="absolute inset-0 bg-gradient-to-tr from-emerald-950/55 via-transparent to-amber-500/15" />
               </div>
@@ -224,11 +226,12 @@ export function HomePageContent() {
       <section className="px-0 py-20">
         <div className="page-frame text-center">
           <div className="relative overflow-hidden rounded-3xl border border-emerald-900 bg-emerald-950 px-6 py-16 text-white shadow-2xl md:px-12">
-            <img
+            <Image
               src="/images/generated/afritalent-collaboration-hiring.webp"
-              alt={tp("site.home.ctaImageAlt")}
-              loading="lazy"
-              className="absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-overlay pointer-events-none"
+              alt=""
+              fill
+              sizes="100vw"
+              className="pointer-events-none object-cover opacity-20 mix-blend-overlay"
             />
             <div className="relative text-center z-10">
               <p className="text-sm font-semibold uppercase tracking-widest text-emerald-300">

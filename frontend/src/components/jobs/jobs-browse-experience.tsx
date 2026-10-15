@@ -19,11 +19,12 @@ import {
   buildJobsHref,
   hasActiveJobFilters,
 } from "@/lib/jobs-search";
+import { usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
 
-const SORT_LABELS: Record<JobSortOption, string> = {
-  relevance: "Relevance",
-  newest: "Newest",
-  salary: "Highest salary",
+const SORT_LABELS: Record<JobSortOption, PublicMessageKey> = {
+  relevance: "discover.sort.relevance",
+  newest: "discover.sort.newest",
+  salary: "discover.sort.salary",
 };
 
 interface JobsBrowseExperienceProps {
@@ -46,8 +47,8 @@ function buildPathAwareJobsHref(pathname: string, state: Partial<JobSearchState>
 
 function StatPill({ label, value }: { label: string; value: number }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[rgba(255,255,255,0.62)] px-3 py-1.5 text-xs font-semibold text-fg-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] dark:bg-[rgba(7,17,29,0.58)] dark:text-gray-200">
-      <span className="font-display text-sm text-fg dark:text-white">{value}</span>
+    <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface-raised px-3 py-1.5 text-xs font-semibold text-fg-secondary shadow-xs">
+      <span className="font-display text-sm text-fg">{value}</span>
       {label}
     </span>
   );
@@ -60,6 +61,7 @@ export function JobsBrowseExperience({
   error,
   resultMetrics,
 }: JobsBrowseExperienceProps) {
+  const tp = usePublicT();
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
@@ -154,17 +156,15 @@ export function JobsBrowseExperience({
       >
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-2">
-            <p className="font-display text-2xl font-bold text-fg dark:text-white">
-              {pagination.total} job{pagination.total !== 1 ? "s" : ""} found
+            <p className="font-display text-2xl font-bold text-fg">
+              {tp(pagination.total === 1 ? "discover.results.countOne" : "discover.results.count", { count: pagination.total })}
             </p>
-            <p className="text-sm text-fg-secondary dark:text-gray-300">
-              Search stays anchored while results refresh, so you can keep refining without losing context.
-            </p>
+            <p className="text-sm text-fg-secondary">{tp("discover.results.anchored")}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center gap-2 text-sm font-medium text-fg-secondary dark:text-gray-200">
-              <span>Sort</span>
+            <label className="inline-flex items-center gap-2 text-sm font-medium text-fg-secondary">
+              <span>{tp("discover.sort.label")}</span>
               <select
                 value={filters.sortBy || DEFAULT_JOB_SORT}
                 onChange={(event) =>
@@ -173,45 +173,41 @@ export function JobsBrowseExperience({
                     { scrollToResults: false },
                   )
                 }
-                className="rounded-full border border-[var(--border-soft)] bg-white/80 px-3 py-1.5 text-sm text-fg dark:bg-[rgba(7,17,29,0.58)] dark:text-gray-100"
-                aria-label="Sort jobs"
+                className="rounded-full border border-line-strong bg-surface-raised px-3 py-1.5 text-sm text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                aria-label={tp("discover.sort.aria")}
               >
                 {JOB_SORT_OPTIONS.map((option) => (
                   <option key={option} value={option}>
-                    {SORT_LABELS[option]}
+                    {tp(SORT_LABELS[option])}
                   </option>
                 ))}
               </select>
             </label>
           {resultMetrics && !error && (
             <div className="flex flex-wrap gap-2">
-              <StatPill label="showing now" value={resultMetrics.visibleResults} />
-              <StatPill label="trusted cues" value={resultMetrics.trustedResults} />
-              <StatPill label="recently refreshed" value={resultMetrics.freshResults} />
+              <StatPill label={tp("discover.results.showing")} value={resultMetrics.visibleResults} />
+              <StatPill label={tp("discover.results.trusted")} value={resultMetrics.trustedResults} />
+              <StatPill label={tp("discover.results.fresh")} value={resultMetrics.freshResults} />
             </div>
           )}
           </div>
         </div>
 
         {hasResults && !error && (
-          <div className="mb-6 rounded-[1.5rem] border border-emerald-200 bg-emerald-50/75 px-4 py-4 text-sm text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
-            Search ranking prioritizes relevance, recent refreshes, verified employers, salary transparency, and visa or relocation fit when it matters.
+          <div className="mb-6 rounded-[1.5rem] border border-success-line bg-success-soft px-4 py-4 text-sm text-fg-secondary">
+            {tp("discover.results.rankingNote")}
           </div>
         )}
 
         {error ? (
-          <div className="surface-panel-strong rounded-[1.75rem] border border-red-200 px-6 py-8 dark:border-red-500/20">
-            <p className="font-display text-2xl font-bold text-fg dark:text-white">
-              We couldn&apos;t load the latest roles just now.
-            </p>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-secondary dark:text-gray-300">
-              The search controls above are still available. Retry in a moment, or broaden the filters if the market is refreshing.
-            </p>
+          <div role="alert" className="surface-panel-strong rounded-[1.75rem] border border-danger-line px-6 py-8">
+            <p className="font-display text-2xl font-bold text-fg">{tp("discover.results.errorTitle")}</p>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-secondary">{tp("discover.results.errorBody")}</p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <RetryButton />
+              <RetryButton label={tp("site.error.retry")} />
               {hasActiveJobFilters(filters) && (
                 <Link href={clearFiltersHref}>
-                  <Button variant="ghost">Clear filters</Button>
+                  <Button variant="ghost">{tp("discover.filters.clear")}</Button>
                 </Link>
               )}
             </div>
@@ -229,7 +225,7 @@ export function JobsBrowseExperience({
             </div>
 
             {isPending && (
-              <div className="pointer-events-none absolute inset-0 z-10 rounded-[1.75rem] bg-[rgba(244,239,229,0.72)] p-2 backdrop-blur-[2px] dark:bg-[rgba(7,17,29,0.55)]">
+              <div className="pointer-events-none absolute inset-0 z-10 rounded-[1.75rem] bg-canvas/70 p-2 backdrop-blur-[2px]">
                 <JobResultsSkeletonGrid count={Math.min(Math.max(jobs.length, 3), 6)} />
               </div>
             )}
@@ -238,19 +234,15 @@ export function JobsBrowseExperience({
           <JobResultsSkeletonGrid count={Math.min(filters.limit, 6)} />
         ) : (
           <div className="surface-panel-strong rounded-[1.75rem] px-6 py-10 text-center">
-            <p className="font-display text-2xl font-bold text-fg dark:text-white">
-              No roles matched this search yet.
-            </p>
-            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-fg-secondary dark:text-gray-300">
-              Try a broader title, a wider location, or clear the mobility filters to see more opportunities.
-            </p>
+            <p className="font-display text-2xl font-bold text-fg">{tp("discover.results.emptyTitle")}</p>
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-fg-secondary">{tp("discover.results.emptyBody")}</p>
             <div className="mt-5 flex flex-wrap justify-center gap-3">
               {hasActiveJobFilters(filters) ? (
                 <Link href={clearFiltersHref}>
-                  <Button variant="outline">Clear filters</Button>
+                  <Button variant="outline">{tp("discover.filters.clear")}</Button>
                 </Link>
               ) : (
-                <RetryButton />
+                <RetryButton label={tp("site.error.retry")} />
               )}
             </div>
           </div>
@@ -266,16 +258,16 @@ export function JobsBrowseExperience({
                     shouldScrollToResultsRef.current = true;
                   }}
                 >
-                  Previous
+                  {tp("discover.page.previous")}
                 </Button>
               </Link>
             ) : (
               <Button variant="outline" disabled>
-                Previous
+                {tp("discover.page.previous")}
               </Button>
             )}
-            <span className="flex items-center justify-center px-4 text-sm text-fg-secondary dark:text-gray-300">
-              Page {filters.page} of {pagination.totalPages}
+            <span className="flex items-center justify-center px-4 text-sm text-fg-secondary">
+              {tp("discover.page.of", { page: filters.page, total: pagination.totalPages })}
             </span>
             {filters.page < pagination.totalPages && !isPending ? (
               <Link href={nextHref}>
@@ -285,12 +277,12 @@ export function JobsBrowseExperience({
                     shouldScrollToResultsRef.current = true;
                   }}
                 >
-                  Next
+                  {tp("discover.page.next")}
                 </Button>
               </Link>
             ) : (
               <Button variant="outline" disabled>
-                Next
+                {tp("discover.page.next")}
               </Button>
             )}
           </div>

@@ -2,67 +2,36 @@
 
 import { useState } from "react";
 import { pricingEvents } from "@/lib/analytics";
+import { PUBLIC_MESSAGES, usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
 
 interface FaqItem {
-  question: string;
-  answer: string;
+  question: PublicMessageKey;
+  answer: PublicMessageKey;
 }
 
 const FAQ_ITEMS: FaqItem[] = [
-  {
-    question: "Why does pricing vary by region?",
-    answer:
-      "AfriTalent serves talent across Africa, Europe, and the rest of the world. We adjust pricing to reflect local purchasing power so that our tools are accessible to everyone, regardless of where they are. Plan features remain the same everywhere \u2014 only the price changes.",
-  },
-  {
-    question: "How is my billing region determined?",
-    answer:
-      "Your billing region is set by the country you select during checkout. If you haven't selected a country yet, we detect it from your payment method or suggest one based on your location. You can always update your billing country from your account settings.",
-  },
-  {
-    question: "Do I get the same features regardless of my region?",
-    answer:
-      "Absolutely. Plan entitlements (features, limits, AI usage) are tied to your plan level, not your region. A Professional plan in Nigeria has the exact same features as one in Germany or the US.",
-  },
-  {
-    question: "What happens if I switch regions?",
-    answer:
-      "If you update your billing country, your next invoice will reflect the new regional pricing. Your current billing cycle completes at the existing rate. All changes are audited for transparency.",
-  },
-  {
-    question: "What is grandfathered pricing?",
-    answer:
-      "If you're an existing subscriber when we change prices, your subscription stays at the rate you signed up for until you cancel. This is called 'grandfathering.' You'll only see new prices if you cancel and re-subscribe.",
-  },
-  {
-    question: "Can I switch between monthly and annual billing?",
-    answer:
-      "Yes. Annual billing saves you approximately 17% compared to monthly. You can switch at any time from the Manage Billing page. Stripe handles proration automatically.",
-  },
-  {
-    question: "Is VAT included in European prices?",
-    answer:
-      "European prices are shown excluding VAT. The applicable VAT rate will be calculated and added during checkout based on your country. You can provide a VAT ID for business purchases.",
-  },
-  {
-    question: "What payment methods do you accept?",
-    answer:
-      "We accept all major credit and debit cards (Visa, Mastercard, American Express) through Stripe. We're working on adding local African payment methods like mobile money in the near future.",
-  },
-  {
-    question: "Can I cancel anytime?",
-    answer:
-      "Yes. Cancel anytime from your billing dashboard. Your plan features remain active until the end of your current billing period. No cancellation fees.",
-  },
+  { question: "discover.faq.regionVary.q", answer: "discover.faq.regionVary.a" },
+  { question: "discover.faq.billingRegion.q", answer: "discover.faq.billingRegion.a" },
+  { question: "discover.faq.sameFeatures.q", answer: "discover.faq.sameFeatures.a" },
+  { question: "discover.faq.switchRegion.q", answer: "discover.faq.switchRegion.a" },
+  { question: "discover.faq.grandfathered.q", answer: "discover.faq.grandfathered.a" },
+  { question: "discover.faq.switchInterval.q", answer: "discover.faq.switchInterval.a" },
+  { question: "discover.faq.vat.q", answer: "discover.faq.vat.a" },
+  { question: "discover.faq.paymentMethods.q", answer: "discover.faq.paymentMethods.a" },
+  { question: "discover.faq.cancel.q", answer: "discover.faq.cancel.a" },
 ];
 
+// Analytics keep the English question so reports stay comparable across locales.
+const PUBLIC_EN_QUESTION = (key: PublicMessageKey) => PUBLIC_MESSAGES.en[key];
+
 export function FaqSection() {
+  const tp = usePublicT();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
     <div className="max-w-3xl mx-auto" data-testid="pricing-faq">
       <h2 className="text-2xl font-bold text-fg text-center mb-8">
-        Frequently Asked Questions
+        {tp("discover.faq.title")}
       </h2>
       <div className="space-y-2">
         {FAQ_ITEMS.map((item, i) => {
@@ -76,16 +45,17 @@ export function FaqSection() {
                 onClick={() => {
                   const next = isOpen ? null : i;
                   setOpenIndex(next);
-                  if (next !== null) pricingEvents.faqExpand(item.question);
+                  if (next !== null) pricingEvents.faqExpand(PUBLIC_EN_QUESTION(item.question));
                 }}
-                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-surface-sunken transition"
+                className="w-full flex items-center justify-between px-5 py-4 text-start hover:bg-surface-sunken transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
                 aria-expanded={isOpen}
               >
-                <span className="text-sm font-medium text-fg pr-4">
-                  {item.question}
+                <span className="text-sm font-medium text-fg pe-4">
+                  {tp(item.question)}
                 </span>
                 <svg
-                  className={`w-5 h-5 text-gray-400 shrink-0 transition-transform ${
+                  aria-hidden="true"
+                  className={`w-5 h-5 text-fg-muted shrink-0 transition-transform ${
                     isOpen ? "rotate-180" : ""
                   }`}
                   fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
@@ -95,7 +65,7 @@ export function FaqSection() {
               </button>
               {isOpen && (
                 <div className="px-5 pb-4">
-                  <p className="text-sm text-fg-secondary leading-relaxed">{item.answer}</p>
+                  <p className="text-sm text-fg-secondary leading-relaxed">{tp(item.answer)}</p>
                 </div>
               )}
             </div>

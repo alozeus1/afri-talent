@@ -194,6 +194,13 @@ export default {
   "site.verify.failedTitle": "Falha na verificação",
   "site.verify.noToken": "Nenhum token de verificação foi informado.",
 
+  "site.trust.whyTrusted": "Por que é confiável",
+  "site.trust.explainer": "Entenda a confiança",
+  "site.trust.close": "Fechar",
+  "site.trust.supportTitle": "Precisa de uma revisão humana?",
+  "site.trust.supportBody": "Se um resultado de verificação parecer errado, se um recrutador pressionar você a sair da plataforma ou se precisar de ajuda para entender um status de confiança, fale com o suporte ou registre uma denúncia.",
+  "site.trust.reportActivity": "Denunciar atividade suspeita",
+
   "site.oauth.orContinue": "Ou continue com",
   "site.oauth.signInWith": "Entrar com {provider}",
   "site.oauth.signUpWith": "Cadastrar-se com {provider}",

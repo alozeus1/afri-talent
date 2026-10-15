@@ -5,23 +5,24 @@ import { Briefcase, Check, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
 
-const CANDIDATE_FEATURES = [
-  "AI resume builder",
-  "Job matching",
-  "Career advisor",
-  "Cover letters",
-  "Interview prep",
-  "Salary insights",
+const CANDIDATE_FEATURES: PublicMessageKey[] = [
+  "discover.free.c.resume",
+  "discover.free.c.matching",
+  "discover.free.c.advisor",
+  "discover.free.c.letters",
+  "discover.free.c.interview",
+  "discover.free.c.salary",
 ];
 
-const EMPLOYER_FEATURES = [
-  "Unlimited job posts",
-  "Full applicant details",
-  "Talent search",
-  "Analytics",
-  "Verified-candidate filters",
-  "Employer branding",
+const EMPLOYER_FEATURES: PublicMessageKey[] = [
+  "discover.free.e.posts",
+  "discover.free.e.applicants",
+  "discover.free.e.search",
+  "discover.free.e.analytics",
+  "discover.free.e.verified",
+  "discover.free.e.branding",
 ];
 
 function FeatureColumn({
@@ -32,23 +33,24 @@ function FeatureColumn({
 }: {
   icon: React.ReactNode;
   title: string;
-  features: string[];
+  features: PublicMessageKey[];
   testId: string;
 }) {
+  const tp = usePublicT();
   return (
     <Card className="h-full" data-testid={testId}>
       <CardContent className="p-6 md:p-8">
         <div className="mb-5 flex items-center gap-3">
-          <div className="rounded-full bg-emerald-100 p-2.5 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+          <div className="rounded-full bg-success-soft p-2.5 text-primary-text" aria-hidden="true">
             {icon}
           </div>
-          <h2 className="text-xl font-semibold text-fg dark:text-zinc-50">{title}</h2>
+          <h2 className="text-xl font-semibold text-fg">{title}</h2>
         </div>
         <ul className="space-y-3">
           {features.map((feature) => (
-            <li key={feature} className="flex items-start gap-2 text-fg-secondary dark:text-zinc-300">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary-text dark:text-emerald-400" />
-              <span>{feature}</span>
+            <li key={feature} className="flex items-start gap-2 text-fg-secondary">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary-text" aria-hidden="true" />
+              <span>{tp(feature)}</span>
             </li>
           ))}
         </ul>
@@ -60,29 +62,28 @@ function FeatureColumn({
 /** /pricing during the free launch: no plans, no checkout, just what everyone gets. */
 export function FreeForEveryone() {
   const locale = useLocale();
+  const tp = usePublicT();
 
   return (
     <div className="bg-[var(--background)] px-4 py-12 md:py-20" data-testid="free-for-everyone">
       <div className="mx-auto max-w-5xl">
         <div className="mx-auto max-w-3xl text-center">
-          <h1 className="font-display text-4xl font-bold leading-tight text-fg dark:text-zinc-50 md:text-5xl">
-            AfriTalent is free for everyone — candidates and employers
+          <h1 className="font-display text-4xl font-bold leading-tight tracking-tight text-fg md:text-5xl">
+            {tp("discover.free.title")}
           </h1>
-          <p className="mt-4 text-lg text-emerald-700 dark:text-emerald-400 font-semibold">
-            No credit card. No trial. No catch.
-          </p>
+          <p className="mt-4 text-lg font-semibold text-primary-text">{tp("discover.free.subtitle")}</p>
         </div>
 
         <div className="mt-10 grid gap-6 md:grid-cols-2">
           <FeatureColumn
             icon={<UserRound className="h-5 w-5" />}
-            title="For candidates"
+            title={tp("site.footer.forCandidates")}
             features={CANDIDATE_FEATURES}
             testId="free-for-everyone-candidates"
           />
           <FeatureColumn
             icon={<Briefcase className="h-5 w-5" />}
-            title="For employers"
+            title={tp("site.footer.forEmployers")}
             features={EMPLOYER_FEATURES}
             testId="free-for-everyone-employers"
           />
@@ -91,12 +92,12 @@ export function FreeForEveryone() {
         <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
           <Link href={localizePath("/register", locale)} prefetch={false}>
             <Button size="lg" className="w-full sm:w-auto">
-              Create your free account
+              {tp("discover.free.cta")}
             </Button>
           </Link>
           <Link href={localizePath("/jobs", locale)} prefetch={false}>
             <Button size="lg" variant="outline" className="w-full sm:w-auto">
-              Browse jobs
+              {tp("site.footer.browseJobs")}
             </Button>
           </Link>
         </div>
