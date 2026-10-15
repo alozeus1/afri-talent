@@ -1,17 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { applications, messages, Application } from "@/lib/api";
-import { toFriendlyError } from "@/lib/friendly-error";
 import { employerOnboardingEvents } from "@/lib/analytics";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { LoadErrorCard } from "@/components/ui/load-error-card";
+import {
+  BackLink,
+  EmployerDialog,
+  EmployerLoadError,
+  EmptyPanel,
+  Eyebrow,
+  Notice,
+  PageSpinner,
+  Spinner,
+} from "@/components/employer/employer-ui";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { useEmployerI18n } from "@/lib/i18n/employer-messages";
 import { FREE_MODE } from "@/lib/free-mode";
 
 const statusVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
@@ -21,6 +30,9 @@ const statusVariants: Record<string, "default" | "success" | "warning" | "danger
   REJECTED: "danger",
   ACCEPTED: "success",
 };
+
+const PIPELINE_FILTERS = ["ALL", "PENDING", "REVIEWING", "SHORTLISTED", "ACCEPTED", "REJECTED"] as const;
+type PipelineFilter = (typeof PIPELINE_FILTERS)[number];
 
 function safeExternalUrl(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -33,7 +45,13 @@ function safeExternalUrl(value: string | null | undefined): string | null {
   }
 }
 
+function initials(name: string | null | undefined): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "?";
+}
+
 function ApplicantSummary({ application }: { application: Application }) {
+  const { t, tn } = useEmployerI18n();
   const profile = application.candidate?.candidateProfile;
   const location = application.candidate?.socialProfile?.location;
   if (!profile && !location) return null;
@@ -42,16 +60,14 @@ function ApplicantSummary({ application }: { application: Application }) {
   const links = [
     { label: "LinkedIn", href: safeExternalUrl(profile?.linkedinUrl) },
     { label: "GitHub", href: safeExternalUrl(profile?.githubUrl) },
-    { label: "Portfolio", href: safeExternalUrl(profile?.portfolioUrl) },
+    { label: t("common.portfolio"), href: safeExternalUrl(profile?.portfolioUrl) },
   ].filter((link): link is { label: string; href: string } => Boolean(link.href));
   const facts = [
-    typeof profile?.yearsExperience === "number"
-      ? `${profile.yearsExperience} yr${profile.yearsExperience === 1 ? "" : "s"} experience`
-      : null,
+    typeof profile?.yearsExperience === "number" ? tn("common.yearsExperience", profile.yearsExperience) : null,
     location || null,
     // The stored score can lag behind the profile (it refreshes on save), so
     // only surface it when it carries information.
-    profile?.profileCompleteness ? `Profile ${profile.profileCompleteness}% complete` : null,
+    profile?.profileCompleteness ? t("apps.profileComplete", { pct: profile.profileCompleteness }) : null,
   ].filter(Boolean);
 
   return (
@@ -61,12 +77,14 @@ function ApplicantSummary({ application }: { application: Application }) {
       {skills.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {skills.slice(0, 6).map((skill) => (
-            <span key={skill} className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+            <span key={skill} className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary-text">
               {skill}
             </span>
           ))}
           {skills.length > 6 && (
-            <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-xs text-fg-secondary">+{skills.length - 6} more</span>
+            <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-xs text-fg-secondary">
+              {t("apps.moreSkills", { count: skills.length - 6 })}
+            </span>
           )}
         </div>
       )}
@@ -78,7 +96,7 @@ function ApplicantSummary({ application }: { application: Application }) {
               href={link.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-emerald-700 underline-offset-2 hover:underline"
+              className="rounded font-medium text-primary-text underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               {link.label}
             </a>
@@ -94,20 +112,22 @@ export default function JobApplicationsPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { t, tn, tv, fmt } = useEmployerI18n();
   const [jobApplications, setJobApplications] = useState<Application[]>([]);
   const [candidateAccessLocked, setCandidateAccessLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
-  const [statusErrors, setStatusErrors] = useState<Record<string, string>>({});
+  const [statusErrors, setStatusErrors] = useState<Record<string, boolean>>({});
   const [updating, setUpdating] = useState<string | null>(null);
   const [messagingId, setMessagingId] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [messageError, setMessageError] = useState<string | null>(null);
   const [cvLoadingId, setCvLoadingId] = useState<string | null>(null);
-  const [cvErrors, setCvErrors] = useState<Record<string, string>>({});
+  const [cvErrors, setCvErrors] = useState<Record<string, boolean>>({});
   const [cvLinks, setCvLinks] = useState<Record<string, string>>({});
   const [cvText, setCvText] = useState<{ name: string; text: string } | null>(null);
   const [rejectTarget, setRejectTarget] = useState<Application | null>(null);
+  const [filter, setFilter] = useState<PipelineFilter>("ALL");
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "EMPLOYER")) {
@@ -144,6 +164,17 @@ export default function JobApplicationsPage() {
     }
   }, [isEmployer, loadApplications]);
 
+  const counts = useMemo(() => {
+    const result: Record<string, number> = { ALL: jobApplications.length };
+    for (const application of jobApplications) {
+      result[application.status] = (result[application.status] ?? 0) + 1;
+    }
+    return result;
+  }, [jobApplications]);
+
+  const visibleApplications =
+    filter === "ALL" ? jobApplications : jobApplications.filter((application) => application.status === filter);
+
   const updateStatus = async (applicationId: string, status: string) => {
     if (!user) return;
     setUpdating(applicationId);
@@ -157,12 +188,8 @@ export default function JobApplicationsPage() {
       setJobApplications((prev) =>
         prev.map((a) => (a.id === applicationId ? { ...a, status: updated.status } : a))
       );
-    } catch (err) {
-      const friendly = toFriendlyError(err);
-      setStatusErrors((prev) => ({
-        ...prev,
-        [applicationId]: `Status not updated. ${friendly.description}`,
-      }));
+    } catch {
+      setStatusErrors((prev) => ({ ...prev, [applicationId]: true }));
     } finally {
       setUpdating(null);
     }
@@ -190,10 +217,10 @@ export default function JobApplicationsPage() {
         return;
       }
       if (cv.text) {
-        setCvText({ name: application.candidate?.name ?? "Candidate", text: cv.text });
+        setCvText({ name: application.candidate?.name ?? t("apps.candidateFallback"), text: cv.text });
       }
-    } catch (err) {
-      setCvErrors((prev) => ({ ...prev, [application.id]: toFriendlyError(err).description }));
+    } catch {
+      setCvErrors((prev) => ({ ...prev, [application.id]: true }));
     } finally {
       setCvLoadingId(null);
     }
@@ -225,234 +252,251 @@ export default function JobApplicationsPage() {
           return;
         }
       }
-      setMessageError(err instanceof Error ? err.message : "Failed to send message");
+      setMessageError(err instanceof Error && err.message ? err.message : t("message.sendFailed"));
     } finally {
       setMessagingId(null);
     }
   };
 
   if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+    return <PageSpinner />;
   }
 
+  const jobTitle = jobApplications[0]?.job?.title;
+
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
       {rejectTarget && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="reject-dialog-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        <EmployerDialog
+          title={t("apps.rejectTitle", { name: rejectTarget.candidate?.name ?? t("apps.thisCandidate") })}
+          description={t("apps.rejectBody")}
+          onClose={() => setRejectTarget(null)}
         >
-          <Card className="w-full max-w-md">
-            <CardContent className="p-6">
-              <h2 id="reject-dialog-title" className="mb-2 text-lg font-semibold text-fg">
-                Reject {rejectTarget.candidate?.name ?? "this candidate"}?
-              </h2>
-              <p className="mb-6 text-sm text-fg-secondary">
-                The candidate will be notified that their application was not successful.
-              </p>
-              <div className="flex gap-3">
-                <Button variant="danger" className="flex-1" onClick={() => void confirmReject()}>
-                  Reject application
-                </Button>
-                <Button variant="outline" onClick={() => setRejectTarget(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setRejectTarget(null)}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="danger" onClick={() => void confirmReject()}>
+              {t("apps.rejectConfirm")}
+            </Button>
+          </div>
+        </EmployerDialog>
       )}
 
       {cvText && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="cv-dialog-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-        >
-          <Card className="flex max-h-[85vh] w-full max-w-2xl flex-col">
-            <CardContent className="flex min-h-0 flex-col p-6">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <h2 id="cv-dialog-title" className="text-lg font-semibold text-fg">
-                  {cvText.name}&apos;s resume
-                </h2>
-                <Button size="sm" variant="outline" onClick={() => setCvText(null)}>
-                  Close
-                </Button>
-              </div>
-              <pre
-                data-testid="cv-text"
-                className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap rounded-lg bg-surface-sunken p-4 font-sans text-sm text-fg"
-              >
-                {cvText.text}
-              </pre>
-            </CardContent>
-          </Card>
-        </div>
+        <EmployerDialog size="lg" title={t("apps.resumeOf", { name: cvText.name })} onClose={() => setCvText(null)}>
+          <pre
+            data-testid="cv-text"
+            className="max-h-[60vh] min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap rounded-xl border border-line bg-surface-sunken p-4 font-sans text-sm text-fg"
+          >
+            {cvText.text}
+          </pre>
+          <div className="mt-4 flex justify-end">
+            <Button size="sm" variant="outline" onClick={() => setCvText(null)}>
+              {t("common.close")}
+            </Button>
+          </div>
+        </EmployerDialog>
       )}
 
-      <Link href={localizePath("/employer", locale)} className="inline-flex items-center text-primary-text hover:text-emerald-700 mb-6">
-        <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Dashboard
-      </Link>
+      <BackLink href={localizePath("/employer", locale)}>{t("common.backToDashboard")}</BackLink>
 
       <Card>
         <CardHeader>
-          <h1 className="text-2xl font-bold text-fg">Applications</h1>
-          {!loadError && (
-            <p className="text-fg-secondary">{jobApplications.length} candidate(s) applied</p>
+          <Eyebrow>{t("apps.eyebrow")}</Eyebrow>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-fg">{jobTitle ?? t("apps.title")}</h1>
+          {!loadError && !loading && (
+            <p className="mt-1 text-sm text-fg-secondary">{tn("apps.count", jobApplications.length)}</p>
+          )}
+          {!loadError && jobApplications.length > 0 && (
+            <div
+              role="tablist"
+              aria-label={t("apps.filterLabel")}
+              className="-mx-1 mt-5 flex gap-2 overflow-x-auto px-1 pb-1 hide-scrollbar"
+            >
+              {PIPELINE_FILTERS.map((value) => {
+                const active = filter === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setFilter(value)}
+                    className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                      active
+                        ? "border-transparent bg-primary text-primary-fg"
+                        : "border-line bg-surface text-fg-secondary hover:bg-surface-muted hover:text-fg"
+                    }`}
+                  >
+                    {value === "ALL" ? t("apps.filterAll") : tv("status.app", value)}
+                    <span
+                      className={`rounded-full px-1.5 text-xs tabular-nums ${active ? "bg-white/20" : "bg-surface-muted text-fg-muted"}`}
+                    >
+                      {counts[value] ?? 0}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           )}
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
+              <Spinner />
             </div>
           ) : loadError ? (
-            <LoadErrorCard error={loadError} subject="applications for this job" onRetry={retryLoadApplications} />
+            <EmployerLoadError subject={t("apps.loadSubject")} onRetry={retryLoadApplications} />
           ) : jobApplications.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-fg-secondary">No applications yet</p>
-            </div>
+            <EmptyPanel title={t("apps.emptyTitle")} description={t("apps.emptyBody")} />
           ) : (
             <div>
               {candidateAccessLocked && !FREE_MODE && (
-                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
-                  Applications are being counted, but full candidate profiles, resumes, and contact details unlock with an active employer subscription.
-                  <Link href={localizePath("/billing", locale)} className="ml-1 font-semibold text-amber-950 underline">
-                    Upgrade to review candidates
+                <Notice tone="warning" className="mb-4">
+                  {t("apps.locked")}{" "}
+                  <Link href={localizePath("/billing", locale)} className="font-semibold text-fg underline">
+                    {t("apps.unlock")}
                   </Link>
-                </div>
+                </Notice>
               )}
-              <div className="divide-y divide-line">
-              {jobApplications.map((application) => (
-                <div key={application.id} className="py-6">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-fg">{application.candidate?.name}</h3>
-                      <p className="text-sm text-fg-secondary">{application.candidate?.email}</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Applied {new Date(application.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Badge variant={statusVariants[application.status] || "default"}>
-                      {application.status}
-                    </Badge>
-                  </div>
-
-                  {!candidateAccessLocked && <ApplicantSummary application={application} />}
-
-                  {application.coverLetter && (
-                    <div className="bg-surface-sunken rounded-lg p-4 mb-4">
-                      <p className="text-sm text-fg-secondary font-medium mb-1">Cover Letter</p>
-                      <p className="text-sm text-fg-secondary whitespace-pre-wrap">
-                        {application.coverLetter}
-                      </p>
-                    </div>
-                  )}
-
-                  {!candidateAccessLocked && (
-                    <div className="mb-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={cvLoadingId === application.id}
-                        onClick={() => void viewCv(application)}
-                      >
-                        {cvLoadingId === application.id ? "Opening CV..." : "View CV"}
-                      </Button>
-                      {cvLinks[application.id] && (
-                        <a
-                          href={cvLinks[application.id]}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-3 text-sm text-emerald-700 underline-offset-2 hover:underline"
-                        >
-                          Open CV
-                        </a>
-                      )}
-                      {cvErrors[application.id] && (
-                        <p className="mt-1 text-xs text-fg-muted">{cvErrors[application.id]}</p>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 mt-4">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={candidateAccessLocked || updating === application.id || application.status === "REVIEWING"}
-                      onClick={() => updateStatus(application.id, "REVIEWING")}
-                    >
-                      Mark Reviewing
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={candidateAccessLocked || updating === application.id || application.status === "SHORTLISTED"}
-                      onClick={() => updateStatus(application.id, "SHORTLISTED")}
-                    >
-                      Shortlist
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={candidateAccessLocked || updating === application.id || application.status === "ACCEPTED"}
-                      onClick={() => updateStatus(application.id, "ACCEPTED")}
-                    >
-                      Accept
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      disabled={candidateAccessLocked || updating === application.id || application.status === "REJECTED"}
-                      onClick={() => setRejectTarget(application)}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                  {statusErrors[application.id] && (
-                    <p role="alert" className="mt-2 text-sm text-red-600">
-                      {statusErrors[application.id]}
-                    </p>
-                  )}
-
-                  {!candidateAccessLocked && application.candidate?.id && (
-                    <div className="mt-4 pt-4 border-t border-line">
-                      {messageError && messagingId === application.candidate.id && (
-                        <p className="text-xs text-red-500 mb-2">{messageError}</p>
-                      )}
-                      <div className="flex gap-2 items-start">
-                        <textarea
-                          className="flex-1 text-sm rounded-lg border border-line-strong px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          rows={2}
-                          placeholder="Send a message to this candidate..."
-                          value={messagingId === application.candidate.id ? messageInput : ""}
-                          onChange={(e) => {
-                            setMessagingId(application.candidate!.id);
-                            setMessageInput(e.target.value);
-                          }}
-                        />
-                        <Button
-                          size="sm"
-                          disabled={!messageInput.trim() || messagingId !== application.candidate.id}
-                          onClick={() => startThread(application.candidate!.id)}
-                        >
-                          {messagingId === application.candidate.id && messageInput.trim() ? "Send" : "Message"}
-                        </Button>
+              {visibleApplications.length === 0 ? (
+                <p className="py-8 text-center text-sm text-fg-muted">{t("apps.filterEmpty")}</p>
+              ) : (
+                <ul className="divide-y divide-line">
+                  {visibleApplications.map((application) => (
+                    <li key={application.id} className="py-6">
+                      <div className="mb-3 flex items-start justify-between gap-4">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <span
+                            aria-hidden="true"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-text"
+                          >
+                            {initials(application.candidate?.name)}
+                          </span>
+                          <div className="min-w-0">
+                            <h3 className="truncate font-semibold text-fg">{application.candidate?.name}</h3>
+                            {application.candidate?.email && (
+                              <p className="truncate text-sm text-fg-secondary">{application.candidate.email}</p>
+                            )}
+                            <p className="mt-1 text-xs text-fg-muted">
+                              {t("apps.appliedOn", { date: fmt.date(application.createdAt) })}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant={statusVariants[application.status] || "default"}>
+                          {tv("status.app", application.status)}
+                        </Badge>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              </div>
+
+                      <div className="sm:ps-[52px]">
+                        {!candidateAccessLocked && <ApplicantSummary application={application} />}
+
+                        {application.coverLetter && (
+                          <div className="mb-4 rounded-xl border border-line bg-surface-sunken p-4">
+                            <p className="mb-1 text-sm font-medium text-fg">{t("apps.coverLetter")}</p>
+                            <p className="whitespace-pre-wrap text-sm text-fg-secondary">{application.coverLetter}</p>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {!candidateAccessLocked && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={cvLoadingId === application.id}
+                              onClick={() => void viewCv(application)}
+                            >
+                              {cvLoadingId === application.id ? t("apps.openingCv") : t("apps.viewCv")}
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={candidateAccessLocked || updating === application.id || application.status === "REVIEWING"}
+                            onClick={() => updateStatus(application.id, "REVIEWING")}
+                          >
+                            {t("apps.markReviewing")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={candidateAccessLocked || updating === application.id || application.status === "SHORTLISTED"}
+                            onClick={() => updateStatus(application.id, "SHORTLISTED")}
+                          >
+                            {t("apps.shortlist")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            disabled={candidateAccessLocked || updating === application.id || application.status === "ACCEPTED"}
+                            onClick={() => updateStatus(application.id, "ACCEPTED")}
+                          >
+                            {t("apps.accept")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-danger hover:text-danger"
+                            disabled={candidateAccessLocked || updating === application.id || application.status === "REJECTED"}
+                            onClick={() => setRejectTarget(application)}
+                          >
+                            {t("apps.reject")}
+                          </Button>
+                        </div>
+                        {cvLinks[application.id] && (
+                          <a
+                            href={cvLinks[application.id]}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex text-sm font-medium text-primary-text underline-offset-2 hover:underline"
+                          >
+                            {t("apps.openCv")}
+                          </a>
+                        )}
+                        {cvErrors[application.id] && <p className="mt-2 text-xs text-fg-muted">{t("apps.cvFailed")}</p>}
+                        {statusErrors[application.id] && (
+                          <p role="alert" className="mt-2 text-sm text-danger">
+                            {t("apps.statusFailed")}
+                          </p>
+                        )}
+
+                        {!candidateAccessLocked && application.candidate?.id && (
+                          <div className="mt-4 border-t border-line pt-4">
+                            {messageError && messagingId === application.candidate.id && (
+                              <p role="alert" className="mb-2 text-xs text-danger">{messageError}</p>
+                            )}
+                            <div className="flex items-start gap-2">
+                              <label htmlFor={`message-${application.id}`} className="sr-only">
+                                {t("apps.messageLabel", { name: application.candidate.name ?? t("apps.candidateFallback") })}
+                              </label>
+                              <textarea
+                                id={`message-${application.id}`}
+                                className="flex-1 resize-none rounded-xl border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus"
+                                rows={2}
+                                placeholder={t("apps.messagePlaceholder")}
+                                value={messagingId === application.candidate.id ? messageInput : ""}
+                                onChange={(e) => {
+                                  setMessagingId(application.candidate!.id);
+                                  setMessageInput(e.target.value);
+                                }}
+                              />
+                              <Button
+                                size="sm"
+                                disabled={!messageInput.trim() || messagingId !== application.candidate.id}
+                                onClick={() => startThread(application.candidate!.id)}
+                              >
+                                {messagingId === application.candidate.id && messageInput.trim()
+                                  ? t("common.send")
+                                  : t("message.button")}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </CardContent>

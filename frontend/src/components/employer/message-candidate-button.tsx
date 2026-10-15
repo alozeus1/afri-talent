@@ -7,6 +7,8 @@ import { Job, jobs, messages } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { useEmployerT } from "@/lib/i18n/employer-messages";
+import { controlClass } from "./employer-ui";
 
 interface MessageCandidateButtonProps {
   candidateUserId: string;
@@ -22,6 +24,7 @@ interface MessageCandidateButtonProps {
 export function MessageCandidateButton({ candidateUserId, candidateName, className }: MessageCandidateButtonProps) {
   const router = useRouter();
   const locale = useLocale();
+  const t = useEmployerT();
   const [open, setOpen] = useState(false);
   const [jobOptions, setJobOptions] = useState<Job[] | null>(null);
   const [jobId, setJobId] = useState("");
@@ -33,7 +36,8 @@ export function MessageCandidateButton({ candidateUserId, candidateName, classNa
     setOpen(true);
     setError(null);
     if (!body) {
-      setBody(`Hi${candidateName ? ` ${candidateName.split(" ")[0]}` : ""}, I came across your profile on AfriTalent and would like to talk about a role on our team.`);
+      const firstName = candidateName?.split(" ")[0];
+      setBody(firstName ? t("message.templateNamed", { name: firstName }) : t("message.template"));
     }
     if (jobOptions !== null) return;
     try {
@@ -43,7 +47,7 @@ export function MessageCandidateButton({ candidateUserId, candidateName, classNa
       if (published.length > 0) setJobId(published[0].id);
     } catch (err) {
       setJobOptions([]);
-      setError(err instanceof Error ? err.message : "Failed to load your jobs");
+      setError(err instanceof Error && err.message ? err.message : t("message.loadJobsFailed"));
     }
   };
 
@@ -59,7 +63,7 @@ export function MessageCandidateButton({ candidateUserId, candidateName, classNa
       });
       router.push(localizePath(`/messages/${thread.id}`, locale));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send message");
+      setError(err instanceof Error && err.message ? err.message : t("message.sendFailed"));
       setSending(false);
     }
   };
@@ -67,31 +71,31 @@ export function MessageCandidateButton({ candidateUserId, candidateName, classNa
   if (!open) {
     return (
       <Button size="sm" className={className} onClick={() => void openComposer()}>
-        Message
+        {t("message.button")}
       </Button>
     );
   }
 
   return (
-    <div className="w-full space-y-2 rounded-xl border border-line p-3">
+    <div className="w-full space-y-2 rounded-xl border border-line bg-surface-raised p-3 shadow-xs">
       {jobOptions === null ? (
-        <p className="text-sm text-fg-muted">Loading your jobs...</p>
+        <p className="text-sm text-fg-muted" role="status">{t("message.loadingJobs")}</p>
       ) : jobOptions.length === 0 ? (
         <p className="text-sm text-fg-secondary">
-          Messages are tied to a published role.{" "}
-          <Link href={localizePath("/employer/jobs/new", locale)} className="font-medium text-emerald-700 hover:underline">
-            Post a job
+          {t("message.needsJobBefore")}{" "}
+          <Link href={localizePath("/employer/jobs/new", locale)} className="font-medium text-primary-text hover:underline">
+            {t("message.postJob")}
           </Link>{" "}
-          to reach out to candidates.
+          {t("message.needsJobAfter")}
         </p>
       ) : (
         <>
           <label className="block text-xs font-semibold uppercase tracking-wide text-fg-muted" htmlFor={`msg-job-${candidateUserId}`}>
-            About role
+            {t("message.aboutRole")}
           </label>
           <select
             id={`msg-job-${candidateUserId}`}
-            className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm"
+            className={`${controlClass} py-2`}
             value={jobId}
             onChange={(event) => setJobId(event.target.value)}
           >
@@ -100,7 +104,8 @@ export function MessageCandidateButton({ candidateUserId, candidateName, classNa
             ))}
           </select>
           <Textarea
-            aria-label="Message"
+            aria-label={t("message.bodyLabel")}
+            className="w-full"
             rows={3}
             maxLength={5000}
             value={body}
@@ -108,15 +113,15 @@ export function MessageCandidateButton({ candidateUserId, candidateName, classNa
           />
         </>
       )}
-      {error && <p role="alert" className="text-sm text-rose-600">{error}</p>}
+      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       <div className="flex gap-2">
         {jobOptions && jobOptions.length > 0 && (
           <Button size="sm" disabled={sending || !jobId || !body.trim()} onClick={() => void send()}>
-            {sending ? "Sending..." : "Send"}
+            {sending ? t("common.sending") : t("common.send")}
           </Button>
         )}
         <Button size="sm" variant="outline" disabled={sending} onClick={() => setOpen(false)}>
-          Cancel
+          {t("common.cancel")}
         </Button>
       </div>
     </div>

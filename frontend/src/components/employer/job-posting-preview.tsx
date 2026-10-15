@@ -3,6 +3,8 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { EmployerJobPreview } from "@/lib/api";
+import { useEmployerI18n } from "@/lib/i18n/employer-messages";
+import { Eyebrow, Spinner } from "./employer-ui";
 
 interface EmployerJobPostingPreviewProps {
   preview: EmployerJobPreview | null;
@@ -15,95 +17,96 @@ function qualityVariant(score: number) {
   return "warning" as const;
 }
 
+function BulletList({ items }: { items: string[] }) {
+  return (
+    <ul className="mt-2 space-y-2 text-sm text-fg-secondary">
+      {items.map((item) => (
+        <li key={item} className="flex gap-2">
+          <span aria-hidden="true" className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-fg-muted" />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function EmployerJobPostingPreview({
   preview,
   loading = false,
 }: EmployerJobPostingPreviewProps) {
+  const { t, tv, ts } = useEmployerI18n();
   return (
-    <Card className="border-line bg-surface shadow-sm">
+    <Card className="border-line bg-surface shadow-card">
       <CardHeader>
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
-          Credibility preview
-        </p>
-        <h2 className="mt-2 text-lg font-semibold text-fg">Job quality before publish</h2>
-        <p className="mt-2 text-sm text-fg-secondary">
-          See how trustworthy and moderation-ready this draft looks before it reaches candidates.
-        </p>
+        <Eyebrow>{t("preview.eyebrow")}</Eyebrow>
+        <h2 className="mt-2 text-lg font-semibold text-fg">{t("preview.title")}</h2>
+        <p className="mt-2 text-sm text-fg-secondary">{t("preview.subtitle")}</p>
       </CardHeader>
-      <CardContent>
+      <CardContent aria-live="polite">
         {loading ? (
           <div className="flex justify-center py-8">
-            <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-emerald-600" />
+            <Spinner label={t("preview.loading")} />
           </div>
         ) : !preview ? (
           <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-6 text-sm text-fg-secondary">
-            Fill in the role basics to unlock your quality score, moderation guidance, and credibility tips.
+            {t("preview.empty")}
           </div>
         ) : (
           <div className="space-y-5">
-            <div className="rounded-3xl bg-slate-950 px-5 py-5 text-white">
+            <div className="rounded-2xl border border-line bg-surface-sunken px-5 py-5">
               <div className="flex flex-wrap items-center gap-2">
                 <TrustBadge
-                  label={`${preview.qualityLabel} quality`}
+                  label={t("preview.qualityBadge", { label: tv("quality", preview.qualityLabel) })}
                   variant={qualityVariant(preview.qualityScore)}
                 />
                 <TrustBadge
-                  label={`${preview.moderationRiskLevel} moderation risk`}
+                  label={t("preview.riskBadge", { level: tv("risk", preview.moderationRiskLevel) })}
                   riskLevel={preview.moderationRiskLevel}
                   variant="info"
                 />
               </div>
               <div className="mt-4 flex items-end gap-3">
-                <span className="text-4xl font-bold">{preview.qualityScore}</span>
-                <span className="pb-1 text-sm text-slate-300">out of 100</span>
+                <span className="text-4xl font-bold tabular-nums text-fg">{preview.qualityScore}</span>
+                <span className="pb-1 text-sm text-fg-muted">{t("preview.outOf100")}</span>
               </div>
-              <p className="mt-3 text-sm text-slate-300">{preview.guidance}</p>
+              <p className="mt-3 text-sm text-fg-secondary">{ts(preview.guidance)}</p>
             </div>
 
-            <div className="grid gap-2">
+            <ul className="grid gap-2">
               {preview.checklist.map((item) => (
-                <div
+                <li
                   key={item.key}
-                  className={`flex items-center justify-between rounded-2xl border px-3 py-3 text-sm ${
-                    item.done ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-900"
+                  className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-3 text-sm ${
+                    item.done ? "border-success-line bg-success-soft" : "border-warning-line bg-warning-soft"
                   }`}
                 >
-                  <span>{item.label}</span>
-                  <span className="font-semibold">{item.done ? "Ready" : "Needs work"}</span>
-                </div>
+                  <span className="text-fg">{ts(item.label)}</span>
+                  <span className={`shrink-0 font-semibold ${item.done ? "text-success" : "text-warning"}`}>
+                    {item.done ? t("preview.ready") : t("preview.needsWork")}
+                  </span>
+                </li>
               ))}
-            </div>
+            </ul>
 
             {preview.strengths.length > 0 && (
               <div>
-                <p className="text-sm font-semibold text-fg">What is already helping</p>
-                <ul className="mt-2 space-y-2 text-sm text-fg-secondary">
-                  {preview.strengths.map((item) => (
-                    <li key={item}>• {item}</li>
-                  ))}
-                </ul>
+                <p className="text-sm font-semibold text-fg">{t("preview.strengths")}</p>
+                <BulletList items={preview.strengths.map((item) => ts(item))} />
               </div>
             )}
 
             {preview.tips.length > 0 && (
               <div>
-                <p className="text-sm font-semibold text-fg">Fix these before publish</p>
-                <ul className="mt-2 space-y-2 text-sm text-fg-secondary">
-                  {preview.tips.map((item) => (
-                    <li key={item}>• {item}</li>
-                  ))}
-                </ul>
+                <p className="text-sm font-semibold text-fg">{t("preview.tips")}</p>
+                <BulletList items={preview.tips.map((item) => ts(item))} />
               </div>
             )}
 
             {preview.flags.length > 0 && (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4">
-                <p className="text-sm font-semibold text-rose-900">Moderation flags detected</p>
-                <ul className="mt-2 space-y-2 text-sm text-rose-800">
-                  {preview.flags.map((flag) => (
-                    <li key={flag}>• {flag}</li>
-                  ))}
-                </ul>
+              <div className="rounded-2xl border border-danger-line bg-danger-soft px-4 py-4">
+                <p className="text-sm font-semibold text-danger">{t("preview.flags")}</p>
+                {/* Flags are codes such as "off_platform_contact:<pattern>"; show one line per code. */}
+                <BulletList items={[...new Set(preview.flags.map((flag) => tv("flag", flag.split(":")[0])))]} />
               </div>
             )}
           </div>

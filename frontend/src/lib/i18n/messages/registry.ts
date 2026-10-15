@@ -10,6 +10,11 @@ import candidateProfile from "./candidateProfile";
 import common from "./common";
 import companies from "./companies";
 import discover from "./discover";
+import employer from "./employer";
+import employerInsights from "./employerInsights";
+import employerJobs from "./employerJobs";
+import employerSetup from "./employerSetup";
+import employerTalent from "./employerTalent";
 import guides from "./guides";
 import home from "./home";
 import interviews from "./interviews";
@@ -39,8 +44,10 @@ export const SITE_NAMESPACES = {
 
 /**
  * Area namespaces with their own hooks: useAdminT, useSupportT,
- * usePublicT (site, discover, guides, legal; see public-messages.ts) and
- * useCandidateT (candidateHome, candidateProfile, candidateAi).
+ * usePublicT (site, discover, guides, legal; see public-messages.ts),
+ * useCandidateT (candidateHome, candidateProfile, candidateAi) and
+ * useEmployerI18n (employer, employerJobs, employerTalent, employerSetup,
+ * employerInsights).
  */
 export const AREA_NAMESPACES = {
   admin,
@@ -52,6 +59,11 @@ export const AREA_NAMESPACES = {
   candidateHome,
   candidateProfile,
   candidateAi,
+  employer,
+  employerJobs,
+  employerTalent,
+  employerSetup,
+  employerInsights,
 } as const;
 
 export const ALL_NAMESPACES: Record<string, Record<SupportedLocale, Record<string, string>>> = {

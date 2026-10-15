@@ -14,19 +14,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Eyebrow, Notice, PageSpinner, Spinner, StatCard, checkboxClass, controlClass, labelClass } from "@/components/employer/employer-ui";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { ATS_PROVIDER_NAMES } from "@/components/employer/locale-neutral";
+import { useEmployerI18n, type EmployerMessageKey, type EmployerVars } from "@/lib/i18n/employer-messages";
 
 type Provider = "GREENHOUSE" | "LEVER" | "WORKABLE";
 
-const PROVIDER_HELP: Record<Provider, {
-  orgLabel: string;
-  accessTokenLabel: string;
-  description: string;
-  stageMappingHint: string;
-}> = {
+// Labels and help copy are translated (`ats.help.<PROVIDER>.*`); the stage
+// mapping hint is a JSON template and stays as-is.
+const PROVIDER_HELP: Record<Provider, { stageMappingHint: string }> = {
   GREENHOUSE: {
-    orgLabel: "Board token",
-    accessTokenLabel: "Harvest API key",
-    description: "Use the public board token for job import. Add a Harvest API key, stage mappings, and a Greenhouse user ID for writeback.",
     stageMappingHint: `{
   "REVIEWING": "12345",
   "SHORTLISTED": "67890",
@@ -35,9 +33,6 @@ const PROVIDER_HELP: Record<Provider, {
 }`,
   },
   LEVER: {
-    orgLabel: "Site token",
-    accessTokenLabel: "API key or OAuth token",
-    description: "Use the Lever site token for import. Add an API key or OAuth token with opportunities write scope to push stage changes back.",
     stageMappingHint: `{
   "REVIEWING": "screen-stage-id",
   "SHORTLISTED": "onsite-stage-id",
@@ -46,9 +41,6 @@ const PROVIDER_HELP: Record<Provider, {
 }`,
   },
   WORKABLE: {
-    orgLabel: "Account subdomain",
-    accessTokenLabel: "Workable API token",
-    description: "Workable requires an API token for import and writeback. Provide a member ID plus target stage slugs for candidate moves.",
     stageMappingHint: `{
   "REVIEWING": "phone-screen",
   "SHORTLISTED": "final-interview",
@@ -58,13 +50,7 @@ const PROVIDER_HELP: Record<Provider, {
   },
 };
 
-function formatTimestamp(value: string | null | undefined): string {
-  if (!value) {
-    return "Not yet";
-  }
-
-  return new Date(value).toLocaleString();
-}
+type T = (key: EmployerMessageKey, vars?: EmployerVars) => string;
 
 function healthBadgeVariant(health: ATSHealthStatus): "success" | "warning" | "danger" | "info" {
   switch (health) {
@@ -106,7 +92,7 @@ function splitConnectionMetadata(metadata: Record<string, unknown> | null) {
   };
 }
 
-function buildConnectionPayload(form: {
+function buildConnectionPayload(t: T, form: {
   provider: Provider;
   externalOrgId: string;
   displayName: string;
@@ -130,7 +116,7 @@ function buildConnectionPayload(form: {
       ? JSON.parse(form.stageMappingsText)
       : {};
   } catch {
-    throw new Error("Stage mapping JSON is invalid.");
+    throw new Error(t("ats.errStageJson"));
   }
 
   try {
@@ -138,15 +124,15 @@ function buildConnectionPayload(form: {
       ? JSON.parse(form.extraMetadataText)
       : {};
   } catch {
-    throw new Error("Advanced metadata JSON is invalid.");
+    throw new Error(t("ats.errMetaJson"));
   }
 
   if (Array.isArray(stageMappings) || typeof stageMappings !== "object" || stageMappings === null) {
-    throw new Error("Stage mappings must be a JSON object.");
+    throw new Error(t("ats.errStageObject"));
   }
 
   if (Array.isArray(extraMetadata) || typeof extraMetadata !== "object" || extraMetadata === null) {
-    throw new Error("Advanced metadata must be a JSON object.");
+    throw new Error(t("ats.errMetaObject"));
   }
 
   const metadata: Record<string, unknown> = {
@@ -198,9 +184,12 @@ function emptyForm(provider: Provider = "GREENHOUSE") {
 
 export default function EmployerIntegrationsPage() {
   const router = useRouter();
+  const locale = useLocale();
   const { user, isLoading } = useAuth();
+  const { t, tn, tv, fmt } = useEmployerI18n();
   const [dashboard, setDashboard] = useState<EmployerAtsDashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  // "" = failed without a server message (rendered with a translated fallback).
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -216,12 +205,15 @@ export default function EmployerIntegrationsPage() {
 
   const connections = dashboard?.connections ?? [];
   const selectedConnection = connections.find((connection) => connection.id === editingConnectionId) ?? null;
+  const when = (value: string | null | undefined) => (value ? fmt.dateTime(value) : t("ats.notYet"));
+  const errText = (err: unknown, fallback: EmployerMessageKey) =>
+    err instanceof Error && err.message ? err.message : t(fallback);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "EMPLOYER")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [isLoading, router, user]);
+  }, [isLoading, router, user, locale]);
 
   const loadDashboard = async () => {
     const data = await ats.dashboard();
@@ -233,7 +225,7 @@ export default function EmployerIntegrationsPage() {
       setLoading(true);
       void loadDashboard()
         .catch((err) => {
-          setError(err instanceof Error ? err.message : "Failed to load ATS integrations");
+          setError(err instanceof Error ? err.message : "");
         })
         .finally(() => setLoading(false));
     }
@@ -268,6 +260,13 @@ export default function EmployerIntegrationsPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const refreshLogsIfOpen = async (connectionId: string) => {
+    if (selectedConnectionId === connectionId) {
+      const logs = await ats.connectionLogs(connectionId);
+      setLogsByConnection((prev) => ({ ...prev, [connectionId]: logs }));
+    }
+  };
+
   const saveConnection = async (event: React.FormEvent) => {
     event.preventDefault();
     setSaving(true);
@@ -275,19 +274,19 @@ export default function EmployerIntegrationsPage() {
     setNotice(null);
 
     try {
-      const payload = buildConnectionPayload(form);
+      const payload = buildConnectionPayload(t, form);
       if (editingConnectionId) {
         await ats.updateConnection(editingConnectionId, payload);
-        setNotice("Integration settings updated.");
+        setNotice(t("ats.noticeUpdated"));
       } else {
         await ats.createConnection(payload);
-        setNotice("Integration saved. Run a connection test to validate credentials and readiness.");
+        setNotice(t("ats.noticeSaved"));
       }
 
       await loadDashboard();
       resetForm(form.provider);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save integration");
+      setError(errText(err, "ats.errSave"));
     } finally {
       setSaving(false);
     }
@@ -300,17 +299,14 @@ export default function EmployerIntegrationsPage() {
     try {
       const result = await ats.testConnection(connectionId);
       await loadDashboard();
-      if (selectedConnectionId === connectionId) {
-        const logs = await ats.connectionLogs(connectionId);
-        setLogsByConnection((prev) => ({ ...prev, [connectionId]: logs }));
-      }
+      await refreshLogsIfOpen(connectionId);
       setNotice(
         result.ok
-          ? `Connection test passed. ${result.sampleJobCount} jobs were visible.`
-          : `Connection test completed with issues: ${result.warnings[0] ?? "Check the readiness notes."}`,
+          ? t("ats.testPassed", { count: result.sampleJobCount })
+          : t("ats.testIssues", { issue: result.warnings[0] ?? t("ats.checkReadiness") }),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Connection test failed");
+      setError(errText(err, "ats.errTest"));
     } finally {
       setTestingId(null);
     }
@@ -323,15 +319,10 @@ export default function EmployerIntegrationsPage() {
     try {
       const result = await ats.syncConnection(connectionId);
       await loadDashboard();
-      if (selectedConnectionId === connectionId) {
-        const logs = await ats.connectionLogs(connectionId);
-        setLogsByConnection((prev) => ({ ...prev, [connectionId]: logs }));
-      }
-      setNotice(
-        `Sync complete: ${result.createdJobs} new job${result.createdJobs === 1 ? "" : "s"}, ${result.updatedJobs} updated.`,
-      );
+      await refreshLogsIfOpen(connectionId);
+      setNotice(t("ats.syncComplete", { created: result.createdJobs, updated: result.updatedJobs }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "ATS sync failed");
+      setError(errText(err, "ats.errSync"));
     } finally {
       setSyncingId(null);
     }
@@ -344,28 +335,24 @@ export default function EmployerIntegrationsPage() {
     try {
       const result = await ats.retryConnection(connectionId);
       await loadDashboard();
-      if (selectedConnectionId === connectionId) {
-        const logs = await ats.connectionLogs(connectionId);
-        setLogsByConnection((prev) => ({ ...prev, [connectionId]: logs }));
-      }
-      setNotice(
-        `Retry finished: ${result.createdJobs} new job${result.createdJobs === 1 ? "" : "s"}, ${result.updatedJobs} updated.`,
-      );
+      await refreshLogsIfOpen(connectionId);
+      setNotice(t("ats.retryComplete", { created: result.createdJobs, updated: result.updatedJobs }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Retry failed");
+      setError(errText(err, "ats.errRetry"));
     } finally {
       setRetryingId(null);
     }
   };
 
   const handleDisconnect = async (connectionId: string) => {
+    if (!window.confirm(t("ats.confirmDisconnect"))) return;
     setDisconnectingId(connectionId);
     setError(null);
     setNotice(null);
     try {
       await ats.disconnectConnection(connectionId);
       await loadDashboard();
-      setNotice("Integration disconnected.");
+      setNotice(t("ats.noticeDisconnected"));
       if (selectedConnectionId === connectionId) {
         setSelectedConnectionId(null);
       }
@@ -373,7 +360,7 @@ export default function EmployerIntegrationsPage() {
         resetForm(form.provider);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Disconnect failed");
+      setError(errText(err, "ats.errDisconnect"));
     } finally {
       setDisconnectingId(null);
     }
@@ -392,7 +379,7 @@ export default function EmployerIntegrationsPage() {
       const logs = await ats.connectionLogs(connectionId);
       setLogsByConnection((prev) => ({ ...prev, [connectionId]: logs }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load sync logs");
+      setError(errText(err, "ats.errLogs"));
     } finally {
       setLoadingLogsId(null);
     }
@@ -401,89 +388,83 @@ export default function EmployerIntegrationsPage() {
   const copyWebhookUrl = async (url: string) => {
     try {
       await navigator.clipboard.writeText(url);
-      setNotice("Webhook URL copied.");
+      setNotice(t("ats.noticeCopied"));
     } catch {
-      setError("Failed to copy webhook URL.");
+      setError(t("ats.errCopy"));
     }
   };
 
   if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
-  const help = PROVIDER_HELP[form.provider];
+  const provider = form.provider;
+  const orgLabel = t(`ats.help.${provider}.org` as EmployerMessageKey);
+  const tokenLabel = t(`ats.help.${provider}.token` as EmployerMessageKey);
+  const providerDescription = t(`ats.help.${provider}.description` as EmployerMessageKey);
+  const toggles: Array<{
+    id: string;
+    field: "webhookSyncEnabled" | "twoWaySyncEnabled" | "clearAccessToken" | "clearWebhookSecret";
+    title: string;
+    body: string;
+  }> = [
+    { id: "ats-webhook", field: "webhookSyncEnabled", title: t("ats.webhookToggle"), body: t("ats.webhookToggleBody") },
+    { id: "ats-writeback", field: "twoWaySyncEnabled", title: t("ats.writebackToggle"), body: t("ats.writebackToggleBody") },
+    ...(editingConnectionId
+      ? [
+          { id: "ats-clear-token", field: "clearAccessToken" as const, title: t("ats.clearToken"), body: t("ats.clearTokenBody") },
+          { id: "ats-clear-secret", field: "clearWebhookSecret" as const, title: t("ats.clearSecret"), body: t("ats.clearSecretBody") },
+        ]
+      : []),
+  ];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <header className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-fg">ATS Integrations</h1>
-          <p className="mt-2 max-w-3xl text-fg-secondary">
-            Connect Greenhouse, Lever, and Workable with real health checks, webhook readiness, sync logs, and stage writeback configuration.
-          </p>
+          <Eyebrow className="text-primary-text">{t("ats.eyebrow")}</Eyebrow>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-fg sm:text-4xl">{t("ats.title")}</h1>
+          <p className="mt-2 max-w-3xl text-fg-secondary">{t("ats.subtitle")}</p>
         </div>
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          First launch milestone: healthy connection, successful import, webhook enabled, and stage mappings configured for writeback.
-        </div>
-      </div>
+        <Notice tone="brand" className="lg:max-w-sm">
+          {t("ats.milestone")}
+        </Notice>
+      </header>
 
-      {error && (
-        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>
+      {error !== null && (
+        <Notice tone="danger" role="alert" className="mb-6">
+          {error || t("ats.errLoad")}
+        </Notice>
       )}
 
       {notice && (
-        <div className="mb-6 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700">{notice}</div>
+        <Notice tone="success" role="status" className="mb-6">
+          {notice}
+        </Notice>
       )}
 
       <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-sm text-fg-muted">Healthy connections</div>
-            <div className="mt-2 text-3xl font-semibold text-emerald-700">
-              {dashboard?.summary.healthyConnections ?? 0}
-            </div>
-            <p className="mt-2 text-sm text-fg-secondary">
-              {dashboard?.summary.totalConnections ?? 0} total live integrations
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-sm text-fg-muted">Needs attention</div>
-            <div className="mt-2 text-3xl font-semibold text-blue-700">
-              {dashboard?.summary.needsAttentionConnections ?? 0}
-            </div>
-            <p className="mt-2 text-sm text-fg-secondary">
-              Missing credentials, secrets, or stage mappings
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-sm text-fg-muted">Webhook issues</div>
-            <div className="mt-2 text-3xl font-semibold text-amber-700">
-              {dashboard?.summary.failedWebhookEvents ?? 0}
-            </div>
-            <p className="mt-2 text-sm text-fg-secondary">
-              Failed webhook deliveries across all connected ATS instances
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-sm text-fg-muted">Two-way sync enabled</div>
-            <div className="mt-2 text-3xl font-semibold text-fg">
-              {dashboard?.summary.twoWayEnabledConnections ?? 0}
-            </div>
-            <p className="mt-2 text-sm text-fg-secondary">
-              Connections configured for application stage writeback
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          accent
+          label={t("ats.statHealthy")}
+          value={fmt.number(dashboard?.summary.healthyConnections ?? 0)}
+          helper={t("ats.statHealthyHelper", { count: dashboard?.summary.totalConnections ?? 0 })}
+        />
+        <StatCard
+          label={t("ats.statAttention")}
+          value={fmt.number(dashboard?.summary.needsAttentionConnections ?? 0)}
+          helper={t("ats.statAttentionHelper")}
+        />
+        <StatCard
+          label={t("ats.statWebhook")}
+          value={fmt.number(dashboard?.summary.failedWebhookEvents ?? 0)}
+          helper={t("ats.statWebhookHelper")}
+        />
+        <StatCard
+          label={t("ats.statTwoWay")}
+          value={fmt.number(dashboard?.summary.twoWayEnabledConnections ?? 0)}
+          helper={t("ats.statTwoWayHelper")}
+        />
       </div>
 
       <div className="mb-8 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -492,15 +473,13 @@ export default function EmployerIntegrationsPage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold text-fg">
-                  {editingConnectionId ? "Manage Integration" : "Add Integration"}
+                  {editingConnectionId ? t("ats.manageTitle") : t("ats.addTitle")}
                 </h2>
-                <p className="mt-1 text-sm text-fg-secondary">
-                  Store credentials safely, configure webhook verification, and map AfriTalent statuses to provider stages.
-                </p>
+                <p className="mt-1 text-sm text-fg-secondary">{t("ats.formBody")}</p>
               </div>
               {editingConnectionId && (
                 <Button variant="outline" size="sm" onClick={() => resetForm(form.provider)}>
-                  Cancel edit
+                  {t("ats.cancelEdit")}
                 </Button>
               )}
             </div>
@@ -508,148 +487,145 @@ export default function EmployerIntegrationsPage() {
           <CardContent>
             <form className="space-y-5" onSubmit={saveConnection}>
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-fg-secondary">Provider</span>
+                <div>
+                  <label htmlFor="ats-provider" className={labelClass}>
+                    {t("ats.provider")}
+                  </label>
                   <select
+                    id="ats-provider"
                     value={form.provider}
                     onChange={(event) => {
-                      const provider = event.target.value as Provider;
+                      const nextProvider = event.target.value as Provider;
                       setForm({
-                        ...emptyForm(provider),
-                        provider,
+                        ...emptyForm(nextProvider),
+                        provider: nextProvider,
                       });
                       setEditingConnectionId(null);
                     }}
-                    className="h-11 w-full rounded-lg border border-line-strong px-3 text-sm"
+                    className={controlClass}
                   >
-                    <option value="GREENHOUSE">Greenhouse</option>
-                    <option value="LEVER">Lever</option>
-                    <option value="WORKABLE">Workable</option>
+                    {(Object.keys(ATS_PROVIDER_NAMES) as Provider[]).map((value) => (
+                      <option key={value} value={value}>
+                        {ATS_PROVIDER_NAMES[value]}
+                      </option>
+                    ))}
                   </select>
-                </label>
+                </div>
                 <Input
-                  label="Connection label"
-                  placeholder="EMEA hiring pipeline"
+                  id="ats-label"
+                  label={t("ats.connectionLabel")}
+                  placeholder={t("ats.connectionLabelPlaceholder")}
                   value={form.displayName}
                   onChange={(event) => setForm((prev) => ({ ...prev, displayName: event.target.value }))}
                 />
                 <Input
-                  label={help.orgLabel}
+                  id="ats-org"
+                  label={orgLabel}
                   placeholder={form.provider === "WORKABLE" ? "acme" : "company-token"}
                   value={form.externalOrgId}
                   onChange={(event) => setForm((prev) => ({ ...prev, externalOrgId: event.target.value }))}
                 />
                 <Input
-                  label={help.accessTokenLabel}
-                  placeholder="Stored securely"
+                  id="ats-token"
+                  type="password"
+                  autoComplete="off"
+                  label={tokenLabel}
+                  placeholder={t("ats.storedSecurely")}
                   value={form.accessToken}
                   onChange={(event) => setForm((prev) => ({ ...prev, accessToken: event.target.value }))}
                 />
                 <Input
-                  label="Refresh token"
-                  placeholder="Optional"
+                  id="ats-refresh"
+                  type="password"
+                  autoComplete="off"
+                  label={t("ats.refreshToken")}
+                  placeholder={t("ats.optional")}
                   value={form.refreshToken}
                   onChange={(event) => setForm((prev) => ({ ...prev, refreshToken: event.target.value }))}
                 />
                 <Input
-                  label="Webhook secret"
-                  placeholder="Used to verify inbound events"
+                  id="ats-secret"
+                  type="password"
+                  autoComplete="off"
+                  label={t("ats.webhookSecret")}
+                  placeholder={t("ats.webhookSecretPlaceholder")}
                   value={form.webhookSecret}
                   onChange={(event) => setForm((prev) => ({ ...prev, webhookSecret: event.target.value }))}
                 />
                 <Input
-                  label="Service user / member ID"
-                  placeholder="Required for Greenhouse and Workable writeback"
+                  id="ats-service-user"
+                  label={t("ats.serviceUser")}
+                  placeholder={t("ats.serviceUserPlaceholder")}
                   value={form.performAsUserId}
                   onChange={(event) => setForm((prev) => ({ ...prev, performAsUserId: event.target.value }))}
                 />
               </div>
 
-              <div className="grid gap-4 rounded-2xl border border-line bg-surface-sunken p-4 md:grid-cols-2">
-                <label className="flex items-start gap-3 rounded-xl bg-surface p-4 text-sm text-fg-secondary">
-                  <input
-                    type="checkbox"
-                    checked={form.webhookSyncEnabled}
-                    onChange={(event) => setForm((prev) => ({ ...prev, webhookSyncEnabled: event.target.checked }))}
-                    className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
-                  />
-                  <span>
-                    <span className="block font-medium text-fg">Enable webhook sync</span>
-                    Verify inbound candidate or job events before they are applied locally.
-                  </span>
-                </label>
-                <label className="flex items-start gap-3 rounded-xl bg-surface p-4 text-sm text-fg-secondary">
-                  <input
-                    type="checkbox"
-                    checked={form.twoWaySyncEnabled}
-                    onChange={(event) => setForm((prev) => ({ ...prev, twoWaySyncEnabled: event.target.checked }))}
-                    className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
-                  />
-                  <span>
-                    <span className="block font-medium text-fg">Enable stage writeback</span>
-                    Push AfriTalent application status changes back into the ATS when credentials and mappings are ready.
-                  </span>
-                </label>
-                {editingConnectionId && (
-                  <>
-                    <label className="flex items-start gap-3 rounded-xl bg-surface p-4 text-sm text-fg-secondary">
-                      <input
-                        type="checkbox"
-                        checked={form.clearAccessToken}
-                        onChange={(event) => setForm((prev) => ({ ...prev, clearAccessToken: event.target.checked }))}
-                        className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
-                      />
-                      <span>
-                        <span className="block font-medium text-fg">Clear stored access token</span>
-                        Remove the current token on save.
-                      </span>
-                    </label>
-                    <label className="flex items-start gap-3 rounded-xl bg-surface p-4 text-sm text-fg-secondary">
-                      <input
-                        type="checkbox"
-                        checked={form.clearWebhookSecret}
-                        onChange={(event) => setForm((prev) => ({ ...prev, clearWebhookSecret: event.target.checked }))}
-                        className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
-                      />
-                      <span>
-                        <span className="block font-medium text-fg">Clear webhook secret</span>
-                        Disable shared-secret verification until a new one is saved.
-                      </span>
-                    </label>
-                  </>
-                )}
-              </div>
+              <fieldset className="grid gap-3 rounded-2xl border border-line bg-surface-sunken p-4 md:grid-cols-2">
+                <legend className="sr-only">{t("ats.syncOptions")}</legend>
+                {toggles.map((toggle) => (
+                  <label
+                    key={toggle.id}
+                    htmlFor={toggle.id}
+                    className="flex cursor-pointer items-start gap-3 rounded-xl bg-surface p-4 text-sm text-fg-secondary"
+                  >
+                    <input
+                      id={toggle.id}
+                      type="checkbox"
+                      checked={form[toggle.field]}
+                      onChange={(event) => setForm((prev) => ({ ...prev, [toggle.field]: event.target.checked }))}
+                      className={`mt-0.5 ${checkboxClass}`}
+                    />
+                    <span>
+                      <span className="block font-medium text-fg">{toggle.title}</span>
+                      {toggle.body}
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
 
               <div className="grid gap-4 lg:grid-cols-2">
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-fg-secondary">Stage mappings JSON</span>
+                <div>
+                  <label htmlFor="ats-stage-mappings" className={labelClass}>
+                    {t("ats.stageMappings")}
+                  </label>
                   <textarea
+                    id="ats-stage-mappings"
+                    aria-describedby="ats-stage-mappings-hint"
                     value={form.stageMappingsText}
                     onChange={(event) => setForm((prev) => ({ ...prev, stageMappingsText: event.target.value }))}
                     rows={8}
-                    className="w-full rounded-lg border border-line-strong px-4 py-3 text-sm text-fg"
+                    dir="ltr"
+                    spellCheck={false}
+                    className={`${controlClass} font-mono text-xs`}
                   />
-                  <span className="mt-2 block text-xs text-fg-muted">
-                    {help.description}
-                  </span>
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-fg-secondary">Advanced metadata JSON</span>
+                  <p id="ats-stage-mappings-hint" className="mt-2 text-xs text-fg-muted">
+                    {providerDescription}
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="ats-metadata" className={labelClass}>
+                    {t("ats.metadata")}
+                  </label>
                   <textarea
+                    id="ats-metadata"
+                    aria-describedby="ats-metadata-hint"
                     value={form.extraMetadataText}
                     onChange={(event) => setForm((prev) => ({ ...prev, extraMetadataText: event.target.value }))}
                     rows={8}
-                    className="w-full rounded-lg border border-line-strong px-4 py-3 text-sm text-fg"
+                    dir="ltr"
+                    spellCheck={false}
+                    className={`${controlClass} font-mono text-xs`}
                   />
-                  <span className="mt-2 block text-xs text-fg-muted">
-                    Use this for provider-specific settings such as custom conditions, enterprise proxy URLs, or future flags.
-                  </span>
-                </label>
+                  <p id="ats-metadata-hint" className="mt-2 text-xs text-fg-muted">
+                    {t("ats.metadataHint")}
+                  </p>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <Button type="submit" disabled={saving || !form.externalOrgId.trim()}>
-                  {saving ? "Saving..." : editingConnectionId ? "Update integration" : "Save integration"}
+                <Button type="submit" isLoading={saving} disabled={saving || !form.externalOrgId.trim()}>
+                  {saving ? t("common.saving") : editingConnectionId ? t("ats.update") : t("ats.save")}
                 </Button>
                 {editingConnectionId && selectedConnection && (
                   <Button
@@ -658,7 +634,7 @@ export default function EmployerIntegrationsPage() {
                     onClick={() => void handleTest(selectedConnection.id)}
                     disabled={testingId === selectedConnection.id}
                   >
-                    {testingId === selectedConnection.id ? "Testing..." : "Test current config"}
+                    {testingId === selectedConnection.id ? t("ats.testing") : t("ats.testCurrent")}
                   </Button>
                 )}
               </div>
@@ -666,49 +642,38 @@ export default function EmployerIntegrationsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-line bg-surface-sunken">
+        <Card className="bg-surface-sunken">
           <CardHeader>
-            <h2 className="text-xl font-semibold text-fg">Provider readiness guide</h2>
+            <h2 className="text-xl font-semibold text-fg">{t("ats.guideTitle")}</h2>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-fg-secondary">
-            <div className="rounded-2xl bg-surface p-4">
-              <p className="font-semibold text-fg">{help.orgLabel}</p>
-              <p className="mt-1">{help.description}</p>
-            </div>
-            <div className="rounded-2xl bg-surface p-4">
-              <p className="font-semibold text-fg">Webhook setup</p>
-              <p className="mt-1">
-                Save the integration, then copy the generated webhook URL from the connection card. Use the shared secret or provider-specific signature verification where supported.
-              </p>
-            </div>
-            <div className="rounded-2xl bg-surface p-4">
-              <p className="font-semibold text-fg">Writeback readiness</p>
-              <p className="mt-1">
-                Stage writeback only turns healthy when a write-capable token is stored, stage mappings are present, and the provider-specific service user/member ID is configured where required.
-              </p>
-            </div>
-            <div className="rounded-2xl bg-surface p-4">
-              <p className="font-semibold text-fg">Support visibility</p>
-              <p className="mt-1">
-                Every sync run, webhook event, and retry is captured in the connection timeline so your recruiting team can troubleshoot without digging into backend logs.
-              </p>
-            </div>
+          <CardContent className="space-y-3 text-sm text-fg-secondary">
+            {[
+              [orgLabel, providerDescription],
+              [t("ats.guideWebhook"), t("ats.guideWebhookBody")],
+              [t("ats.guideWriteback"), t("ats.guideWritebackBody")],
+              [t("ats.guideSupport"), t("ats.guideSupportBody")],
+            ].map(([title, body]) => (
+              <div key={title} className="rounded-2xl border border-line bg-surface p-4">
+                <p className="font-semibold text-fg">{title}</p>
+                <p className="mt-1">{body}</p>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <h2 className="text-xl font-semibold text-fg">Connected providers</h2>
+          <h2 className="text-xl font-semibold text-fg">{t("ats.connectedTitle")}</h2>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-12">
-              <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-emerald-600" />
+              <Spinner />
             </div>
           ) : connections.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-line-strong p-8 text-center text-sm text-fg-secondary">
-              No ATS integrations yet. Add your first connection above, then run a connection test before turning on webhooks or stage writeback.
+            <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken p-8 text-center text-sm text-fg-secondary">
+              {t("ats.empty")}
             </div>
           ) : (
             <div className="space-y-5">
@@ -723,44 +688,45 @@ export default function EmployerIntegrationsPage() {
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-lg font-semibold text-fg">
-                            {connection.displayName || `${connection.providerLabel} integration`}
+                            {connection.displayName || t("ats.integrationOf", { provider: connection.providerLabel })}
                           </h3>
                           <Badge variant={healthBadgeVariant(connection.healthStatus)}>
-                            {connection.healthStatus.replace(/_/g, " ")}
+                            {tv("ats.health", connection.healthStatus)}
                           </Badge>
                           <Badge variant={connectionStatusVariant(connection.status)}>
-                            {connection.status}
+                            {tv("ats.status", connection.status)}
                           </Badge>
-                          {connection.webhookSyncEnabled && <Badge variant="info">Webhook sync on</Badge>}
-                          {connection.twoWaySyncEnabled && <Badge variant="default">Writeback on</Badge>}
+                          {connection.webhookSyncEnabled && <Badge variant="info">{t("ats.webhookOn")}</Badge>}
+                          {connection.twoWaySyncEnabled && <Badge variant="default">{t("ats.writebackOn")}</Badge>}
                         </div>
                         <p className="text-sm text-fg-secondary">
-                          {connection.providerLabel} • {connection.externalOrgId}
+                          {connection.providerLabel} • <span dir="ltr">{connection.externalOrgId}</span>
                         </p>
                         <div className="flex flex-wrap gap-2">
                           <Badge variant={connection.capabilities.jobImportReady ? "success" : "warning"}>
-                            Job import {connection.capabilities.jobImportReady ? "ready" : "needs config"}
+                            {connection.capabilities.jobImportReady ? t("ats.importReady") : t("ats.importNeedsConfig")}
                           </Badge>
                           <Badge variant={connection.capabilities.webhookReady ? "success" : "warning"}>
-                            Webhooks {connection.capabilities.webhookReady ? "ready" : "unverified"}
+                            {connection.capabilities.webhookReady ? t("ats.webhooksReady") : t("ats.webhooksUnverified")}
                           </Badge>
                           <Badge variant={connection.capabilities.stageWritebackReady ? "success" : "warning"}>
-                            Stage writeback {connection.capabilities.stageWritebackReady ? "ready" : "needs config"}
+                            {connection.capabilities.stageWritebackReady ? t("ats.writebackReady") : t("ats.writebackNeedsConfig")}
                           </Badge>
                         </div>
                       </div>
 
                       <div className="flex flex-wrap gap-2">
                         <Button size="sm" variant="outline" onClick={() => populateFormForConnection(connection)}>
-                          {isEditing ? "Editing" : "Manage"}
+                          {isEditing ? t("ats.editing") : t("ats.manage")}
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
+                          aria-expanded={isLogsOpen}
                           onClick={() => void handleLoadLogs(connection.id)}
                           disabled={loadingLogsId === connection.id}
                         >
-                          {loadingLogsId === connection.id ? "Loading..." : isLogsOpen ? "Hide logs" : "View logs"}
+                          {loadingLogsId === connection.id ? t("common.loading") : isLogsOpen ? t("ats.hideLogs") : t("ats.viewLogs")}
                         </Button>
                         <Button
                           size="sm"
@@ -768,14 +734,10 @@ export default function EmployerIntegrationsPage() {
                           onClick={() => void handleTest(connection.id)}
                           disabled={testingId === connection.id}
                         >
-                          {testingId === connection.id ? "Testing..." : "Test"}
+                          {testingId === connection.id ? t("ats.testing") : t("ats.test")}
                         </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => void handleSync(connection.id)}
-                          disabled={syncingId === connection.id}
-                        >
-                          {syncingId === connection.id ? "Syncing..." : "Sync jobs"}
+                        <Button size="sm" onClick={() => void handleSync(connection.id)} disabled={syncingId === connection.id}>
+                          {syncingId === connection.id ? t("ats.syncing") : t("ats.sync")}
                         </Button>
                         <Button
                           size="sm"
@@ -783,7 +745,7 @@ export default function EmployerIntegrationsPage() {
                           onClick={() => void handleRetry(connection.id)}
                           disabled={retryingId === connection.id}
                         >
-                          {retryingId === connection.id ? "Retrying..." : "Retry"}
+                          {retryingId === connection.id ? t("ats.retrying") : t("common.retry")}
                         </Button>
                         <Button
                           size="sm"
@@ -791,107 +753,110 @@ export default function EmployerIntegrationsPage() {
                           onClick={() => void handleDisconnect(connection.id)}
                           disabled={disconnectingId === connection.id}
                         >
-                          {disconnectingId === connection.id ? "Disconnecting..." : "Disconnect"}
+                          {disconnectingId === connection.id ? t("ats.disconnecting") : t("ats.disconnect")}
                         </Button>
                       </div>
                     </div>
 
                     <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                       <div className="rounded-2xl bg-surface-sunken p-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Credentials on file</p>
+                        <Eyebrow className="tracking-wide">{t("ats.credentials")}</Eyebrow>
                         <div className="mt-3 flex flex-wrap gap-2">
-                          <Badge variant={connection.credentials.hasAccessToken ? "success" : "warning"}>Access token</Badge>
-                          <Badge variant={connection.credentials.hasRefreshToken ? "success" : "default"}>Refresh token</Badge>
-                          <Badge variant={connection.credentials.hasWebhookSecret ? "success" : "warning"}>Webhook secret</Badge>
+                          <Badge variant={connection.credentials.hasAccessToken ? "success" : "warning"}>{t("ats.accessToken")}</Badge>
+                          <Badge variant={connection.credentials.hasRefreshToken ? "success" : "default"}>{t("ats.refreshToken")}</Badge>
+                          <Badge variant={connection.credentials.hasWebhookSecret ? "success" : "warning"}>{t("ats.webhookSecret")}</Badge>
                         </div>
                       </div>
                       <div className="rounded-2xl bg-surface-sunken p-4 text-sm text-fg-secondary">
-                        <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Recent activity</p>
-                        <p className="mt-3">Last sync: {formatTimestamp(connection.lastSyncedAt)}</p>
-                        <p>Last test: {formatTimestamp(connection.lastConnectionTestAt)}</p>
-                        <p>Last webhook: {formatTimestamp(connection.lastWebhookAt)}</p>
+                        <Eyebrow className="tracking-wide">{t("ats.recentActivity")}</Eyebrow>
+                        <p className="mt-3">{t("ats.lastSync", { when: when(connection.lastSyncedAt) })}</p>
+                        <p>{t("ats.lastTest", { when: when(connection.lastConnectionTestAt) })}</p>
+                        <p>{t("ats.lastWebhook", { when: when(connection.lastWebhookAt) })}</p>
                       </div>
                       <div className="rounded-2xl bg-surface-sunken p-4 text-sm text-fg-secondary">
-                        <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Backlog</p>
-                        <p className="mt-3">{connection.recentLogSummary.failedSyncRuns} failed sync runs</p>
-                        <p>{connection.recentLogSummary.failedWebhookEvents} failed webhook events</p>
-                        <p>{connection.recentLogSummary.pendingApplicationLinks} pending application links</p>
+                        <Eyebrow className="tracking-wide">{t("ats.backlog")}</Eyebrow>
+                        <p className="mt-3">{tn("ats.failedSyncRuns", connection.recentLogSummary.failedSyncRuns)}</p>
+                        <p>{tn("ats.failedWebhookEvents", connection.recentLogSummary.failedWebhookEvents)}</p>
+                        <p>{tn("ats.pendingLinks", connection.recentLogSummary.pendingApplicationLinks)}</p>
                       </div>
                       <div className="rounded-2xl bg-surface-sunken p-4 text-sm text-fg-secondary">
-                        <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Webhook endpoint</p>
-                        <p className="mt-3 break-all font-mono text-xs text-fg-secondary">{connection.webhookUrl}</p>
+                        <Eyebrow className="tracking-wide">{t("ats.webhookEndpoint")}</Eyebrow>
+                        <p className="mt-3 break-all font-mono text-xs text-fg-secondary" dir="ltr">{connection.webhookUrl}</p>
                         <Button size="sm" variant="ghost" className="mt-3" onClick={() => void copyWebhookUrl(connection.webhookUrl)}>
-                          Copy webhook URL
+                          {t("ats.copyWebhook")}
                         </Button>
                       </div>
                     </div>
 
                     {connection.capabilities.notes.length > 0 && (
-                      <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                        <p className="font-medium">Readiness gaps</p>
-                        <ul className="mt-2 list-disc pl-5">
+                      <Notice tone="warning" className="mt-4" title={t("ats.readinessGaps")}>
+                        <ul className="list-disc ps-5">
                           {connection.capabilities.notes.map((note) => (
                             <li key={note}>{note}</li>
                           ))}
                         </ul>
-                      </div>
+                      </Notice>
                     )}
 
                     {connection.lastErrorMessage && (
-                      <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                        <p className="font-medium">Latest error</p>
-                        <p className="mt-2">{connection.lastErrorMessage}</p>
-                        <p className="mt-2 text-xs text-red-700">Recorded {formatTimestamp(connection.lastErrorAt)}</p>
-                      </div>
+                      <Notice tone="danger" className="mt-4" title={t("ats.latestError")}>
+                        <p>{connection.lastErrorMessage}</p>
+                        <p className="mt-2 text-xs text-fg-muted">{t("ats.recorded", { when: when(connection.lastErrorAt) })}</p>
+                      </Notice>
                     )}
 
                     {isLogsOpen && (
                       <div className="mt-5 space-y-5 rounded-2xl border border-line bg-surface-sunken p-5">
                         {!logs ? (
                           <div className="flex justify-center py-8">
-                            <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-emerald-600" />
+                            <Spinner />
                           </div>
                         ) : (
                           <>
-                            <div className="grid gap-4 md:grid-cols-4">
-                              <div className="rounded-2xl bg-surface p-4 text-sm text-fg-secondary">
-                                <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Linked applications</p>
-                                <p className="mt-3 text-2xl font-semibold text-fg">{logs.applicationLinks.stats.total}</p>
-                              </div>
-                              <div className="rounded-2xl bg-surface p-4 text-sm text-fg-secondary">
-                                <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Synced</p>
-                                <p className="mt-3 text-2xl font-semibold text-emerald-700">{logs.applicationLinks.stats.synced}</p>
-                              </div>
-                              <div className="rounded-2xl bg-surface p-4 text-sm text-fg-secondary">
-                                <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Pending</p>
-                                <p className="mt-3 text-2xl font-semibold text-amber-700">{logs.applicationLinks.stats.pending}</p>
-                              </div>
-                              <div className="rounded-2xl bg-surface p-4 text-sm text-fg-secondary">
-                                <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Manual review</p>
-                                <p className="mt-3 text-2xl font-semibold text-fg">{logs.applicationLinks.stats.manualReview}</p>
-                              </div>
+                            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+                              {(
+                                [
+                                  [t("ats.linkedApplications"), logs.applicationLinks.stats.total, "text-fg"],
+                                  [t("ats.synced"), logs.applicationLinks.stats.synced, "text-success"],
+                                  [t("common.pending"), logs.applicationLinks.stats.pending, "text-warning"],
+                                  [t("ats.manualReview"), logs.applicationLinks.stats.manualReview, "text-fg"],
+                                ] as const
+                              ).map(([label, value, tone]) => (
+                                <div key={label} className="rounded-2xl bg-surface p-4 text-sm text-fg-secondary">
+                                  <Eyebrow className="tracking-wide">{label}</Eyebrow>
+                                  <p className={`mt-3 text-2xl font-semibold tabular-nums ${tone}`}>{fmt.number(value)}</p>
+                                </div>
+                              ))}
                             </div>
 
                             <div className="grid gap-5 xl:grid-cols-3">
                               <div className="space-y-3 rounded-2xl bg-surface p-4">
-                                <h4 className="font-semibold text-fg">Recent sync runs</h4>
+                                <h4 className="font-semibold text-fg">{t("ats.recentRuns")}</h4>
                                 {logs.syncRuns.length === 0 ? (
-                                  <p className="text-sm text-fg-muted">No sync runs yet.</p>
+                                  <p className="text-sm text-fg-muted">{t("ats.noRuns")}</p>
                                 ) : (
                                   <div className="space-y-3">
                                     {logs.syncRuns.slice(0, 6).map((run) => (
                                       <div key={run.id} className="rounded-xl border border-line p-3 text-sm">
                                         <div className="flex items-center justify-between gap-3">
-                                          <span className="font-medium text-fg">{run.syncType.replace(/_/g, " ")}</span>
+                                          <span className="font-medium text-fg">{tv("ats.syncType", run.syncType)}</span>
                                           <Badge variant={run.status === "SUCCESS" ? "success" : run.status === "FAILED" ? "danger" : "warning"}>
-                                            {run.status}
+                                            {tv("ats.runStatus", run.status)}
                                           </Badge>
                                         </div>
                                         <p className="mt-2 text-fg-secondary">
-                                          {run.direction} via {run.trigger.toLowerCase()} • {formatTimestamp(run.startedAt)}
+                                          {t("ats.runVia", {
+                                            direction: tv("ats.direction", run.direction),
+                                            trigger: tv("ats.trigger", run.trigger),
+                                            when: when(run.startedAt),
+                                          })}
                                         </p>
                                         <p className="mt-1 text-fg-secondary">
-                                          {run.createdJobs} created, {run.updatedJobs} updated, {run.updatedStages} stage changes
+                                          {t("ats.runCounts", {
+                                            created: run.createdJobs,
+                                            updated: run.updatedJobs,
+                                            stages: run.updatedStages,
+                                          })}
                                         </p>
                                       </div>
                                     ))}
@@ -900,25 +865,21 @@ export default function EmployerIntegrationsPage() {
                               </div>
 
                               <div className="space-y-3 rounded-2xl bg-surface p-4">
-                                <h4 className="font-semibold text-fg">Webhook events</h4>
+                                <h4 className="font-semibold text-fg">{t("ats.webhookEvents")}</h4>
                                 {logs.webhookEvents.length === 0 ? (
-                                  <p className="text-sm text-fg-muted">No webhook events yet.</p>
+                                  <p className="text-sm text-fg-muted">{t("ats.noWebhookEvents")}</p>
                                 ) : (
                                   <div className="space-y-3">
                                     {logs.webhookEvents.slice(0, 6).map((event) => (
                                       <div key={event.id} className="rounded-xl border border-line p-3 text-sm">
                                         <div className="flex items-center justify-between gap-3">
-                                          <span className="font-medium text-fg">{event.eventType}</span>
+                                          <span className="break-all font-medium text-fg" dir="ltr">{event.eventType}</span>
                                           <Badge variant={event.status === "PROCESSED" ? "success" : event.status === "FAILED" ? "danger" : "warning"}>
-                                            {event.status}
+                                            {tv("ats.runStatus", event.status)}
                                           </Badge>
                                         </div>
-                                        <p className="mt-2 text-fg-secondary">
-                                          {formatTimestamp(event.receivedAt)}
-                                        </p>
-                                        {event.errorMessage && (
-                                          <p className="mt-1 text-red-700">{event.errorMessage}</p>
-                                        )}
+                                        <p className="mt-2 text-fg-secondary">{when(event.receivedAt)}</p>
+                                        {event.errorMessage && <p className="mt-1 text-danger">{event.errorMessage}</p>}
                                       </div>
                                     ))}
                                   </div>
@@ -926,16 +887,16 @@ export default function EmployerIntegrationsPage() {
                               </div>
 
                               <div className="space-y-3 rounded-2xl bg-surface p-4">
-                                <h4 className="font-semibold text-fg">Audit timeline</h4>
+                                <h4 className="font-semibold text-fg">{t("ats.auditTimeline")}</h4>
                                 {logs.auditLogs.length === 0 ? (
-                                  <p className="text-sm text-fg-muted">No audit entries yet.</p>
+                                  <p className="text-sm text-fg-muted">{t("ats.noAudit")}</p>
                                 ) : (
                                   <div className="space-y-3">
                                     {logs.auditLogs.slice(0, 8).map((entry) => (
                                       <div key={entry.id} className="rounded-xl border border-line p-3 text-sm">
-                                        <p className="font-medium text-fg">{entry.actionType.replace(/_/g, " ")}</p>
+                                        <p className="font-medium text-fg">{tv("ats.action", entry.actionType)}</p>
                                         <p className="mt-1 text-fg-secondary">{entry.summary}</p>
-                                        <p className="mt-1 text-xs text-fg-muted">{formatTimestamp(entry.createdAt)}</p>
+                                        <p className="mt-1 text-xs text-fg-muted">{when(entry.createdAt)}</p>
                                       </div>
                                     ))}
                                   </div>
@@ -945,7 +906,7 @@ export default function EmployerIntegrationsPage() {
 
                             {logs.applicationLinks.recent.length > 0 && (
                               <div className="rounded-2xl bg-surface p-4">
-                                <h4 className="font-semibold text-fg">Recent application links</h4>
+                                <h4 className="font-semibold text-fg">{t("ats.recentLinks")}</h4>
                                 <div className="mt-4 space-y-3">
                                   {logs.applicationLinks.recent.slice(0, 6).map((link) => (
                                     <div key={link.id} className="rounded-xl border border-line p-4 text-sm">
@@ -955,16 +916,17 @@ export default function EmployerIntegrationsPage() {
                                             {link.application.candidate.name} • {link.application.job.title}
                                           </p>
                                           <p className="mt-1 text-fg-secondary">
-                                            Local status: {link.application.status} • External stage: {link.externalStageName || "Unknown"}
+                                            {t("ats.linkStatus", {
+                                              local: tv("status.app", link.application.status),
+                                              external: link.externalStageName || t("ats.unknown"),
+                                            })}
                                           </p>
                                         </div>
                                         <Badge variant={link.status === "SYNCED" ? "success" : link.status === "FAILED" ? "danger" : "warning"}>
-                                          {link.status.replace(/_/g, " ")}
+                                          {tv("ats.linkState", link.status)}
                                         </Badge>
                                       </div>
-                                      {link.lastSyncError && (
-                                        <p className="mt-2 text-red-700">{link.lastSyncError}</p>
-                                      )}
+                                      {link.lastSyncError && <p className="mt-2 text-danger">{link.lastSyncError}</p>}
                                     </div>
                                   ))}
                                 </div>
