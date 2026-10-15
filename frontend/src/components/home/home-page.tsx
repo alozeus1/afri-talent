@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Globe, Plane, ShieldCheck, Sparkles } from "lucide-react";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 import { FREE_MODE } from "@/lib/free-mode";
+import { usePublicT } from "@/lib/i18n/public-messages";
 
 const featureIcons = [Globe, Plane, ShieldCheck, Sparkles];
 const featureTones = [
@@ -19,18 +20,20 @@ const featureTones = [
 ];
 
 const sourceLabels = [
-  ["RemoteOK", "Remote global"],
-  ["We Work Remotely", "Remote global"],
-  ["Jobberman", "Africa"],
-  ["Himalayas", "Remote global"],
-  ["Arbeitnow", "Europe + visa"],
-  ["Remotive", "Remote global"],
-  ["Adzuna", "US, UK, EU, CA"],
-];
+  ["RemoteOK", "site.home.source.remoteGlobal"],
+  ["We Work Remotely", "site.home.source.remoteGlobal"],
+  ["Jobberman", "site.home.source.africa"],
+  ["Himalayas", "site.home.source.remoteGlobal"],
+  ["Arbeitnow", "site.home.source.europeVisa"],
+  ["Remotive", "site.home.source.remoteGlobal"],
+  ["Adzuna", "site.home.source.adzuna"],
+] as const;
 
 export function HomePageContent() {
   const t = useT();
+  const tp = usePublicT();
   const locale = useLocale();
+  const href = (path: string) => localizePath(path, locale);
 
   const productSignals = [
     { titleKey: "home.feature.remoteTitle" as const, descKey: "home.feature.remoteDesc" as const, tone: featureTones[0], Icon: featureIcons[0] },
@@ -60,8 +63,8 @@ export function HomePageContent() {
                 </div>
 
                 <h1 className="font-display max-w-4xl text-5xl font-bold leading-[1.05] text-fg dark:text-zinc-50 md:text-6xl lg:text-7xl">
-                  {t("home.hero.heading").replace("global opportunities.", "")}{" "}
-                  <span className="text-emerald-700 dark:text-emerald-400">global opportunities.</span>
+                  {tp("site.home.headingLead")}{" "}
+                  <span className="text-primary-text">{tp("site.home.headingAccent")}</span>
                 </h1>
 
                 <p className="mt-6 max-w-2xl text-lg leading-8 text-fg-secondary dark:text-zinc-400 md:text-xl">
@@ -69,12 +72,12 @@ export function HomePageContent() {
                 </p>
 
                 <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-                  <Link href="/jobs" prefetch={false}>
+                  <Link href={href("/jobs")} prefetch={false}>
                     <Button size="lg" className="w-full sm:w-auto">
                       {t("home.hero.exploreCta")}
                     </Button>
                   </Link>
-                  <Link href="/register?role=employer" prefetch={false}>
+                  <Link href={href("/register?role=employer")} prefetch={false}>
                     <Button size="lg" variant="outline" className="w-full sm:w-auto">
                       {t("home.hero.employerCta")}
                     </Button>
@@ -100,7 +103,7 @@ export function HomePageContent() {
                   <Link href={localizePath("/jobs?visaSponsorship=YES", locale)} prefetch={false} className="rounded-full border border-line bg-surface-sunken px-4 py-2 hover:bg-surface-muted dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     {t("home.hero.visaSupported")}
                   </Link>
-                  <Link href="/trust" prefetch={false} className="rounded-full border border-line bg-surface-sunken px-4 py-2 hover:bg-surface-muted dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                  <Link href={href("/trust")} prefetch={false} className="rounded-full border border-line bg-surface-sunken px-4 py-2 hover:bg-surface-muted dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     {t("home.hero.seeTrustModel")}
                   </Link>
                 </div>
@@ -121,7 +124,7 @@ export function HomePageContent() {
                   <div className="relative flex h-[540px] items-center justify-center overflow-hidden rounded-2xl border border-line dark:border-zinc-800 bg-surface dark:bg-zinc-950">
                     <img
                       src="/images/hero/homepage-design-preview.webp"
-                      alt="AfriTalent platform preview"
+                      alt={tp("site.home.previewAlt")}
                       width={190}
                       height={600}
                       className="h-full w-auto object-contain p-4"
@@ -185,7 +188,7 @@ export function HomePageContent() {
               <div className="relative min-h-[320px] overflow-hidden bg-zinc-950 lg:min-h-[420px]">
                 <img
                   src="/images/generated/afritalent-smart-search-workspace.webp"
-                  alt="Smart job search workspace with hiring signals and candidate notes"
+                  alt={tp("site.home.searchImageAlt")}
                   loading="lazy"
                   className="absolute inset-0 h-full w-full object-cover opacity-90"
                 />
@@ -207,7 +210,7 @@ export function HomePageContent() {
                   {sourceLabels.map(([label, sublabel]) => (
                     <div key={label}>
                       <div className="font-bold text-fg dark:text-zinc-200">{label}</div>
-                      <div className="mt-1 text-xs font-medium text-fg-muted dark:text-zinc-300">{sublabel}</div>
+                      <div className="mt-1 text-xs font-medium text-fg-muted">{tp(sublabel)}</div>
                     </div>
                   ))}
                 </div>
@@ -223,7 +226,7 @@ export function HomePageContent() {
           <div className="relative overflow-hidden rounded-3xl border border-emerald-900 bg-emerald-950 px-6 py-16 text-white shadow-2xl md:px-12">
             <img
               src="/images/generated/afritalent-collaboration-hiring.webp"
-              alt="Hiring team collaborating with a remote teammate"
+              alt={tp("site.home.ctaImageAlt")}
               loading="lazy"
               className="absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-overlay pointer-events-none"
             />
@@ -240,12 +243,12 @@ export function HomePageContent() {
             </div>
 
             <div className="relative mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link href="/register" prefetch={false}>
+              <Link href={href("/register")} prefetch={false}>
                 <Button size="lg" className="w-full sm:w-auto bg-emerald-700 text-white hover:bg-emerald-800 border-transparent">
                   {t("home.cta.candidateCta")}
                 </Button>
               </Link>
-              <Link href="/resources" prefetch={false}>
+              <Link href={href("/resources")} prefetch={false}>
                 <Button size="lg" variant="outline" className="w-full border-emerald-700 bg-emerald-900 text-emerald-100 hover:bg-emerald-800 hover:text-white sm:w-auto">
                   {t("home.cta.resourcesCta")}
                 </Button>

@@ -7,6 +7,7 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { NetworkStatusBanner } from "@/components/layout/network-status-banner";
 import { HtmlLangSync } from "@/components/layout/html-lang-sync";
+import { SkipLink } from "@/components/layout/skip-link";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({
@@ -40,12 +41,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className={`${inter.variable} ${dmSans.variable} antialiased app-shell`}>
-        <a
-          href="#main-content"
-          className="skip-link"
-        >
-          Skip to main content
-        </a>
+        <SkipLink />
         <HtmlLangSync />
         <ThemeProvider>
           <AuthProvider>

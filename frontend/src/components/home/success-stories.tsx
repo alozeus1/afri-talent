@@ -7,6 +7,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { usePublicT } from "@/lib/i18n/public-messages";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 export const SUCCESS_STORIES_CATEGORY = "Success Stories";
@@ -22,6 +24,8 @@ interface Story {
 
 export function SuccessStories() {
   const [stories, setStories] = useState<Story[]>([]);
+  const tp = usePublicT();
+  const locale = useLocale();
 
   useEffect(() => {
     const params = new URLSearchParams({ category: SUCCESS_STORIES_CATEGORY, limit: "3" });
@@ -38,15 +42,15 @@ export function SuccessStories() {
       <div className="page-frame">
         <div className="mb-10 text-center">
           <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
-            Real outcomes
+            {tp("site.stories.eyebrow")}
           </p>
           <h2 className="font-display mt-3 text-3xl font-bold text-fg dark:text-zinc-50 md:text-4xl">
-            Success stories from the community
+            {tp("site.stories.title")}
           </h2>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
           {stories.map((story) => (
-            <Link key={story.id} href={`/resources/${story.slug}`} className="group">
+            <Link key={story.id} href={localizePath(`/resources/${story.slug}`, locale)} className="group">
               <div className="h-full overflow-hidden rounded-2xl border border-line bg-surface transition hover:-translate-y-0.5 hover:shadow-lg dark:border-zinc-800 dark:bg-zinc-950/50">
                 {story.coverImage && (
                   <div className="relative h-44 bg-surface-muted dark:bg-zinc-900">
@@ -65,7 +69,7 @@ export function SuccessStories() {
                   </h3>
                   <p className="mt-2 text-sm text-fg-secondary line-clamp-3 dark:text-zinc-400">{story.excerpt}</p>
                   <span className="mt-3 inline-block text-sm font-medium text-emerald-700 group-hover:underline dark:text-emerald-400">
-                    Read the story →
+                    {tp("site.stories.read")} <span aria-hidden="true">→</span>
                   </span>
                 </div>
               </div>

@@ -8,6 +8,7 @@ import { notifications as notificationsApi, messages as messagesApi } from "@/li
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { usePublicT } from "@/lib/i18n/public-messages";
 import { FREE_MODE } from "@/lib/free-mode";
 import { useNetworkProfile } from "@/lib/network-profile";
 
@@ -32,6 +33,7 @@ function checkBlogAvailable(): Promise<boolean> {
 export function Header() {
   const locale = useLocale();
   const t = useT();
+  const tp = usePublicT();
   const { user, isLoading, logout } = useAuth();
   const { online, isLowBandwidth } = useNetworkProfile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -151,11 +153,11 @@ export function Header() {
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50">
           <div className="bg-surface dark:bg-gray-900 rounded-xl p-6 max-w-sm mx-4 shadow-xl border border-line dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-fg dark:text-gray-100 mb-2">Confirm Logout</h3>
-            <p className="text-fg-secondary dark:text-gray-300 mb-4">Are you sure you want to logout?</p>
+            <h3 className="text-lg font-semibold text-fg dark:text-gray-100 mb-2">{tp("site.header.confirmLogoutTitle")}</h3>
+            <p className="text-fg-secondary dark:text-gray-300 mb-4">{tp("site.header.confirmLogoutBody")}</p>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setShowLogoutConfirm(false)}>
-                Cancel
+                {tp("site.common.cancel")}
               </Button>
               <Button variant="danger" className="flex-1" onClick={handleLogout}>
                 {t("nav.logout")}
@@ -174,8 +176,8 @@ export function Header() {
                   <span className="font-display text-lg font-bold text-white">A</span>
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-display text-xl font-bold text-fg dark:text-white">AfriTalent</span>
-                  <span className="text-[11px] uppercase tracking-widest text-fg-muted dark:text-zinc-400">Trust-first hiring</span>
+                  <span className="font-display text-xl font-bold text-fg">{"AfriTalent"}</span>
+                  <span className="text-[11px] uppercase tracking-widest text-fg-muted dark:text-zinc-400">{tp("site.brand.tagline")}</span>
                 </div>
               </Link>
             </div>
@@ -199,18 +201,18 @@ export function Header() {
               </Link>
               {showBlogLink && (
                 <Link href={href("/blog")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
-                  Blog
+                  {t("nav.blog")}
                 </Link>
               )}
               <Link href={href("/pricing")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
                 {FREE_MODE ? t("nav.freeForEveryone") : t("nav.pricing")}
               </Link>
               <Link href={href("/trust")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
-                Trust
+                {t("nav.trust")}
               </Link>
               {user?.role === "CANDIDATE" && (
                 <Link href={href("/candidate/ai-assistant")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
-                  AI Assistant
+                  {tp("site.header.aiAssistant")}
                 </Link>
               )}
               {user && (
@@ -224,8 +226,8 @@ export function Header() {
                 </Link>
               )}
               {user && (
-                <Link href={href("/notifications")} prefetch={false} className="relative text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <Link href={href("/notifications")} prefetch={false} aria-label={t("nav.notifications")} className="relative text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100">
+                  <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
                   {unreadNotifs > 0 && (
@@ -275,7 +277,7 @@ export function Header() {
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="inline-flex items-center justify-center rounded-md border border-line bg-surface p-2.5 text-fg-secondary shadow-sm hover:text-fg dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100 transition-colors"
-                aria-label="Toggle menu"
+                aria-label={mobileMenuOpen ? tp("site.header.closeMenu") : tp("site.header.openMenu")}
                 aria-expanded={mobileMenuOpen}
                 aria-controls="mobile-menu-panel"
               >
@@ -299,19 +301,19 @@ export function Header() {
             type="button"
             className="absolute inset-0 bg-black/40"
             onClick={() => setMobileMenuOpen(false)}
-            aria-label="Close menu backdrop"
+            aria-label={tp("site.header.closeMenu")}
           />
           <div
             id="mobile-menu-panel"
             className="absolute right-0 top-0 h-full w-[85%] max-w-sm overflow-y-auto border-l border-line bg-surface p-5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-950"
           >
             <div className="flex items-center justify-between mb-6">
-              <p className="text-base font-semibold text-fg dark:text-gray-100">Menu</p>
+              <p className="text-base font-semibold text-fg dark:text-gray-100">{tp("site.header.menu")}</p>
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(false)}
                 className="rounded-md p-2 text-fg-secondary dark:text-gray-300 hover:bg-surface-muted dark:hover:bg-gray-800"
-                aria-label="Close menu"
+                aria-label={tp("site.header.closeMenu")}
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -326,9 +328,9 @@ export function Header() {
                 { href: "/salaries", label: t("nav.salaries") },
                 { href: "/interviews", label: t("nav.interviews") },
                 { href: "/learning", label: t("nav.learn") },
-                ...(showBlogLink ? [{ href: "/blog", label: "Blog" }] : []),
+                ...(showBlogLink ? [{ href: "/blog", label: t("nav.blog") }] : []),
                 { href: "/pricing", label: FREE_MODE ? t("nav.freeForEveryone") : t("nav.pricing") },
-                { href: "/trust", label: "Trust" },
+                { href: "/trust", label: t("nav.trust") },
               ].map((item) => (
                 <Link
                   key={item.href}
@@ -352,7 +354,7 @@ export function Header() {
                   </Link>
                   {user.role === "CANDIDATE" && (
                     <Link href={href("/candidate/ai-assistant")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-fg-secondary dark:text-gray-200">
-                      AI Assistant
+                      {tp("site.header.aiAssistant")}
                     </Link>
                   )}
                   <Link href={href("/messages")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-fg-secondary dark:text-gray-200">
@@ -373,7 +375,7 @@ export function Header() {
                   </Link>
                   {user.role === "CANDIDATE" && (
                     <Link href={href("/immigration")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-fg-secondary dark:text-gray-200">
-                      Visa Tracker
+                      {tp("site.header.visaTracker")}
                     </Link>
                   )}
                   <button
