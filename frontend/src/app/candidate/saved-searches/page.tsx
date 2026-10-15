@@ -88,7 +88,7 @@ function TagInput({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label className="block text-sm font-medium text-fg-secondary mb-1">
         {label}
       </label>
       <div className="flex flex-wrap gap-2 mb-2">
@@ -101,7 +101,7 @@ function TagInput({
             <button
               type="button"
               onClick={() => removeTag(tag)}
-              className="text-emerald-600 hover:text-emerald-800 font-bold"
+              className="text-primary-text hover:text-emerald-800 font-bold"
             >
               ×
             </button>
@@ -115,7 +115,7 @@ function TagInput({
         onKeyDown={handleKeyDown}
         onBlur={() => inputValue.trim() && addTags(inputValue)}
         placeholder={placeholder || "Type and press Enter or comma to add"}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+        className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
       />
     </div>
   );
@@ -281,8 +281,8 @@ export default function SavedSearchesPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Saved Searches</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-fg">Saved Searches</h1>
+          <p className="text-fg-secondary mt-1">
             Manage your job search alerts and preferences
           </p>
         </div>
@@ -300,8 +300,8 @@ export default function SavedSearchesPage() {
         <CardContent className="p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-base font-semibold text-gray-900">Build a low-noise alert stack</h2>
-              <p className="mt-1 text-sm text-gray-600">
+              <h2 className="text-base font-semibold text-fg">Build a low-noise alert stack</h2>
+              <p className="mt-1 text-sm text-fg-secondary">
                 Saved searches feed your weekly digest, visa or relocation alerts, and application-momentum reminders.
               </p>
             </div>
@@ -323,7 +323,7 @@ export default function SavedSearchesPage() {
       {showForm && (
         <Card className="mb-8">
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-fg">
               {editingId ? "Edit Search" : "Create New Search"}
             </h2>
           </CardHeader>
@@ -352,7 +352,7 @@ export default function SavedSearchesPage() {
 
             {/* Job Types */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-fg-secondary mb-2">
                 Job Types
               </label>
               <div className="flex flex-wrap gap-3">
@@ -374,7 +374,7 @@ export default function SavedSearchesPage() {
                           });
                         }
                       }}
-                      className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                      className="rounded border-line-strong text-primary-text focus:ring-emerald-500"
                     />
                     {jobTypeLabels[jt] || jt}
                   </label>
@@ -391,7 +391,7 @@ export default function SavedSearchesPage() {
                   onChange={(e) =>
                     setForm({ ...form, remoteOnly: e.target.checked })
                   }
-                  className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  className="rounded border-line-strong text-primary-text focus:ring-emerald-500"
                 />
                 Remote Only
               </label>
@@ -402,7 +402,7 @@ export default function SavedSearchesPage() {
                   onChange={(e) =>
                     setForm({ ...form, visaSponsorship: e.target.checked })
                   }
-                  className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  className="rounded border-line-strong text-primary-text focus:ring-emerald-500"
                 />
                 Visa Sponsorship
               </label>
@@ -410,7 +410,7 @@ export default function SavedSearchesPage() {
 
             {/* Alert Frequency */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-fg-secondary mb-1">
                 Alert Frequency
               </label>
               <select
@@ -421,7 +421,7 @@ export default function SavedSearchesPage() {
                     alertFrequency: e.target.value as AlertFrequency,
                   })
                 }
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+                className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
               >
                 <option value="INSTANT">Instant</option>
                 <option value="DAILY">Daily</option>
@@ -455,10 +455,10 @@ export default function SavedSearchesPage() {
         <Card>
           <CardContent className="p-12 text-center">
             <span className="text-4xl mb-4 block">🔍</span>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <h3 className="text-lg font-semibold text-fg mb-2">
               No saved searches
             </h3>
-            <p className="text-gray-500 mb-6">
+            <p className="text-fg-muted mb-6">
               Create one to get job alerts!
             </p>
             {!showForm && (
@@ -475,7 +475,7 @@ export default function SavedSearchesPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">
+                      <h3 className="text-lg font-semibold text-fg">
                         {search.name}
                       </h3>
                       <Badge
@@ -508,7 +508,7 @@ export default function SavedSearchesPage() {
                       {search.jobTypes.map((jt) => (
                         <span
                           key={jt}
-                          className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700"
+                          className="px-2 py-0.5 text-xs rounded-full bg-surface-muted text-fg-secondary"
                         >
                           {jobTypeLabels[jt] || jt}
                         </span>
@@ -539,7 +539,7 @@ export default function SavedSearchesPage() {
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      className={`inline-block h-4 w-4 transform rounded-full bg-surface transition-transform ${
                         search.alertEnabled
                           ? "translate-x-6"
                           : "translate-x-1"
@@ -549,7 +549,7 @@ export default function SavedSearchesPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-center gap-2 mt-4 pt-4 border-t border-line">
                   <Button
                     size="sm"
                     onClick={() => handleViewJobs(search)}

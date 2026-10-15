@@ -61,13 +61,13 @@ export function ReportJobButton({ jobId }: { jobId: string }) {
 
   return (
     <div className="mt-2 rounded-xl border border-red-200 bg-red-50/60 p-4 dark:border-red-900 dark:bg-red-950/20">
-      <p className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+      <p className="mb-2 text-sm font-semibold text-fg dark:text-gray-100">
         Report this job to the trust team
       </p>
       <select
         value={reason}
         onChange={(e) => setReason(e.target.value as AbuseReportInput["reason"])}
-        className="mb-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-gray-100"
+        className="mb-2 w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-gray-100"
         aria-label="Report reason"
       >
         {REASONS.map((r) => (
@@ -80,7 +80,7 @@ export function ReportJobButton({ jobId }: { jobId: string }) {
         placeholder="Anything that helps us review (optional)"
         rows={2}
         maxLength={4000}
-        className="mb-3 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-gray-100"
+        className="mb-3 w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-gray-100"
       />
       {state === "error" && (
         <p className="mb-2 text-xs text-red-600">Could not submit the report — please try again.</p>

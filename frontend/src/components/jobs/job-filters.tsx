@@ -64,7 +64,7 @@ export function JobFilters({
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-700 dark:text-emerald-300">Search the market</p>
-          <h2 className="font-display mt-2 text-2xl font-bold text-gray-950 dark:text-white">Find roles that match your trust, mobility, and work style.</h2>
+          <h2 className="font-display mt-2 text-2xl font-bold text-fg dark:text-white">Find roles that match your trust, mobility, and work style.</h2>
         </div>
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={onClear}>
@@ -103,7 +103,7 @@ export function JobFilters({
           )}
         </div>
         <select
-          className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
+          className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by job type"
           value={type}
           onChange={(e) => onTypeChange(e.target.value)}
@@ -116,7 +116,7 @@ export function JobFilters({
           ))}
         </select>
         <select
-          className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
+          className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by job field"
           value={jobField}
           onChange={(e) => onJobFieldChange(e.target.value)}
@@ -129,7 +129,7 @@ export function JobFilters({
           ))}
         </select>
         <select
-          className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
+          className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by workplace type"
           value={workplaceType}
           onChange={(e) => onWorkplaceTypeChange(e.target.value)}
@@ -142,7 +142,7 @@ export function JobFilters({
           ))}
         </select>
         <select
-          className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-gray-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
+          className="w-full rounded-2xl border border-[rgba(15,23,32,0.12)] bg-[rgba(255,255,255,0.68)] px-4 py-3 text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-[rgba(210,226,244,0.12)] dark:bg-[rgba(7,17,29,0.72)] dark:text-gray-100"
           aria-label="Filter by seniority"
           value={seniority}
           onChange={(e) => onSeniorityChange(e.target.value)}
@@ -162,7 +162,7 @@ export function JobFilters({
           aria-pressed={Boolean(remote)}
           aria-label="Toggle remote only jobs"
           className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${
-            remote ? "border-emerald-600 bg-emerald-600 text-white shadow-[0_12px_30px_rgba(15,143,120,0.24)]" : "bg-white/70 text-gray-700 border-[rgba(15,23,32,0.12)] hover:border-emerald-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
+            remote ? "border-emerald-600 bg-emerald-600 text-white shadow-[0_12px_30px_rgba(15,143,120,0.24)]" : "bg-white/70 text-fg-secondary border-[rgba(15,23,32,0.12)] hover:border-emerald-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
           }`}
         >
           {remote && <Check className="w-4 h-4" />}
@@ -174,7 +174,7 @@ export function JobFilters({
           aria-pressed={Boolean(visaSponsorship)}
           aria-label="Toggle visa sponsored jobs"
           className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${
-            visaSponsorship ? "border-blue-600 bg-blue-600 text-white shadow-[0_12px_30px_rgba(37,99,235,0.22)]" : "bg-white/70 text-gray-700 border-[rgba(15,23,32,0.12)] hover:border-blue-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
+            visaSponsorship ? "border-blue-600 bg-blue-600 text-white shadow-[0_12px_30px_rgba(37,99,235,0.22)]" : "bg-white/70 text-fg-secondary border-[rgba(15,23,32,0.12)] hover:border-blue-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
           }`}
         >
           {visaSponsorship && <Check className="w-4 h-4" />}
@@ -186,7 +186,7 @@ export function JobFilters({
           aria-pressed={Boolean(relocationAssistance)}
           aria-label="Toggle relocation support jobs"
           className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${
-            relocationAssistance ? "border-purple-600 bg-purple-600 text-white shadow-[0_12px_30px_rgba(147,51,234,0.22)]" : "bg-white/70 text-gray-700 border-[rgba(15,23,32,0.12)] hover:border-purple-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
+            relocationAssistance ? "border-purple-600 bg-purple-600 text-white shadow-[0_12px_30px_rgba(147,51,234,0.22)]" : "bg-white/70 text-fg-secondary border-[rgba(15,23,32,0.12)] hover:border-purple-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
           }`}
         >
           {relocationAssistance && <Check className="w-4 h-4" />}
@@ -198,7 +198,7 @@ export function JobFilters({
           aria-pressed={Boolean(hiresFromAfrica)}
           aria-label="Toggle jobs verified to hire from Africa"
           className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${
-            hiresFromAfrica ? "border-amber-600 bg-amber-600 text-white shadow-[0_12px_30px_rgba(217,119,6,0.22)]" : "bg-white/70 text-gray-700 border-[rgba(15,23,32,0.12)] hover:border-amber-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
+            hiresFromAfrica ? "border-amber-600 bg-amber-600 text-white shadow-[0_12px_30px_rgba(217,119,6,0.22)]" : "bg-white/70 text-fg-secondary border-[rgba(15,23,32,0.12)] hover:border-amber-500 dark:bg-white/5 dark:text-gray-200 dark:border-[rgba(210,226,244,0.12)]"
           }`}
         >
           {hiresFromAfrica && <Check className="w-4 h-4" />}

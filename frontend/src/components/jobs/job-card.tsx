@@ -158,12 +158,12 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
         });
       }}
     >
-      <Card className="isolate h-full cursor-pointer transition-all duration-300 border border-[var(--border-soft)] bg-white dark:bg-zinc-950 hover:bg-gradient-to-br hover:from-white hover:to-emerald-50/50 dark:hover:from-zinc-950 dark:hover:to-emerald-950/20 group-hover:-translate-y-1 hover:border-emerald-300 dark:hover:border-emerald-700 shadow-sm hover:shadow-[0_8px_24px_rgba(0,0,0,0.15)] relative overflow-hidden">
+      <Card className="isolate h-full cursor-pointer transition-all duration-300 border border-[var(--border-soft)] bg-surface dark:bg-zinc-950 hover:bg-gradient-to-br hover:from-white hover:to-emerald-50/50 dark:hover:from-zinc-950 dark:hover:to-emerald-950/20 group-hover:-translate-y-1 hover:border-emerald-300 dark:hover:border-emerald-700 shadow-sm hover:shadow-[0_8px_24px_rgba(0,0,0,0.15)] relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/0 to-emerald-500/0 group-hover:via-emerald-500/5 transition-all duration-500 rounded-xl pointer-events-none" />
         <CardContent className="relative z-10 flex h-full flex-col p-6">
           <div className="flex justify-between items-start mb-3">
             <div className="flex-1 pr-4">
-              <h3 className="font-display text-lg font-bold text-gray-900 dark:text-gray-100 mb-1 line-clamp-2">
+              <h3 className="font-display text-lg font-bold text-fg dark:text-gray-100 mb-1 line-clamp-2">
                 {job.title}
               </h3>
               {companyName && (
@@ -204,7 +204,7 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
                 className={`p-2 rounded-full transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70 ${
                   isSaved 
                     ? "bg-rose-50 text-rose-500 shadow-sm ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-500/30"
-                    : "bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:bg-zinc-800/50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                    : "bg-surface-sunken text-gray-400 hover:bg-surface-muted hover:text-fg-secondary dark:bg-zinc-800/50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
                 }`}
                 aria-pressed={isSaved}
                 aria-label={isSaved ? "Remove saved job" : "Save job"}
@@ -217,18 +217,18 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
           </div>
 
           <div className="flex flex-wrap gap-4 mb-4">
-            <span className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300">
-              <MapPin className="w-4 h-4 mr-1.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="inline-flex items-center text-sm font-medium text-fg-secondary dark:text-gray-300">
+              <MapPin className="w-4 h-4 mr-1.5 text-primary-text dark:text-emerald-400" />
               {job.workplaceType ? `${job.location} · ${job.workplaceType.toLowerCase()}` : job.location}
             </span>
-            <span className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300">
-              <Briefcase className="w-4 h-4 mr-1.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="inline-flex items-center text-sm font-medium text-fg-secondary dark:text-gray-300">
+              <Briefcase className="w-4 h-4 mr-1.5 text-primary-text dark:text-emerald-400" />
               {job.seniority}
             </span>
           </div>
 
           {salary && (
-            <p className="mb-4 font-display text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors duration-200">{salary}</p>
+            <p className="mb-4 font-display text-lg font-bold text-fg dark:text-gray-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors duration-200">{salary}</p>
           )}
 
           {job.discovery && (
@@ -239,7 +239,7 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
                 </span>
               )}
               {job.discovery.salaryTransparent && (
-                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <span className="inline-flex items-center rounded-full border border-line bg-surface-muted px-2.5 py-1 text-xs font-semibold text-fg-secondary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                   Salary disclosed
                 </span>
               )}
@@ -257,7 +257,7 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
           )}
 
           {discoverySummary && (
-            <p className="mb-4 text-sm leading-6 text-gray-600 dark:text-gray-300">
+            <p className="mb-4 text-sm leading-6 text-fg-secondary dark:text-gray-300">
               {discoverySummary}
             </p>
           )}
@@ -294,7 +294,7 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
 
           <div className="mt-auto" />
 
-          <div className="mt-4 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-zinc-800/60 pt-4">
+          <div className="mt-4 flex items-center justify-between text-xs text-fg-muted dark:text-gray-400 border-t border-line dark:border-zinc-800/60 pt-4">
             <span className="flex items-center gap-1.5 font-medium">
               <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

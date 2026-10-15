@@ -100,7 +100,7 @@ export default function BulkPage() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-bold">Bulk Operations</h1>
-                <p className="text-gray-600">Manage administrative bulk tasks</p>
+                <p className="text-fg-secondary">Manage administrative bulk tasks</p>
             </div>
 
             <Card>
@@ -113,7 +113,7 @@ export default function BulkPage() {
                         <select
                             value={operationType}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setOperationType(e.target.value)}
-                            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            className="mt-1 w-full px-3 py-2 border border-line-strong rounded-lg text-sm"
                         >
                             <option value="DATA_EXPORT">Data Export</option>
                             <option value="CUSTOM_QUERY">Custom Query</option>
@@ -153,7 +153,7 @@ export default function BulkPage() {
                     {loading ? (
                         <div>Loading...</div>
                     ) : operations.length === 0 ? (
-                        <div className="text-gray-500">No operations found</div>
+                        <div className="text-fg-muted">No operations found</div>
                     ) : (
                         <div className="space-y-3">
                             {operations.map((op) => (
@@ -177,12 +177,12 @@ export default function BulkPage() {
                                                     {op.status}
                                                 </Badge>
                                             </div>
-                                            <div className="text-sm text-gray-600 mt-2">
+                                            <div className="text-sm text-fg-secondary mt-2">
                                                 <div>
                                                     Targets: {op.targetCount} | Success:{" "}
                                                     {op.successCount} | Failed: {op.failureCount}
                                                 </div>
-                                                <div className="text-xs text-gray-500 mt-1">
+                                                <div className="text-xs text-fg-muted mt-1">
                                                     Created:{" "}
                                                     {formatDistanceToNow(new Date(op.createdAt), {
                                                         addSuffix: true,

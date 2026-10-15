@@ -67,7 +67,7 @@ function TagInput({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
+      <label className="block text-sm font-medium text-fg-secondary mb-1 dark:text-gray-300">
         {label}
       </label>
       <div className="flex flex-wrap gap-2 mb-2">
@@ -80,7 +80,7 @@ function TagInput({
             <button
               type="button"
               onClick={() => removeTag(tag)}
-              className="text-emerald-600 hover:text-emerald-800 font-bold"
+              className="text-primary-text hover:text-emerald-800 font-bold"
             >
               ×
             </button>
@@ -94,7 +94,7 @@ function TagInput({
         onKeyDown={handleKeyDown}
         onBlur={() => inputValue.trim() && addTags(inputValue)}
         placeholder={placeholder || "Type and press Enter or comma to add"}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors dark:border-zinc-700"
+        className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors dark:border-zinc-700"
       />
     </div>
   );
@@ -116,12 +116,12 @@ function CountrySelect({
   };
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-fg-secondary dark:text-gray-300 mb-1">{label}</label>
       <div className="flex flex-wrap gap-2 mb-2">
         {values.map((country) => (
           <span key={country} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
             {countryDisplayName(country)}
-            <button type="button" onClick={() => onChange(values.filter((c) => c !== country))} className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 font-bold" aria-label={`Remove ${countryDisplayName(country)}`}>
+            <button type="button" onClick={() => onChange(values.filter((c) => c !== country))} className="text-primary-text hover:text-emerald-800 dark:text-emerald-400 font-bold" aria-label={`Remove ${countryDisplayName(country)}`}>
               ×
             </button>
           </span>
@@ -130,7 +130,7 @@ function CountrySelect({
       <select
         value=""
         onChange={(e) => addCountry(e.target.value)}
-        className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        className="w-full px-4 py-2 border border-line-strong dark:border-zinc-700 rounded-lg bg-surface dark:bg-zinc-900 text-fg dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
         aria-label={`Add ${label.toLowerCase()}`}
       >
         <option value="">Add a country…</option>
@@ -165,13 +165,13 @@ function PeriodPicker({ value, onChange }: { value: string; onChange: (next: str
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Period</label>
+      <label className="block text-sm font-medium text-fg-secondary dark:text-gray-300 mb-1">Period</label>
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="month"
           value={start}
           onChange={(e) => emit(e.target.value, end, isPresent)}
-          className="px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 text-sm"
+          className="px-3 py-2 border border-line-strong dark:border-zinc-700 rounded-lg bg-surface dark:bg-zinc-900 text-fg dark:text-gray-100 text-sm"
           aria-label="Start month"
         />
         <span className="text-gray-400">–</span>
@@ -180,15 +180,15 @@ function PeriodPicker({ value, onChange }: { value: string; onChange: (next: str
           value={end}
           disabled={isPresent}
           onChange={(e) => emit(start, e.target.value, false)}
-          className="px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 text-sm disabled:opacity-50"
+          className="px-3 py-2 border border-line-strong dark:border-zinc-700 rounded-lg bg-surface dark:bg-zinc-900 text-fg dark:text-gray-100 text-sm disabled:opacity-50"
           aria-label="End month"
         />
-        <label className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+        <label className="inline-flex items-center gap-1.5 text-sm text-fg-secondary dark:text-gray-400">
           <input
             type="checkbox"
             checked={isPresent}
             onChange={(e) => emit(start, end, e.target.checked)}
-            className="rounded border-gray-300 dark:border-zinc-700"
+            className="rounded border-line-strong dark:border-zinc-700"
           />
           Present
         </label>
@@ -368,8 +368,8 @@ export default function CandidateProfilePage() {
         message={toast?.message}
       />
 
-      <h1 className="text-3xl font-bold text-gray-900 mb-2 dark:text-gray-100">Edit Profile</h1>
-      <p className="text-gray-600 mb-8 dark:text-gray-400">
+      <h1 className="text-3xl font-bold text-fg mb-2 dark:text-gray-100">Edit Profile</h1>
+      <p className="text-fg-secondary mb-8 dark:text-gray-400">
         Complete your profile to stand out to employers
       </p>
 
@@ -398,15 +398,15 @@ export default function CandidateProfilePage() {
                   strokeLinecap="round"
                 />
               </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-gray-900 dark:text-gray-100">
+              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-fg dark:text-gray-100">
                 {completeness}%
               </span>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              <h3 className="text-sm font-semibold text-fg dark:text-gray-100">
                 Profile Completeness
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-fg-muted dark:text-gray-400">
                 {completeness >= 80
                   ? "Your profile looks great!"
                   : "Fill in more details to improve your visibility"}
@@ -419,7 +419,7 @@ export default function CandidateProfilePage() {
       {/* Section 1: Personal Info */}
       <Card className="mb-6">
         <CardHeader>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <h2 className="text-lg font-semibold text-fg dark:text-gray-100">
             Personal Information
           </h2>
         </CardHeader>
@@ -434,7 +434,7 @@ export default function CandidateProfilePage() {
           <div>
             <label
               htmlFor="bio"
-              className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300"
+              className="block text-sm font-medium text-fg-secondary mb-1 dark:text-gray-300"
             >
               Bio
             </label>
@@ -444,7 +444,7 @@ export default function CandidateProfilePage() {
               onChange={(e) => setBio(e.target.value)}
               placeholder="Tell employers about yourself, your experience, and what you're looking for"
               rows={4}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors resize-none dark:border-zinc-700"
+              className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors resize-none dark:border-zinc-700"
             />
           </div>
         </CardContent>
@@ -453,7 +453,7 @@ export default function CandidateProfilePage() {
       {/* Section 2: Skills */}
       <Card className="mb-6">
         <CardHeader>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Skills</h2>
+          <h2 className="text-lg font-semibold text-fg dark:text-gray-100">Skills</h2>
         </CardHeader>
         <CardContent>
           <TagInput
@@ -468,7 +468,7 @@ export default function CandidateProfilePage() {
       {/* Section 3: Career Preferences */}
       <Card className="mb-6">
         <CardHeader>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <h2 className="text-lg font-semibold text-fg dark:text-gray-100">
             Career Preferences
           </h2>
         </CardHeader>
@@ -513,8 +513,8 @@ export default function CandidateProfilePage() {
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Work History</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <h2 className="text-lg font-semibold text-fg dark:text-gray-100">Work History</h2>
+              <p className="text-sm text-fg-muted dark:text-gray-400">
                 Structured roles make your profile more credible and easier for employers to review.
               </p>
             </div>
@@ -534,14 +534,14 @@ export default function CandidateProfilePage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {workHistory.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600 dark:text-gray-400 dark:border-zinc-700">
+            <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary dark:text-gray-400 dark:border-zinc-700">
               No structured work history yet. Add recent roles with clear titles, employers, and dates.
             </div>
           ) : (
             workHistory.map((item, index) => (
-              <div key={`work-${index}`} className="rounded-2xl border border-gray-200 p-4 space-y-4">
+              <div key={`work-${index}`} className="rounded-2xl border border-line p-4 space-y-4">
                 <div className="flex items-center justify-between gap-4">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Role {index + 1}</p>
+                  <p className="text-sm font-semibold text-fg dark:text-gray-100">Role {index + 1}</p>
                   <button
                     type="button"
                     onClick={() => setWorkHistory((current) => current.filter((_, itemIndex) => itemIndex !== index))}
@@ -569,7 +569,7 @@ export default function CandidateProfilePage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
+                  <label className="block text-sm font-medium text-fg-secondary mb-1 dark:text-gray-300">
                     Highlights
                   </label>
                   <textarea
@@ -577,7 +577,7 @@ export default function CandidateProfilePage() {
                     onChange={(event) => updateWorkHistory(index, "description", event.target.value)}
                     rows={3}
                     placeholder="What did you ship, improve, or own in this role?"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors resize-none dark:border-zinc-700"
+                    className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors resize-none dark:border-zinc-700"
                   />
                 </div>
               </div>
@@ -590,8 +590,8 @@ export default function CandidateProfilePage() {
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Education</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <h2 className="text-lg font-semibold text-fg dark:text-gray-100">Education</h2>
+              <p className="text-sm text-fg-muted dark:text-gray-400">
                 Add universities, bootcamps, or formal training so partner and credential checks have context.
               </p>
             </div>
@@ -611,14 +611,14 @@ export default function CandidateProfilePage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {educationHistory.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600 dark:text-gray-400 dark:border-zinc-700">
+            <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary dark:text-gray-400 dark:border-zinc-700">
               No education history yet.
             </div>
           ) : (
             educationHistory.map((item, index) => (
-              <div key={`education-${index}`} className="rounded-2xl border border-gray-200 p-4 space-y-4">
+              <div key={`education-${index}`} className="rounded-2xl border border-line p-4 space-y-4">
                 <div className="flex items-center justify-between gap-4">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Education {index + 1}</p>
+                  <p className="text-sm font-semibold text-fg dark:text-gray-100">Education {index + 1}</p>
                   <button
                     type="button"
                     onClick={() => setEducationHistory((current) => current.filter((_, itemIndex) => itemIndex !== index))}
@@ -655,8 +655,8 @@ export default function CandidateProfilePage() {
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Certifications</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <h2 className="text-lg font-semibold text-fg dark:text-gray-100">Certifications</h2>
+              <p className="text-sm text-fg-muted dark:text-gray-400">
                 Add certifications here, then verify them from your trust profile with a document or credential link.
               </p>
             </div>
@@ -676,14 +676,14 @@ export default function CandidateProfilePage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {certifications.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600 dark:text-gray-400 dark:border-zinc-700">
+            <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary dark:text-gray-400 dark:border-zinc-700">
               No certifications added yet.
             </div>
           ) : (
             certifications.map((item, index) => (
-              <div key={`certification-${index}`} className="rounded-2xl border border-gray-200 p-4 space-y-4">
+              <div key={`certification-${index}`} className="rounded-2xl border border-line p-4 space-y-4">
                 <div className="flex items-center justify-between gap-4">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Certification {index + 1}</p>
+                  <p className="text-sm font-semibold text-fg dark:text-gray-100">Certification {index + 1}</p>
                   <button
                     type="button"
                     onClick={() => setCertifications((current) => current.filter((_, itemIndex) => itemIndex !== index))}
@@ -722,7 +722,7 @@ export default function CandidateProfilePage() {
       {/* Section 4: Links */}
       <Card className="mb-6">
         <CardHeader>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Links</h2>
+          <h2 className="text-lg font-semibold text-fg dark:text-gray-100">Links</h2>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
@@ -755,7 +755,7 @@ export default function CandidateProfilePage() {
       {/* Section 5: Open to Work */}
       <Card className="mb-8">
         <CardHeader>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <h2 className="text-lg font-semibold text-fg dark:text-gray-100">
             Job Visibility
           </h2>
         </CardHeader>
@@ -769,16 +769,16 @@ export default function CandidateProfilePage() {
               }`}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                className={`inline-block h-4 w-4 transform rounded-full bg-surface transition-transform ${
                   openToWork ? "translate-x-6" : "translate-x-1"
                 }`}
               />
             </button>
             <div>
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              <span className="text-sm font-medium text-fg dark:text-gray-100">
                 {openToWork ? "Open to Work" : "Not Looking"}
               </span>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-fg-muted dark:text-gray-400">
                 {openToWork
                   ? "Your profile is visible to employers"
                   : "Your profile is hidden from employer searches"}

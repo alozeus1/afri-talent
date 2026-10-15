@@ -56,8 +56,8 @@ function ApplicantSummary({ application }: { application: Application }) {
 
   return (
     <div className="mb-4 space-y-2" data-testid="applicant-summary">
-      {profile?.headline && <p className="text-sm font-medium text-gray-800">{profile.headline}</p>}
-      {facts.length > 0 && <p className="text-xs text-gray-500">{facts.join(" · ")}</p>}
+      {profile?.headline && <p className="text-sm font-medium text-fg">{profile.headline}</p>}
+      {facts.length > 0 && <p className="text-xs text-fg-muted">{facts.join(" · ")}</p>}
       {skills.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {skills.slice(0, 6).map((skill) => (
@@ -66,7 +66,7 @@ function ApplicantSummary({ application }: { application: Application }) {
             </span>
           ))}
           {skills.length > 6 && (
-            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600">+{skills.length - 6} more</span>
+            <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-xs text-fg-secondary">+{skills.length - 6} more</span>
           )}
         </div>
       )}
@@ -250,10 +250,10 @@ export default function JobApplicationsPage() {
         >
           <Card className="w-full max-w-md">
             <CardContent className="p-6">
-              <h2 id="reject-dialog-title" className="mb-2 text-lg font-semibold text-gray-900">
+              <h2 id="reject-dialog-title" className="mb-2 text-lg font-semibold text-fg">
                 Reject {rejectTarget.candidate?.name ?? "this candidate"}?
               </h2>
-              <p className="mb-6 text-sm text-gray-600">
+              <p className="mb-6 text-sm text-fg-secondary">
                 The candidate will be notified that their application was not successful.
               </p>
               <div className="flex gap-3">
@@ -279,7 +279,7 @@ export default function JobApplicationsPage() {
           <Card className="flex max-h-[85vh] w-full max-w-2xl flex-col">
             <CardContent className="flex min-h-0 flex-col p-6">
               <div className="mb-4 flex items-center justify-between gap-4">
-                <h2 id="cv-dialog-title" className="text-lg font-semibold text-gray-900">
+                <h2 id="cv-dialog-title" className="text-lg font-semibold text-fg">
                   {cvText.name}&apos;s resume
                 </h2>
                 <Button size="sm" variant="outline" onClick={() => setCvText(null)}>
@@ -288,7 +288,7 @@ export default function JobApplicationsPage() {
               </div>
               <pre
                 data-testid="cv-text"
-                className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap rounded-lg bg-gray-50 p-4 font-sans text-sm text-gray-800"
+                className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap rounded-lg bg-surface-sunken p-4 font-sans text-sm text-fg"
               >
                 {cvText.text}
               </pre>
@@ -297,7 +297,7 @@ export default function JobApplicationsPage() {
         </div>
       )}
 
-      <Link href={localizePath("/employer", locale)} className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
+      <Link href={localizePath("/employer", locale)} className="inline-flex items-center text-primary-text hover:text-emerald-700 mb-6">
         <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
@@ -306,9 +306,9 @@ export default function JobApplicationsPage() {
 
       <Card>
         <CardHeader>
-          <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
+          <h1 className="text-2xl font-bold text-fg">Applications</h1>
           {!loadError && (
-            <p className="text-gray-600">{jobApplications.length} candidate(s) applied</p>
+            <p className="text-fg-secondary">{jobApplications.length} candidate(s) applied</p>
           )}
         </CardHeader>
         <CardContent>
@@ -320,7 +320,7 @@ export default function JobApplicationsPage() {
             <LoadErrorCard error={loadError} subject="applications for this job" onRetry={retryLoadApplications} />
           ) : jobApplications.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-600">No applications yet</p>
+              <p className="text-fg-secondary">No applications yet</p>
             </div>
           ) : (
             <div>
@@ -332,13 +332,13 @@ export default function JobApplicationsPage() {
                   </Link>
                 </div>
               )}
-              <div className="divide-y divide-gray-200">
+              <div className="divide-y divide-line">
               {jobApplications.map((application) => (
                 <div key={application.id} className="py-6">
                   <div className="flex justify-between items-start mb-3">
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-gray-900">{application.candidate?.name}</h3>
-                      <p className="text-sm text-gray-600">{application.candidate?.email}</p>
+                      <h3 className="font-semibold text-fg">{application.candidate?.name}</h3>
+                      <p className="text-sm text-fg-secondary">{application.candidate?.email}</p>
                       <p className="text-xs text-gray-400 mt-1">
                         Applied {new Date(application.createdAt).toLocaleDateString()}
                       </p>
@@ -351,9 +351,9 @@ export default function JobApplicationsPage() {
                   {!candidateAccessLocked && <ApplicantSummary application={application} />}
 
                   {application.coverLetter && (
-                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                      <p className="text-sm text-gray-600 font-medium mb-1">Cover Letter</p>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                    <div className="bg-surface-sunken rounded-lg p-4 mb-4">
+                      <p className="text-sm text-fg-secondary font-medium mb-1">Cover Letter</p>
+                      <p className="text-sm text-fg-secondary whitespace-pre-wrap">
                         {application.coverLetter}
                       </p>
                     </div>
@@ -380,7 +380,7 @@ export default function JobApplicationsPage() {
                         </a>
                       )}
                       {cvErrors[application.id] && (
-                        <p className="mt-1 text-xs text-gray-500">{cvErrors[application.id]}</p>
+                        <p className="mt-1 text-xs text-fg-muted">{cvErrors[application.id]}</p>
                       )}
                     </div>
                   )}
@@ -425,13 +425,13 @@ export default function JobApplicationsPage() {
                   )}
 
                   {!candidateAccessLocked && application.candidate?.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-100">
+                    <div className="mt-4 pt-4 border-t border-line">
                       {messageError && messagingId === application.candidate.id && (
                         <p className="text-xs text-red-500 mb-2">{messageError}</p>
                       )}
                       <div className="flex gap-2 items-start">
                         <textarea
-                          className="flex-1 text-sm rounded-lg border border-gray-300 px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          className="flex-1 text-sm rounded-lg border border-line-strong px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
                           rows={2}
                           placeholder="Send a message to this candidate..."
                           value={messagingId === application.candidate.id ? messageInput : ""}

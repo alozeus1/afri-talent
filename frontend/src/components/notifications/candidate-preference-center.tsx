@@ -102,27 +102,27 @@ export function CandidatePreferenceCenter({
     <div className="grid gap-6 lg:grid-cols-[1.4fr_0.9fr]">
       <Card>
         <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">Notification preferences</h2>
-          <p className="text-sm text-gray-600">
+          <h2 className="text-xl font-semibold text-fg">Notification preferences</h2>
+          <p className="text-sm text-fg-secondary">
             Tune the lifecycle loops you want AfriTalent to run on your behalf.
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
           {preferenceGroups.map((group) => (
-            <section key={group.title} className="rounded-2xl border border-gray-200 p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+            <section key={group.title} className="rounded-2xl border border-line p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-fg-muted">
                 {group.title}
               </h3>
-              <p className="mt-1 text-sm text-gray-600">{group.description}</p>
+              <p className="mt-1 text-sm text-fg-secondary">{group.description}</p>
               <div className="mt-4 space-y-3">
                 {group.items.map((item) => (
                   <label
                     key={item.key}
-                    className="flex items-start justify-between gap-4 rounded-xl border border-gray-100 p-3"
+                    className="flex items-start justify-between gap-4 rounded-xl border border-line p-3"
                   >
                     <div>
-                      <div className="text-sm font-medium text-gray-900">{item.label}</div>
-                      <div className="mt-1 text-xs text-gray-500">{item.hint}</div>
+                      <div className="text-sm font-medium text-fg">{item.label}</div>
+                      <div className="mt-1 text-xs text-fg-muted">{item.hint}</div>
                     </div>
                     <input
                       type="checkbox"
@@ -130,7 +130,7 @@ export function CandidatePreferenceCenter({
                       checked={Boolean(preferences[item.key])}
                       disabled={pendingKey === item.key}
                       onChange={(event) => onToggle(item.key, event.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                      className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
                     />
                   </label>
                 ))}
@@ -138,17 +138,17 @@ export function CandidatePreferenceCenter({
             </section>
           ))}
 
-          <section className="rounded-2xl border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <section className="rounded-2xl border border-line p-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-fg-muted">
               Volume controls
             </h3>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <label className="text-sm text-gray-700">
-                <span className="mb-2 block font-medium text-gray-900">Max notifications per week</span>
+              <label className="text-sm text-fg-secondary">
+                <span className="mb-2 block font-medium text-fg">Max notifications per week</span>
                 <select
                   value={preferences.maxNotificationsPerWeek}
                   onChange={(event) => onSetMaxNotifications(Number(event.target.value))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-line-strong px-3 py-2"
                 >
                   {[3, 4, 6, 8, 10].map((value) => (
                     <option key={value} value={value}>
@@ -157,12 +157,12 @@ export function CandidatePreferenceCenter({
                   ))}
                 </select>
               </label>
-              <label className="text-sm text-gray-700">
-                <span className="mb-2 block font-medium text-gray-900">Minimum hours between nudges</span>
+              <label className="text-sm text-fg-secondary">
+                <span className="mb-2 block font-medium text-fg">Minimum hours between nudges</span>
                 <select
                   value={preferences.minimumHoursBetweenNotifications}
                   onChange={(event) => onSetMinimumHours(Number(event.target.value))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-line-strong px-3 py-2"
                 >
                   {[8, 12, 18, 24, 36].map((value) => (
                     <option key={value} value={value}>
@@ -181,8 +181,8 @@ export function CandidatePreferenceCenter({
 
       <Card className="border-blue-200 bg-blue-50/40">
         <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">Lifecycle checklist</h2>
-          <p className="text-sm text-gray-600">
+          <h2 className="text-xl font-semibold text-fg">Lifecycle checklist</h2>
+          <p className="text-sm text-fg-secondary">
             These are the journeys AfriTalent will keep nudging toward, in order of signal quality.
           </p>
         </CardHeader>
@@ -194,8 +194,8 @@ export function CandidatePreferenceCenter({
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">{journey.title}</p>
-                  <p className="mt-1 text-xs text-gray-500">{journey.description}</p>
+                  <p className="text-sm font-semibold text-fg">{journey.title}</p>
+                  <p className="mt-1 text-xs text-fg-muted">{journey.description}</p>
                 </div>
                 <span
                   className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${

@@ -385,7 +385,7 @@ export default function ResumeBuilderPage() {
 
   if (!isProfessional && billingStatus) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="min-h-screen bg-surface-sunken py-8 px-4">
         <div className="max-w-4xl mx-auto">
           <PremiumGate
             feature="AI Resume Builder & Templates"
@@ -403,12 +403,12 @@ export default function ResumeBuilderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 print:bg-white print:py-0 print:px-0">
+    <div className="min-h-screen bg-surface-sunken py-8 px-4 print:bg-surface print:py-0 print:px-0">
       <div className="mx-auto max-w-7xl space-y-6 print:max-w-none print:space-y-0">
         <div className="flex flex-col gap-4 print:hidden sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">AI Resume Builder</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-fg">AI Resume Builder</h1>
+            <p className="text-sm text-fg-muted mt-1">
               Build an ATS-friendly resume draft from truthful profile, project, and work details.
             </p>
           </div>
@@ -447,7 +447,7 @@ export default function ResumeBuilderPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {!generated && savedProfile && step === 1 && (
-                  <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-white p-3">
+                  <div className="flex flex-wrap gap-2 rounded-xl border border-line bg-surface p-3">
                     <Button
                       size="sm"
                       variant="outline"
@@ -533,7 +533,7 @@ export default function ResumeBuilderPage() {
                         {saving ? "Saving..." : saved ? "Saved" : "Save Resume"}
                       </Button>
                     </div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    <label className="block text-xs font-semibold text-fg-muted uppercase tracking-wide">
                       Preview text{" "}
                       <span className="normal-case font-normal text-gray-400">
                         (editable — refine before saving)
@@ -547,7 +547,7 @@ export default function ResumeBuilderPage() {
                       }}
                       rows={18}
                       data-testid="resume-preview-textarea"
-                      className="w-full rounded-md border border-gray-200 bg-white px-4 py-3 font-mono text-sm text-gray-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-md border border-line bg-surface px-4 py-3 font-mono text-sm text-fg leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     {saved && (
                       <p className="text-sm text-emerald-700">
@@ -558,7 +558,7 @@ export default function ResumeBuilderPage() {
                 )}
 
                 {!generated && (
-                  <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+                  <div className="flex items-center justify-between border-t border-line pt-4">
                     <Button
                       variant="outline"
                       onClick={goBack}
@@ -604,7 +604,7 @@ export default function ResumeBuilderPage() {
                 </div>
                 <Link
                   href="/candidate/resume-templates"
-                  className="inline-flex items-center justify-center rounded-md border border-zinc-200 bg-transparent px-3.5 py-2 text-sm font-medium text-zinc-900 shadow-sm transition-all duration-200 hover:bg-zinc-100"
+                  className="inline-flex items-center justify-center rounded-md border border-line bg-transparent px-3.5 py-2 text-sm font-medium text-fg shadow-sm transition-all duration-200 hover:bg-surface-muted"
                 >
                   Browse templates
                 </Link>

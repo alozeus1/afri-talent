@@ -27,7 +27,7 @@ const socialLinks = [
 
 export function Footer() {
   return (
-    <footer className="section-shell mt-12 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400">
+    <footer className="section-shell mt-12 border-t border-line dark:border-zinc-800 bg-surface dark:bg-zinc-950 text-fg-secondary dark:text-zinc-400">
       <div className="page-frame py-14">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
@@ -36,11 +36,11 @@ export function Footer() {
                 <span className="font-display text-lg font-bold text-white">A</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-display text-xl font-bold text-zinc-900 dark:text-zinc-50">AfriTalent</span>
-                <span className="text-[11px] uppercase tracking-widest text-zinc-600 dark:text-zinc-300">Africa to global</span>
+                <span className="font-display text-xl font-bold text-fg dark:text-zinc-50">AfriTalent</span>
+                <span className="text-[11px] uppercase tracking-widest text-fg-secondary dark:text-zinc-300">Africa to global</span>
               </div>
             </Link>
-            <p className="max-w-lg text-sm leading-7 text-zinc-600 dark:text-zinc-400">
+            <p className="max-w-lg text-sm leading-7 text-fg-secondary dark:text-zinc-400">
               A trust-first hiring platform helping global teams discover African talent with stronger credibility, better workflow, and more signal than a generic job board.
             </p>
           </div>
@@ -49,42 +49,42 @@ export function Footer() {
             <h3 className="font-semibold text-lg mb-4">For Candidates</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/jobs" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/jobs" prefetch={false} className="text-fg-secondary hover:text-fg dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Browse Jobs
                 </Link>
               </li>
               <li>
-                <Link href="/companies" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/companies" prefetch={false} className="text-fg-secondary hover:text-fg dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Company Reviews
                 </Link>
               </li>
               <li>
-                <Link href="/salaries" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/salaries" prefetch={false} className="text-fg-secondary hover:text-fg dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Salary Comparison
                 </Link>
               </li>
               <li>
-                <Link href="/interviews" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/interviews" prefetch={false} className="text-fg-secondary hover:text-fg dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Interview Prep
                 </Link>
               </li>
               <li>
-                <Link href="/immigration" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/immigration" prefetch={false} className="text-fg-secondary hover:text-fg dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Visa Tracker
                 </Link>
               </li>
               <li>
-                <Link href="/learning" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/learning" prefetch={false} className="text-fg-secondary hover:text-fg dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Learning Hub
                 </Link>
               </li>
               <li>
-                <Link href="/resources" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/resources" prefetch={false} className="text-fg-secondary hover:text-fg dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Career Resources
                 </Link>
               </li>
               <li>
-                <Link href="/pricing" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/pricing" prefetch={false} className="text-fg-secondary hover:text-fg dark:text-zinc-400 dark:hover:text-white transition-colors">
                   {FREE_MODE ? MESSAGES.en["nav.freeForEveryone"] : MESSAGES.en["nav.pricing"]}
                 </Link>
               </li>
@@ -95,17 +95,17 @@ export function Footer() {
             <h3 className="font-semibold text-lg mb-4">For Employers</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/register?role=employer" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/register?role=employer" prefetch={false} className="text-fg-secondary hover:text-fg dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Post a Job
                 </Link>
               </li>
               <li>
-                <Link href="/employer/talent" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/employer/talent" prefetch={false} className="text-fg-secondary hover:text-fg dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Browse Talent
                 </Link>
               </li>
               <li>
-                <Link href="/hiring-resources" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                <Link href="/hiring-resources" prefetch={false} className="text-fg-secondary hover:text-fg dark:text-zinc-400 dark:hover:text-white transition-colors">
                   Hiring Resources
                 </Link>
               </li>
@@ -113,7 +113,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col items-center justify-between gap-6 border-t border-zinc-200 pt-8 dark:border-white/10 md:flex-row">
+        <div className="mt-12 flex flex-col items-center justify-between gap-6 border-t border-line pt-8 dark:border-white/10 md:flex-row">
           <nav aria-label="Social links" className="flex items-center gap-3">
             {socialLinks.map((link) => (
               <a
@@ -122,7 +122,7 @@ export function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={link.name}
-                className="flex h-11 w-11 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700 shadow-sm transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+                className="flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-surface-sunken text-fg-secondary shadow-sm transition-colors hover:bg-surface-muted hover:text-fg dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
               >
                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   {link.icon}
@@ -132,23 +132,23 @@ export function Footer() {
           </nav>
 
           {/* Legal nav */}
-          <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-zinc-600 dark:text-zinc-400">
-            <Link href="/contact" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Contact us</Link>
-            <Link href="/privacy-policy" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Privacy Policy</Link>
-            <Link href="/terms-of-service" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Terms of Service</Link>
-            <Link href="/cookies-policy" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Cookies Policy</Link>
-            <Link href="/accessibility" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Accessibility</Link>
+          <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-fg-secondary dark:text-zinc-400">
+            <Link href="/contact" prefetch={false} className="hover:text-fg dark:hover:text-white transition-colors">Contact us</Link>
+            <Link href="/privacy-policy" prefetch={false} className="hover:text-fg dark:hover:text-white transition-colors">Privacy Policy</Link>
+            <Link href="/terms-of-service" prefetch={false} className="hover:text-fg dark:hover:text-white transition-colors">Terms of Service</Link>
+            <Link href="/cookies-policy" prefetch={false} className="hover:text-fg dark:hover:text-white transition-colors">Cookies Policy</Link>
+            <Link href="/accessibility" prefetch={false} className="hover:text-fg dark:hover:text-white transition-colors">Accessibility</Link>
           </nav>
 
-          <p className="whitespace-nowrap text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="whitespace-nowrap text-sm text-fg-secondary dark:text-zinc-400">
             &copy; {new Date().getFullYear()} AfriTalent. All rights reserved.
           </p>
         </div>
 
-        <div className="mt-6 border-t border-zinc-200 pt-4 text-center dark:border-white/10">
-          <p className="text-xs text-zinc-600 dark:text-zinc-300">
-            Powered by <span className="font-semibold text-zinc-700 dark:text-zinc-200">Maralito Labs Studio</span>
-            <sup className="text-zinc-600 dark:text-zinc-300 ml-0.5">TM</sup>
+        <div className="mt-6 border-t border-line pt-4 text-center dark:border-white/10">
+          <p className="text-xs text-fg-secondary dark:text-zinc-300">
+            Powered by <span className="font-semibold text-fg-secondary dark:text-zinc-200">Maralito Labs Studio</span>
+            <sup className="text-fg-secondary dark:text-zinc-300 ml-0.5">TM</sup>
           </p>
         </div>
       </div>

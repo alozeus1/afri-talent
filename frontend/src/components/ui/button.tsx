@@ -9,19 +9,16 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className = "", variant = "primary", size = "md", isLoading = false, children, disabled, ...props }, ref) => {
     const baseStyles =
-      "inline-flex items-center justify-center gap-2 font-medium rounded-md border transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-950 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100 disabled:hover:scale-100";
+      "inline-flex items-center justify-center gap-2 font-medium rounded-[var(--radius-control)] border transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:active:scale-100";
 
+    // Variants use semantic tokens only, so text stays legible in light and
+    // dark mode on any surface (see docs/design-system.md).
     const variants = {
-      primary:
-        "border-transparent bg-emerald-700 text-white shadow-sm hover:shadow-lg hover:bg-emerald-800 focus-visible:ring-emerald-500 dark:bg-emerald-700 dark:hover:bg-emerald-800",
-      secondary:
-        "border-zinc-200 bg-white text-zinc-900 shadow-sm hover:shadow-lg hover:bg-zinc-50 focus-visible:ring-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800",
-      outline:
-        "border-zinc-200 bg-transparent text-zinc-900 shadow-sm hover:shadow-lg hover:bg-zinc-100 hover:text-zinc-900 focus-visible:ring-zinc-500 dark:border-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-800",
-      ghost:
-        "border-transparent bg-transparent text-zinc-700 hover:bg-zinc-100 focus-visible:ring-zinc-500 dark:text-zinc-300 dark:hover:bg-zinc-800",
-      danger:
-        "border-transparent bg-red-600 text-white shadow-sm hover:shadow-lg hover:bg-red-700 focus-visible:ring-red-500 dark:bg-red-500 dark:hover:bg-red-600",
+      primary: "border-transparent bg-primary text-primary-fg shadow-xs hover:bg-primary-hover hover:shadow-card",
+      secondary: "border-line bg-surface-raised text-fg shadow-xs hover:bg-surface-muted hover:border-line-strong",
+      outline: "border-line-strong bg-transparent text-fg hover:bg-surface-muted",
+      ghost: "border-transparent bg-transparent text-fg-secondary hover:bg-surface-muted hover:text-fg",
+      danger: "border-transparent bg-red-700 text-white shadow-xs hover:bg-red-800 hover:shadow-card",
     };
 
     const sizes = {

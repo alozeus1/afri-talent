@@ -44,10 +44,10 @@ function ConsentModal({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <h2 className="text-2xl font-bold text-fg mb-2">
               Meet Mara, Your AI Job Assistant
             </h2>
-            <p className="text-gray-600">
+            <p className="text-fg-secondary">
               Before we get started, please review and accept the following agreements.
               Your privacy matters to us.
             </p>
@@ -55,53 +55,53 @@ function ConsentModal({
 
           <div className="space-y-4 mb-8">
             {/* Privacy Notice */}
-            <label className="flex items-start gap-3 p-4 rounded-lg border border-gray-200 hover:border-emerald-300 transition-colors cursor-pointer">
+            <label className="flex items-start gap-3 p-4 rounded-lg border border-line hover:border-emerald-300 transition-colors cursor-pointer">
               <input
                 type="checkbox"
                 checked={checks.privacyNotice}
                 onChange={(e) => setChecks({ ...checks, privacyNotice: e.target.checked })}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
               />
               <div className="flex-1">
-                <p className="font-medium text-gray-900">{policies.privacyNotice.title}</p>
-                <p className="text-sm text-gray-600 mt-1">{policies.privacyNotice.summary}</p>
+                <p className="font-medium text-fg">{policies.privacyNotice.title}</p>
+                <p className="text-sm text-fg-secondary mt-1">{policies.privacyNotice.summary}</p>
                 <span className="text-xs text-gray-400 mt-1 block">Version {policies.privacyNotice.version}</span>
               </div>
             </label>
 
             {/* Terms of Use */}
-            <label className="flex items-start gap-3 p-4 rounded-lg border border-gray-200 hover:border-emerald-300 transition-colors cursor-pointer">
+            <label className="flex items-start gap-3 p-4 rounded-lg border border-line hover:border-emerald-300 transition-colors cursor-pointer">
               <input
                 type="checkbox"
                 checked={checks.termsOfUse}
                 onChange={(e) => setChecks({ ...checks, termsOfUse: e.target.checked })}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
               />
               <div className="flex-1">
-                <p className="font-medium text-gray-900">{policies.termsOfUse.title}</p>
-                <p className="text-sm text-gray-600 mt-1">{policies.termsOfUse.summary}</p>
+                <p className="font-medium text-fg">{policies.termsOfUse.title}</p>
+                <p className="text-sm text-fg-secondary mt-1">{policies.termsOfUse.summary}</p>
                 <span className="text-xs text-gray-400 mt-1 block">Version {policies.termsOfUse.version}</span>
               </div>
             </label>
 
             {/* Data Storage */}
-            <label className="flex items-start gap-3 p-4 rounded-lg border border-gray-200 hover:border-emerald-300 transition-colors cursor-pointer">
+            <label className="flex items-start gap-3 p-4 rounded-lg border border-line hover:border-emerald-300 transition-colors cursor-pointer">
               <input
                 type="checkbox"
                 checked={checks.dataStorage}
                 onChange={(e) => setChecks({ ...checks, dataStorage: e.target.checked })}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
               />
               <div className="flex-1">
-                <p className="font-medium text-gray-900">{policies.dataStorage.title}</p>
-                <p className="text-sm text-gray-600 mt-1">{policies.dataStorage.summary}</p>
+                <p className="font-medium text-fg">{policies.dataStorage.title}</p>
+                <p className="text-sm text-fg-secondary mt-1">{policies.dataStorage.summary}</p>
                 <span className="text-xs text-gray-400 mt-1 block">Version {policies.dataStorage.version}</span>
               </div>
             </label>
           </div>
 
           <div className="flex items-center justify-between">
-            <Link href="/candidate" className="text-sm text-gray-500 hover:text-gray-700">
+            <Link href="/candidate" className="text-sm text-fg-muted hover:text-fg-secondary">
               Back to dashboard
             </Link>
             <Button onClick={onAccept} disabled={!allChecked || loading}>
@@ -240,10 +240,10 @@ function ChatInterface() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden">
+    <div className="flex h-[calc(100vh-12rem)] rounded-xl border border-line dark:border-gray-800 bg-surface dark:bg-gray-950 overflow-hidden">
       {/* Sidebar */}
-      <div className={`${showSidebar ? "block" : "hidden"} md:block w-64 border-r border-gray-200 dark:border-gray-800 flex-shrink-0 flex flex-col`}>
-        <div className="p-3 border-b border-gray-100 dark:border-gray-800">
+      <div className={`${showSidebar ? "block" : "hidden"} md:block w-64 border-r border-line dark:border-gray-800 flex-shrink-0 flex flex-col`}>
+        <div className="p-3 border-b border-line dark:border-gray-800">
           <Button onClick={handleNewConversation} size="sm" className="w-full">
             + New Chat
           </Button>
@@ -253,8 +253,8 @@ function ChatInterface() {
             <button
               key={conv.id}
               onClick={() => handleSelectConversation(conv.id)}
-              className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors ${
-                conv.id === conversationId ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300" : "text-gray-700 dark:text-gray-300"
+              className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-50 dark:border-gray-800 hover:bg-surface-sunken dark:hover:bg-gray-900 transition-colors ${
+                conv.id === conversationId ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300" : "text-fg-secondary dark:text-gray-300"
               }`}
             >
               <p className="truncate font-medium">{conv.title || "New conversation"}</p>
@@ -268,15 +268,15 @@ function ChatInterface() {
             <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">No conversations yet</p>
           )}
         </div>
-        <div className="p-3 border-t border-gray-100 dark:border-gray-800">
+        <div className="p-3 border-t border-line dark:border-gray-800">
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="text-xs text-gray-400 dark:text-gray-500 hover:text-fg-secondary dark:hover:text-gray-300 transition-colors"
           >
             Settings & Privacy
           </button>
           {showSettings && (
-            <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            <div className="mt-2 p-2 bg-surface-sunken dark:bg-gray-900 rounded-lg">
               <button
                 onClick={handleRevoke}
                 disabled={revoking}
@@ -293,16 +293,16 @@ function ChatInterface() {
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+        <div className="px-4 py-3 border-b border-line dark:border-gray-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowSidebar(!showSidebar)} className="md:hidden text-gray-500 dark:text-gray-300">
+            <button onClick={() => setShowSidebar(!showSidebar)} className="md:hidden text-fg-muted dark:text-gray-300">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
             <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
-              <span className="text-emerald-600 font-bold text-sm">M</span>
+              <span className="text-primary-text font-bold text-sm">M</span>
             </div>
             <div>
-              <p className="font-medium text-gray-900 dark:text-gray-100 text-sm">Mara</p>
+              <p className="font-medium text-fg dark:text-gray-100 text-sm">Mara</p>
               <p className="text-xs text-gray-400 dark:text-gray-500">AI Job Assistant</p>
             </div>
           </div>
@@ -318,8 +318,8 @@ function ChatInterface() {
               <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
                 <span className="text-3xl">👋</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">Hi! I&apos;m Mara</h3>
-              <p className="text-gray-500 dark:text-gray-400 text-sm max-w-md mb-6">
+              <h3 className="text-lg font-semibold text-fg dark:text-gray-100 mb-1">Hi! I&apos;m Mara</h3>
+              <p className="text-fg-muted dark:text-gray-400 text-sm max-w-md mb-6">
                 Your personal AI job assistant. I know your profile, applications, and job searches.
                 Ask me anything about your career journey!
               </p>
@@ -333,7 +333,7 @@ function ChatInterface() {
                   <button
                     key={q}
                     onClick={() => { setInput(q); inputRef.current?.focus(); }}
-                    className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
+                    className="px-3 py-1.5 text-xs bg-surface-muted dark:bg-gray-800 text-fg-secondary dark:text-gray-200 rounded-full hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
                   >
                     {q}
                   </button>
@@ -347,7 +347,7 @@ function ChatInterface() {
               <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
                 msg.role === "USER"
                   ? "bg-emerald-600 text-white"
-                  : "bg-gray-100 text-gray-900"
+                  : "bg-surface-muted text-fg"
               }`}>
                 <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                 <p className={`text-xs mt-1 ${msg.role === "USER" ? "text-emerald-200" : "text-gray-400 dark:text-gray-500"}`}>
@@ -359,7 +359,7 @@ function ChatInterface() {
 
           {sending && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 rounded-2xl px-4 py-3">
+              <div className="bg-surface-muted rounded-2xl px-4 py-3">
                 <div className="flex gap-1">
                   <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                   <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -372,7 +372,7 @@ function ChatInterface() {
         </div>
 
         {/* Input */}
-        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+        <div className="px-4 py-3 border-t border-line dark:border-gray-800">
           <div className="flex items-end gap-2">
             <textarea
               ref={inputRef}
@@ -381,7 +381,7 @@ function ChatInterface() {
               onKeyDown={handleKeyDown}
               placeholder="Ask Mara anything about your job search..."
               rows={1}
-              className="flex-1 resize-none rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="flex-1 resize-none rounded-xl border border-line-strong dark:border-gray-700 bg-surface dark:bg-gray-900 text-fg dark:text-gray-100 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               style={{ maxHeight: "120px" }}
             />
             <Button onClick={handleSend} disabled={!input.trim() || sending} size="sm" className="shrink-0 rounded-xl px-4">
@@ -389,7 +389,7 @@ function ChatInterface() {
             </Button>
           </div>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
-            Powered by <span className="font-semibold text-gray-500 dark:text-gray-300">Maralito Labs</span> · AI responses may not always be accurate
+            Powered by <span className="font-semibold text-fg-muted dark:text-gray-300">Maralito Labs</span> · AI responses may not always be accurate
           </p>
         </div>
       </div>
@@ -439,7 +439,7 @@ export default function ChatPage() {
           <Skeleton className="h-4 w-28" />
           <Skeleton className="h-8 w-56" />
         </div>
-        <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+        <div className="rounded-xl border border-line dark:border-gray-800 p-4">
           <Skeleton className="h-[50vh] w-full" />
         </div>
       </div>
@@ -452,14 +452,14 @@ export default function ChatPage() {
       <div className="mb-6">
         <Link
           href="/candidate"
-          className="inline-flex items-center text-sm text-emerald-600 hover:text-emerald-700 mb-3"
+          className="inline-flex items-center text-sm text-primary-text hover:text-emerald-700 mb-3"
         >
           <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Dashboard
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">AI Job Assistant</h1>
+        <h1 className="text-2xl font-bold text-fg dark:text-gray-100">AI Job Assistant</h1>
       </div>
 
       {/* Show consent or chat */}

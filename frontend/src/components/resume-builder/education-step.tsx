@@ -42,7 +42,7 @@ export function EducationStep({ value, onChange, isActive }: EducationStepProps)
   return (
     <div className="space-y-6">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-fg-secondary mb-1">
           Skills * <span className="text-gray-400">(comma-separated)</span>
         </label>
         <input
@@ -54,13 +54,13 @@ export function EducationStep({ value, onChange, isActive }: EducationStepProps)
           placeholder="React, TypeScript, Node.js, PostgreSQL"
           data-testid="resume-skills-input"
         />
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-fg-muted">
           List skills you can demonstrate. The AI will not invent ones you didn&apos;t mention.
         </p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-fg-secondary mb-1">
           Certifications <span className="text-gray-400">(comma-separated)</span>
         </label>
         <input
@@ -74,7 +74,7 @@ export function EducationStep({ value, onChange, isActive }: EducationStepProps)
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-sm font-medium text-gray-700">Education</label>
+          <label className="text-sm font-medium text-fg-secondary">Education</label>
           <button
             type="button"
             onClick={addEducation}
@@ -114,7 +114,7 @@ export function EducationStep({ value, onChange, isActive }: EducationStepProps)
 }
 
 const inputClass =
-  "w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 export function educationStepValid(value: EducationStepValue): boolean {
   return value.skills

@@ -99,12 +99,12 @@ export default function JobMatchesPage() {
   if (loading) return <DashboardSkeleton />;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-surface-sunken py-8 px-4">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">AI Job Matches</h1>
-            <p className="text-sm text-gray-500 mt-1 dark:text-gray-400">
+            <h1 className="text-2xl font-bold text-fg dark:text-gray-100">AI Job Matches</h1>
+            <p className="text-sm text-fg-muted mt-1 dark:text-gray-400">
               {FREE_MODE
                 ? "Personalized match scoring, skill-gap analysis, and saved match history."
                 : "Available on the Professional plan — unlocks personalized match scoring, skill-gap analysis, and saved match history."}
@@ -112,13 +112,13 @@ export default function JobMatchesPage() {
             <div className="flex items-center gap-2 flex-wrap mt-2">
               <button
                 onClick={() => setFilterVisa(!filterVisa)}
-                className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterVisa ? "bg-green-100 border-green-400 text-green-800" : "border-gray-300 text-gray-600"}`}
+                className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterVisa ? "bg-green-100 border-green-400 text-green-800" : "border-line-strong text-fg-secondary"}`}
               >
                 Visa Sponsorship
               </button>
               <button
                 onClick={() => setFilterRemote(!filterRemote)}
-                className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterRemote ? "bg-blue-100 border-blue-400 text-blue-800" : "border-gray-300 text-gray-600"}`}
+                className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterRemote ? "bg-blue-100 border-blue-400 text-blue-800" : "border-line-strong text-fg-secondary"}`}
               >
                 Remote Only
               </button>
@@ -129,7 +129,7 @@ export default function JobMatchesPage() {
             <Button
               onClick={handleReEmbed}
               disabled={embedding}
-              className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm dark:text-gray-300 dark:border-zinc-700 dark:bg-zinc-900"
+              className="border border-line-strong bg-surface text-fg-secondary hover:bg-surface-sunken text-sm dark:text-gray-300 dark:border-zinc-700 dark:bg-zinc-900"
             >
               {embedding ? "Updating..." : "Refresh Matches"}
             </Button>
@@ -203,11 +203,11 @@ export default function JobMatchesPage() {
                     <div className="flex-1 min-w-0">
                       <Link
                         href={`/jobs/${match.slug}`}
-                        className="font-semibold text-gray-900 hover:text-blue-600 truncate block dark:text-gray-100"
+                        className="font-semibold text-fg hover:text-blue-600 truncate block dark:text-gray-100"
                       >
                         {match.title}
                       </Link>
-                      <p className="text-sm text-gray-500 mt-0.5 dark:text-gray-400">
+                      <p className="text-sm text-fg-muted mt-0.5 dark:text-gray-400">
                         {match.company} · {match.location}
                       </p>
                       <div className="flex gap-2 mt-2 flex-wrap">
@@ -241,7 +241,7 @@ export default function JobMatchesPage() {
                       {/* AI Explanation */}
                       {match.explanation && (
                         <p
-                          className="mt-2 text-xs text-gray-500 italic dark:text-gray-400"
+                          className="mt-2 text-xs text-fg-muted italic dark:text-gray-400"
                           data-testid="match-explanation"
                         >
                           {match.explanation}

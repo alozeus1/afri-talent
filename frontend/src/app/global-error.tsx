@@ -15,11 +15,11 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
 
   return (
     <html lang="en">
-      <body className="bg-gray-50 text-gray-900 antialiased">
+      <body className="bg-surface-sunken text-fg antialiased">
         <main className="flex min-h-screen items-center justify-center px-6">
           <div className="max-w-md space-y-4 text-center">
             <h1 className="text-2xl font-semibold">Something went wrong</h1>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-fg-secondary">
               We&apos;ve logged the issue and can use the report to investigate it.
             </p>
             <button

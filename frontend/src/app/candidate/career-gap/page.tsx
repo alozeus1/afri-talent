@@ -65,12 +65,12 @@ export default function CareerGapPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-surface-sunken py-8 px-4">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Career Gap Explainer</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-fg">Career Gap Explainer</h1>
+            <p className="text-sm text-fg-muted mt-1">
               Turn employment gaps into a strength with AI-powered framing
             </p>
           </div>
@@ -91,31 +91,31 @@ export default function CareerGapPage() {
             <CardContent className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-fg-secondary mb-1">
                     Gap Start Date <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
                     value={gapStartDate}
                     onChange={(e) => setGapStartDate(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-fg-secondary mb-1">
                     Gap End Date <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
                     value={gapEndDate}
                     onChange={(e) => setGapEndDate(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-fg-secondary mb-1">
                   What were you doing?{" "}
                   <span className="text-gray-400 text-xs font-normal">(optional)</span>
                 </label>
@@ -123,13 +123,13 @@ export default function CareerGapPage() {
                   value={activities}
                   onChange={(e) => setActivities(e.target.value)}
                   rows={4}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   placeholder="e.g. Caring for family, freelancing, studying, health reasons"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-fg-secondary mb-1">
                   Target Role{" "}
                   <span className="text-gray-400 text-xs font-normal">(optional)</span>
                 </label>
@@ -137,7 +137,7 @@ export default function CareerGapPage() {
                   type="text"
                   value={targetRole}
                   onChange={(e) => setTargetRole(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. Product Manager"
                 />
               </div>
@@ -171,7 +171,7 @@ export default function CareerGapPage() {
               </div>
               <Button
                 onClick={handleReset}
-                className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-4 py-2"
+                className="border border-line-strong bg-surface text-fg-secondary hover:bg-surface-sunken text-sm px-4 py-2"
               >
                 Try Another Gap
               </Button>
@@ -180,12 +180,12 @@ export default function CareerGapPage() {
             {/* Framing */}
             <Card>
               <CardHeader>
-                <h2 className="text-base font-semibold text-gray-700 uppercase tracking-wide text-xs">
+                <h2 className="text-base font-semibold text-fg-secondary uppercase tracking-wide text-xs">
                   Framing
                 </h2>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-700 leading-relaxed bg-gray-50 rounded-md px-4 py-3 text-sm font-medium">
+                <p className="text-fg-secondary leading-relaxed bg-surface-sunken rounded-md px-4 py-3 text-sm font-medium">
                   {result.framing}
                 </p>
               </CardContent>
@@ -194,22 +194,22 @@ export default function CareerGapPage() {
             {/* Full Explanation */}
             <Card>
               <CardHeader>
-                <h2 className="text-base font-semibold text-gray-900">Full Explanation</h2>
+                <h2 className="text-base font-semibold text-fg">Full Explanation</h2>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-gray-700 leading-relaxed">{result.explanation}</p>
+                <p className="text-sm text-fg-secondary leading-relaxed">{result.explanation}</p>
               </CardContent>
             </Card>
 
             {/* Talking Points */}
             <Card>
               <CardHeader>
-                <h2 className="text-base font-semibold text-gray-900">Talking Points</h2>
+                <h2 className="text-base font-semibold text-fg">Talking Points</h2>
               </CardHeader>
               <CardContent>
                 <ol className="space-y-3">
                   {result.talkingPoints.map((point, i) => (
-                    <li key={i} className="flex gap-3 text-sm text-gray-700">
+                    <li key={i} className="flex gap-3 text-sm text-fg-secondary">
                       <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-semibold">
                         {i + 1}
                       </span>

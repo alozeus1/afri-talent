@@ -76,8 +76,8 @@ export default function EmployerTalentProfilePage() {
         {backLink}
         <Card>
           <CardContent className="py-10 text-center">
-            <h1 className="text-xl font-semibold text-gray-900">Candidate unavailable</h1>
-            <p className="mt-2 text-sm text-gray-600">
+            <h1 className="text-xl font-semibold text-fg">Candidate unavailable</h1>
+            <p className="mt-2 text-sm text-fg-secondary">
               {error || "This candidate profile could not be found or is no longer open to work."}
             </p>
           </CardContent>
@@ -102,9 +102,9 @@ export default function EmployerTalentProfilePage() {
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-gray-900">{profile.user.name}</h1>
-              {profile.headline && <p className="mt-1 text-gray-700">{profile.headline}</p>}
-              <div className="mt-3 flex flex-wrap gap-2 text-sm text-gray-600">
+              <h1 className="text-2xl font-bold text-fg">{profile.user.name}</h1>
+              {profile.headline && <p className="mt-1 text-fg-secondary">{profile.headline}</p>}
+              <div className="mt-3 flex flex-wrap gap-2 text-sm text-fg-secondary">
                 {profile.yearsExperience !== null && (
                   <span>{profile.yearsExperience} yrs experience</span>
                 )}
@@ -120,13 +120,13 @@ export default function EmployerTalentProfilePage() {
         <CardContent className="space-y-8">
           {profile.bio && (
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">About</h2>
-              <p className="mt-2 whitespace-pre-line text-gray-700">{profile.bio}</p>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-fg-muted">About</h2>
+              <p className="mt-2 whitespace-pre-line text-fg-secondary">{profile.bio}</p>
             </section>
           )}
 
           <section>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Skills</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-fg-muted">Skills</h2>
             {profile.skills.length > 0 ? (
               <div className="mt-2 flex flex-wrap gap-2">
                 {profile.skills.map((skill) => (
@@ -134,7 +134,7 @@ export default function EmployerTalentProfilePage() {
                 ))}
               </div>
             ) : (
-              <p className="mt-2 text-sm text-gray-500">No skills listed yet.</p>
+              <p className="mt-2 text-sm text-fg-muted">No skills listed yet.</p>
             )}
             {(profile.verifiedSkills?.length ?? 0) > 0 && (
               <p className="mt-2 text-sm text-emerald-700">
@@ -144,24 +144,24 @@ export default function EmployerTalentProfilePage() {
           </section>
 
           <section>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Experience</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-fg-muted">Experience</h2>
             {workHistory.length > 0 ? (
               <ul className="mt-2 space-y-3">
                 {workHistory.map((item, index) => (
                   <li key={`${item.company}-${item.title}-${index}`}>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-fg">
                       {[item.title, item.company].filter(Boolean).join(" at ") || "Role"}
                     </p>
-                    {item.period && <p className="text-sm text-gray-500">{item.period}</p>}
-                    {item.description && <p className="mt-1 text-sm text-gray-700">{item.description}</p>}
+                    {item.period && <p className="text-sm text-fg-muted">{item.period}</p>}
+                    {item.description && <p className="mt-1 text-sm text-fg-secondary">{item.description}</p>}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-sm text-gray-500">No work history shared yet.</p>
+              <p className="mt-2 text-sm text-fg-muted">No work history shared yet.</p>
             )}
             {education.length > 0 && (
-              <ul className="mt-4 space-y-1 text-sm text-gray-700">
+              <ul className="mt-4 space-y-1 text-sm text-fg-secondary">
                 {education.map((item, index) => (
                   <li key={`${item.institution}-${index}`}>
                     {[item.degree, item.institution].filter(Boolean).join(", ")}
@@ -173,19 +173,19 @@ export default function EmployerTalentProfilePage() {
           </section>
 
           <section>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Location &amp; mobility</h2>
-            <dl className="mt-2 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-fg-muted">Location &amp; mobility</h2>
+            <dl className="mt-2 grid gap-2 text-sm text-fg-secondary sm:grid-cols-2">
               <div>
-                <dt className="text-gray-500">Target countries</dt>
+                <dt className="text-fg-muted">Target countries</dt>
                 <dd>{profile.targetCountries.length > 0 ? profile.targetCountries.join(", ") : "Not specified"}</dd>
               </div>
               <div>
-                <dt className="text-gray-500">Visa status</dt>
+                <dt className="text-fg-muted">Visa status</dt>
                 <dd>{profile.visaStatus || "Not specified"}</dd>
               </div>
               {profile.targetRoles.length > 0 && (
                 <div className="sm:col-span-2">
-                  <dt className="text-gray-500">Target roles</dt>
+                  <dt className="text-fg-muted">Target roles</dt>
                   <dd>{profile.targetRoles.join(", ")}</dd>
                 </div>
               )}
@@ -194,7 +194,7 @@ export default function EmployerTalentProfilePage() {
 
           {links.length > 0 && (
             <section>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Links</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-fg-muted">Links</h2>
               <ul className="mt-2 flex flex-wrap gap-4 text-sm">
                 {links.map((link) => (
                   <li key={link.label}>

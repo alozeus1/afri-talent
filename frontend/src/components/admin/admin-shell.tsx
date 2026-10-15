@@ -85,7 +85,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${compact ? "whitespace-nowrap" : ""} ${
           active
             ? "bg-emerald-600 text-white shadow-sm dark:bg-emerald-600"
-            : "text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+            : "text-fg-secondary hover:bg-surface-muted hover:text-fg dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
         }`}
       >
         <NavIcon d={item.icon} />

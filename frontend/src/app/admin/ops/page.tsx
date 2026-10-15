@@ -92,7 +92,7 @@ export default function OpsPage() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-bold">Platform Operations</h1>
-                <p className="text-gray-600">Monitor system health and alerts</p>
+                <p className="text-fg-secondary">Monitor system health and alerts</p>
             </div>
 
             <Card>
@@ -105,7 +105,7 @@ export default function OpsPage() {
                         <select
                             value={filterStatus}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value)}
-                            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            className="mt-1 w-full px-3 py-2 border border-line-strong rounded-lg text-sm"
                         >
                             <option value="ACTIVE">Active</option>
                             <option value="ACKNOWLEDGED">Acknowledged</option>
@@ -117,7 +117,7 @@ export default function OpsPage() {
                     {loading ? (
                         <div>Loading...</div>
                     ) : alerts.length === 0 ? (
-                        <div className="text-gray-500">No alerts found</div>
+                        <div className="text-fg-muted">No alerts found</div>
                     ) : (
                         <div className="space-y-3">
                             {alerts.map((alert) => (
@@ -151,10 +151,10 @@ export default function OpsPage() {
                                                 </Badge>
                                             </div>
                                             <h3 className="font-semibold mt-2">{alert.title}</h3>
-                                            <p className="text-sm text-gray-600 mt-1">
+                                            <p className="text-sm text-fg-secondary mt-1">
                                                 {alert.description}
                                             </p>
-                                            <p className="text-xs text-gray-500 mt-1">
+                                            <p className="text-xs text-fg-muted mt-1">
                                                 Last occurred:{" "}
                                                 {formatDistanceToNow(new Date(alert.lastOccurredAt), {
                                                     addSuffix: true,

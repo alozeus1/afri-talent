@@ -274,8 +274,8 @@ export default function CandidateDashboard() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Welcome */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">{t("candidate.dashboard")}: {user.name}</h1>
-        <p className="text-gray-600">Track your job applications and career progress</p>
+        <h1 className="text-3xl font-bold text-fg mb-2">{t("candidate.dashboard")}: {user.name}</h1>
+        <p className="text-fg-secondary">Track your job applications and career progress</p>
       </div>
 
       {profileError ? (
@@ -291,7 +291,7 @@ export default function CandidateDashboard() {
         orientation="horizontal"
         onValueChange={(val) => setSelectedTab(val)}
       >
-        <div className="mb-8 border-b border-gray-200 dark:border-zinc-800">
+        <div className="mb-8 border-b border-line dark:border-zinc-800">
           <Tabs.List
             className="flex -mb-px space-x-8 overflow-x-auto hide-scrollbar"
             aria-label="Candidate Dashboard Tabs"
@@ -299,7 +299,7 @@ export default function CandidateDashboard() {
             {tabItems.map((item, idx) => (
               <Tabs.Trigger
                 key={idx}
-                className="data-[state=active]:border-emerald-600 data-[state=active]:text-emerald-600 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:data-[state=active]:text-emerald-400 dark:data-[state=active]:border-emerald-400 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+                className="data-[state=active]:border-emerald-600 data-[state=active]:text-primary-text border-transparent text-fg-muted hover:text-fg-secondary hover:border-line-strong dark:text-gray-400 dark:hover:text-gray-300 dark:data-[state=active]:text-emerald-400 dark:data-[state=active]:border-emerald-400 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
                 value={item}
               >
                 {item}
@@ -311,23 +311,23 @@ export default function CandidateDashboard() {
         <Tabs.Content value="Overview">
 
       {!emailVerified && (
-        <Card className="mb-8 border-amber-200 bg-amber-50">
+        <Card className="mb-8 border-warning-line bg-warning-soft">
           <CardContent className="p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-base font-semibold text-amber-900">Verify your email to unlock all actions</h2>
-                <p className="text-sm text-amber-800 mt-1">
+                <h2 className="text-base font-semibold text-fg">Verify your email to unlock all actions</h2>
+                <p className="text-sm text-fg-secondary mt-1">
                   Applying to jobs, quick apply, and billing actions require a verified email.
                 </p>
                 {verificationMessage && (
-                  <p className="text-sm text-amber-900 mt-2">{verificationMessage}</p>
+                  <p className="text-sm text-warning mt-2">{verificationMessage}</p>
                 )}
               </div>
               <Button
                 variant="outline"
                 onClick={handleSendVerification}
                 disabled={sendingVerification}
-                className="border-amber-300 text-amber-900 hover:bg-amber-100"
+                className="border-warning-line text-warning"
               >
                 {sendingVerification ? "Sending..." : "Resend Verification Email"}
               </Button>
@@ -337,7 +337,7 @@ export default function CandidateDashboard() {
       )}
 
       {trustDashboard && (
-        <Card className={`mb-8 ${trustDashboard.trust.premiumFilterEligible ? "border-emerald-200 bg-emerald-50/40" : "border-blue-200 bg-blue-50/50"}`}>
+        <Card className={`mb-8 ${trustDashboard.trust.premiumFilterEligible ? "border-success-line bg-success-soft" : "border-info-line bg-info-soft"}`}>
           <CardContent className="p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-3xl">
@@ -354,10 +354,10 @@ export default function CandidateDashboard() {
                     <TrustBadge label="Eligible for premium employer filters" variant="success" />
                   )}
                 </div>
-                <h2 className="mt-4 text-lg font-semibold text-gray-900">
+                <h2 className="mt-4 text-lg font-semibold text-fg">
                   Build a stronger verified profile
                 </h2>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-sm text-fg-secondary">
                   Authenticity score {trustDashboard.trust.authenticityScore} • Risk score {trustDashboard.trust.riskScore}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -381,7 +381,7 @@ export default function CandidateDashboard() {
                   )}
                 </div>
                 {trustDashboard.trust.warnings.length > 0 && (
-                  <ul className="mt-3 space-y-1 text-sm text-gray-700">
+                  <ul className="mt-3 space-y-1 text-sm text-fg-secondary">
                     {trustDashboard.trust.warnings.map((warning) => (
                       <li key={warning}>• {warning}</li>
                     ))}
@@ -398,17 +398,17 @@ export default function CandidateDashboard() {
 
       {retentionSummary && (
         <div className="mb-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <Card className="border-amber-200 bg-amber-50/40">
+          <Card className="border-warning-line bg-warning-soft">
             <CardHeader>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Your next best actions</h2>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <h2 className="text-lg font-semibold text-fg">Your next best actions</h2>
+                  <p className="mt-1 text-sm text-fg-secondary">
                     AfriTalent is prioritizing trusted jobs, verified employers, and low-noise nudges.
                   </p>
                 </div>
                 <Link href={localizePath("/candidate/preferences", locale)}>
-                  <Button variant="outline" className="border-amber-400 text-amber-800 hover:bg-amber-100 hover:border-amber-500 focus-visible:ring-amber-500">
+                  <Button variant="outline" className="border-warning-line text-warning hover:bg-surface-muted">
                     🔔 Manage alerts
                   </Button>
                 </Link>
@@ -416,11 +416,11 @@ export default function CandidateDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {retentionSummary.journeys.slice(0, 3).map((journey) => (
-                <div key={journey.key} className="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-sm">
+                <div key={journey.key} className="rounded-2xl border border-line bg-surface-raised p-4 shadow-xs">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{journey.title}</p>
-                      <p className="mt-1 text-xs text-gray-600">{journey.description}</p>
+                      <p className="text-sm font-semibold text-fg">{journey.title}</p>
+                      <p className="mt-1 text-xs text-fg-secondary">{journey.description}</p>
                     </div>
                     <Badge variant={journey.status === "DONE" ? "success" : journey.status === "READY" ? "warning" : "info"}>
                       {journey.status}
@@ -448,26 +448,26 @@ export default function CandidateDashboard() {
 
           <Card>
             <CardHeader>
-              <h2 className="text-lg font-semibold text-gray-900">Trusted matches this week</h2>
-              <p className="mt-1 text-sm text-gray-600">{retentionSummary.weeklyDigest.headline}</p>
+              <h2 className="text-lg font-semibold text-fg">Trusted matches this week</h2>
+              <p className="mt-1 text-sm text-fg-secondary">{retentionSummary.weeklyDigest.headline}</p>
             </CardHeader>
             <CardContent>
               <div className="mb-4 grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-gray-100 p-3">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Trusted roles</p>
-                  <p className="mt-1 text-lg font-semibold text-gray-900">{retentionSummary.weeklyDigest.trustedJobCount}</p>
+                <div className="rounded-xl border border-line bg-surface-sunken p-3">
+                  <p className="text-xs uppercase tracking-wide text-fg-muted">Trusted roles</p>
+                  <p className="mt-1 text-lg font-semibold text-fg">{retentionSummary.weeklyDigest.trustedJobCount}</p>
                 </div>
-                <div className="rounded-xl border border-gray-100 p-3">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Verified employers</p>
-                  <p className="mt-1 text-lg font-semibold text-gray-900">{retentionSummary.weeklyDigest.verifiedEmployerCount}</p>
+                <div className="rounded-xl border border-line bg-surface-sunken p-3">
+                  <p className="text-xs uppercase tracking-wide text-fg-muted">Verified employers</p>
+                  <p className="mt-1 text-lg font-semibold text-fg">{retentionSummary.weeklyDigest.verifiedEmployerCount}</p>
                 </div>
               </div>
               <div className="space-y-3">
                 {retentionSummary.recommendations.slice(0, 3).map((job) => (
-                  <div key={job.id} className="rounded-2xl border border-gray-100 p-4">
+                  <div key={job.id} className="rounded-2xl border border-line bg-surface-sunken p-4">
                     <Link
                       href={localizePath(`/jobs/${job.slug}`, locale)}
-                      className="text-sm font-semibold text-gray-900 hover:text-emerald-600"
+                      className="text-sm font-semibold text-fg hover:text-primary-text"
                       onClick={() =>
                         candidateRetentionEvents.recommendationClicked({
                           source: "candidate_dashboard",
@@ -477,10 +477,10 @@ export default function CandidateDashboard() {
                     >
                       {job.title}
                     </Link>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-fg-muted">
                       {job.employer?.companyName} • {job.location}
                     </p>
-                    <p className="mt-2 text-xs text-gray-600">
+                    <p className="mt-2 text-xs text-fg-secondary">
                       {job.rankingExplanation?.summary}
                     </p>
                   </div>
@@ -492,18 +492,18 @@ export default function CandidateDashboard() {
       )}
 
       {!retentionSummary && (
-        <Card className="mb-8 border-emerald-200 bg-emerald-50/40">
+        <Card className="mb-8 border-success-line bg-success-soft">
           <CardHeader>
-            <h2 className="text-lg font-semibold text-gray-900">Next best actions</h2>
-            <p className="mt-1 text-sm text-gray-600">
+            <h2 className="text-lg font-semibold text-fg">Next best actions</h2>
+            <p className="mt-1 text-sm text-fg-secondary">
               Early tester guidance based on profile completeness, resume readiness, applications, and trust signals.
             </p>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
             {fallbackNextActions.map((action) => (
-              <div key={action.title} className="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-sm">
-                <p className="text-sm font-semibold text-gray-900">{action.title}</p>
-                <p className="mt-1 text-xs text-gray-600">{action.description}</p>
+              <div key={action.title} className="rounded-2xl border border-line bg-surface-raised p-4 shadow-xs">
+                <p className="text-sm font-semibold text-fg">{action.title}</p>
+                <p className="mt-1 text-xs text-fg-secondary">{action.description}</p>
                 <Link href={localizePath(action.href, locale)} className="mt-3 inline-block">
                   <Button size="sm" variant="outline">{action.cta}</Button>
                 </Link>
@@ -518,35 +518,35 @@ export default function CandidateDashboard() {
         {/* Profile Completeness */}
         <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
           <CardContent className="p-6">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Profile Completeness</h3>
+            <h3 className="text-sm font-semibold text-fg-muted uppercase tracking-wide mb-3">Profile Completeness</h3>
             <div className="flex items-center gap-4 mb-3">
               <div className="relative h-16 w-16 flex-shrink-0">
                 <svg className="h-16 w-16 -rotate-90" viewBox="0 0 36 36">
                   <circle
                     cx="18" cy="18" r="15.9155"
                     fill="none"
-                    stroke="#e5e7eb"
+                    stroke="var(--line-strong)"
                     strokeWidth="3"
                   />
                   <circle
                     cx="18" cy="18" r="15.9155"
                     fill="none"
-                    stroke={completeness >= 80 ? "#059669" : "#f59e0b"}
+                    stroke={completeness >= 80 ? "var(--success)" : "var(--warning)"}
                     strokeWidth="3"
                     strokeDasharray={`${completeness} ${100 - completeness}`}
                     strokeLinecap="round"
                   />
                 </svg>
-                <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-gray-900">
+                <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-fg">
                   {completeness}%
                 </span>
               </div>
               <div className="min-w-0">
                 {completeness >= 80 ? (
-                  <p className="text-sm text-emerald-700 font-medium">Profile looks great! You&apos;re ready for premium matches.</p>
+                  <p className="text-sm text-success font-medium">Profile looks great! You&apos;re ready for premium matches.</p>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-xs text-amber-700 font-medium leading-tight">Complete your profile to unlock premium employer matches!</p>
+                    <p className="text-xs text-warning font-medium leading-tight">Complete your profile to unlock premium employer matches!</p>
                     <Link href={localizePath("/candidate/profile", locale)}>
                       <Button size="sm" className="w-full">Complete Profile</Button>
                     </Link>
@@ -557,9 +557,9 @@ export default function CandidateDashboard() {
             {completeness < 80 && missingItems.length > 0 && (
               <ul className="space-y-1 mt-2">
                 {missingItems.slice(0, 3).map((item) => (
-                  <li key={item} className="text-xs text-gray-500 flex items-center gap-1">
-                    <span className="text-amber-500">•</span>
-                    <Link href={localizePath("/candidate/profile", locale)} className="hover:text-emerald-600 hover:underline">
+                  <li key={item} className="text-xs text-fg-muted flex items-center gap-1">
+                    <span className="text-warning">•</span>
+                    <Link href={localizePath("/candidate/profile", locale)} className="hover:text-primary-text hover:underline">
                       {item}
                     </Link>
                   </li>
@@ -575,20 +575,20 @@ export default function CandidateDashboard() {
         {/* Application Streak */}
         <Card className="border-orange-200 bg-orange-50/40 dark:bg-orange-950/20 dark:border-orange-500/20 dark:shadow-[0_0_20px_rgba(249,115,22,0.05)] backdrop-blur-sm transition-all hover:dark:border-orange-500/40">
           <CardContent className="p-6">
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Activity</h3>
+            <h3 className="text-sm font-semibold text-fg-muted dark:text-gray-400 uppercase tracking-wide mb-3">Activity</h3>
             <div className="flex items-center gap-3 mb-2">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 text-2xl shadow-sm dark:shadow-[0_0_10px_rgba(249,115,22,0.2)]">
                 🔥
               </div>
               <div>
-                <p className="text-lg font-bold text-gray-900 dark:text-orange-50">3-Day Streak!</p>
-                <p className="text-xs text-gray-600 dark:text-orange-200/60 mt-0.5">Keep applying to stay visible</p>
+                <p className="text-lg font-bold text-fg">3-Day Streak!</p>
+                <p className="text-xs text-fg-secondary mt-0.5">Keep applying to stay visible</p>
               </div>
             </div>
             <div className="mt-4 w-full bg-orange-100 dark:bg-orange-950/50 rounded-full h-1.5 shadow-inner">
               <div className="bg-orange-500 h-1.5 rounded-full dark:shadow-[0_0_8px_rgba(249,115,22,0.6)]" style={{ width: '40%' }}></div>
             </div>
-            <p className="text-[10px] text-gray-500 dark:text-orange-200/50 mt-2 text-right">2 days until next milestone</p>
+            <p className="text-[10px] text-fg-muted mt-2 text-right">2 days until next milestone</p>
           </CardContent>
         </Card>
       </div>
@@ -596,10 +596,10 @@ export default function CandidateDashboard() {
       {/* Quick Links */}
       <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8">
         <Link href={localizePath("/candidate/chat", locale)}>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer border-emerald-200 bg-emerald-50/30">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-success-line bg-success-soft">
             <CardContent className="p-4 text-center">
               <span className="text-2xl mb-1 block">🤖</span>
-              <span className="text-sm font-medium text-emerald-700">Mara (AI Chat)</span>
+              <span className="text-sm font-medium text-primary-text">Mara (AI Chat)</span>
             </CardContent>
           </Card>
         </Link>
@@ -607,7 +607,7 @@ export default function CandidateDashboard() {
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardContent className="p-4 text-center">
               <span className="text-2xl mb-1 block">✦</span>
-              <span className="text-sm font-medium text-gray-900">AI Assistant</span>
+              <span className="text-sm font-medium text-fg">AI Assistant</span>
             </CardContent>
           </Card>
         </Link>
@@ -615,7 +615,7 @@ export default function CandidateDashboard() {
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardContent className="p-4 text-center">
               <span className="text-2xl mb-1 block">💬</span>
-              <span className="text-sm font-medium text-gray-900">Messages</span>
+              <span className="text-sm font-medium text-fg">Messages</span>
             </CardContent>
           </Card>
         </Link>
@@ -623,7 +623,7 @@ export default function CandidateDashboard() {
           <Card className="hover:shadow-md transition-shadow cursor-pointer">
             <CardContent className="p-4 text-center">
               <span className="text-2xl mb-1 block">🔍</span>
-              <span className="text-sm font-medium text-gray-900">Saved Searches</span>
+              <span className="text-sm font-medium text-fg">Saved Searches</span>
             </CardContent>
           </Card>
         </Link>
@@ -632,24 +632,24 @@ export default function CandidateDashboard() {
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="p-4 text-center">
                 <span className="text-2xl mb-1 block">💳</span>
-                <span className="text-sm font-medium text-gray-900">Billing</span>
+                <span className="text-sm font-medium text-fg">Billing</span>
               </CardContent>
             </Card>
           </Link>
         )}
         <Link href={localizePath("/candidate/trust", locale)}>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer border-blue-200 bg-blue-50/40">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-info-line bg-info-soft">
             <CardContent className="p-4 text-center">
               <span className="text-2xl mb-1 block">🛡️</span>
-              <span className="text-sm font-medium text-blue-900">Trust Profile</span>
+              <span className="text-sm font-medium text-info">Trust Profile</span>
             </CardContent>
           </Card>
         </Link>
         <Link href={localizePath("/candidate/preferences", locale)}>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer border-amber-200 bg-amber-50/40">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-warning-line bg-warning-soft">
             <CardContent className="p-4 text-center">
               <span className="text-2xl mb-1 block">🔔</span>
-              <span className="text-sm font-medium text-amber-900">Alert Preferences</span>
+              <span className="text-sm font-medium text-warning">Alert Preferences</span>
             </CardContent>
           </Card>
         </Link>
@@ -657,19 +657,19 @@ export default function CandidateDashboard() {
 
       {/* My workspace — simple section map (roadmap Phase 2 IA) */}
       <div className="mb-10">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">My workspace</h2>
+        <h2 className="text-xl font-bold text-fg dark:text-gray-100 mb-4">My workspace</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {workspaceLinks.map((item) => (
             <Link
               key={item.href}
               href={localizePath(item.href, locale)}
-              className="rounded-xl border border-gray-200 bg-white p-4 transition hover:border-emerald-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-950/50 dark:hover:border-emerald-700"
+              className="rounded-xl border border-line bg-surface p-4 transition hover:border-emerald-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-950/50 dark:hover:border-emerald-700"
             >
-              <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm flex items-center gap-2">
+              <p className="font-semibold text-fg dark:text-gray-100 text-sm flex items-center gap-2">
                 {item.label}
                 {item.badge && <PlanBadge label={item.badge} />}
               </p>
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{item.desc}</p>
+              <p className="mt-0.5 text-xs text-fg-muted dark:text-gray-400">{item.desc}</p>
             </Link>
           ))}
         </div>
@@ -679,14 +679,14 @@ export default function CandidateDashboard() {
       <div className="mb-10">
         <div className="flex justify-between items-end mb-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Recommended For You</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <h2 className="text-xl font-bold text-fg dark:text-gray-100">Recommended For You</h2>
+            <p className="text-sm text-fg-muted dark:text-gray-400">
               {matchesProfileReady
                 ? "Live matches based on your skills and target roles — refreshed as new jobs arrive."
                 : "Fresh Africa-friendly roles. Add your skills to unlock personalized matching."}
             </p>
           </div>
-          <Link href={localizePath("/jobs", locale)} className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+          <Link href={localizePath("/jobs", locale)} className="text-sm font-semibold text-primary-text hover:underline flex items-center gap-1">
             View all <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
@@ -695,10 +695,10 @@ export default function CandidateDashboard() {
           <Card className="bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900">
             <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                <h3 className="font-semibold text-fg dark:text-gray-100">
                   Your first 10 matches are minutes away
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                <p className="text-sm text-fg-secondary dark:text-gray-300 mt-1">
                   Add your skills and target roles and we&apos;ll instantly surface live jobs matched to you — free on every plan.
                 </p>
               </div>
@@ -711,25 +711,25 @@ export default function CandidateDashboard() {
           <div className="flex overflow-x-auto gap-4 pb-4 snap-x hide-scrollbar">
             {instantMatches.map((job) => (
               <Link key={job.id} href={localizePath(`/jobs/${job.slug}`, locale)} className="min-w-[300px] sm:min-w-[340px] snap-start group">
-                <Card className="h-full hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md transition-all duration-300 group-hover:-translate-y-1 bg-white dark:bg-zinc-950/50">
+                <Card className="h-full hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md transition-all duration-300 group-hover:-translate-y-1 bg-surface dark:bg-zinc-950/50">
                   <CardContent className="p-5">
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-1">{job.title}</h3>
-                        <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">{job.companyName}</p>
+                        <h3 className="font-semibold text-fg dark:text-gray-100 line-clamp-1">{job.title}</h3>
+                        <p className="text-sm text-primary-text dark:text-emerald-400 font-medium">{job.companyName}</p>
                       </div>
                       <Badge variant="default" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300">
                         {job.type}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-4 mb-3">
+                    <div className="flex items-center gap-3 text-xs text-fg-muted dark:text-gray-400 mt-4 mb-3">
                       <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {job.location}</span>
                       {job.hiresFromAfrica && (
                         <span className="text-emerald-700 dark:text-emerald-400 font-medium">Hires from Africa</span>
                       )}
                     </div>
                     {(job.salaryMin != null || job.salaryMax != null) && (
-                      <div className="font-semibold text-gray-900 dark:text-gray-100 border-t border-gray-100 dark:border-zinc-800 pt-3">
+                      <div className="font-semibold text-fg dark:text-gray-100 border-t border-line dark:border-zinc-800 pt-3">
                         {[job.salaryMin, job.salaryMax]
                           .filter((v): v is number => v != null)
                           .map((v) => `${job.currency ?? "$"}${Math.round(v / 1000)}k`)
@@ -759,8 +759,8 @@ export default function CandidateDashboard() {
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         <Card>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold text-emerald-600 mb-1">{myApplications.length}</div>
-            <div className="text-gray-600">Total Applications</div>
+            <div className="text-3xl font-bold text-primary-text mb-1">{myApplications.length}</div>
+            <div className="text-fg-secondary">Total Applications</div>
           </CardContent>
         </Card>
         <Card>
@@ -768,7 +768,7 @@ export default function CandidateDashboard() {
             <div className="text-3xl font-bold text-blue-600 mb-1">
               {myApplications.filter((a) => a.status === "REVIEWING" || a.status === "SHORTLISTED").length}
             </div>
-            <div className="text-gray-600">In Progress</div>
+            <div className="text-fg-secondary">In Progress</div>
           </CardContent>
         </Card>
         <Card>
@@ -776,7 +776,7 @@ export default function CandidateDashboard() {
             <div className="text-3xl font-bold text-green-600 mb-1">
               {myApplications.filter((a) => a.status === "ACCEPTED").length}
             </div>
-            <div className="text-gray-600">Accepted</div>
+            <div className="text-fg-secondary">Accepted</div>
           </CardContent>
         </Card>
       </div>
@@ -785,7 +785,7 @@ export default function CandidateDashboard() {
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900">My Applications</h2>
+            <h2 className="text-xl font-semibold text-fg">My Applications</h2>
             <Link href={localizePath("/jobs", locale)}>
               <Button>Browse Jobs</Button>
             </Link>
@@ -793,7 +793,7 @@ export default function CandidateDashboard() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-12 text-emerald-600">
+            <div className="flex items-center justify-center py-12 text-primary-text">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
               <span className="ml-3 text-sm font-medium">Loading your applications...</span>
             </div>
@@ -804,30 +804,30 @@ export default function CandidateDashboard() {
               loadApplications();
             }} />
           ) : myApplications.length === 0 ? (
-            <div className="text-center py-12 px-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 dark:bg-zinc-900/50 dark:border-zinc-800">
+            <div className="text-center py-12 px-4 rounded-xl border border-dashed border-line bg-surface-sunken dark:bg-zinc-900/50 dark:border-zinc-800">
               <div className="flex justify-center mb-4 text-gray-400 dark:text-zinc-500">
                 <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <p className="text-gray-900 dark:text-zinc-100 font-semibold mb-1">No applications yet</p>
-              <p className="text-gray-500 dark:text-zinc-400 text-sm mb-6 max-w-sm mx-auto">When you apply to roles, you can track their status and trust-safety reviews here.</p>
+              <p className="text-fg dark:text-zinc-100 font-semibold mb-1">No applications yet</p>
+              <p className="text-fg-muted dark:text-zinc-400 text-sm mb-6 max-w-sm mx-auto">When you apply to roles, you can track their status and trust-safety reviews here.</p>
               <Link href={localizePath("/jobs", locale)}>
                 <Button>Explore Verified Jobs</Button>
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-line">
               {myApplications.map((application) => (
                 <div key={application.id} className="py-4 flex justify-between items-center">
                   <div>
                     <Link
                       href={localizePath(`/jobs/${application.job.slug}`, locale)}
-                      className="font-medium text-gray-900 hover:text-emerald-600"
+                      className="font-medium text-fg hover:text-primary-text"
                     >
                       {application.job.title}
                     </Link>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-fg-secondary">
                       {application.job.employer?.companyName} • {application.job.location}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
@@ -860,7 +860,7 @@ export default function CandidateDashboard() {
             {/* Open to Work Toggle */}
             <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
               <CardContent className="p-6">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Job Visibility</h3>
+                <h3 className="text-sm font-semibold text-fg-muted uppercase tracking-wide mb-3">Job Visibility</h3>
                 <div className="flex items-center gap-3 mb-2">
                   <button
                     onClick={toggleOpenToWork}
@@ -869,15 +869,15 @@ export default function CandidateDashboard() {
                       openToWork ? "bg-emerald-600" : "bg-gray-300"
                     }`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-surface transition-transform ${
                       openToWork ? "translate-x-6" : "translate-x-1"
                     }`} />
                   </button>
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm font-medium text-fg">
                     {openToWork ? "Open to Work" : "Not Looking"}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-fg-muted">
                   {openToWork ? "Visible to employers" : "Hidden from employers"}
                 </p>
               </CardContent>
@@ -886,7 +886,7 @@ export default function CandidateDashboard() {
             {/* Subscription Status */}
             <Card className="dark:bg-zinc-900/50 dark:border-white/10 dark:shadow-[0_0_15px_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:dark:border-white/20">
               <CardContent className="p-6">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{FREE_MODE ? "Plan" : "Subscription"}</h3>
+                <h3 className="text-sm font-semibold text-fg-muted uppercase tracking-wide mb-3">{FREE_MODE ? "Plan" : "Subscription"}</h3>
                 {FREE_MODE ? (
                   <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400" data-testid="free-plan-note">
                     Free plan — all features unlocked
@@ -898,7 +898,7 @@ export default function CandidateDashboard() {
                         {planLabels[billingStatus.plan] || billingStatus.plan}
                       </Badge>
                       {billingStatus.status === "ACTIVE" && billingStatus.plan !== "FREE" && (
-                        <span className="text-xs text-emerald-600 font-medium">Active</span>
+                        <span className="text-xs text-primary-text font-medium">Active</span>
                       )}
                     </div>
                     {billingStatus.plan === "FREE" && (
@@ -907,7 +907,7 @@ export default function CandidateDashboard() {
                       </Link>
                     )}
                     {billingStatus.plan !== "FREE" && billingStatus.currentPeriodEnd && (
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-fg-muted mt-1">
                         Renews {new Date(billingStatus.currentPeriodEnd).toLocaleDateString()}
                       </p>
                     )}

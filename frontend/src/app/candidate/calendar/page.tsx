@@ -13,7 +13,7 @@ const eventTypeColors: Record<string, { bg: string; text: string; dot: string; v
   INTERVIEW: { bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", variant: "info" },
   FOLLOW_UP: { bg: "bg-yellow-50", text: "text-yellow-700", dot: "bg-yellow-500", variant: "warning" },
   DEADLINE: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500", variant: "danger" },
-  CUSTOM: { bg: "bg-gray-50", text: "text-gray-700", dot: "bg-gray-500", variant: "default" },
+  CUSTOM: { bg: "bg-surface-sunken", text: "text-fg-secondary", dot: "bg-gray-500", variant: "default" },
 };
 
 function getEventColor(type: string) {
@@ -222,8 +222,8 @@ export default function CalendarPage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Calendar</h1>
-          <p className="text-gray-600">Manage your interviews and scheduling</p>
+          <h1 className="text-3xl font-bold text-fg mb-2">Calendar</h1>
+          <p className="text-fg-secondary">Manage your interviews and scheduling</p>
         </div>
         <Button onClick={openAddModal}>Add Event</Button>
       </div>
@@ -246,14 +246,14 @@ export default function CalendarPage() {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <Button variant="ghost" size="sm" onClick={prevMonth}>← Prev</Button>
-                  <h2 className="text-lg font-semibold text-gray-900">{monthName}</h2>
+                  <h2 className="text-lg font-semibold text-fg">{monthName}</h2>
                   <Button variant="ghost" size="sm" onClick={nextMonth}>Next →</Button>
                 </div>
               </CardHeader>
               <CardContent className="p-4">
                 <div className="grid grid-cols-7 gap-1">
                   {DAYS.map((d) => (
-                    <div key={d} className="text-center text-xs font-medium text-gray-500 py-2">
+                    <div key={d} className="text-center text-xs font-medium text-fg-muted py-2">
                       {d}
                     </div>
                   ))}
@@ -274,7 +274,7 @@ export default function CalendarPage() {
                             ? "bg-emerald-600 text-white font-bold"
                             : isToday
                             ? "bg-emerald-50 text-emerald-700 font-semibold"
-                            : "hover:bg-gray-100 text-gray-700"
+                            : "hover:bg-surface-muted text-fg-secondary"
                         }`}
                       >
                         {day}
@@ -300,7 +300,7 @@ export default function CalendarPage() {
           <div>
             <Card>
               <CardHeader>
-                <h3 className="font-semibold text-gray-900">
+                <h3 className="font-semibold text-fg">
                   {selectedDay
                     ? `${new Date(year, month, selectedDay).toLocaleDateString("default", { weekday: "long", month: "short", day: "numeric" })}`
                     : "Select a day"}
@@ -308,10 +308,10 @@ export default function CalendarPage() {
               </CardHeader>
               <CardContent>
                 {selectedDay === null ? (
-                  <p className="text-sm text-gray-500 py-4">Click a day on the calendar to see events</p>
+                  <p className="text-sm text-fg-muted py-4">Click a day on the calendar to see events</p>
                 ) : selectedDayEvents.length === 0 ? (
                   <div className="text-center py-6">
-                    <p className="text-sm text-gray-500 mb-3">No events on this day</p>
+                    <p className="text-sm text-fg-muted mb-3">No events on this day</p>
                     <Button size="sm" variant="outline" onClick={openAddModal}>
                       Add Event
                     </Button>
@@ -326,37 +326,37 @@ export default function CalendarPage() {
                             <Badge variant={color.variant}>
                               {ev.eventType.replace("_", " ")}
                             </Badge>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-fg-muted">
                               {new Date(ev.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </span>
                           </div>
                           <h4 className={`font-medium text-sm ${color.text}`}>{ev.title}</h4>
                           {ev.description && (
-                            <p className="text-xs text-gray-600 mt-1 line-clamp-2">{ev.description}</p>
+                            <p className="text-xs text-fg-secondary mt-1 line-clamp-2">{ev.description}</p>
                           )}
                           {ev.meetingUrl && (
                             <a
                               href={ev.meetingUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs text-emerald-600 hover:underline mt-1 inline-block"
+                              className="text-xs text-primary-text hover:underline mt-1 inline-block"
                             >
                               Join Meeting →
                             </a>
                           )}
                           {ev.location && (
-                            <p className="text-xs text-gray-500 mt-1">📍 {ev.location}</p>
+                            <p className="text-xs text-fg-muted mt-1">📍 {ev.location}</p>
                           )}
                           <div className="flex gap-2 mt-2">
                             <button
                               onClick={() => openEditModal(ev)}
-                              className="text-xs text-gray-600 hover:text-emerald-600"
+                              className="text-xs text-fg-secondary hover:text-primary-text"
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => handleDelete(ev.id)}
-                              className="text-xs text-gray-600 hover:text-red-600"
+                              className="text-xs text-fg-secondary hover:text-red-600"
                             >
                               Delete
                             </button>
@@ -376,12 +376,12 @@ export default function CalendarPage() {
       <div className="mt-8">
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Upcoming Events</h2>
+            <h2 className="text-xl font-semibold text-fg">Upcoming Events</h2>
           </CardHeader>
           <CardContent>
             {upcoming.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-600">No upcoming events</p>
+                <p className="text-fg-secondary">No upcoming events</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -389,34 +389,34 @@ export default function CalendarPage() {
                   const color = getEventColor(ev.eventType);
                   const start = new Date(ev.startTime);
                   return (
-                    <div key={ev.id} className="flex items-start gap-4 py-3 border-b border-gray-100 last:border-0">
+                    <div key={ev.id} className="flex items-start gap-4 py-3 border-b border-line last:border-0">
                       <div className="text-center flex-shrink-0 w-14">
-                        <div className="text-xs text-gray-500 uppercase">
+                        <div className="text-xs text-fg-muted uppercase">
                           {start.toLocaleDateString("default", { month: "short" })}
                         </div>
-                        <div className="text-2xl font-bold text-gray-900">{start.getDate()}</div>
+                        <div className="text-2xl font-bold text-fg">{start.getDate()}</div>
                       </div>
                       <div className={`w-1 self-stretch rounded-full ${color.dot}`} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium text-gray-900 text-sm">{ev.title}</h3>
+                          <h3 className="font-medium text-fg text-sm">{ev.title}</h3>
                           <Badge variant={color.variant}>
                             {ev.eventType.replace("_", " ")}
                           </Badge>
                         </div>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-fg-muted">
                           {start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           {ev.endTime && ` – ${new Date(ev.endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
                         </p>
                         {ev.location && (
-                          <p className="text-xs text-gray-500 mt-1">📍 {ev.location}</p>
+                          <p className="text-xs text-fg-muted mt-1">📍 {ev.location}</p>
                         )}
                         {ev.meetingUrl && (
                           <a
                             href={ev.meetingUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-emerald-600 hover:underline mt-1 inline-block"
+                            className="text-xs text-primary-text hover:underline mt-1 inline-block"
                           >
                             Join Meeting →
                           </a>
@@ -425,13 +425,13 @@ export default function CalendarPage() {
                       <div className="flex gap-2 flex-shrink-0">
                         <button
                           onClick={() => openEditModal(ev)}
-                          className="text-xs text-gray-500 hover:text-emerald-600"
+                          className="text-xs text-fg-muted hover:text-primary-text"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleDelete(ev.id)}
-                          className="text-xs text-gray-500 hover:text-red-600"
+                          className="text-xs text-fg-muted hover:text-red-600"
                         >
                           Delete
                         </button>
@@ -448,14 +448,14 @@ export default function CalendarPage() {
       {/* Add/Edit Event Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-900">
+          <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-line flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-fg">
                 {editingEvent ? "Edit Event" : "Add Event"}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-xl"
+                className="text-gray-400 hover:text-fg-secondary text-xl"
               >
                 ✕
               </button>
@@ -469,9 +469,9 @@ export default function CalendarPage() {
                 required
               />
               <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-fg-secondary mb-1">Description</label>
                 <textarea
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors resize-none"
+                  className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors resize-none"
                   rows={2}
                   value={form.description}
                   onChange={(e) => updateField("description", e.target.value)}
@@ -479,9 +479,9 @@ export default function CalendarPage() {
                 />
               </div>
               <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
+                <label className="block text-sm font-medium text-fg-secondary mb-1">Event Type</label>
                 <select
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                  className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
                   value={form.eventType}
                   onChange={(e) => updateField("eventType", e.target.value)}
                 >

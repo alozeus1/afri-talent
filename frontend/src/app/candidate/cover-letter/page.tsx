@@ -130,12 +130,12 @@ function CoverLetterPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-surface-sunken py-8 px-4">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">AI Cover Letter Generator</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-fg">AI Cover Letter Generator</h1>
+            <p className="text-sm text-fg-muted mt-1">
               Generate an editable draft from your profile, resume, and a selected job without inventing experience.
             </p>
           </div>
@@ -169,7 +169,7 @@ function CoverLetterPageContent() {
               Use this as an application assistant, not an auto-submit tool. Review every claim before sending and replace placeholders if fallback mode is used.
             </div>
             <div>
-              <label htmlFor="cover-letter-job-search" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="cover-letter-job-search" className="block text-sm font-medium text-fg-secondary mb-1">
                 Select a job
               </label>
               <input
@@ -177,10 +177,10 @@ function CoverLetterPageContent() {
                 type="text"
                 value={jobQuery}
                 onChange={(e) => setJobQuery(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Search by title, company, location, or keyword"
               />
-              {jobSearchLoading && <p className="mt-2 text-xs text-gray-500">Searching jobs...</p>}
+              {jobSearchLoading && <p className="mt-2 text-xs text-fg-muted">Searching jobs...</p>}
               {jobResults.length > 0 && (
                 <div className="mt-3 space-y-2">
                   {jobResults.map((job) => (
@@ -193,10 +193,10 @@ function CoverLetterPageContent() {
                         setJobQuery("");
                         setJobResults([]);
                       }}
-                      className="w-full rounded-lg border border-gray-200 bg-white p-3 text-left text-sm hover:border-emerald-300 hover:bg-emerald-50"
+                      className="w-full rounded-lg border border-line bg-surface p-3 text-left text-sm hover:border-emerald-300 hover:bg-emerald-50"
                     >
-                      <span className="block font-semibold text-gray-900">{job.title}</span>
-                      <span className="mt-1 block text-xs text-gray-600">
+                      <span className="block font-semibold text-fg">{job.title}</span>
+                      <span className="mt-1 block text-xs text-fg-secondary">
                         {job.company} • {job.location || "Location not listed"} • {job.type || "Role"}
                       </span>
                     </button>
@@ -214,13 +214,13 @@ function CoverLetterPageContent() {
               <button
                 type="button"
                 onClick={() => setShowAdvanced((value) => !value)}
-                className="mt-3 text-sm font-medium text-gray-600 hover:text-gray-900"
+                className="mt-3 text-sm font-medium text-fg-secondary hover:text-fg"
               >
                 {showAdvanced ? "Hide advanced job ID" : "Advanced: paste job ID"}
               </button>
               {showAdvanced && (
                 <div className="mt-3">
-                  <label htmlFor="cover-letter-job-id" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="cover-letter-job-id" className="block text-sm font-medium text-fg-secondary mb-1">
                     Manual Job ID
                   </label>
                   <input
@@ -231,7 +231,7 @@ function CoverLetterPageContent() {
                       setJobId(e.target.value);
                       setSelectedJob(null);
                     }}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Paste a known job UUID"
                   />
                 </div>
@@ -239,7 +239,7 @@ function CoverLetterPageContent() {
             </div>
 
             <div role="radiogroup" aria-label="Cover letter tone">
-              <p className="block text-sm font-medium text-gray-700 mb-2">Tone</p>
+              <p className="block text-sm font-medium text-fg-secondary mb-2">Tone</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {TONES.map((t) => (
                   <button
@@ -251,11 +251,11 @@ function CoverLetterPageContent() {
                     className={`rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
                       tone === t.value
                         ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                        : "border-line bg-surface text-fg-secondary hover:border-line-strong"
                     }`}
                   >
                     <div className="font-medium">{t.label}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{t.description}</div>
+                    <div className="text-xs text-fg-muted mt-0.5">{t.description}</div>
                   </button>
                 ))}
               </div>
@@ -290,7 +290,7 @@ function CoverLetterPageContent() {
                   </Badge>
                   <Button
                     onClick={handleCopy}
-                    className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1"
+                    className="border border-line-strong bg-surface text-fg-secondary hover:bg-surface-sunken text-sm px-3 py-1"
                   >
                     {copied ? "Copied!" : "Copy"}
                   </Button>
@@ -299,7 +299,7 @@ function CoverLetterPageContent() {
                       setCoverLetter(null);
                       setSource(null);
                     }}
-                    className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1"
+                    className="border border-line-strong bg-surface text-fg-secondary hover:bg-surface-sunken text-sm px-3 py-1"
                   >
                     Regenerate
                   </Button>
@@ -307,7 +307,7 @@ function CoverLetterPageContent() {
               </div>
             </CardHeader>
             <CardContent>
-              <label htmlFor="cover-letter-textarea" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="cover-letter-textarea" className="block text-sm font-medium text-fg-secondary mb-2">
                 Cover Letter{" "}
                 <span className="text-gray-400 font-normal">
                   (editable — personalise before sending)
@@ -322,7 +322,7 @@ function CoverLetterPageContent() {
                 }}
                 rows={18}
                 data-testid="cover-letter-textarea"
-                className="w-full rounded-md border border-gray-300 px-4 py-3 text-sm text-gray-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-md border border-line-strong px-4 py-3 text-sm text-fg leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-xs text-gray-400 mt-2">
                 {edited

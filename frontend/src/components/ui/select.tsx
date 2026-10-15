@@ -7,7 +7,7 @@ const Select = forwardRef<
     return (
         <select
             ref={ref}
-            className={`px-3 py-2 border border-[var(--border-soft)] rounded-lg bg-white text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-zinc-900 dark:text-zinc-100 ${className}`}
+            className={`px-3 py-2 border border-line-strong rounded-[var(--radius-control)] bg-surface-raised text-sm text-fg focus:outline-none focus:ring-2 focus:ring-focus ${className}`}
             {...props}
         >
             {children}

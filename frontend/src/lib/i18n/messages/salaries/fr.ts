@@ -1,0 +1,25 @@
+import type en from "./en";
+
+export default {
+  "salaries.title": "Connaissez votre valeur",
+  "salaries.subtitle": "Explorez des données salariales anonymes de professionnels africains travaillant dans le monde entier.",
+  "salaries.practicalSubtitle": "Explorez les données salariales anonymes disponibles, ainsi que les orientations de marché clairement étiquetées pour les rôles mondiaux.",
+  "salaries.searchSalaries": "Rechercher des salaires",
+  "salaries.compareCountries": "Comparer entre pays",
+  "salaries.compareDesc": "Sélectionnez un titre de poste pour voir les salaires moyens dans différents pays",
+  "salaries.distributionByLevel": "Distribution des salaires par niveau",
+  "salaries.distributionDesc": "Fourchettes de rémunération d'exemple à des fins éducatives uniquement.",
+  "salaries.topPayingRoles": "Rôles les mieux rémunérés",
+  "salaries.topPayingDesc": "Rapports salariaux de la communauté en direct lorsque disponibles.",
+  "salaries.submitSalary": "Soumettre votre salaire",
+  "salaries.submitButton": "Soumettre le salaire",
+  "salaries.searchButton": "Rechercher",
+  "salaries.compareButton": "Comparer",
+  "salaries.allCountries": "Tous les pays",
+  "salaries.noReportsFound": "Aucun rapport salarial trouvé pour cette recherche. Soyez le premier à contribuer !",
+  "salaries.noCompareData": "Aucune donnée de comparaison disponible pour ce titre de poste.",
+  "salaries.noVerifiedReports": "Pas encore de rapports salariaux vérifiés de la communauté",
+  "salaries.noVerifiedDesc": "AfriTalent affichera les rôles les mieux rémunérés après suffisamment de soumissions de salaires réels.",
+  "salaries.jobTitlePlaceholder": "Titre du poste (ex. Ingénieur Logiciel)",
+  "salaries.compareJobTitle": "Titre du poste (ex. Data Scientist)",
+} satisfies Record<keyof typeof en, string>;

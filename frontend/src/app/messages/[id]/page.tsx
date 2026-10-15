@@ -134,7 +134,7 @@ export default function ThreadDetailPage() {
         <LoadErrorCard error={loadError} subject="this conversation" onRetry={retryLoadThread} />
         <Link
           href={localizePath("/messages", locale)}
-          className="mt-4 inline-block text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+          className="mt-4 inline-block text-sm text-primary-text hover:text-emerald-700 font-medium"
         >
           ← Back to Messages
         </Link>
@@ -146,7 +146,7 @@ export default function ThreadDetailPage() {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center py-12">
-          <p className="text-gray-600 mb-4">Thread not found</p>
+          <p className="text-fg-secondary mb-4">Thread not found</p>
           <Link href={localizePath("/messages", locale)}>
             <Button>Back to Messages</Button>
           </Link>
@@ -163,7 +163,7 @@ export default function ThreadDetailPage() {
       <div className="mb-4">
         <Link
           href={localizePath("/messages", locale)}
-          className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+          className="text-sm text-primary-text hover:text-emerald-700 font-medium"
         >
           ← Back to Messages
         </Link>
@@ -195,7 +195,7 @@ export default function ThreadDetailPage() {
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="text-lg font-semibold text-gray-900 truncate">
+              <h1 className="text-lg font-semibold text-fg truncate">
                 {participantNames}
               </h1>
               {thread.job && (
@@ -224,7 +224,7 @@ export default function ThreadDetailPage() {
                     className={`max-w-[75%] sm:max-w-[65%] rounded-2xl px-4 py-2.5 ${
                       isOwn
                         ? "bg-emerald-600 text-white rounded-br-md"
-                        : "bg-gray-100 text-gray-900 rounded-bl-md"
+                        : "bg-surface-muted text-fg rounded-bl-md"
                     }`}
                   >
                     {!isOwn && (
@@ -271,7 +271,7 @@ export default function ThreadDetailPage() {
                 )}
               </Button>
             </form>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-fg-muted">
               Keep hiring conversations on-platform and never send money, deposits, or verification fees.
             </p>
           </div>

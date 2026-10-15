@@ -25,7 +25,7 @@ interface JobMobilityFieldsProps {
 }
 
 const selectClass =
-  "w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500";
+  "w-full rounded-lg border border-line-strong px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
 /**
  * Workplace type, field, visa sponsorship, relocation and eligible countries.
@@ -37,7 +37,7 @@ export function JobMobilityFields({ values, onChange }: JobMobilityFieldsProps) 
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="workplaceType" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="workplaceType" className="mb-1 block text-sm font-medium text-fg-secondary">
             Workplace type
           </label>
           <select
@@ -53,7 +53,7 @@ export function JobMobilityFields({ values, onChange }: JobMobilityFieldsProps) 
           </select>
         </div>
         <div>
-          <label htmlFor="jobField" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="jobField" className="mb-1 block text-sm font-medium text-fg-secondary">
             Field
           </label>
           <select
@@ -72,7 +72,7 @@ export function JobMobilityFields({ values, onChange }: JobMobilityFieldsProps) 
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="visaSponsorship" className="mb-1 block text-sm font-medium text-gray-700">
+          <label htmlFor="visaSponsorship" className="mb-1 block text-sm font-medium text-fg-secondary">
             Visa sponsorship
           </label>
           <select
@@ -88,12 +88,12 @@ export function JobMobilityFields({ values, onChange }: JobMobilityFieldsProps) 
         </div>
         <label
           htmlFor="relocationAssistance"
-          className="flex items-center gap-3 self-end rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-700"
+          className="flex items-center gap-3 self-end rounded-lg border border-line px-4 py-2.5 text-sm text-fg-secondary"
         >
           <input
             id="relocationAssistance"
             type="checkbox"
-            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+            className="h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
             checked={values.relocationAssistance}
             onChange={(e) => onChange("relocationAssistance", e.target.checked)}
           />

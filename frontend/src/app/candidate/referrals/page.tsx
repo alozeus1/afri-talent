@@ -131,8 +131,8 @@ export default function ReferralsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Referrals</h1>
-        <p className="text-gray-600">Refer talented professionals and help them find opportunities</p>
+        <h1 className="text-3xl font-bold text-fg mb-2">Referrals</h1>
+        <p className="text-fg-secondary">Refer talented professionals and help them find opportunities</p>
       </div>
 
       {error && (
@@ -145,10 +145,10 @@ export default function ReferralsPage() {
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         <Card>
           <CardContent className="p-6">
-            <div className="text-3xl font-bold text-emerald-600 mb-1">
+            <div className="text-3xl font-bold text-primary-text mb-1">
               {loading ? "–" : stats?.totalMade ?? 0}
             </div>
-            <div className="text-gray-600">Referrals Made</div>
+            <div className="text-fg-secondary">Referrals Made</div>
           </CardContent>
         </Card>
         <Card>
@@ -156,7 +156,7 @@ export default function ReferralsPage() {
             <div className="text-3xl font-bold text-blue-600 mb-1">
               {loading ? "–" : stats?.totalAccepted ?? 0}
             </div>
-            <div className="text-gray-600">Accepted</div>
+            <div className="text-fg-secondary">Accepted</div>
           </CardContent>
         </Card>
         <Card>
@@ -164,7 +164,7 @@ export default function ReferralsPage() {
             <div className="text-3xl font-bold text-green-600 mb-1">
               {loading ? "–" : stats?.totalHired ?? 0}
             </div>
-            <div className="text-gray-600">Hired</div>
+            <div className="text-fg-secondary">Hired</div>
           </CardContent>
         </Card>
       </div>
@@ -172,7 +172,7 @@ export default function ReferralsPage() {
       {/* Refer a Friend Form */}
       <Card className="mb-8">
         <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">Refer a Friend</h2>
+          <h2 className="text-xl font-semibold text-fg">Refer a Friend</h2>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -201,11 +201,11 @@ export default function ReferralsPage() {
               />
             </div>
             <div className="w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-fg-secondary mb-1">
                 Personal Message (optional)
               </label>
               <textarea
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors resize-none"
+                className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors resize-none"
                 rows={3}
                 placeholder="Add a personal note about why you're referring them..."
                 value={message}
@@ -216,7 +216,7 @@ export default function ReferralsPage() {
               <p className="text-sm text-red-600">{formError}</p>
             )}
             {formSuccess && (
-              <p className="text-sm text-emerald-600">Referral sent successfully!</p>
+              <p className="text-sm text-primary-text">Referral sent successfully!</p>
             )}
             <Button type="submit" disabled={submitting}>
               {submitting ? "Sending..." : "Send Referral"}
@@ -228,7 +228,7 @@ export default function ReferralsPage() {
       {/* My Referrals */}
       <Card>
         <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">My Referrals</h2>
+          <h2 className="text-xl font-semibold text-fg">My Referrals</h2>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -240,28 +240,28 @@ export default function ReferralsPage() {
               <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl">🤝</span>
               </div>
-              <p className="text-gray-600 mb-2">No referrals yet</p>
-              <p className="text-sm text-gray-500">
+              <p className="text-fg-secondary mb-2">No referrals yet</p>
+              <p className="text-sm text-fg-muted">
                 Refer talented professionals and help them find opportunities
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-line">
               {myReferrals.map((referral) => (
                 <div key={referral.id} className="py-4">
                   <div className="flex justify-between items-start">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-gray-900">{referral.refereeEmail}</span>
+                        <span className="font-medium text-fg">{referral.refereeEmail}</span>
                         <Badge variant={statusVariants[referral.status] || "default"}>
                           {statusLabels[referral.status] || referral.status}
                         </Badge>
                       </div>
                       {referral.companyName && (
-                        <p className="text-sm text-gray-600">{referral.companyName}</p>
+                        <p className="text-sm text-fg-secondary">{referral.companyName}</p>
                       )}
                       {referral.message && (
-                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{referral.message}</p>
+                        <p className="text-sm text-fg-muted mt-1 line-clamp-2">{referral.message}</p>
                       )}
                       <p className="text-xs text-gray-400 mt-1">
                         {new Date(referral.createdAt).toLocaleDateString()}

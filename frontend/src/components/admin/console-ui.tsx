@@ -9,11 +9,11 @@ import type { ConsoleJobStatus, EmployerVerificationLevel, Pagination as Paginat
 // Shared building blocks for the admin console. All colours resolve through
 // light/dark pairs so text keeps WCAG-AA contrast on both themes.
 
-export const muted = "text-zinc-600 dark:text-zinc-400";
-export const strong = "text-zinc-900 dark:text-zinc-50";
+export const muted = "text-fg-secondary dark:text-zinc-400";
+export const strong = "text-fg dark:text-zinc-50";
 export const fieldClass =
-  "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500";
-export const labelClass = "mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400";
+  "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-zinc-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500";
+export const labelClass = "mb-1 block text-xs font-semibold uppercase tracking-wide text-fg-secondary dark:text-zinc-400";
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
   return (
@@ -68,7 +68,7 @@ const pillTones = {
   red: "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-700/50 dark:bg-rose-900/40 dark:text-rose-200",
   blue: "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-700/50 dark:bg-sky-900/40 dark:text-sky-200",
   violet: "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-700/50 dark:bg-violet-900/40 dark:text-violet-200",
-  zinc: "border-zinc-200 bg-zinc-100 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200",
+  zinc: "border-line bg-surface-muted text-fg-secondary dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200",
 } as const;
 export type PillTone = keyof typeof pillTones;
 
@@ -285,12 +285,12 @@ export function TableShell({ children }: { children: ReactNode }) {
 
 export function Th({ children, className = "" }: { children?: ReactNode; className?: string }) {
   return (
-    <th scope="col" className={`bg-zinc-50 px-4 py-3 text-start text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:bg-zinc-900/60 dark:text-zinc-400 ${className}`}>
+    <th scope="col" className={`bg-surface-sunken px-4 py-3 text-start text-xs font-semibold uppercase tracking-wide text-fg-secondary dark:bg-zinc-900/60 dark:text-zinc-400 ${className}`}>
       {children}
     </th>
   );
 }
 
 export function Td({ children, className = "", colSpan }: { children?: ReactNode; className?: string; colSpan?: number }) {
-  return <td colSpan={colSpan} className={`px-4 py-3 align-top text-zinc-800 dark:text-zinc-200 ${className}`}>{children}</td>;
+  return <td colSpan={colSpan} className={`px-4 py-3 align-top text-fg dark:text-zinc-200 ${className}`}>{children}</td>;
 }

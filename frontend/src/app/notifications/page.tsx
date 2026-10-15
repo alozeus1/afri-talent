@@ -155,7 +155,7 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
+          <h1 className="text-3xl font-bold text-fg">Notifications</h1>
           {unreadCount > 0 && (
             <Badge variant="success">{unreadCount} unread</Badge>
           )}
@@ -179,14 +179,14 @@ export default function NotificationsPage() {
           onValueChange={(val) => handleFilterChange(val as FilterTab)}
         >
           <Tabs.List
-            className="flex items-center gap-x-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm text-sm"
+            className="flex items-center gap-x-1 p-1 bg-surface border border-line rounded-xl shadow-sm text-sm"
             aria-label="Filter Notifications"
           >
             {(["ALL", "UNREAD"] as FilterTab[]).map((tab) => (
               <Tabs.Trigger
                 key={tab}
                 value={tab}
-                className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-gray-500 hover:text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-medium"
+                className="data-[state=active]:bg-surface-muted data-[state=active]:text-fg data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-fg-muted hover:text-fg-secondary hover:bg-surface-sunken active:bg-surface-muted font-medium"
               >
                 {tab === "ALL" ? "All" : "Unread"}
               </Tabs.Trigger>
@@ -217,10 +217,10 @@ export default function NotificationsPage() {
         <Card>
           <CardContent className="p-12 text-center">
             <span className="text-4xl mb-4 block">🔔</span>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <h3 className="text-lg font-semibold text-fg mb-2">
               No notifications yet
             </h3>
-            <p className="text-gray-500">
+            <p className="text-fg-muted">
               {filter === "UNREAD"
                 ? "You're all caught up! No unread notifications."
                 : "You'll see notifications here when there's activity on your account."}
@@ -249,8 +249,8 @@ export default function NotificationsPage() {
                       <h3
                         className={`text-sm ${
                           isUnread
-                            ? "font-semibold text-gray-900"
-                            : "font-medium text-gray-700"
+                            ? "font-semibold text-fg"
+                            : "font-medium text-fg-secondary"
                         }`}
                       >
                         {notification.title}
@@ -259,7 +259,7 @@ export default function NotificationsPage() {
                         {timeAgo(notification.createdAt)}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-sm text-fg-muted mt-1">
                       {notification.body}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -280,7 +280,7 @@ export default function NotificationsPage() {
                           className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
                             notification.metadata?.feedback === value
                               ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                              : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                              : "border-line text-fg-muted hover:border-line-strong hover:text-fg-secondary"
                           }`}
                         >
                           {label}
@@ -309,7 +309,7 @@ export default function NotificationsPage() {
           >
             Previous
           </Button>
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-fg-secondary">
             Page {page} of {totalPages}
           </span>
           <Button

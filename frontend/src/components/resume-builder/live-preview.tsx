@@ -18,7 +18,7 @@ export function LivePreview({ data, template }: LivePreviewProps): ReactNode {
     <div
       data-testid="resume-preview-pane"
       aria-live="polite"
-      className="rounded-md bg-white p-6 shadow-sm"
+      className="rounded-md bg-surface p-6 shadow-sm"
     >
       {renderTemplate(data, template)}
     </div>
@@ -34,7 +34,7 @@ export function LivePreview({ data, template }: LivePreviewProps): ReactNode {
           onClick={() => setCollapsedOnMobile((v) => !v)}
           aria-expanded={!collapsedOnMobile}
           data-testid="resume-preview-toggle"
-          className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700"
+          className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium text-fg-secondary"
         >
           {collapsedOnMobile ? "Show preview" : "Hide preview"}
         </button>

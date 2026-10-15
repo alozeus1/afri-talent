@@ -159,9 +159,9 @@ function OAuthCallbackInner() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Authentication Failed</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
-          <Link href="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
+          <h2 className="text-xl font-semibold text-fg dark:text-gray-100 mb-2">Authentication Failed</h2>
+          <p className="text-fg-secondary dark:text-gray-300 mb-4">{error}</p>
+          <Link href="/login" className="text-primary-text hover:text-emerald-700 font-medium">
             Back to Login
           </Link>
         </div>
@@ -173,7 +173,7 @@ function OAuthCallbackInner() {
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600 mx-auto mb-4" />
-        <p className="text-gray-600 dark:text-gray-300">Completing sign in...</p>
+        <p className="text-fg-secondary dark:text-gray-300">Completing sign in...</p>
       </div>
     </div>
   );

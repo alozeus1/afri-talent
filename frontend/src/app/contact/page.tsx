@@ -17,8 +17,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type FieldErrors = Partial<Record<"name" | "email" | "message", string>>;
 
 const fieldClass =
-  "w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 text-zinc-900 shadow-sm placeholder:text-zinc-500 transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-400";
-const labelClass = "mb-1 block text-sm font-medium text-zinc-800 dark:text-zinc-200";
+  "w-full rounded-xl border border-line bg-surface px-4 py-3 text-fg shadow-sm placeholder:text-fg-muted transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-400";
+const labelClass = "mb-1 block text-sm font-medium text-fg dark:text-zinc-200";
 
 function statusTone(status: MyTicket["status"]): string {
   if (status === "RESOLVED") return "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300";
@@ -132,10 +132,10 @@ export default function ContactPage() {
           <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
             {t("contact.eyebrow")}
           </p>
-          <h1 className="mt-2 font-display text-4xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-5xl">
+          <h1 className="mt-2 font-display text-4xl font-bold tracking-tight text-fg dark:text-zinc-50 sm:text-5xl">
             {t("contact.title")}
           </h1>
-          <p className="mt-4 text-lg leading-8 text-zinc-700 dark:text-zinc-300">{t("contact.subtitle")}</p>
+          <p className="mt-4 text-lg leading-8 text-fg-secondary dark:text-zinc-300">{t("contact.subtitle")}</p>
           <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
             <span aria-hidden="true" className="h-2 w-2 rounded-full bg-emerald-500" />
             {t("contact.responseTime")}
@@ -145,19 +145,19 @@ export default function ContactPage() {
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
           <section
             aria-labelledby="contact-form-title"
-            className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 sm:p-8"
+            className="rounded-2xl border border-line bg-surface p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 sm:p-8"
           >
             {sent ? (
               <div role="status" className="py-6 text-center">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/15">
-                  <svg className="h-7 w-7 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <svg className="h-7 w-7 text-primary-text dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h2 id="contact-form-title" className="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">
+                <h2 id="contact-form-title" className="text-2xl font-semibold text-fg dark:text-zinc-50">
                   {t("contact.successTitle")}
                 </h2>
-                <p className="mx-auto mt-3 max-w-md text-zinc-700 dark:text-zinc-300">
+                <p className="mx-auto mt-3 max-w-md text-fg-secondary dark:text-zinc-300">
                   {t("contact.successBody", { email: sent.email, reference: sent.reference })}
                 </p>
                 <Button className="mt-6" variant="outline" onClick={resetForm}>
@@ -166,12 +166,12 @@ export default function ContactPage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} noValidate className="space-y-5">
-                <h2 id="contact-form-title" className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">
+                <h2 id="contact-form-title" className="text-xl font-semibold text-fg dark:text-zinc-50">
                   {t("contact.formTitle")}
                 </h2>
 
                 {user && (
-                  <p className="rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+                  <p className="rounded-xl bg-surface-sunken px-4 py-3 text-sm text-fg-secondary dark:bg-zinc-900 dark:text-zinc-300">
                     {t("contact.signedInAs", { name: user.name || user.email })}
                   </p>
                 )}
@@ -245,7 +245,7 @@ export default function ContactPage() {
                   />
                   <p
                     id="contact-message-hint"
-                    className={`mt-1 text-sm ${errors.message ? "text-red-600 dark:text-red-400" : "text-zinc-600 dark:text-zinc-400"}`}
+                    className={`mt-1 text-sm ${errors.message ? "text-red-600 dark:text-red-400" : "text-fg-secondary dark:text-zinc-400"}`}
                   >
                     {errors.message ?? t("contact.messageHint")}
                   </p>
@@ -271,7 +271,7 @@ export default function ContactPage() {
                 )}
 
                 <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  <p className="text-sm text-fg-secondary dark:text-zinc-400">
                     {t("contact.privacyNote")}{" "}
                     <Link href="/privacy-policy" prefetch={false} className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">
                       {t("contact.privacyLink")}
@@ -286,26 +286,26 @@ export default function ContactPage() {
           </section>
 
           <aside aria-label={t("contact.channels.title")} className="space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-widest text-zinc-600 dark:text-zinc-400">
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-fg-secondary dark:text-zinc-400">
               {t("contact.channels.title")}
             </h2>
-            <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
-              <h3 className="font-semibold text-zinc-950 dark:text-zinc-50">{t("contact.channels.trustTitle")}</h3>
-              <p className="mt-1 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{t("contact.channels.trustBody")}</p>
+            <div className="rounded-2xl border border-line bg-surface p-5 dark:border-zinc-800 dark:bg-zinc-950">
+              <h3 className="font-semibold text-fg dark:text-zinc-50">{t("contact.channels.trustTitle")}</h3>
+              <p className="mt-1 text-sm leading-6 text-fg-secondary dark:text-zinc-300">{t("contact.channels.trustBody")}</p>
               <Link href={href("/trust/report")} prefetch={false} className="mt-3 inline-block text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-400">
                 {t("contact.channels.trustCta")} →
               </Link>
             </div>
-            <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
-              <h3 className="font-semibold text-zinc-950 dark:text-zinc-50">{t("contact.channels.resourcesTitle")}</h3>
-              <p className="mt-1 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{t("contact.channels.resourcesBody")}</p>
+            <div className="rounded-2xl border border-line bg-surface p-5 dark:border-zinc-800 dark:bg-zinc-950">
+              <h3 className="font-semibold text-fg dark:text-zinc-50">{t("contact.channels.resourcesTitle")}</h3>
+              <p className="mt-1 text-sm leading-6 text-fg-secondary dark:text-zinc-300">{t("contact.channels.resourcesBody")}</p>
               <Link href={href("/resources")} prefetch={false} className="mt-3 inline-block text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-400">
                 {t("contact.channels.resourcesCta")} →
               </Link>
             </div>
-            <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
-              <h3 className="font-semibold text-zinc-950 dark:text-zinc-50">{t("contact.channels.emailTitle")}</h3>
-              <p className="mt-1 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+            <div className="rounded-2xl border border-line bg-surface p-5 dark:border-zinc-800 dark:bg-zinc-950">
+              <h3 className="font-semibold text-fg dark:text-zinc-50">{t("contact.channels.emailTitle")}</h3>
+              <p className="mt-1 text-sm leading-6 text-fg-secondary dark:text-zinc-300">
                 {t("contact.channels.emailBody", { email: SUPPORT_EMAIL })}
               </p>
               <a href={`mailto:${SUPPORT_EMAIL}`} className="mt-3 inline-block text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-400">
@@ -317,27 +317,27 @@ export default function ContactPage() {
 
         {user && myTickets.length > 0 && (
           <section id="my-requests" aria-labelledby="my-requests-title" className="mt-12">
-            <h2 id="my-requests-title" className="mb-4 text-xl font-semibold text-zinc-950 dark:text-zinc-50">
+            <h2 id="my-requests-title" className="mb-4 text-xl font-semibold text-fg dark:text-zinc-50">
               {t("contact.myRequests")}
             </h2>
             <ul className="space-y-3">
               {myTickets.map((ticket) => (
-                <li key={ticket.id} className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
+                <li key={ticket.id} className="rounded-2xl border border-line bg-surface p-5 dark:border-zinc-800 dark:bg-zinc-950">
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">{ticket.reference}</span>
+                    <span className="font-mono text-sm font-semibold text-fg dark:text-zinc-100">{ticket.reference}</span>
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusTone(ticket.status)}`}>
                       {t(`contact.status.${ticket.status}`)}
                     </span>
-                    <span className="text-sm text-zinc-600 dark:text-zinc-400">{t(`contact.topic.${ticket.topic}`)}</span>
-                    <time className="ms-auto text-xs text-zinc-600 dark:text-zinc-400" dateTime={ticket.createdAt}>
+                    <span className="text-sm text-fg-secondary dark:text-zinc-400">{t(`contact.topic.${ticket.topic}`)}</span>
+                    <time className="ms-auto text-xs text-fg-secondary dark:text-zinc-400" dateTime={ticket.createdAt}>
                       {new Date(ticket.createdAt).toLocaleDateString(locale)}
                     </time>
                   </div>
-                  <p className="mt-2 line-clamp-3 text-sm text-zinc-700 dark:text-zinc-300">{ticket.subject || ticket.message}</p>
+                  <p className="mt-2 line-clamp-3 text-sm text-fg-secondary dark:text-zinc-300">{ticket.subject || ticket.message}</p>
                   {ticket.replies.map((reply) => (
                     <div key={reply.id} className="mt-3 rounded-xl border-s-4 border-emerald-500 bg-emerald-50 px-4 py-3 dark:bg-emerald-500/10">
                       <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">{t("contact.teamReply")}</p>
-                      <p className="mt-1 whitespace-pre-line text-sm text-zinc-800 dark:text-zinc-200">{reply.body}</p>
+                      <p className="mt-1 whitespace-pre-line text-sm text-fg dark:text-zinc-200">{reply.body}</p>
                     </div>
                   ))}
                 </li>

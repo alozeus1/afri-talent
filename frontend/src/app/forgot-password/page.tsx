@@ -51,8 +51,8 @@ export default function ForgotPasswordPage() {
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Forgot Password</h1>
-          <p className="text-gray-600">Enter your email and we&apos;ll send you a reset link</p>
+          <h1 className="text-2xl font-bold text-fg">Forgot Password</h1>
+          <p className="text-fg-secondary">Enter your email and we&apos;ll send you a reset link</p>
         </CardHeader>
         <CardContent>
           {submitted ? (
@@ -60,8 +60,8 @@ export default function ForgotPasswordPage() {
               <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm">
                 If an account with that email exists, a password reset link has been sent.
               </div>
-              <div className="text-center text-sm text-gray-600">
-                <Link href="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
+              <div className="text-center text-sm text-fg-secondary">
+                <Link href="/login" className="text-primary-text hover:text-emerald-700 font-medium">
                   Back to Sign In
                 </Link>
               </div>
@@ -90,9 +90,9 @@ export default function ForgotPasswordPage() {
                 </Button>
               </form>
 
-              <div className="mt-6 text-center text-sm text-gray-600">
+              <div className="mt-6 text-center text-sm text-fg-secondary">
                 Remember your password?{" "}
-                <Link href="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
+                <Link href="/login" className="text-primary-text hover:text-emerald-700 font-medium">
                   Sign In
                 </Link>
               </div>

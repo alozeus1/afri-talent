@@ -23,7 +23,7 @@ export function StepIndicator({ step, total, labels }: StepIndicatorProps): Reac
           ? "bg-blue-600 text-white border-blue-600"
           : isDone
             ? "bg-emerald-50 text-emerald-900 border-emerald-300"
-            : "bg-white text-gray-500 border-gray-200";
+            : "bg-surface text-fg-muted border-line";
         return (
           <li key={label} className="flex items-center gap-2">
             <span

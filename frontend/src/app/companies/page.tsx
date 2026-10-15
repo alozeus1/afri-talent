@@ -62,7 +62,7 @@ function StarRating({ rating }: { rating: number }) {
           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
         </svg>
       ))}
-      <span className="ml-1 text-sm text-gray-600">{rating.toFixed(1)}</span>
+      <span className="ml-1 text-sm text-fg-secondary">{rating.toFixed(1)}</span>
     </div>
   );
 }
@@ -149,22 +149,22 @@ export default function CompaniesPage() {
 
       {!loading && data && (
         <>
-          <div className="mb-4 text-gray-600">
+          <div className="mb-4 text-fg-secondary">
             {data.pagination.total} compan{data.pagination.total !== 1 ? "ies" : "y"} found
           </div>
 
           {data.companies.length === 0 ? (
             <div className="py-8">
-              <div className="text-center py-16 px-4 surface-panel bg-white shadow-sm border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800 rounded-2xl mb-12">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 mb-6 dark:bg-emerald-500/10 dark:text-emerald-400">
+              <div className="text-center py-16 px-4 surface-panel bg-surface shadow-sm border border-line dark:bg-zinc-900/50 dark:border-zinc-800 rounded-2xl mb-12">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-50 text-primary-text mb-6 dark:bg-emerald-500/10 dark:text-emerald-400">
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+                <h2 className="text-2xl font-bold text-fg dark:text-gray-100 mb-3">
                   {search ? t("companies.noCompaniesFound") : t("companies.directoryUpdating")}
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-8">
+                <p className="text-fg-secondary dark:text-gray-400 max-w-md mx-auto mb-8">
                   {search
                     ? t("companies.noCompaniesDesc")
                     : t("companies.directoryDesc")}
@@ -190,10 +190,10 @@ export default function CompaniesPage() {
                       <Card className="h-full interactive-card transition-all duration-200">
                         <CardContent className="p-5">
                           <Badge variant="info">Available now</Badge>
-                          <h3 className="mt-4 text-base font-semibold text-gray-900 dark:text-gray-100">
+                          <h3 className="mt-4 text-base font-semibold text-fg dark:text-gray-100">
                             {action.label}
                           </h3>
-                          <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
+                          <p className="mt-2 text-sm leading-6 text-fg-secondary dark:text-gray-400">
                             Use candidate-side tools while verified employer profiles are onboarded.
                           </p>
                         </CardContent>
@@ -216,7 +216,7 @@ export default function CompaniesPage() {
                               <img
                                 src={company.logoUrl}
                                 alt={`${company.companyName} logo`}
-                                className="h-10 w-10 rounded-lg border border-gray-200 object-contain"
+                                className="h-10 w-10 rounded-lg border border-line object-contain"
                               />
                             ) : (
                               <span
@@ -227,11 +227,11 @@ export default function CompaniesPage() {
                               </span>
                             )}
                             <div className="min-w-0">
-                              <h3 className="truncate text-lg font-semibold text-gray-900">
+                              <h3 className="truncate text-lg font-semibold text-fg">
                                 {company.companyName}
                               </h3>
                               {company.industry && (
-                                <p className="text-sm text-gray-600">{company.industry}</p>
+                                <p className="text-sm text-fg-secondary">{company.industry}</p>
                               )}
                             </div>
                           </div>
@@ -242,7 +242,7 @@ export default function CompaniesPage() {
                       </div>
 
                       {company.headquarters && (
-                        <p className="text-sm text-gray-500 mb-3">
+                        <p className="text-sm text-fg-muted mb-3">
                           📍 {company.headquarters}
                         </p>
                       )}
@@ -251,7 +251,7 @@ export default function CompaniesPage() {
                         company.ratingAggregate.averageOverall != null && (
                         <div className="mb-3">
                           <StarRating rating={company.ratingAggregate.averageOverall} />
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-fg-muted mt-1">
                             {company.ratingAggregate.totalReviews} review
                             {company.ratingAggregate.totalReviews !== 1 ? "s" : ""}
                           </p>
@@ -285,7 +285,7 @@ export default function CompaniesPage() {
               >
                 {t("common.previous")}
               </Button>
-              <span className="flex items-center px-4 text-gray-600">
+              <span className="flex items-center px-4 text-fg-secondary">
                 Page {page} of {data.pagination.totalPages}
               </span>
               <Button
@@ -300,22 +300,22 @@ export default function CompaniesPage() {
 
           {/* Honest early-access employer proof */}
           {!search && (
-            <div className="mt-16 pt-16 border-t border-gray-100 dark:border-zinc-800">
+            <div className="mt-16 pt-16 border-t border-line dark:border-zinc-800">
               <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4 font-display">
+                <h2 className="text-3xl font-bold text-fg dark:text-gray-100 mb-4 font-display">
                   {t("companies.trustComingTitle")}
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                <p className="text-fg-secondary dark:text-gray-400 max-w-2xl mx-auto">
                   {t("companies.trustComingDesc")}
                 </p>
               </div>
               
               <div className="grid gap-4 md:grid-cols-3">
                 {["Employer verification", "Candidate safety", "Pilot stories"].map((item) => (
-                  <Card key={item} className="interactive-card bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
+                  <Card key={item} className="interactive-card bg-surface dark:bg-zinc-900 border-line dark:border-zinc-800">
                     <CardContent className="p-6">
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">{item}</h3>
-                      <p className="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-400">
+                      <h3 className="font-semibold text-fg dark:text-gray-100">{item}</h3>
+                      <p className="mt-3 text-sm leading-6 text-fg-secondary dark:text-gray-400">
                         {item === "Employer verification"
                           ? "Profiles should show verified domains, application paths, and hiring expectations before public promotion."
                           : item === "Candidate safety"

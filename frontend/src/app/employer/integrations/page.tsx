@@ -421,8 +421,8 @@ export default function EmployerIntegrationsPage() {
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">ATS Integrations</h1>
-          <p className="mt-2 max-w-3xl text-gray-600">
+          <h1 className="text-3xl font-bold text-fg">ATS Integrations</h1>
+          <p className="mt-2 max-w-3xl text-fg-secondary">
             Connect Greenhouse, Lever, and Workable with real health checks, webhook readiness, sync logs, and stage writeback configuration.
           </p>
         </div>
@@ -442,44 +442,44 @@ export default function EmployerIntegrationsPage() {
       <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardContent className="p-6">
-            <div className="text-sm text-gray-500">Healthy connections</div>
+            <div className="text-sm text-fg-muted">Healthy connections</div>
             <div className="mt-2 text-3xl font-semibold text-emerald-700">
               {dashboard?.summary.healthyConnections ?? 0}
             </div>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-fg-secondary">
               {dashboard?.summary.totalConnections ?? 0} total live integrations
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
-            <div className="text-sm text-gray-500">Needs attention</div>
+            <div className="text-sm text-fg-muted">Needs attention</div>
             <div className="mt-2 text-3xl font-semibold text-blue-700">
               {dashboard?.summary.needsAttentionConnections ?? 0}
             </div>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-fg-secondary">
               Missing credentials, secrets, or stage mappings
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
-            <div className="text-sm text-gray-500">Webhook issues</div>
+            <div className="text-sm text-fg-muted">Webhook issues</div>
             <div className="mt-2 text-3xl font-semibold text-amber-700">
               {dashboard?.summary.failedWebhookEvents ?? 0}
             </div>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-fg-secondary">
               Failed webhook deliveries across all connected ATS instances
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-6">
-            <div className="text-sm text-gray-500">Two-way sync enabled</div>
-            <div className="mt-2 text-3xl font-semibold text-slate-900">
+            <div className="text-sm text-fg-muted">Two-way sync enabled</div>
+            <div className="mt-2 text-3xl font-semibold text-fg">
               {dashboard?.summary.twoWayEnabledConnections ?? 0}
             </div>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-fg-secondary">
               Connections configured for application stage writeback
             </p>
           </CardContent>
@@ -491,10 +491,10 @@ export default function EmployerIntegrationsPage() {
           <CardHeader>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-xl font-semibold text-fg">
                   {editingConnectionId ? "Manage Integration" : "Add Integration"}
                 </h2>
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-sm text-fg-secondary">
                   Store credentials safely, configure webhook verification, and map AfriTalent statuses to provider stages.
                 </p>
               </div>
@@ -509,7 +509,7 @@ export default function EmployerIntegrationsPage() {
             <form className="space-y-5" onSubmit={saveConnection}>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-gray-700">Provider</span>
+                  <span className="mb-1 block text-sm font-medium text-fg-secondary">Provider</span>
                   <select
                     value={form.provider}
                     onChange={(event) => {
@@ -520,7 +520,7 @@ export default function EmployerIntegrationsPage() {
                       });
                       setEditingConnectionId(null);
                     }}
-                    className="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                    className="h-11 w-full rounded-lg border border-line-strong px-3 text-sm"
                   >
                     <option value="GREENHOUSE">Greenhouse</option>
                     <option value="LEVER">Lever</option>
@@ -565,54 +565,54 @@ export default function EmployerIntegrationsPage() {
                 />
               </div>
 
-              <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
-                <label className="flex items-start gap-3 rounded-xl bg-white p-4 text-sm text-gray-700">
+              <div className="grid gap-4 rounded-2xl border border-line bg-surface-sunken p-4 md:grid-cols-2">
+                <label className="flex items-start gap-3 rounded-xl bg-surface p-4 text-sm text-fg-secondary">
                   <input
                     type="checkbox"
                     checked={form.webhookSyncEnabled}
                     onChange={(event) => setForm((prev) => ({ ...prev, webhookSyncEnabled: event.target.checked }))}
-                    className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
                   />
                   <span>
-                    <span className="block font-medium text-gray-900">Enable webhook sync</span>
+                    <span className="block font-medium text-fg">Enable webhook sync</span>
                     Verify inbound candidate or job events before they are applied locally.
                   </span>
                 </label>
-                <label className="flex items-start gap-3 rounded-xl bg-white p-4 text-sm text-gray-700">
+                <label className="flex items-start gap-3 rounded-xl bg-surface p-4 text-sm text-fg-secondary">
                   <input
                     type="checkbox"
                     checked={form.twoWaySyncEnabled}
                     onChange={(event) => setForm((prev) => ({ ...prev, twoWaySyncEnabled: event.target.checked }))}
-                    className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
                   />
                   <span>
-                    <span className="block font-medium text-gray-900">Enable stage writeback</span>
+                    <span className="block font-medium text-fg">Enable stage writeback</span>
                     Push AfriTalent application status changes back into the ATS when credentials and mappings are ready.
                   </span>
                 </label>
                 {editingConnectionId && (
                   <>
-                    <label className="flex items-start gap-3 rounded-xl bg-white p-4 text-sm text-gray-700">
+                    <label className="flex items-start gap-3 rounded-xl bg-surface p-4 text-sm text-fg-secondary">
                       <input
                         type="checkbox"
                         checked={form.clearAccessToken}
                         onChange={(event) => setForm((prev) => ({ ...prev, clearAccessToken: event.target.checked }))}
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                        className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
                       />
                       <span>
-                        <span className="block font-medium text-gray-900">Clear stored access token</span>
+                        <span className="block font-medium text-fg">Clear stored access token</span>
                         Remove the current token on save.
                       </span>
                     </label>
-                    <label className="flex items-start gap-3 rounded-xl bg-white p-4 text-sm text-gray-700">
+                    <label className="flex items-start gap-3 rounded-xl bg-surface p-4 text-sm text-fg-secondary">
                       <input
                         type="checkbox"
                         checked={form.clearWebhookSecret}
                         onChange={(event) => setForm((prev) => ({ ...prev, clearWebhookSecret: event.target.checked }))}
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                        className="mt-1 h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
                       />
                       <span>
-                        <span className="block font-medium text-gray-900">Clear webhook secret</span>
+                        <span className="block font-medium text-fg">Clear webhook secret</span>
                         Disable shared-secret verification until a new one is saved.
                       </span>
                     </label>
@@ -622,26 +622,26 @@ export default function EmployerIntegrationsPage() {
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-gray-700">Stage mappings JSON</span>
+                  <span className="mb-1 block text-sm font-medium text-fg-secondary">Stage mappings JSON</span>
                   <textarea
                     value={form.stageMappingsText}
                     onChange={(event) => setForm((prev) => ({ ...prev, stageMappingsText: event.target.value }))}
                     rows={8}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900"
+                    className="w-full rounded-lg border border-line-strong px-4 py-3 text-sm text-fg"
                   />
-                  <span className="mt-2 block text-xs text-gray-500">
+                  <span className="mt-2 block text-xs text-fg-muted">
                     {help.description}
                   </span>
                 </label>
                 <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-gray-700">Advanced metadata JSON</span>
+                  <span className="mb-1 block text-sm font-medium text-fg-secondary">Advanced metadata JSON</span>
                   <textarea
                     value={form.extraMetadataText}
                     onChange={(event) => setForm((prev) => ({ ...prev, extraMetadataText: event.target.value }))}
                     rows={8}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900"
+                    className="w-full rounded-lg border border-line-strong px-4 py-3 text-sm text-fg"
                   />
-                  <span className="mt-2 block text-xs text-gray-500">
+                  <span className="mt-2 block text-xs text-fg-muted">
                     Use this for provider-specific settings such as custom conditions, enterprise proxy URLs, or future flags.
                   </span>
                 </label>
@@ -666,29 +666,29 @@ export default function EmployerIntegrationsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 bg-slate-50">
+        <Card className="border-line bg-surface-sunken">
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Provider readiness guide</h2>
+            <h2 className="text-xl font-semibold text-fg">Provider readiness guide</h2>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-gray-700">
-            <div className="rounded-2xl bg-white p-4">
-              <p className="font-semibold text-gray-900">{help.orgLabel}</p>
+          <CardContent className="space-y-4 text-sm text-fg-secondary">
+            <div className="rounded-2xl bg-surface p-4">
+              <p className="font-semibold text-fg">{help.orgLabel}</p>
               <p className="mt-1">{help.description}</p>
             </div>
-            <div className="rounded-2xl bg-white p-4">
-              <p className="font-semibold text-gray-900">Webhook setup</p>
+            <div className="rounded-2xl bg-surface p-4">
+              <p className="font-semibold text-fg">Webhook setup</p>
               <p className="mt-1">
                 Save the integration, then copy the generated webhook URL from the connection card. Use the shared secret or provider-specific signature verification where supported.
               </p>
             </div>
-            <div className="rounded-2xl bg-white p-4">
-              <p className="font-semibold text-gray-900">Writeback readiness</p>
+            <div className="rounded-2xl bg-surface p-4">
+              <p className="font-semibold text-fg">Writeback readiness</p>
               <p className="mt-1">
                 Stage writeback only turns healthy when a write-capable token is stored, stage mappings are present, and the provider-specific service user/member ID is configured where required.
               </p>
             </div>
-            <div className="rounded-2xl bg-white p-4">
-              <p className="font-semibold text-gray-900">Support visibility</p>
+            <div className="rounded-2xl bg-surface p-4">
+              <p className="font-semibold text-fg">Support visibility</p>
               <p className="mt-1">
                 Every sync run, webhook event, and retry is captured in the connection timeline so your recruiting team can troubleshoot without digging into backend logs.
               </p>
@@ -699,7 +699,7 @@ export default function EmployerIntegrationsPage() {
 
       <Card>
         <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">Connected providers</h2>
+          <h2 className="text-xl font-semibold text-fg">Connected providers</h2>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -707,7 +707,7 @@ export default function EmployerIntegrationsPage() {
               <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-emerald-600" />
             </div>
           ) : connections.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-gray-600">
+            <div className="rounded-2xl border border-dashed border-line-strong p-8 text-center text-sm text-fg-secondary">
               No ATS integrations yet. Add your first connection above, then run a connection test before turning on webhooks or stage writeback.
             </div>
           ) : (
@@ -718,11 +718,11 @@ export default function EmployerIntegrationsPage() {
                 const isEditing = editingConnectionId === connection.id;
 
                 return (
-                  <div key={connection.id} className="rounded-2xl border border-gray-200 p-5">
+                  <div key={connection.id} className="rounded-2xl border border-line p-5">
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-lg font-semibold text-gray-900">
+                          <h3 className="text-lg font-semibold text-fg">
                             {connection.displayName || `${connection.providerLabel} integration`}
                           </h3>
                           <Badge variant={healthBadgeVariant(connection.healthStatus)}>
@@ -734,7 +734,7 @@ export default function EmployerIntegrationsPage() {
                           {connection.webhookSyncEnabled && <Badge variant="info">Webhook sync on</Badge>}
                           {connection.twoWaySyncEnabled && <Badge variant="default">Writeback on</Badge>}
                         </div>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-fg-secondary">
                           {connection.providerLabel} • {connection.externalOrgId}
                         </p>
                         <div className="flex flex-wrap gap-2">
@@ -797,29 +797,29 @@ export default function EmployerIntegrationsPage() {
                     </div>
 
                     <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                      <div className="rounded-2xl bg-slate-50 p-4">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Credentials on file</p>
+                      <div className="rounded-2xl bg-surface-sunken p-4">
+                        <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Credentials on file</p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Badge variant={connection.credentials.hasAccessToken ? "success" : "warning"}>Access token</Badge>
                           <Badge variant={connection.credentials.hasRefreshToken ? "success" : "default"}>Refresh token</Badge>
                           <Badge variant={connection.credentials.hasWebhookSecret ? "success" : "warning"}>Webhook secret</Badge>
                         </div>
                       </div>
-                      <div className="rounded-2xl bg-slate-50 p-4 text-sm text-gray-700">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Recent activity</p>
+                      <div className="rounded-2xl bg-surface-sunken p-4 text-sm text-fg-secondary">
+                        <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Recent activity</p>
                         <p className="mt-3">Last sync: {formatTimestamp(connection.lastSyncedAt)}</p>
                         <p>Last test: {formatTimestamp(connection.lastConnectionTestAt)}</p>
                         <p>Last webhook: {formatTimestamp(connection.lastWebhookAt)}</p>
                       </div>
-                      <div className="rounded-2xl bg-slate-50 p-4 text-sm text-gray-700">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Backlog</p>
+                      <div className="rounded-2xl bg-surface-sunken p-4 text-sm text-fg-secondary">
+                        <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Backlog</p>
                         <p className="mt-3">{connection.recentLogSummary.failedSyncRuns} failed sync runs</p>
                         <p>{connection.recentLogSummary.failedWebhookEvents} failed webhook events</p>
                         <p>{connection.recentLogSummary.pendingApplicationLinks} pending application links</p>
                       </div>
-                      <div className="rounded-2xl bg-slate-50 p-4 text-sm text-gray-700">
-                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Webhook endpoint</p>
-                        <p className="mt-3 break-all font-mono text-xs text-slate-600">{connection.webhookUrl}</p>
+                      <div className="rounded-2xl bg-surface-sunken p-4 text-sm text-fg-secondary">
+                        <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Webhook endpoint</p>
+                        <p className="mt-3 break-all font-mono text-xs text-fg-secondary">{connection.webhookUrl}</p>
                         <Button size="sm" variant="ghost" className="mt-3" onClick={() => void copyWebhookUrl(connection.webhookUrl)}>
                           Copy webhook URL
                         </Button>
@@ -846,7 +846,7 @@ export default function EmployerIntegrationsPage() {
                     )}
 
                     {isLogsOpen && (
-                      <div className="mt-5 space-y-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <div className="mt-5 space-y-5 rounded-2xl border border-line bg-surface-sunken p-5">
                         {!logs ? (
                           <div className="flex justify-center py-8">
                             <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-emerald-600" />
@@ -854,43 +854,43 @@ export default function EmployerIntegrationsPage() {
                         ) : (
                           <>
                             <div className="grid gap-4 md:grid-cols-4">
-                              <div className="rounded-2xl bg-white p-4 text-sm text-gray-700">
-                                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Linked applications</p>
-                                <p className="mt-3 text-2xl font-semibold text-gray-900">{logs.applicationLinks.stats.total}</p>
+                              <div className="rounded-2xl bg-surface p-4 text-sm text-fg-secondary">
+                                <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Linked applications</p>
+                                <p className="mt-3 text-2xl font-semibold text-fg">{logs.applicationLinks.stats.total}</p>
                               </div>
-                              <div className="rounded-2xl bg-white p-4 text-sm text-gray-700">
-                                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Synced</p>
+                              <div className="rounded-2xl bg-surface p-4 text-sm text-fg-secondary">
+                                <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Synced</p>
                                 <p className="mt-3 text-2xl font-semibold text-emerald-700">{logs.applicationLinks.stats.synced}</p>
                               </div>
-                              <div className="rounded-2xl bg-white p-4 text-sm text-gray-700">
-                                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Pending</p>
+                              <div className="rounded-2xl bg-surface p-4 text-sm text-fg-secondary">
+                                <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Pending</p>
                                 <p className="mt-3 text-2xl font-semibold text-amber-700">{logs.applicationLinks.stats.pending}</p>
                               </div>
-                              <div className="rounded-2xl bg-white p-4 text-sm text-gray-700">
-                                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Manual review</p>
-                                <p className="mt-3 text-2xl font-semibold text-slate-900">{logs.applicationLinks.stats.manualReview}</p>
+                              <div className="rounded-2xl bg-surface p-4 text-sm text-fg-secondary">
+                                <p className="text-xs font-medium uppercase tracking-wide text-fg-muted">Manual review</p>
+                                <p className="mt-3 text-2xl font-semibold text-fg">{logs.applicationLinks.stats.manualReview}</p>
                               </div>
                             </div>
 
                             <div className="grid gap-5 xl:grid-cols-3">
-                              <div className="space-y-3 rounded-2xl bg-white p-4">
-                                <h4 className="font-semibold text-gray-900">Recent sync runs</h4>
+                              <div className="space-y-3 rounded-2xl bg-surface p-4">
+                                <h4 className="font-semibold text-fg">Recent sync runs</h4>
                                 {logs.syncRuns.length === 0 ? (
-                                  <p className="text-sm text-gray-500">No sync runs yet.</p>
+                                  <p className="text-sm text-fg-muted">No sync runs yet.</p>
                                 ) : (
                                   <div className="space-y-3">
                                     {logs.syncRuns.slice(0, 6).map((run) => (
-                                      <div key={run.id} className="rounded-xl border border-slate-200 p-3 text-sm">
+                                      <div key={run.id} className="rounded-xl border border-line p-3 text-sm">
                                         <div className="flex items-center justify-between gap-3">
-                                          <span className="font-medium text-gray-900">{run.syncType.replace(/_/g, " ")}</span>
+                                          <span className="font-medium text-fg">{run.syncType.replace(/_/g, " ")}</span>
                                           <Badge variant={run.status === "SUCCESS" ? "success" : run.status === "FAILED" ? "danger" : "warning"}>
                                             {run.status}
                                           </Badge>
                                         </div>
-                                        <p className="mt-2 text-gray-600">
+                                        <p className="mt-2 text-fg-secondary">
                                           {run.direction} via {run.trigger.toLowerCase()} • {formatTimestamp(run.startedAt)}
                                         </p>
-                                        <p className="mt-1 text-gray-600">
+                                        <p className="mt-1 text-fg-secondary">
                                           {run.createdJobs} created, {run.updatedJobs} updated, {run.updatedStages} stage changes
                                         </p>
                                       </div>
@@ -899,21 +899,21 @@ export default function EmployerIntegrationsPage() {
                                 )}
                               </div>
 
-                              <div className="space-y-3 rounded-2xl bg-white p-4">
-                                <h4 className="font-semibold text-gray-900">Webhook events</h4>
+                              <div className="space-y-3 rounded-2xl bg-surface p-4">
+                                <h4 className="font-semibold text-fg">Webhook events</h4>
                                 {logs.webhookEvents.length === 0 ? (
-                                  <p className="text-sm text-gray-500">No webhook events yet.</p>
+                                  <p className="text-sm text-fg-muted">No webhook events yet.</p>
                                 ) : (
                                   <div className="space-y-3">
                                     {logs.webhookEvents.slice(0, 6).map((event) => (
-                                      <div key={event.id} className="rounded-xl border border-slate-200 p-3 text-sm">
+                                      <div key={event.id} className="rounded-xl border border-line p-3 text-sm">
                                         <div className="flex items-center justify-between gap-3">
-                                          <span className="font-medium text-gray-900">{event.eventType}</span>
+                                          <span className="font-medium text-fg">{event.eventType}</span>
                                           <Badge variant={event.status === "PROCESSED" ? "success" : event.status === "FAILED" ? "danger" : "warning"}>
                                             {event.status}
                                           </Badge>
                                         </div>
-                                        <p className="mt-2 text-gray-600">
+                                        <p className="mt-2 text-fg-secondary">
                                           {formatTimestamp(event.receivedAt)}
                                         </p>
                                         {event.errorMessage && (
@@ -925,17 +925,17 @@ export default function EmployerIntegrationsPage() {
                                 )}
                               </div>
 
-                              <div className="space-y-3 rounded-2xl bg-white p-4">
-                                <h4 className="font-semibold text-gray-900">Audit timeline</h4>
+                              <div className="space-y-3 rounded-2xl bg-surface p-4">
+                                <h4 className="font-semibold text-fg">Audit timeline</h4>
                                 {logs.auditLogs.length === 0 ? (
-                                  <p className="text-sm text-gray-500">No audit entries yet.</p>
+                                  <p className="text-sm text-fg-muted">No audit entries yet.</p>
                                 ) : (
                                   <div className="space-y-3">
                                     {logs.auditLogs.slice(0, 8).map((entry) => (
-                                      <div key={entry.id} className="rounded-xl border border-slate-200 p-3 text-sm">
-                                        <p className="font-medium text-gray-900">{entry.actionType.replace(/_/g, " ")}</p>
-                                        <p className="mt-1 text-gray-600">{entry.summary}</p>
-                                        <p className="mt-1 text-xs text-gray-500">{formatTimestamp(entry.createdAt)}</p>
+                                      <div key={entry.id} className="rounded-xl border border-line p-3 text-sm">
+                                        <p className="font-medium text-fg">{entry.actionType.replace(/_/g, " ")}</p>
+                                        <p className="mt-1 text-fg-secondary">{entry.summary}</p>
+                                        <p className="mt-1 text-xs text-fg-muted">{formatTimestamp(entry.createdAt)}</p>
                                       </div>
                                     ))}
                                   </div>
@@ -944,17 +944,17 @@ export default function EmployerIntegrationsPage() {
                             </div>
 
                             {logs.applicationLinks.recent.length > 0 && (
-                              <div className="rounded-2xl bg-white p-4">
-                                <h4 className="font-semibold text-gray-900">Recent application links</h4>
+                              <div className="rounded-2xl bg-surface p-4">
+                                <h4 className="font-semibold text-fg">Recent application links</h4>
                                 <div className="mt-4 space-y-3">
                                   {logs.applicationLinks.recent.slice(0, 6).map((link) => (
-                                    <div key={link.id} className="rounded-xl border border-slate-200 p-4 text-sm">
+                                    <div key={link.id} className="rounded-xl border border-line p-4 text-sm">
                                       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                                         <div>
-                                          <p className="font-medium text-gray-900">
+                                          <p className="font-medium text-fg">
                                             {link.application.candidate.name} • {link.application.job.title}
                                           </p>
-                                          <p className="mt-1 text-gray-600">
+                                          <p className="mt-1 text-fg-secondary">
                                             Local status: {link.application.status} • External stage: {link.externalStageName || "Unknown"}
                                           </p>
                                         </div>

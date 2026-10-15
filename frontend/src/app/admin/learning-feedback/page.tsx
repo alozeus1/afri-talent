@@ -73,8 +73,8 @@ export default function AdminLearningFeedbackPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Learning Feedback Moderation</h1>
-        <p className="mt-2 text-gray-600">Approve or reject learner feedback before it appears on the Learn page.</p>
+        <h1 className="text-3xl font-bold text-fg">Learning Feedback Moderation</h1>
+        <p className="mt-2 text-fg-secondary">Approve or reject learner feedback before it appears on the Learn page.</p>
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
@@ -85,7 +85,7 @@ export default function AdminLearningFeedbackPage() {
             className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
               filter === item
                 ? "border-emerald-600 bg-emerald-600 text-white"
-                : "border-gray-300 bg-white text-gray-700 hover:border-emerald-400"
+                : "border-line-strong bg-surface text-fg-secondary hover:border-emerald-400"
             }`}
           >
             {item === "ALL" ? "All feedback" : item === "PENDING" ? "Pending" : item === "APPROVED" ? "Approved" : "Rejected"}
@@ -105,7 +105,7 @@ export default function AdminLearningFeedbackPage() {
         </div>
       ) : feedback.length === 0 ? (
         <Card>
-          <CardContent className="p-12 text-center text-gray-600">
+          <CardContent className="p-12 text-center text-fg-secondary">
             No feedback found for this filter.
           </CardContent>
         </Card>
@@ -129,7 +129,7 @@ export default function AdminLearningFeedbackPage() {
                       >
                         {item.status}
                       </Badge>
-                      {item.lessonTitle && <span className="text-sm text-gray-500">{item.lessonTitle}</span>}
+                      {item.lessonTitle && <span className="text-sm text-fg-muted">{item.lessonTitle}</span>}
                     </div>
 
                     <div className="mt-3 flex items-center gap-3">
@@ -146,12 +146,12 @@ export default function AdminLearningFeedbackPage() {
                         )}
                       </div>
                       <div>
-                        <h2 className="font-semibold text-gray-900">{item.displayName}</h2>
-                        <p className="text-sm text-gray-500">{new Date(item.createdAt).toLocaleString()}</p>
+                        <h2 className="font-semibold text-fg">{item.displayName}</h2>
+                        <p className="text-sm text-fg-muted">{new Date(item.createdAt).toLocaleString()}</p>
                       </div>
                     </div>
 
-                    <p className="mt-4 text-sm leading-6 text-gray-700">{item.comment}</p>
+                    <p className="mt-4 text-sm leading-6 text-fg-secondary">{item.comment}</p>
                     <p className="mt-2 text-sm font-medium text-amber-600">Rating: {item.rating}/5</p>
                   </div>
 

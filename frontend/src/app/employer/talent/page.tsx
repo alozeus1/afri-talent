@@ -326,8 +326,8 @@ export default function TalentMarketplacePage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Talent Marketplace</h1>
-        <p className="max-w-3xl text-gray-600">
+        <h1 className="text-3xl font-bold text-fg mb-2">Talent Marketplace</h1>
+        <p className="max-w-3xl text-fg-secondary">
           Search talent by role intent, trust evidence, and mobility clarity so the shortlist feels smaller, sharper, and safer to act on.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
@@ -402,7 +402,7 @@ export default function TalentMarketplacePage() {
                   }}
                 />
                 <select
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full rounded-lg border border-line-strong px-4 py-2 transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   value={minExperience}
                   onChange={(event) => {
                     setMinExperience(event.target.value);
@@ -474,7 +474,7 @@ export default function TalentMarketplacePage() {
                         filter.onChange(event.target.checked);
                         setPage(1);
                       }}
-                      className="mt-0.5 h-4 w-4 rounded border-blue-300 text-emerald-600 focus:ring-emerald-500"
+                      className="mt-0.5 h-4 w-4 rounded border-blue-300 text-primary-text focus:ring-emerald-500"
                     />
                     <span>
                       <span className="block font-semibold">{filter.title}</span>
@@ -484,22 +484,22 @@ export default function TalentMarketplacePage() {
                 ))}
               </div>
 
-              <div className="mt-4 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-3">
+              <div className="mt-4 grid gap-3 rounded-2xl border border-line bg-surface-sunken p-4 md:grid-cols-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Semantic search</p>
-                  <p className="mt-2 text-sm text-slate-700">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Semantic search</p>
+                  <p className="mt-2 text-sm text-fg-secondary">
                     Search by a recruiter brief, not just exact keywords.
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Trust-aware ranking</p>
-                  <p className="mt-2 text-sm text-slate-700">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Trust-aware ranking</p>
+                  <p className="mt-2 text-sm text-fg-secondary">
                     Fit score blends verified skill proof, profile strength, and authenticity posture.
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Mobility clarity</p>
-                  <p className="mt-2 text-sm text-slate-700">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Mobility clarity</p>
+                  <p className="mt-2 text-sm text-fg-secondary">
                     Surface relocation and visa readiness before you spend shortlist time.
                   </p>
                 </div>
@@ -560,12 +560,12 @@ export default function TalentMarketplacePage() {
                 />
               )}
 
-              <div className="flex flex-wrap items-center justify-between gap-3 text-gray-600">
+              <div className="flex flex-wrap items-center justify-between gap-3 text-fg-secondary">
                 <span>
                   {data.pagination.total} candidate{data.pagination.total !== 1 ? "s" : ""} found
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-gray-500">{compareIds.length}/4 selected for comparison</span>
+                  <span className="text-sm text-fg-muted">{compareIds.length}/4 selected for comparison</span>
                   <Button
                     size="sm"
                     variant="outline"
@@ -578,14 +578,14 @@ export default function TalentMarketplacePage() {
               </div>
 
               {data.candidates.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 px-6 py-12 text-center">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-200">
+                <div className="rounded-3xl border border-dashed border-line-strong bg-surface-sunken px-6 py-12 text-center">
+                  <div className="w-16 h-16 bg-surface rounded-full flex items-center justify-center mx-auto mb-4 border border-line">
                     <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                   </div>
-                  <p className="text-gray-900 mb-2 font-semibold">No candidates match your current filters</p>
-                  <p className="text-gray-600 text-sm max-w-xl mx-auto">
+                  <p className="text-fg mb-2 font-semibold">No candidates match your current filters</p>
+                  <p className="text-fg-secondary text-sm max-w-xl mx-auto">
                     Try broadening the brief, location, or trust filters. The best recruiter flow usually starts with a role narrative, then narrows with proof and mobility.
                   </p>
                   <div className="mt-5 flex flex-wrap justify-center gap-3">
@@ -619,12 +619,12 @@ export default function TalentMarketplacePage() {
                     const selectedForCompare = compareIds.includes(candidate.user.id);
 
                     return (
-                      <Card key={candidate.user.id} className="h-full border border-slate-200 bg-white/95 shadow-sm">
+                      <Card key={candidate.user.id} className="h-full border border-line bg-white/95 shadow-sm">
                         <CardContent className="p-6">
                           <div className="flex items-start justify-between gap-4">
                             <div>
                               <div className="flex flex-wrap items-start gap-2">
-                                <h3 className="font-semibold text-gray-900 text-lg">{candidate.user.name}</h3>
+                                <h3 className="font-semibold text-fg text-lg">{candidate.user.name}</h3>
                                 {candidate.trust && (
                                   <TrustBadge
                                     label={candidate.trust.badge}
@@ -635,15 +635,15 @@ export default function TalentMarketplacePage() {
                                 <Badge variant="default">Fit {candidate.match.score}/100</Badge>
                               </div>
                               {candidate.headline && (
-                                <p className="text-sm text-gray-600 mt-1">{candidate.headline}</p>
+                                <p className="text-sm text-fg-secondary mt-1">{candidate.headline}</p>
                               )}
                             </div>
-                            <label className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+                            <label className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-fg-muted">
                               <input
                                 type="checkbox"
                                 checked={selectedForCompare}
                                 onChange={() => toggleCompare(candidate.user.id)}
-                                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                className="h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
                               />
                               Compare
                             </label>
@@ -661,17 +661,17 @@ export default function TalentMarketplacePage() {
                           )}
 
                           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Why this matched</p>
-                              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-700">
-                                <div className="rounded-xl bg-white px-3 py-2">Semantic {candidate.match.semanticScore}</div>
-                                <div className="rounded-xl bg-white px-3 py-2">Skills {candidate.match.skillScore}</div>
-                                <div className="rounded-xl bg-white px-3 py-2">Trust {candidate.match.trustScore}</div>
-                                <div className="rounded-xl bg-white px-3 py-2">Mobility {candidate.match.mobilityScore}</div>
+                            <div className="rounded-2xl border border-line bg-surface-sunken p-4">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-fg-muted">Why this matched</p>
+                              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-fg-secondary">
+                                <div className="rounded-xl bg-surface px-3 py-2">Semantic {candidate.match.semanticScore}</div>
+                                <div className="rounded-xl bg-surface px-3 py-2">Skills {candidate.match.skillScore}</div>
+                                <div className="rounded-xl bg-surface px-3 py-2">Trust {candidate.match.trustScore}</div>
+                                <div className="rounded-xl bg-surface px-3 py-2">Mobility {candidate.match.mobilityScore}</div>
                               </div>
                               <div className="mt-3 space-y-2">
                                 {candidate.match.reasons.map((reason) => (
-                                  <p key={`${candidate.user.id}-${reason}`} className="text-xs leading-5 text-slate-600">
+                                  <p key={`${candidate.user.id}-${reason}`} className="text-xs leading-5 text-fg-secondary">
                                     {reason}
                                   </p>
                                 ))}
@@ -694,14 +694,14 @@ export default function TalentMarketplacePage() {
                                 )}
                               </div>
                               {candidate.mobility.activeProcess && (
-                                <div className="mt-3 rounded-xl bg-white px-3 py-3 text-xs text-emerald-900">
+                                <div className="mt-3 rounded-xl bg-surface px-3 py-3 text-xs text-emerald-900">
                                   Active process: {candidate.mobility.activeProcess.visaType} for {candidate.mobility.activeProcess.targetCountry} ({candidate.mobility.activeProcess.status.toLowerCase().replaceAll("_", " ")})
                                 </div>
                               )}
                             </div>
                           </div>
 
-                          <div className="mt-4 space-y-1.5 text-sm text-gray-600">
+                          <div className="mt-4 space-y-1.5 text-sm text-fg-secondary">
                             {candidate.yearsExperience != null && (
                               <p>Experience: {candidate.yearsExperience} years</p>
                             )}
@@ -714,7 +714,7 @@ export default function TalentMarketplacePage() {
                           </div>
 
                           {candidate.trust && (
-                            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="mt-4 rounded-2xl border border-line bg-surface-sunken p-4">
                               <div className="flex flex-wrap gap-2">
                                 {candidate.trust.premiumFilterEligible && (
                                   <TrustBadge label="Eligible for verified filters" variant="success" />
@@ -752,9 +752,9 @@ export default function TalentMarketplacePage() {
 
                               <div className="mt-3 space-y-2">
                                 {candidateTrustReasons(candidate).map((reason) => (
-                                  <div key={`${candidate.user.id}-${reason.title}`} className="rounded-xl bg-white px-3 py-3">
-                                    <p className="text-sm font-medium text-slate-900">{reason.title}</p>
-                                    <p className="mt-1 text-xs leading-5 text-slate-600">{reason.description}</p>
+                                  <div key={`${candidate.user.id}-${reason.title}`} className="rounded-xl bg-surface px-3 py-3">
+                                    <p className="text-sm font-medium text-fg">{reason.title}</p>
+                                    <p className="mt-1 text-xs leading-5 text-fg-secondary">{reason.description}</p>
                                   </div>
                                 ))}
                               </div>
@@ -772,7 +772,7 @@ export default function TalentMarketplacePage() {
 
                           {candidate.poolMemberships.length > 0 && (
                             <div className="mt-4">
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Current recruiter pools</p>
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-fg-muted">Current recruiter pools</p>
                               <div className="mt-2 flex flex-wrap gap-2">
                                 {candidate.poolMemberships.map((membership) => (
                                   <Badge key={membership.id} variant="default">
@@ -795,7 +795,7 @@ export default function TalentMarketplacePage() {
                               </Button>
                               {activeMembership && (
                                 <select
-                                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                  className="rounded-lg border border-line-strong px-3 py-2 text-sm"
                                   value={activeMembership.stage}
                                   onChange={(event) => void updateCandidateStage(candidate, event.target.value)}
                                   disabled={savingCandidateId === candidate.user.id}
@@ -838,7 +838,7 @@ export default function TalentMarketplacePage() {
                   >
                     Previous
                   </Button>
-                  <span className="flex items-center px-4 text-gray-600">
+                  <span className="flex items-center px-4 text-fg-secondary">
                     Page {page} of {data.pagination.totalPages}
                   </span>
                   <Button
@@ -859,9 +859,9 @@ export default function TalentMarketplacePage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Recruiter workspace</p>
-                  <h2 className="mt-2 text-xl font-semibold text-slate-950">Talent pools</h2>
-                  <p className="mt-2 text-sm text-slate-600">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Recruiter workspace</p>
+                  <h2 className="mt-2 text-xl font-semibold text-fg">Talent pools</h2>
+                  <p className="mt-2 text-sm text-fg-secondary">
                     Save strong candidates into reusable pools and move them through a simple sourcing stage flow.
                   </p>
                 </div>
@@ -875,9 +875,9 @@ export default function TalentMarketplacePage() {
               )}
 
               {poolLoading ? (
-                <div className="mt-4 text-sm text-slate-500">Loading pools...</div>
+                <div className="mt-4 text-sm text-fg-muted">Loading pools...</div>
               ) : pools.length === 0 ? (
-                <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                <div className="mt-4 rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary">
                   Create your first talent pool to start capturing semantic shortlist winners.
                 </div>
               ) : (
@@ -890,14 +890,14 @@ export default function TalentMarketplacePage() {
                       className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
                         activePoolId === pool.id
                           ? "border-emerald-300 bg-emerald-50"
-                          : "border-slate-200 bg-white hover:border-slate-300"
+                          : "border-line bg-surface hover:border-line-strong"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="font-semibold text-slate-900">{pool.name}</p>
+                          <p className="font-semibold text-fg">{pool.name}</p>
                           {pool.description && (
-                            <p className="mt-1 text-sm text-slate-600">{pool.description}</p>
+                            <p className="mt-1 text-sm text-fg-secondary">{pool.description}</p>
                           )}
                         </div>
                         <Badge variant="default">{pool.candidateCount}</Badge>
@@ -916,8 +916,8 @@ export default function TalentMarketplacePage() {
                 </div>
               )}
 
-              <div className="mt-6 space-y-3 border-t border-slate-200 pt-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Create a pool</p>
+              <div className="mt-6 space-y-3 border-t border-line pt-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Create a pool</p>
                 <Input
                   placeholder="Pool name"
                   value={newPoolName}
@@ -941,12 +941,12 @@ export default function TalentMarketplacePage() {
 
           <Card>
             <CardContent className="p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Comparison flow</p>
-              <h2 className="mt-2 text-xl font-semibold text-slate-950">Shortlist review</h2>
-              <p className="mt-2 text-sm text-slate-600">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Comparison flow</p>
+              <h2 className="mt-2 text-xl font-semibold text-fg">Shortlist review</h2>
+              <p className="mt-2 text-sm text-fg-secondary">
                 Select up to four candidates, then compare trust, skills, and mobility context before starting outreach.
               </p>
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+              <div className="mt-4 rounded-2xl border border-line bg-surface-sunken px-4 py-4 text-sm text-fg-secondary">
                 <p>{compareIds.length} candidate{compareIds.length === 1 ? "" : "s"} selected.</p>
                 <p className="mt-2">Recommended workflow: semantic search, save to pool, compare finalists, then message.</p>
               </div>

@@ -34,10 +34,10 @@ export default function SavedJobsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 dark:bg-gray-950">
+    <div className="min-h-screen bg-surface-sunken py-8 px-4 dark:bg-gray-950">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Saved jobs</h1>
-        <p className="mt-1 mb-6 text-sm text-gray-500 dark:text-gray-400">
+        <h1 className="text-2xl font-bold text-fg dark:text-gray-100">Saved jobs</h1>
+        <p className="mt-1 mb-6 text-sm text-fg-muted dark:text-gray-400">
           Roles you bookmarked to compare, track, and apply to when ready.
         </p>
 
@@ -50,8 +50,8 @@ export default function SavedJobsPage() {
         ) : items.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
-              <p className="font-semibold text-gray-900 dark:text-gray-100">No saved jobs yet</p>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <p className="font-semibold text-fg dark:text-gray-100">No saved jobs yet</p>
+              <p className="mt-1 text-sm text-fg-muted dark:text-gray-400">
                 Tap “Save job” on any listing and it will appear here.
               </p>
               <Link href="/jobs" className="mt-4 inline-block">
@@ -65,13 +65,13 @@ export default function SavedJobsPage() {
               <Card key={item.id} className={item.job.isExpired ? "opacity-60" : ""}>
                 <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
-                    <Link href={`/jobs/${item.job.slug}`} className="font-semibold text-gray-900 hover:text-emerald-700 dark:text-gray-100 dark:hover:text-emerald-400">
+                    <Link href={`/jobs/${item.job.slug}`} className="font-semibold text-fg hover:text-emerald-700 dark:text-gray-100 dark:hover:text-emerald-400">
                       {item.job.title}
                     </Link>
-                    <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                    <p className="text-sm text-primary-text dark:text-emerald-400">
                       {item.job.employer?.companyName ?? item.job.sourceName ?? "Company"}
                     </p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-fg-muted dark:text-gray-400">
                       <span>{item.job.location}</span>
                       <span>·</span>
                       <span>{item.job.type}</span>

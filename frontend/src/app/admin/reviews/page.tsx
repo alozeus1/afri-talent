@@ -131,8 +131,8 @@ export default function AdminReviewsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Review Moderation</h1>
-        <p className="text-gray-600">Review and moderate company reviews</p>
+        <h1 className="text-3xl font-bold text-fg mb-2">Review Moderation</h1>
+        <p className="text-fg-secondary">Review and moderate company reviews</p>
       </div>
 
       {/* Filter Tabs */}
@@ -142,14 +142,14 @@ export default function AdminReviewsPage() {
           onValueChange={(val) => { setFilter(val as ReviewFilter); setPage(1); }}
         >
           <Tabs.List
-            className="flex items-center gap-x-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm text-sm"
+            className="flex items-center gap-x-1 p-1 bg-surface border border-line rounded-xl shadow-sm text-sm"
             aria-label="Filter Reviews"
           >
             {(["PENDING", "APPROVED", "REJECTED", "ALL"] as const).map((f) => (
               <Tabs.Trigger
                 key={f}
                 value={f}
-                className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-gray-500 hover:text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-medium"
+                className="data-[state=active]:bg-surface-muted data-[state=active]:text-fg data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-fg-muted hover:text-fg-secondary hover:bg-surface-sunken active:bg-surface-muted font-medium"
               >
                 {f === "ALL" ? "All Reviews" : f === "PENDING" ? "Pending" : f === "APPROVED" ? "Approved" : "Rejected"}
               </Tabs.Trigger>
@@ -176,7 +176,7 @@ export default function AdminReviewsPage() {
               <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl">✅</span>
               </div>
-              <p className="text-gray-600">
+              <p className="text-fg-secondary">
                 {filter === "PENDING"
                   ? "No pending reviews to moderate"
                   : filter === "APPROVED"
@@ -196,7 +196,7 @@ export default function AdminReviewsPage() {
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-semibold text-gray-900 text-lg">{review.companyName}</h3>
+                      <h3 className="font-semibold text-fg text-lg">{review.companyName}</h3>
                       <Badge
                         variant={
                           review.approved ? "success" : review.moderationStatus === "REJECTED" ? "danger" : "warning"
@@ -207,7 +207,7 @@ export default function AdminReviewsPage() {
                     </div>
                     <div className="flex items-center gap-2 mb-1">
                       {renderStars(review.rating)}
-                      <span className="text-sm text-gray-500">by {review.reviewerName}</span>
+                      <span className="text-sm text-fg-muted">by {review.reviewerName}</span>
                     </div>
                   </div>
                   <span className="text-xs text-gray-400">
@@ -215,20 +215,20 @@ export default function AdminReviewsPage() {
                   </span>
                 </div>
 
-                <h4 className="font-medium text-gray-800 mb-2">{review.title}</h4>
+                <h4 className="font-medium text-fg mb-2">{review.title}</h4>
 
                 <div className="grid md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Pros</p>
-                    <p className="text-sm text-gray-600">{review.pros}</p>
+                    <p className="text-sm text-fg-secondary">{review.pros}</p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">Cons</p>
-                    <p className="text-sm text-gray-600">{review.cons}</p>
+                    <p className="text-sm text-fg-secondary">{review.cons}</p>
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-3 border-t border-gray-100 dark:border-zinc-800">
+                <div className="flex gap-3 pt-3 border-t border-line dark:border-zinc-800">
                   {!review.approved && (
                     <Button
                       size="sm"
@@ -264,7 +264,7 @@ export default function AdminReviewsPage() {
               >
                 Previous
               </Button>
-              <span className="flex items-center px-3 text-sm text-gray-600">
+              <span className="flex items-center px-3 text-sm text-fg-secondary">
                 Page {page} of {totalPages}
               </span>
               <Button

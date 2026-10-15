@@ -42,12 +42,12 @@ function FeatureColumn({
           <div className="rounded-full bg-emerald-100 p-2.5 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
             {icon}
           </div>
-          <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">{title}</h2>
+          <h2 className="text-xl font-semibold text-fg dark:text-zinc-50">{title}</h2>
         </div>
         <ul className="space-y-3">
           {features.map((feature) => (
-            <li key={feature} className="flex items-start gap-2 text-zinc-700 dark:text-zinc-300">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <li key={feature} className="flex items-start gap-2 text-fg-secondary dark:text-zinc-300">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary-text dark:text-emerald-400" />
               <span>{feature}</span>
             </li>
           ))}
@@ -65,7 +65,7 @@ export function FreeForEveryone() {
     <div className="bg-[var(--background)] px-4 py-12 md:py-20" data-testid="free-for-everyone">
       <div className="mx-auto max-w-5xl">
         <div className="mx-auto max-w-3xl text-center">
-          <h1 className="font-display text-4xl font-bold leading-tight text-zinc-900 dark:text-zinc-50 md:text-5xl">
+          <h1 className="font-display text-4xl font-bold leading-tight text-fg dark:text-zinc-50 md:text-5xl">
             AfriTalent is free for everyone — candidates and employers
           </h1>
           <p className="mt-4 text-lg text-emerald-700 dark:text-emerald-400 font-semibold">

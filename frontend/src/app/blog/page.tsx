@@ -90,7 +90,7 @@ function FeaturedPost({ post }: { post: BlogPost }) {
 function PostCard({ post }: { post: BlogPost }) {
   return (
     <Link href={`/resources/${post.slug}`} className="block group h-full">
-      <Card className="h-full hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 overflow-hidden border-gray-200">
+      <Card className="h-full hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 overflow-hidden border-line">
         <div className="relative h-48 bg-gradient-to-br from-emerald-50 to-teal-100 overflow-hidden">
           {post.coverImage ? (
             <Image
@@ -114,13 +114,13 @@ function PostCard({ post }: { post: BlogPost }) {
               <span className="text-xs text-gray-400">{formatDate(post.publishedAt)}</span>
             )}
           </div>
-          <h3 className="font-semibold text-gray-900 text-base leading-snug mb-2 group-hover:text-emerald-700 transition-colors line-clamp-2">
+          <h3 className="font-semibold text-fg text-base leading-snug mb-2 group-hover:text-emerald-700 transition-colors line-clamp-2">
             {post.title}
           </h3>
-          <p className="text-gray-500 text-sm line-clamp-3 leading-relaxed">{post.excerpt}</p>
+          <p className="text-fg-muted text-sm line-clamp-3 leading-relaxed">{post.excerpt}</p>
           <div className="mt-4 flex items-center justify-between">
             <span className="text-xs text-gray-400">{readTime(post)} min read</span>
-            <span className="text-xs text-emerald-600 font-medium group-hover:underline">Read →</span>
+            <span className="text-xs text-primary-text font-medium group-hover:underline">Read →</span>
           </div>
         </CardContent>
       </Card>
@@ -172,21 +172,21 @@ export default function BlogPage() {
   const rest = featured ? posts.slice(1) : posts;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-surface-sunken dark:bg-gray-950">
       {/* Page header */}
-      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+      <div className="bg-surface dark:bg-gray-900 border-b border-line dark:border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-emerald-600 font-semibold text-sm tracking-wide uppercase">
+                <span className="text-primary-text font-semibold text-sm tracking-wide uppercase">
                   AfriTalent Blog
                 </span>
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-3">
+              <h1 className="text-4xl md:text-5xl font-bold text-fg dark:text-white mb-3">
                 Weekly Hiring Trends
               </h1>
-              <p className="text-gray-500 dark:text-gray-400 text-lg max-w-xl">
+              <p className="text-fg-muted dark:text-gray-400 text-lg max-w-xl">
                 Every week, our AI research team curates the most important remote job market
                 insights — fact-checked and tailored for African tech professionals.
               </p>
@@ -196,7 +196,7 @@ export default function BlogPage() {
                 <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
                   {pagination.total}
                 </div>
-                <div className="text-sm text-emerald-600 dark:text-emerald-500 font-medium">
+                <div className="text-sm text-primary-text dark:text-emerald-500 font-medium">
                   Issues published
                 </div>
               </div>
@@ -212,7 +212,7 @@ export default function BlogPage() {
             placeholder="Search blog posts..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="bg-white dark:bg-gray-800"
+            className="bg-surface dark:bg-gray-800"
           />
         </div>
 
@@ -230,10 +230,10 @@ export default function BlogPage() {
         ) : posts.length === 0 && search ? (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">📰</div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            <h2 className="text-2xl font-bold text-fg dark:text-white mb-2">
               No matching posts
             </h2>
-            <p className="text-gray-500 max-w-md mx-auto">
+            <p className="text-fg-muted max-w-md mx-auto">
               Try a different search term.
             </p>
             <Button variant="outline" className="mt-4" onClick={() => setSearch("")}>
@@ -248,8 +248,8 @@ export default function BlogPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 12h6M7 8h2" />
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-3">Insights coming soon</h2>
-              <p className="text-gray-600 mb-6">
+              <h2 className="text-xl font-semibold text-fg mb-3">Insights coming soon</h2>
+              <p className="text-fg-secondary mb-6">
                 We&apos;re curating weekly hiring trends, remote work guides, and salary insights for African professionals. Check back soon.
               </p>
               <Link href="/resources">
@@ -271,7 +271,7 @@ export default function BlogPage() {
               <>
                 {featured && (
                   <div className="flex items-center gap-4 mb-6">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Archive</h2>
+                    <h2 className="text-xl font-bold text-fg dark:text-white">Archive</h2>
                     <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
                   </div>
                 )}
@@ -293,7 +293,7 @@ export default function BlogPage() {
                 >
                   ← Previous
                 </Button>
-                <span className="flex items-center px-4 text-sm text-gray-600 dark:text-gray-300">
+                <span className="flex items-center px-4 text-sm text-fg-secondary dark:text-gray-300">
                   Page {page} of {pagination.totalPages}
                 </span>
                 <Button
@@ -320,7 +320,7 @@ export default function BlogPage() {
             job market insights — delivered automatically.
           </p>
           <Link href="/register">
-            <Button className="bg-white text-emerald-700 hover:bg-emerald-50 font-semibold px-8 py-3 text-base">
+            <Button className="bg-surface text-emerald-700 hover:bg-emerald-50 font-semibold px-8 py-3 text-base">
               Join AfriTalent free →
             </Button>
           </Link>

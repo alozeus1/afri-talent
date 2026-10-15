@@ -33,7 +33,7 @@ export function RubricScorePanel({
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold">ATS rubric score</h2>
-            <p className="mt-0.5 text-sm text-gray-500">
+            <p className="mt-0.5 text-sm text-fg-muted">
               Optionally paste a job description for a targeted, weighted score.
             </p>
           </div>
@@ -45,7 +45,7 @@ export function RubricScorePanel({
           value={jobDescription}
           onChange={(e) => onJobDescriptionChange(e.target.value)}
           rows={4}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           placeholder="Paste a job description here for a targeted, weighted rubric score (optional)"
         />
         <Button
@@ -81,7 +81,7 @@ export function RubricScorePanel({
           <div className="space-y-4 pt-2" data-testid="resume-rubric-score">
             <div className="flex items-center gap-4">
               <ATSScoreDisplay score={rubric.atsScore} size="lg" />
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-fg-muted">
                 {rubric.source === "ai" ? "AI-powered rubric" : "Heuristic rubric"}
                 {rubric.matchScore !== null && (
                   <span className="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">
@@ -98,11 +98,11 @@ export function RubricScorePanel({
                   <div
                     key={c.key}
                     data-testid={`resume-rubric-criterion-${c.key}`}
-                    className={`rounded-md border border-gray-200 p-3 ${tone.bg}`}
+                    className={`rounded-md border border-line p-3 ${tone.bg}`}
                   >
                     <div className="flex items-baseline justify-between gap-2">
                       <p className={`text-sm font-medium ${tone.text}`}>{c.label}</p>
-                      <p className="text-xs text-gray-600">
+                      <p className="text-xs text-fg-secondary">
                         {c.score}/100 · weight {c.weight}
                       </p>
                     </div>
@@ -113,7 +113,7 @@ export function RubricScorePanel({
                       />
                     </div>
                     {c.notes.length > 0 && (
-                      <ul className="mt-2 list-inside list-disc text-xs text-gray-700">
+                      <ul className="mt-2 list-inside list-disc text-xs text-fg-secondary">
                         {c.notes.slice(0, 5).map((n, i) => (
                           <li key={i}>{n}</li>
                         ))}

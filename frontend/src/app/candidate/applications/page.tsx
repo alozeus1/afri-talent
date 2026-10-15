@@ -141,7 +141,7 @@ export default function CandidateApplicationsPage() {
 
   const statCards = funnel
     ? [
-        { label: "Total Applied", value: funnel.totalApplied, color: "text-gray-700", bg: "bg-gray-50" },
+        { label: "Total Applied", value: funnel.totalApplied, color: "text-fg-secondary", bg: "bg-surface-sunken" },
         { label: "In Review", value: funnel.reviewing, color: "text-blue-700", bg: "bg-blue-50" },
         { label: "Shortlisted", value: funnel.shortlisted, color: "text-yellow-700", bg: "bg-yellow-50" },
         { label: "Accepted", value: funnel.accepted, color: "text-emerald-700", bg: "bg-emerald-50" },
@@ -153,14 +153,14 @@ export default function CandidateApplicationsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Header */}
       <div className="mb-8">
-        <Link href="/candidate" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-4">
+        <Link href="/candidate" className="inline-flex items-center text-primary-text hover:text-emerald-700 mb-4">
           <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Back to Dashboard
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Applications</h1>
-        <p className="text-gray-600">Track the status of your job applications</p>
+        <h1 className="text-3xl font-bold text-fg mb-2">My Applications</h1>
+        <p className="text-fg-secondary">Track the status of your job applications</p>
         <p className="mt-2 text-sm text-amber-700">
           Early tester mode: notes, follow-up reminders, and expanded statuses are saved locally until backend tracker persistence is added.
         </p>
@@ -183,7 +183,7 @@ export default function CandidateApplicationsPage() {
                 <Card key={stat.label} className={stat.bg}>
                   <CardContent className="p-4 text-center">
                     <div className={`text-2xl font-bold ${stat.color} mb-1`}>{stat.value}</div>
-                    <div className="text-sm text-gray-600">{stat.label}</div>
+                    <div className="text-sm text-fg-secondary">{stat.label}</div>
                   </CardContent>
                 </Card>
               ))}
@@ -194,8 +194,8 @@ export default function CandidateApplicationsPage() {
           {funnelSegments.length > 0 && funnelTotal > 0 && (
             <Card className="mb-8">
               <CardContent className="p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Application Pipeline</h2>
-                <div className="flex h-8 rounded-full overflow-hidden bg-gray-100">
+                <h2 className="text-lg font-semibold text-fg mb-4">Application Pipeline</h2>
+                <div className="flex h-8 rounded-full overflow-hidden bg-surface-muted">
                   {funnelSegments.map((seg) =>
                     seg.count > 0 ? (
                       <div
@@ -211,7 +211,7 @@ export default function CandidateApplicationsPage() {
                 </div>
                 <div className="flex flex-wrap gap-4 mt-3">
                   {funnelSegments.map((seg) => (
-                    <div key={seg.label} className="flex items-center gap-2 text-sm text-gray-600">
+                    <div key={seg.label} className="flex items-center gap-2 text-sm text-fg-secondary">
                       <span className={`w-3 h-3 rounded-full ${seg.color}`} />
                       {seg.label} ({seg.count})
                     </div>
@@ -223,11 +223,11 @@ export default function CandidateApplicationsPage() {
 
           {/* Sort Controls */}
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">All Applications</h2>
+            <h2 className="text-xl font-semibold text-fg">All Applications</h2>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500">Sort by:</span>
+              <span className="text-sm text-fg-muted">Sort by:</span>
               <select
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="px-3 py-1.5 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortKey)}
               >
@@ -242,7 +242,7 @@ export default function CandidateApplicationsPage() {
             <Card>
               <CardContent className="p-12 text-center">
                 <div className="text-4xl mb-4">📋</div>
-                <p className="text-gray-600 mb-4">No applications yet. Start exploring jobs!</p>
+                <p className="text-fg-secondary mb-4">No applications yet. Start exploring jobs!</p>
                 <Link href="/jobs">
                   <Button>Browse Jobs</Button>
                 </Link>
@@ -258,7 +258,7 @@ export default function CandidateApplicationsPage() {
                         <div className="flex items-center gap-3 mb-1">
                           <Link
                             href={`/jobs/${app.job.slug}`}
-                            className="text-lg font-semibold text-gray-900 hover:text-emerald-600 truncate"
+                            className="text-lg font-semibold text-fg hover:text-primary-text truncate"
                           >
                             {app.job.title}
                           </Link>
@@ -266,7 +266,7 @@ export default function CandidateApplicationsPage() {
                             {app.status}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-fg-secondary">
                           {app.job.employer?.companyName}
                           {app.job.location && ` • ${app.job.location}`}
                           {app.job.type && ` • ${app.job.type}`}
@@ -275,35 +275,35 @@ export default function CandidateApplicationsPage() {
                           Applied {timeAgo(app.createdAt)}
                         </p>
                         <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                          <label className="text-xs text-gray-600">
+                          <label className="text-xs text-fg-secondary">
                             Tracker status
                             <select
                               value={localTracker[app.id]?.status || "Applied"}
                               onChange={(event) => updateLocalTracker(app.id, { status: event.target.value })}
-                              className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="mt-1 w-full rounded-md border border-line-strong px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             >
                               {APPLICATION_ASSISTANT_STATUSES.map((status) => (
                                 <option key={status} value={status}>{status}</option>
                               ))}
                             </select>
                           </label>
-                          <label className="text-xs text-gray-600">
+                          <label className="text-xs text-fg-secondary">
                             Follow-up reminder
                             <input
                               type="date"
                               value={localTracker[app.id]?.reminder || ""}
                               onChange={(event) => updateLocalTracker(app.id, { reminder: event.target.value })}
-                              className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="mt-1 w-full rounded-md border border-line-strong px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             />
                           </label>
-                          <label className="text-xs text-gray-600">
+                          <label className="text-xs text-fg-secondary">
                             Notes
                             <input
                               type="text"
                               value={localTracker[app.id]?.note || ""}
                               onChange={(event) => updateLocalTracker(app.id, { note: event.target.value })}
                               placeholder="Recruiter, next step, concern..."
-                              className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="mt-1 w-full rounded-md border border-line-strong px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             />
                           </label>
                         </div>
@@ -324,7 +324,7 @@ export default function CandidateApplicationsPage() {
                       return thread ? (
                         <Link
                           href={localizePath(`/messages/${thread.id}`, locale)}
-                          className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 mt-2"
+                          className="inline-flex items-center gap-1 text-xs text-primary-text hover:text-emerald-700 mt-2"
                         >
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3-3-3z" />

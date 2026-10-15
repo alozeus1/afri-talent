@@ -1,42 +1,170 @@
 @import "tailwindcss";
+@import "../styles/dark-compat.css";
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * AfriTalent design tokens.
+ *
+ * Semantic, theme-aware tokens. Components should use the Tailwind utilities
+ * generated from @theme below (bg-canvas, bg-surface, text-fg, text-fg-muted,
+ * border-line, bg-primary, text-success ...) instead of raw palette classes
+ * such as text-gray-900 / bg-white, which do not adapt to dark mode.
+ * Every text/background pair below meets WCAG AA (4.5:1 body, 3:1 large/UI);
+ * see docs/design-system.md for the contrast table.
+ */
 :root {
-  --background: #fafafa;
-  --foreground: #0f172a;
+  /* Surfaces */
+  --canvas: #f7f7f5;
   --surface: #ffffff;
-  --surface-strong: #f8fafc;
-  --surface-soft: #fafafa;
-  --border-soft: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --brand: #0f766e; /* Tailwind teal-700 */
-  --brand-strong: #0f8f78;
-  --accent: #d97706; /* Tailwind amber-600 */
-  --accent-soft: rgba(217, 119, 6, 0.1);
+  --surface-raised: #ffffff;
+  --surface-sunken: #f3f3f1;
+  --surface-muted: #ecece8;
+  --surface-inverse: #18181b;
+  /* Lines */
+  --line: #e4e4e0;
+  --line-strong: #d0d0ca;
+  /* Text */
+  --fg: #18181b;
+  --fg-secondary: #3f3f46;
+  --fg-muted: #5b5b66;
+  --fg-inverse: #fafafa;
+  /* Brand */
+  --primary: #047857;
+  --primary-hover: #065f46;
+  --primary-fg: #ffffff;
+  --primary-text: #047857;
+  --primary-soft: #ecfdf5;
+  --accent: #b45309;
+  --accent-text: #b45309;
+  --accent-soft: #fffbeb;
+  /* Status (text color / soft background / border) */
+  --success: #047857;
+  --success-soft: #ecfdf5;
+  --success-line: #a7f3d0;
+  --warning: #b45309;
+  --warning-soft: #fffbeb;
+  --warning-line: #fde68a;
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
+  --danger-line: #fecaca;
+  --info: #1d4ed8;
+  --info-soft: #eff6ff;
+  --info-line: #bfdbfe;
+  /* Focus */
   --focus-ring: #059669;
   --focus-ring-soft: rgba(5, 150, 105, 0.24);
-  --transition-fast: 150ms ease;
-  --transition-base: 220ms ease;
-  --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
-  --shadow-elevated: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  /* Elevation */
+  --shadow-xs: 0 1px 2px rgba(24, 24, 27, 0.05);
+  --shadow-soft: 0 1px 2px rgba(24, 24, 27, 0.04), 0 2px 8px -2px rgba(24, 24, 27, 0.06);
+  --shadow-elevated: 0 12px 24px -8px rgba(24, 24, 27, 0.12), 0 4px 8px -4px rgba(24, 24, 27, 0.06);
+  --shadow-overlay: 0 24px 48px -12px rgba(24, 24, 27, 0.25);
+  /* Motion */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --transition-fast: 150ms var(--ease-standard);
+  --transition-base: 220ms var(--ease-standard);
+
+  /* Legacy aliases (kept so existing var(--...) usages keep working) */
+  --background: var(--canvas);
+  --foreground: var(--fg);
+  --surface-strong: var(--surface-sunken);
+  --surface-soft: var(--canvas);
+  --border-soft: var(--line);
+  --border-strong: var(--line-strong);
+  --brand: var(--primary);
+  --brand-strong: var(--primary-hover);
 }
 
 html.dark {
-  --background: #09090b; /* Zinc 950 */
-  --foreground: #f8fafc;
-  --surface: #18181b; /* Zinc 900 */
-  --surface-strong: #27272a; /* Zinc 800 */
-  --surface-soft: #18181b;
-  --border-soft: #27272a;
-  --border-strong: #3f3f46;
-  --brand: #0f766e; /* Tailwind teal-700 */
-  --brand-strong: #14b8a6; /* Tailwind teal-500 */
-  --accent: #f59e0b; /* Tailwind amber-500 */
-  --accent-soft: rgba(245, 158, 11, 0.15);
+  --canvas: #0b0b0e;
+  --surface: #131316;
+  --surface-raised: #1b1b20;
+  --surface-sunken: #0f0f12;
+  --surface-muted: #222228;
+  --surface-inverse: #f4f4f5;
+  --line: #2a2a31;
+  --line-strong: #3b3b44;
+  --fg: #f4f4f5;
+  --fg-secondary: #d4d4d8;
+  --fg-muted: #a1a1aa;
+  --fg-inverse: #18181b;
+  --primary: #047857;
+  --primary-hover: #065f46;
+  --primary-fg: #ffffff;
+  --primary-text: #34d399;
+  --primary-soft: rgba(16, 185, 129, 0.12);
+  --accent: #f59e0b;
+  --accent-text: #fbbf24;
+  --accent-soft: rgba(245, 158, 11, 0.12);
+  --success: #34d399;
+  --success-soft: rgba(16, 185, 129, 0.12);
+  --success-line: rgba(52, 211, 153, 0.3);
+  --warning: #fbbf24;
+  --warning-soft: rgba(245, 158, 11, 0.12);
+  --warning-line: rgba(251, 191, 36, 0.3);
+  --danger: #f87171;
+  --danger-soft: rgba(239, 68, 68, 0.12);
+  --danger-line: rgba(248, 113, 113, 0.3);
+  --info: #60a5fa;
+  --info-soft: rgba(59, 130, 246, 0.12);
+  --info-line: rgba(96, 165, 250, 0.3);
   --focus-ring: #34d399;
   --focus-ring-soft: rgba(52, 211, 153, 0.22);
-  --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-elevated: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px -2px rgba(0, 0, 0, 0.35);
+  --shadow-elevated: 0 12px 24px -8px rgba(0, 0, 0, 0.55), 0 4px 8px -4px rgba(0, 0, 0, 0.35);
+  --shadow-overlay: 0 24px 48px -12px rgba(0, 0, 0, 0.7);
+}
+
+/* Expose tokens as Tailwind utilities: bg-surface, text-fg, border-line ... */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-secondary: var(--fg-secondary);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-inverse: var(--fg-inverse);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-text: var(--primary-text);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-line: var(--success-line);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-line: var(--warning-line);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-line: var(--danger-line);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-line: var(--info-line);
+  --color-focus: var(--focus-ring);
+  /* shadcn-style aliases already used by a few components */
+  --color-background: var(--canvas);
+  --color-foreground: var(--fg);
+  --color-muted-foreground: var(--fg-muted);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-card: var(--shadow-soft);
+  --shadow-raised: var(--shadow-elevated);
+  --shadow-overlay: var(--shadow-overlay);
+
+  --radius-control: 0.625rem;
+  --radius-card: 1rem;
+  --radius-panel: 1.25rem;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 html {
@@ -61,8 +189,8 @@ body {
   position: absolute;
   top: -40px;
   left: 0;
-  background: var(--brand);
-  color: white;
+  background: var(--primary);
+  color: var(--primary-fg);
   padding: 8px;
   z-index: 100;
   transition: top 0.2s ease;
@@ -129,26 +257,21 @@ h4,
 }
 
 .interactive-card:hover {
-  border-color: rgba(16, 185, 129, 0.45);
+  border-color: color-mix(in oklab, var(--focus-ring) 45%, transparent);
   box-shadow: var(--shadow-elevated);
   transform: translateY(-2px);
 }
 
 .interactive-card:focus-within {
-  border-color: rgba(16, 185, 129, 0.55);
+  border-color: color-mix(in oklab, var(--focus-ring) 55%, transparent);
 }
 
 .skeleton-shimmer {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(90deg, rgba(226, 232, 240, 0.8), rgba(241, 245, 249, 0.95), rgba(226, 232, 240, 0.8));
+  background: linear-gradient(90deg, var(--surface-muted), var(--surface-sunken), var(--surface-muted));
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
-}
-
-.dark .skeleton-shimmer {
-  background: linear-gradient(90deg, rgba(39, 39, 42, 0.9), rgba(63, 63, 70, 0.8), rgba(39, 39, 42, 0.9));
-  background-size: 200% 100%;
 }
 
 .surface-panel-strong {

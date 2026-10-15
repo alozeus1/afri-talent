@@ -16,10 +16,10 @@ export function TrustSupportCard({
   supportEmail = "support@afritalent.com",
 }: TrustSupportCardProps) {
   return (
-    <Card className="border-slate-200 bg-slate-50">
+    <Card className="border-line bg-surface-sunken">
       <CardHeader>
-        <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
-        <p className="text-sm leading-6 text-slate-600">{description}</p>
+        <h2 className="text-xl font-semibold text-fg">{title}</h2>
+        <p className="text-sm leading-6 text-fg-secondary">{description}</p>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-3">
         <Link href={reportHref}>
@@ -28,13 +28,13 @@ export function TrustSupportCard({
         <Link
           href="/contact?topic=TRUST_SAFETY"
           prefetch={false}
-          className="inline-flex items-center justify-center rounded-lg border-2 border-emerald-600 px-3 py-1.5 text-sm font-medium text-emerald-600 transition-colors hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+          className="inline-flex items-center justify-center rounded-lg border-2 border-emerald-600 px-3 py-1.5 text-sm font-medium text-primary-text transition-colors hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
         >
           Contact support
         </Link>
         <a
           href={`mailto:${supportEmail}?subject=AfriTalent%20Trust%20Support`}
-          className="inline-flex items-center px-1 text-sm font-medium text-slate-600 underline-offset-2 hover:underline"
+          className="inline-flex items-center px-1 text-sm font-medium text-fg-secondary underline-offset-2 hover:underline"
         >
           {supportEmail}
         </a>

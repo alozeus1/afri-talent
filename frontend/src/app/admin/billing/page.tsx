@@ -314,14 +314,14 @@ export default function AdminBillingPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
-      <section className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-100 via-white to-emerald-50 p-8">
+      <section className="rounded-3xl border border-line bg-gradient-to-br from-slate-100 via-white to-emerald-50 p-8">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700 mb-3">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-fg-secondary mb-3">
               Admin Billing Operations
             </p>
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Reconciliation, support, and pricing safety</h1>
-            <p className="max-w-3xl text-lg text-gray-600">
+            <h1 className="text-4xl font-bold text-fg mb-4">Reconciliation, support, and pricing safety</h1>
+            <p className="max-w-3xl text-lg text-fg-secondary">
               Track webhook health, subscription state drift, pending refunds, and entitlement sync issues before they become finance or support escalations.
             </p>
           </div>
@@ -351,54 +351,54 @@ export default function AdminBillingPage() {
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Successful payments</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Successful payments</p>
             <p className="mt-3 text-3xl font-bold text-emerald-700">{dashboard.metrics.successfulPayments}</p>
-            <p className="mt-1 text-xs text-gray-500">Since {new Date(dashboard.windows.paymentsSince).toLocaleDateString()}</p>
+            <p className="mt-1 text-xs text-fg-muted">Since {new Date(dashboard.windows.paymentsSince).toLocaleDateString()}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Failed payments</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Failed payments</p>
             <p className="mt-3 text-3xl font-bold text-amber-700">{dashboard.metrics.failedPayments}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Webhook failures</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Webhook failures</p>
             <p className="mt-3 text-3xl font-bold text-red-700">{dashboard.metrics.webhookFailures}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Subscription mismatches</p>
-            <p className="mt-3 text-3xl font-bold text-slate-900">{dashboard.metrics.mismatchedSubscriptionStates}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Subscription mismatches</p>
+            <p className="mt-3 text-3xl font-bold text-fg">{dashboard.metrics.mismatchedSubscriptionStates}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Unpaid but entitled</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Unpaid but entitled</p>
             <p className="mt-3 text-3xl font-bold text-orange-700">{dashboard.metrics.unpaidButEntitled}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Paid but not entitled</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Paid but not entitled</p>
             <p className="mt-3 text-3xl font-bold text-red-800">{dashboard.metrics.paidButNotEntitled}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Pending refunds</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Pending refunds</p>
             <p className="mt-3 text-3xl font-bold text-blue-700">{dashboard.metrics.pendingRefunds}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Last reconciliation</p>
-            <p className="mt-3 text-lg font-bold text-slate-900">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Last reconciliation</p>
+            <p className="mt-3 text-lg font-bold text-fg">
               {dashboard.lastReconciliationRun ? dashboard.lastReconciliationRun.status : "Never"}
             </p>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-fg-muted">
               {dashboard.lastReconciliationRun
                 ? new Date(dashboard.lastReconciliationRun.startedAt).toLocaleString()
                 : "No run recorded yet"}
@@ -407,9 +407,9 @@ export default function AdminBillingPage() {
         </Card>
       </div>
 
-      <Card className="border-slate-200">
+      <Card className="border-line">
         <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">Find customer billing history</h2>
+          <h2 className="text-xl font-semibold text-fg">Find customer billing history</h2>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleSearch} className="flex flex-col gap-3 md:flex-row">
@@ -430,12 +430,12 @@ export default function AdminBillingPage() {
                   key={result.id}
                   type="button"
                   onClick={() => void loadCustomer(result.id)}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:border-emerald-300"
+                  className="rounded-2xl border border-line bg-surface px-4 py-4 text-left transition hover:border-emerald-300"
                 >
                   <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <p className="font-semibold text-gray-900">{result.name}</p>
-                      <p className="text-sm text-gray-600">{result.email}</p>
+                      <p className="font-semibold text-fg">{result.name}</p>
+                      <p className="text-sm text-fg-secondary">{result.email}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="default">{result.subscription?.plan || "FREE"}</Badge>
@@ -457,9 +457,9 @@ export default function AdminBillingPage() {
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
-        <Card className="border-slate-200">
+        <Card className="border-line">
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Open discrepancy queue</h2>
+            <h2 className="text-xl font-semibold text-fg">Open discrepancy queue</h2>
           </CardHeader>
           <CardContent className="space-y-4">
             {openDiscrepancies.length === 0 ? (
@@ -468,15 +468,15 @@ export default function AdminBillingPage() {
               </div>
             ) : (
               openDiscrepancies.map((item) => (
-                <div key={item.id} className="rounded-2xl border border-slate-200 p-4">
+                <div key={item.id} className="rounded-2xl border border-line p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
-                      <p className="font-semibold text-gray-900">{item.title}</p>
-                      <p className="mt-1 text-sm text-gray-600">
+                      <p className="font-semibold text-fg">{item.title}</p>
+                      <p className="mt-1 text-sm text-fg-secondary">
                         {item.user?.email || "No linked user"} • {item.type.replaceAll("_", " ")}
                       </p>
                       {item.reasonCode && (
-                        <p className="mt-2 text-xs uppercase tracking-[0.14em] text-gray-500">
+                        <p className="mt-2 text-xs uppercase tracking-[0.14em] text-fg-muted">
                           Reason: {item.reasonCode}
                         </p>
                       )}
@@ -488,7 +488,7 @@ export default function AdminBillingPage() {
                       <Badge variant="info">{item.status}</Badge>
                     </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500">
+                  <div className="mt-3 flex flex-wrap gap-3 text-xs text-fg-muted">
                     <span>Detected {new Date(item.detectedAt).toLocaleString()}</span>
                     {item.dueAt && <span>Due {new Date(item.dueAt).toLocaleString()}</span>}
                   </div>
@@ -505,23 +505,23 @@ export default function AdminBillingPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200">
+        <Card className="border-line">
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Recent reconciliation runs</h2>
+            <h2 className="text-xl font-semibold text-fg">Recent reconciliation runs</h2>
           </CardHeader>
           <CardContent className="space-y-3">
             {runs.length === 0 ? (
-              <p className="text-sm text-gray-600">No reconciliation runs recorded yet.</p>
+              <p className="text-sm text-fg-secondary">No reconciliation runs recorded yet.</p>
             ) : (
               runs.map((run) => (
-                <div key={run.id} className="rounded-2xl border border-slate-200 p-4">
+                <div key={run.id} className="rounded-2xl border border-line p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="font-semibold text-gray-900">{run.status}</p>
+                    <p className="font-semibold text-fg">{run.status}</p>
                     <Badge variant={run.status === "FAILED" ? "danger" : run.status === "PARTIAL" ? "warning" : "success"}>
                       {run.checkedSubscriptions} checked
                     </Badge>
                   </div>
-                  <div className="mt-2 text-sm text-gray-600">
+                  <div className="mt-2 text-sm text-fg-secondary">
                     <p>{new Date(run.startedAt).toLocaleString()}</p>
                     <p>
                       {run.subscriptionMismatches} mismatches • {run.failedPayments} failed payments • {run.pendingRefunds} pending refunds
@@ -536,12 +536,12 @@ export default function AdminBillingPage() {
 
       {selectedCustomer && (
         <section className="space-y-6">
-          <Card className="border-slate-200">
+          <Card className="border-line">
             <CardHeader>
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <h2 className="text-2xl font-semibold text-gray-900">{selectedCustomer.name}</h2>
-                  <p className="text-sm text-gray-600">{selectedCustomer.email}</p>
+                  <h2 className="text-2xl font-semibold text-fg">{selectedCustomer.name}</h2>
+                  <p className="text-sm text-fg-secondary">{selectedCustomer.email}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="default">{selectedCustomer.subscription?.plan || "FREE"}</Badge>
@@ -555,9 +555,9 @@ export default function AdminBillingPage() {
               </div>
             </CardHeader>
             <CardContent className="grid gap-6 lg:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Billing profile</p>
-                <div className="mt-3 space-y-2 text-sm text-gray-700">
+              <div className="rounded-2xl border border-line p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-fg-muted">Billing profile</p>
+                <div className="mt-3 space-y-2 text-sm text-fg-secondary">
                   <p>Region: {selectedCustomer.billingProfile?.region || "ROW"}</p>
                   <p>Country: {selectedCustomer.billingProfile?.country || "n/a"}</p>
                   <p>Stripe country: {selectedCustomer.billingProfile?.stripeCountry || "n/a"}</p>
@@ -565,9 +565,9 @@ export default function AdminBillingPage() {
                   <p>VAT / Tax ID: {selectedCustomer.billingProfile?.taxIdValue || "n/a"}</p>
                 </div>
               </div>
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Subscription</p>
-                <div className="mt-3 space-y-2 text-sm text-gray-700">
+              <div className="rounded-2xl border border-line p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-fg-muted">Subscription</p>
+                <div className="mt-3 space-y-2 text-sm text-fg-secondary">
                   <p>Provider: {selectedCustomer.subscription?.billingProvider || "n/a"}</p>
                   <p>Provider customer: {selectedCustomer.subscription?.providerCustomerId || "n/a"}</p>
                   <p>Provider subscription: {selectedCustomer.subscription?.providerSubscriptionId || "n/a"}</p>
@@ -576,9 +576,9 @@ export default function AdminBillingPage() {
                   <p>Current period end: {selectedCustomer.subscription?.currentPeriodEnd ? new Date(selectedCustomer.subscription.currentPeriodEnd).toLocaleString() : "n/a"}</p>
                 </div>
               </div>
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Entitlement state</p>
-                <div className="mt-3 space-y-2 text-sm text-gray-700">
+              <div className="rounded-2xl border border-line p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-fg-muted">Entitlement state</p>
+                <div className="mt-3 space-y-2 text-sm text-fg-secondary">
                   <p>Effective plan: {selectedCustomer.billingEntitlementState?.effectivePlan || "FREE"}</p>
                   <p>Effective status: {selectedCustomer.billingEntitlementState?.effectiveStatus || "INACTIVE"}</p>
                   <p>Synced: {selectedCustomer.billingEntitlementState?.lastSyncedAt ? new Date(selectedCustomer.billingEntitlementState.lastSyncedAt).toLocaleString() : "never"}</p>
@@ -593,15 +593,15 @@ export default function AdminBillingPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-slate-200">
+          <Card className="border-line">
             <CardHeader>
-              <h3 className="text-xl font-semibold text-gray-900">Premium and AI capability control</h3>
+              <h3 className="text-xl font-semibold text-fg">Premium and AI capability control</h3>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 lg:grid-cols-[0.9fr,1.1fr]">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Current effective capabilities</p>
-                  <div className="mt-3 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
+                <div className="rounded-2xl border border-line bg-surface-sunken p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-fg-muted">Current effective capabilities</p>
+                  <div className="mt-3 grid gap-2 text-sm text-fg-secondary sm:grid-cols-2">
                     <p>AI resume reviews: {formatEntitlementLimit(effectiveEntitlements?.aiResumeReviews)}</p>
                     <p>AI job matches: {formatEntitlementLimit(effectiveEntitlements?.aiJobMatches)}</p>
                     <p>AI apply packs: {formatEntitlementLimit(effectiveEntitlements?.aiApplyPacks)}</p>
@@ -613,15 +613,15 @@ export default function AdminBillingPage() {
                   </div>
                 </div>
 
-                <form onSubmit={handleCapabilityAccess} className="space-y-4 rounded-2xl border border-slate-200 p-4">
+                <form onSubmit={handleCapabilityAccess} className="space-y-4 rounded-2xl border border-line p-4">
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                     Scoped controls map to approved plans, sync BillingEntitlementState, and write support/audit events. Use the raw subscription override only for non-standard cases.
                   </div>
                   <div className="grid gap-3 md:grid-cols-3">
-                    <label className="text-sm text-gray-700">
+                    <label className="text-sm text-fg-secondary">
                       <span className="mb-1 block">Capability</span>
                       <select
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2"
+                        className="w-full rounded-xl border border-line-strong px-3 py-2"
                         value={capabilityForm.capability}
                         onChange={(event) =>
                           setCapabilityForm((current) => ({
@@ -640,10 +640,10 @@ export default function AdminBillingPage() {
                         )}
                       </select>
                     </label>
-                    <label className="text-sm text-gray-700">
+                    <label className="text-sm text-fg-secondary">
                       <span className="mb-1 block">Action</span>
                       <select
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2"
+                        className="w-full rounded-xl border border-line-strong px-3 py-2"
                         value={capabilityForm.action}
                         onChange={(event) =>
                           setCapabilityForm((current) => ({
@@ -656,7 +656,7 @@ export default function AdminBillingPage() {
                         <option value="REVOKE">Revoke</option>
                       </select>
                     </label>
-                    <label className="text-sm text-gray-700">
+                    <label className="text-sm text-fg-secondary">
                       <span className="mb-1 block">Reason code</span>
                       <Input
                         value={capabilityForm.reasonCode}
@@ -669,10 +669,10 @@ export default function AdminBillingPage() {
                       />
                     </label>
                   </div>
-                  <label className="block text-sm text-gray-700">
+                  <label className="block text-sm text-fg-secondary">
                     <span className="mb-1 block">Audit notes</span>
                     <textarea
-                      className="min-h-[100px] w-full rounded-2xl border border-gray-300 px-3 py-3"
+                      className="min-h-[100px] w-full rounded-2xl border border-line-strong px-3 py-3"
                       value={capabilityForm.notes}
                       onChange={(event) =>
                         setCapabilityForm((current) => ({
@@ -690,9 +690,9 @@ export default function AdminBillingPage() {
               </div>
 
               {selectedPlanEntitlements.length > 0 && (
-                <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                  <table className="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+                <div className="overflow-x-auto rounded-2xl border border-line">
+                  <table className="min-w-full divide-y divide-line text-sm">
+                    <thead className="bg-surface-sunken text-left text-xs font-semibold uppercase tracking-[0.14em] text-fg-muted">
                       <tr>
                         <th className="px-4 py-3">Plan</th>
                         <th className="px-4 py-3">AI reviews</th>
@@ -703,10 +703,10 @@ export default function AdminBillingPage() {
                         <th className="px-4 py-3">Employer premium</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white text-gray-700">
+                    <tbody className="divide-y divide-line bg-surface text-fg-secondary">
                       {selectedPlanEntitlements.map((plan) => (
                         <tr key={plan.plan}>
-                          <td className="px-4 py-3 font-semibold text-gray-900">{plan.plan}</td>
+                          <td className="px-4 py-3 font-semibold text-fg">{plan.plan}</td>
                           <td className="px-4 py-3">{formatEntitlementLimit(plan.aiResumeReviews)}</td>
                           <td className="px-4 py-3">{formatEntitlementLimit(plan.aiJobMatches)}</td>
                           <td className="px-4 py-3">{formatEntitlementLimit(plan.aiApplyPacks)}</td>
@@ -724,12 +724,12 @@ export default function AdminBillingPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-slate-200">
+          <Card className="border-line">
             <CardHeader>
-              <h3 className="text-xl font-semibold text-gray-900">Subscription access override</h3>
+              <h3 className="text-xl font-semibold text-fg">Subscription access override</h3>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <div className="rounded-2xl border border-line bg-surface-sunken p-4 text-sm text-fg-secondary">
                 This updates the existing subscription record and immediately re-syncs effective entitlements. It does not create a separate access system.
               </div>
               {(selectedCustomer.subscription?.billingProvider
@@ -739,12 +739,12 @@ export default function AdminBillingPage() {
                   A live provider-linked subscription is still attached to this account. Future billing webhooks may overwrite local plan or status changes.
                 </div>
               )}
-              <form onSubmit={handleSubscriptionAccess} className="space-y-4 rounded-2xl border border-slate-200 p-4">
+              <form onSubmit={handleSubscriptionAccess} className="space-y-4 rounded-2xl border border-line p-4">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <label className="text-sm text-gray-700">
+                  <label className="text-sm text-fg-secondary">
                     <span className="mb-1 block">Plan</span>
                     <select
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2"
+                      className="w-full rounded-xl border border-line-strong px-3 py-2"
                       value={subscriptionAccessForm.plan}
                       onChange={(event) =>
                         setSubscriptionAccessForm((current) => ({
@@ -760,10 +760,10 @@ export default function AdminBillingPage() {
                       ))}
                     </select>
                   </label>
-                  <label className="text-sm text-gray-700">
+                  <label className="text-sm text-fg-secondary">
                     <span className="mb-1 block">Status</span>
                     <select
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2"
+                      className="w-full rounded-xl border border-line-strong px-3 py-2"
                       value={subscriptionAccessForm.status}
                       onChange={(event) =>
                         setSubscriptionAccessForm((current) => ({
@@ -779,7 +779,7 @@ export default function AdminBillingPage() {
                       ))}
                     </select>
                   </label>
-                  <label className="text-sm text-gray-700">
+                  <label className="text-sm text-fg-secondary">
                     <span className="mb-1 block">Current period end</span>
                     <Input
                       type="datetime-local"
@@ -792,7 +792,7 @@ export default function AdminBillingPage() {
                       }
                     />
                   </label>
-                  <label className="text-sm text-gray-700">
+                  <label className="text-sm text-fg-secondary">
                     <span className="mb-1 block">Reason code</span>
                     <Input
                       value={subscriptionAccessForm.reasonCode}
@@ -805,10 +805,10 @@ export default function AdminBillingPage() {
                     />
                   </label>
                 </div>
-                <label className="block text-sm text-gray-700">
+                <label className="block text-sm text-fg-secondary">
                   <span className="mb-1 block">Audit notes</span>
                   <textarea
-                    className="min-h-[120px] w-full rounded-2xl border border-gray-300 px-3 py-3"
+                    className="min-h-[120px] w-full rounded-2xl border border-line-strong px-3 py-3"
                     value={subscriptionAccessForm.notes}
                     onChange={(event) =>
                       setSubscriptionAccessForm((current) => ({
@@ -823,7 +823,7 @@ export default function AdminBillingPage() {
                   <Button type="submit" disabled={busy === "subscription-access"}>
                     {busy === "subscription-access" ? "Updating..." : "Update subscription access"}
                   </Button>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-fg-muted">
                     Role-compatible plans only: {selectedCustomer.role === "EMPLOYER" ? "EMPLOYER_*" : "FREE, BASIC, PROFESSIONAL"}.
                   </p>
                 </div>
@@ -832,20 +832,20 @@ export default function AdminBillingPage() {
           </Card>
 
           <div className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
-            <Card className="border-slate-200">
+            <Card className="border-line">
               <CardHeader>
-                <h3 className="text-xl font-semibold text-gray-900">Payment, invoice, and webhook history</h3>
+                <h3 className="text-xl font-semibold text-fg">Payment, invoice, and webhook history</h3>
               </CardHeader>
               <CardContent className="space-y-3">
                 {selectedCustomer.billingEvents.length === 0 ? (
-                  <p className="text-sm text-gray-600">No billing events recorded yet.</p>
+                  <p className="text-sm text-fg-secondary">No billing events recorded yet.</p>
                 ) : (
                   selectedCustomer.billingEvents.map((event) => (
-                    <div key={event.id} className="rounded-2xl border border-slate-200 p-4">
+                    <div key={event.id} className="rounded-2xl border border-line p-4">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
-                          <p className="font-semibold text-gray-900">{event.eventType}</p>
-                          <p className="mt-1 text-sm text-gray-600">
+                          <p className="font-semibold text-fg">{event.eventType}</p>
+                          <p className="mt-1 text-sm text-fg-secondary">
                             {formatMinorAmount(event.amountMinor, event.currency)} • {event.source}
                           </p>
                         </div>
@@ -856,7 +856,7 @@ export default function AdminBillingPage() {
                           {event.status && <Badge variant="info">{event.status}</Badge>}
                         </div>
                       </div>
-                      <div className="mt-3 text-xs text-gray-500">
+                      <div className="mt-3 text-xs text-fg-muted">
                         <p>{new Date(event.createdAt).toLocaleString()}</p>
                         <p>Invoice: {event.stripeInvoiceId || "n/a"} • Refund: {event.stripeRefundId || "n/a"}</p>
                       </div>
@@ -866,17 +866,17 @@ export default function AdminBillingPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-slate-200">
+            <Card className="border-line">
               <CardHeader>
-                <h3 className="text-xl font-semibold text-gray-900">Support actions</h3>
+                <h3 className="text-xl font-semibold text-fg">Support actions</h3>
               </CardHeader>
               <CardContent className="space-y-4">
-                <form onSubmit={handleSupportAction} className="space-y-3 rounded-2xl border border-slate-200 p-4">
+                <form onSubmit={handleSupportAction} className="space-y-3 rounded-2xl border border-line p-4">
                   <div className="grid gap-3 md:grid-cols-2">
-                    <label className="text-sm text-gray-700">
+                    <label className="text-sm text-fg-secondary">
                       <span className="mb-1 block">Action type</span>
                       <select
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2"
+                        className="w-full rounded-xl border border-line-strong px-3 py-2"
                         value={supportForm.actionType}
                         onChange={(event) =>
                           setSupportForm((current) => ({
@@ -893,7 +893,7 @@ export default function AdminBillingPage() {
                         <option value="GRANDFATHER_OVERRIDE">Grandfather override</option>
                       </select>
                     </label>
-                    <label className="text-sm text-gray-700">
+                    <label className="text-sm text-fg-secondary">
                       <span className="mb-1 block">Reason code</span>
                       <Input
                         value={supportForm.reasonCode}
@@ -901,7 +901,7 @@ export default function AdminBillingPage() {
                       />
                     </label>
                   </div>
-                  <label className="text-sm text-gray-700 block">
+                  <label className="text-sm text-fg-secondary block">
                     <span className="mb-1 block">Invoice ID for resend, if needed</span>
                     <Input
                       value={supportForm.invoiceId}
@@ -909,10 +909,10 @@ export default function AdminBillingPage() {
                       placeholder="in_..."
                     />
                   </label>
-                  <label className="text-sm text-gray-700 block">
+                  <label className="text-sm text-fg-secondary block">
                     <span className="mb-1 block">Notes</span>
                     <textarea
-                      className="min-h-[120px] w-full rounded-2xl border border-gray-300 px-3 py-3"
+                      className="min-h-[120px] w-full rounded-2xl border border-line-strong px-3 py-3"
                       value={supportForm.notes}
                       onChange={(event) => setSupportForm((current) => ({ ...current, notes: event.target.value }))}
                       placeholder="Summarize the support decision, customer context, or next step."
@@ -924,16 +924,16 @@ export default function AdminBillingPage() {
                 </form>
 
                 {selectedCustomer.billingSupportActions.length === 0 ? (
-                  <p className="text-sm text-gray-600">No support actions recorded yet.</p>
+                  <p className="text-sm text-fg-secondary">No support actions recorded yet.</p>
                 ) : (
                   selectedCustomer.billingSupportActions.map((action) => (
-                    <div key={action.id} className="rounded-2xl border border-slate-200 p-4">
+                    <div key={action.id} className="rounded-2xl border border-line p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="font-semibold text-gray-900">{action.actionType.replaceAll("_", " ")}</p>
+                        <p className="font-semibold text-fg">{action.actionType.replaceAll("_", " ")}</p>
                         <Badge variant="info">{action.reasonCode}</Badge>
                       </div>
-                      <p className="mt-2 text-sm text-gray-600">{action.notes || "No notes recorded."}</p>
-                      <p className="mt-3 text-xs text-gray-500">
+                      <p className="mt-2 text-sm text-fg-secondary">{action.notes || "No notes recorded."}</p>
+                      <p className="mt-3 text-xs text-fg-muted">
                         {action.actor?.name || "Admin"} • {new Date(action.createdAt).toLocaleString()}
                       </p>
                     </div>

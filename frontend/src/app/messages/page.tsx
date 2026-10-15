@@ -80,8 +80,8 @@ export default function MessagesPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Messages</h1>
-        <p className="text-gray-600">Your conversations</p>
+        <h1 className="text-3xl font-bold text-fg mb-2">Messages</h1>
+        <p className="text-fg-secondary">Your conversations</p>
       </div>
 
       {guidance && (
@@ -108,7 +108,7 @@ export default function MessagesPage() {
 
       <Card>
         <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">All Conversations</h2>
+          <h2 className="text-xl font-semibold text-fg">All Conversations</h2>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -132,13 +132,13 @@ export default function MessagesPage() {
                   d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
                 />
               </svg>
-              <p className="text-gray-600">No messages yet</p>
+              <p className="text-fg-secondary">No messages yet</p>
               <p className="text-sm text-gray-400 mt-1">
                 Messages from job applications will appear here
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-line">
               {threads.map((thread) => {
                 const otherParticipants = thread.participants.filter(
                   (p) => p.id !== user.id
@@ -150,12 +150,12 @@ export default function MessagesPage() {
                   <Link
                     key={thread.id}
                     href={localizePath(`/messages/${thread.id}`, locale)}
-                    className="block py-4 hover:bg-gray-50 -mx-6 px-6 transition-colors"
+                    className="block py-4 hover:bg-surface-sunken -mx-6 px-6 transition-colors"
                   >
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-gray-900 truncate">
+                          <span className="font-medium text-fg truncate">
                             {participantNames}
                           </span>
                           {thread.job && (
@@ -163,7 +163,7 @@ export default function MessagesPage() {
                           )}
                         </div>
                         {thread.lastMessage ? (
-                          <p className="text-sm text-gray-600 truncate">
+                          <p className="text-sm text-fg-secondary truncate">
                             {thread.lastMessage.sender.id === user.id && (
                               <span className="text-gray-400">You: </span>
                             )}

@@ -324,8 +324,8 @@ export default function InterviewsPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Hero */}
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">{t("interviews.title")}</h1>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+        <h1 className="text-4xl font-bold text-fg mb-4">{t("interviews.title")}</h1>
+        <p className="text-lg text-fg-secondary max-w-2xl mx-auto">
           {t("interviews.practiceSubtitle")}
         </p>
       </div>
@@ -348,14 +348,14 @@ export default function InterviewsPage() {
 
           {/* Filter Chips */}
           <div className="flex flex-wrap gap-2">
-            <span className="text-sm text-gray-500 self-center mr-2">{t("common.difficulty")}:</span>
+            <span className="text-sm text-fg-muted self-center mr-2">{t("common.difficulty")}:</span>
             {DIFFICULTY_OPTIONS.map((d) => (
               <button
                 key={d}
                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                   filterDifficulty === d
                     ? "bg-emerald-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    : "bg-surface-muted text-fg-secondary hover:bg-gray-200"
                 }`}
                 onClick={() => {
                   setFilterDifficulty(filterDifficulty === d ? "" : d);
@@ -366,14 +366,14 @@ export default function InterviewsPage() {
               </button>
             ))}
 
-            <span className="text-sm text-gray-500 self-center ml-4 mr-2">{t("common.outcome")}:</span>
+            <span className="text-sm text-fg-muted self-center ml-4 mr-2">{t("common.outcome")}:</span>
             {["OFFERED", "REJECTED"].map((o) => (
               <button
                 key={o}
                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                   filterOutcome === o
                     ? "bg-emerald-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    : "bg-surface-muted text-fg-secondary hover:bg-gray-200"
                 }`}
                 onClick={() => {
                   setFilterOutcome(filterOutcome === o ? "" : o);
@@ -419,9 +419,9 @@ export default function InterviewsPage() {
       {!loading && filteredExperiences && (
         <>
           {filteredExperiences.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
-              <p className="text-lg font-semibold text-gray-900 mb-2">{t("interviews.noMatch")}</p>
-              <p className="mx-auto max-w-xl text-sm leading-6 text-gray-500">
+            <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken p-10 text-center">
+              <p className="text-lg font-semibold text-fg mb-2">{t("interviews.noMatch")}</p>
+              <p className="mx-auto max-w-xl text-sm leading-6 text-fg-muted">
                 {t("interviews.noMatchDesc")}
               </p>
             </div>
@@ -453,7 +453,7 @@ export default function InterviewsPage() {
               >
                 {t("common.previous")}
               </Button>
-              <span className="flex items-center px-4 text-gray-600">
+              <span className="flex items-center px-4 text-fg-secondary">
                 Page {page} of {data.pagination.totalPages}
               </span>
               <Button
@@ -491,11 +491,11 @@ export default function InterviewsPage() {
           <Card className="w-full max-w-2xl mb-10">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-fg">
                   {t("interviews.shareExperience")}
                 </h2>
                 <button
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                  className="text-gray-400 hover:text-fg-secondary text-2xl"
                   onClick={() => {
                     setShowSubmitForm(false);
                     setSubmitError(null);
@@ -545,13 +545,13 @@ export default function InterviewsPage() {
                   <div className="w-full">
                     <label
                       htmlFor="interview-difficulty"
-                      className="block text-sm font-medium text-gray-700 mb-1"
+                      className="block text-sm font-medium text-fg-secondary mb-1"
                     >
                       Difficulty
                     </label>
                     <select
                       id="interview-difficulty"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       value={formData.difficulty}
                       onChange={(e) =>
                         setFormData({ ...formData, difficulty: e.target.value })
@@ -567,13 +567,13 @@ export default function InterviewsPage() {
                   <div className="w-full">
                     <label
                       htmlFor="interview-outcome"
-                      className="block text-sm font-medium text-gray-700 mb-1"
+                      className="block text-sm font-medium text-fg-secondary mb-1"
                     >
                       Outcome
                     </label>
                     <select
                       id="interview-outcome"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       value={formData.outcome}
                       onChange={(e) =>
                         setFormData({ ...formData, outcome: e.target.value })
@@ -590,13 +590,13 @@ export default function InterviewsPage() {
                   <div className="w-full">
                     <label
                       htmlFor="interview-type"
-                      className="block text-sm font-medium text-gray-700 mb-1"
+                      className="block text-sm font-medium text-fg-secondary mb-1"
                     >
                       Interview Type
                     </label>
                     <select
                       id="interview-type"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       value={formData.interviewType}
                       onChange={(e) =>
                         setFormData({
@@ -618,13 +618,13 @@ export default function InterviewsPage() {
                 <div className="w-full">
                   <label
                     htmlFor="interview-process"
-                    className="block text-sm font-medium text-gray-700 mb-1"
+                    className="block text-sm font-medium text-fg-secondary mb-1"
                   >
                     {t("interviews.interviewProcess")}
                   </label>
                   <textarea
                     id="interview-process"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[100px]"
+                    className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[100px]"
                     placeholder="Describe the interview process step by step..."
                     value={formData.process}
                     onChange={(e) =>
@@ -636,7 +636,7 @@ export default function InterviewsPage() {
 
                 {/* Questions */}
                 <div className="w-full">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-fg-secondary mb-1">
                     {t("interviews.interviewQuestions")}
                   </label>
                   {formData.questions.map((q, i) => (
@@ -672,13 +672,13 @@ export default function InterviewsPage() {
                   <div className="w-full">
                     <label
                       htmlFor="interview-tips"
-                      className="block text-sm font-medium text-gray-700 mb-1"
+                      className="block text-sm font-medium text-fg-secondary mb-1"
                     >
                       {t("interviews.tipsForOthers")}
                     </label>
                     <textarea
                       id="interview-tips"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px]"
+                      className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px]"
                       placeholder="Any tips for future candidates?"
                       value={formData.tips}
                       onChange={(e) =>
@@ -747,10 +747,10 @@ function InterviewCard({
       <CardContent className="p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-fg">
               {experience.company?.name || "Unknown Company"}
             </h3>
-            <p className="text-sm text-gray-600">{experience.jobTitle}</p>
+            <p className="text-sm text-fg-secondary">{experience.jobTitle}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {isSampleScenario && <Badge variant="warning">{t("interviews.sampleScenario")}</Badge>}
@@ -761,7 +761,7 @@ function InterviewCard({
             </Badge>
             <button
               type="button"
-              className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+              className="rounded-full border border-line px-3 py-1 text-xs font-semibold text-fg-secondary hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
               aria-expanded={isExpanded}
               onClick={(event) => {
                 event.stopPropagation();
@@ -773,7 +773,7 @@ function InterviewCard({
           </div>
         </div>
 
-        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+        <p className="text-fg-secondary text-sm mb-3 line-clamp-2">
           {experience.process}
         </p>
 
@@ -787,26 +787,26 @@ function InterviewCard({
         {/* Expanded Detail */}
         {isExpanded && (
           <div
-            className="mt-4 pt-4 border-t border-gray-100 space-y-4"
+            className="mt-4 pt-4 border-t border-line space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-2">
+              <h4 className="text-sm font-semibold text-fg mb-2">
                 {t("interviews.fullProcess")}
               </h4>
-              <p className="text-sm text-gray-600 whitespace-pre-wrap">
+              <p className="text-sm text-fg-secondary whitespace-pre-wrap">
                 {experience.process}
               </p>
             </div>
 
             {experience.questions.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                <h4 className="text-sm font-semibold text-fg mb-2">
                   {t("interviews.questionsLabel")}
                 </h4>
                 <ul className="list-disc list-inside space-y-1">
                   {experience.questions.map((q, i) => (
-                    <li key={i} className="text-sm text-gray-600">
+                    <li key={i} className="text-sm text-fg-secondary">
                       {q}
                     </li>
                   ))}
@@ -816,10 +816,10 @@ function InterviewCard({
 
             {experience.tips && (
               <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                <h4 className="text-sm font-semibold text-fg mb-2">
                   {t("interviews.tipsLabel")}
                 </h4>
-                <p className="text-sm text-gray-600">{experience.tips}</p>
+                <p className="text-sm text-fg-secondary">{experience.tips}</p>
               </div>
             )}
 
@@ -832,7 +832,7 @@ function InterviewCard({
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-line">
           <span className="text-xs text-gray-400">
             {new Date(experience.createdAt).toLocaleDateString()}
           </span>
@@ -840,8 +840,8 @@ function InterviewCard({
             type="button"
             className={`flex items-center gap-1 rounded-md px-2 py-1 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed ${
               isHelpfulMarked
-                ? "text-emerald-600 font-medium"
-                : "text-gray-400 hover:text-emerald-600"
+                ? "text-primary-text font-medium"
+                : "text-gray-400 hover:text-primary-text"
             }`}
             disabled={isHelpfulMarked || isHelpfulLoading}
             aria-pressed={isHelpfulMarked}

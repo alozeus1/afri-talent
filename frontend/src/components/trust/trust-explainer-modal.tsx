@@ -62,7 +62,7 @@ export function TrustExplainerModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-line bg-surface p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">
@@ -70,10 +70,10 @@ export function TrustExplainerModal({
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">
                   Trust explainer
                 </p>
-                <h2 id={titleId} className="mt-3 text-2xl font-bold text-slate-950">
+                <h2 id={titleId} className="mt-3 text-2xl font-bold text-fg">
                   {title}
                 </h2>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
+                <p className="mt-3 text-sm leading-6 text-fg-secondary">{description}</p>
               </div>
               <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
                 Close
@@ -84,12 +84,12 @@ export function TrustExplainerModal({
               {items.map((item) => (
                 <div
                   key={`${item.title}-${item.description}`}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
+                  className="rounded-2xl border border-line bg-surface-sunken px-4 py-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-slate-900">{item.title}</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
+                      <p className="font-semibold text-fg">{item.title}</p>
+                      <p className="mt-2 text-sm leading-6 text-fg-secondary">{item.description}</p>
                     </div>
                     {item.statusLabel ? (
                       <TrustBadge

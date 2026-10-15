@@ -81,7 +81,7 @@ export function MessageComposer({
           type="checkbox"
           checked={sendEmail}
           onChange={(e) => setSendEmail(e.target.checked)}
-          className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 dark:border-zinc-600 dark:bg-zinc-900"
+          className="h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500 dark:border-zinc-600 dark:bg-zinc-900"
         />
         {t("message.sendEmail")}
       </label>

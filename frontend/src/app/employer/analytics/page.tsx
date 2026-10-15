@@ -182,9 +182,9 @@ export default function EmployerAnalyticsPage() {
             ].map((stat) => (
               <Card key={stat.label}>
                 <CardContent className="p-5">
-                  <p className="text-sm text-gray-500">{stat.label}</p>
-                  <p className="mt-2 text-3xl font-semibold text-gray-900">{stat.value}</p>
-                  <p className="mt-2 text-sm text-gray-600">{stat.helper}</p>
+                  <p className="text-sm text-fg-muted">{stat.label}</p>
+                  <p className="mt-2 text-3xl font-semibold text-fg">{stat.value}</p>
+                  <p className="mt-2 text-sm text-fg-secondary">{stat.helper}</p>
                 </CardContent>
               </Card>
             ))}
@@ -198,20 +198,20 @@ export default function EmployerAnalyticsPage() {
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
             <Card>
               <CardHeader>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
                   Funnel conversion
                 </p>
-                <h2 className="mt-2 text-xl font-semibold text-gray-900">From published job to accepted candidate</h2>
+                <h2 className="mt-2 text-xl font-semibold text-fg">From published job to accepted candidate</h2>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {advancedAnalytics.funnel.map((step) => (
-                    <div key={step.step} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <div key={step.step} className="rounded-2xl border border-line bg-surface-sunken p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
                         {step.step.replace(/_/g, " ")}
                       </p>
-                      <p className="mt-2 text-2xl font-semibold text-gray-900">{step.count}</p>
-                      <p className="mt-2 text-xs text-gray-500">
+                      <p className="mt-2 text-2xl font-semibold text-fg">{step.count}</p>
+                      <p className="mt-2 text-xs text-fg-muted">
                         {step.conversionFromPrevious == null
                           ? "Baseline"
                           : `${step.conversionFromPrevious}% from previous step`}
@@ -238,7 +238,7 @@ export default function EmployerAnalyticsPage() {
               </Card>
 
               {roi && !FREE_MODE && (
-                <Card className="border-slate-200 bg-slate-950 text-white">
+                <Card className="border-line bg-slate-950 text-white">
                   <CardHeader>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
                       Upgrade framing
@@ -263,16 +263,16 @@ export default function EmployerAnalyticsPage() {
 
           <Card>
             <CardHeader>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
                 Job performance
               </p>
-              <h2 className="mt-2 text-xl font-semibold text-gray-900">Which postings are producing qualified signal</h2>
+              <h2 className="mt-2 text-xl font-semibold text-fg">Which postings are producing qualified signal</h2>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[860px] text-left">
                   <thead>
-                    <tr className="border-b border-gray-200 text-sm text-gray-500">
+                    <tr className="border-b border-line text-sm text-fg-muted">
                       <th className="pb-3 font-medium">Job</th>
                       <th className="pb-3 font-medium">Impressions</th>
                       <th className="pb-3 font-medium">Clicks</th>
@@ -284,18 +284,18 @@ export default function EmployerAnalyticsPage() {
                       <th className="pb-3 font-medium">Time to first app</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-line">
                     {advancedAnalytics.postingPerformance.map((row) => (
                       <tr key={row.jobId}>
-                        <td className="py-3 text-sm font-medium text-gray-900">{row.title}</td>
-                        <td className="py-3 text-sm text-gray-600">{row.impressions}</td>
-                        <td className="py-3 text-sm text-gray-600">{row.clicks}</td>
-                        <td className="py-3 text-sm text-gray-600">{row.applicationCount}</td>
-                        <td className="py-3 text-sm text-gray-600">{row.qualifiedApplicants}</td>
-                        <td className="py-3 text-sm text-gray-600">{row.ctr}%</td>
-                        <td className="py-3 text-sm text-gray-600">{row.shortlistRate}%</td>
-                        <td className="py-3 text-sm text-gray-600">{row.qualityScore}</td>
-                        <td className="py-3 text-sm text-gray-600">
+                        <td className="py-3 text-sm font-medium text-fg">{row.title}</td>
+                        <td className="py-3 text-sm text-fg-secondary">{row.impressions}</td>
+                        <td className="py-3 text-sm text-fg-secondary">{row.clicks}</td>
+                        <td className="py-3 text-sm text-fg-secondary">{row.applicationCount}</td>
+                        <td className="py-3 text-sm text-fg-secondary">{row.qualifiedApplicants}</td>
+                        <td className="py-3 text-sm text-fg-secondary">{row.ctr}%</td>
+                        <td className="py-3 text-sm text-fg-secondary">{row.shortlistRate}%</td>
+                        <td className="py-3 text-sm text-fg-secondary">{row.qualityScore}</td>
+                        <td className="py-3 text-sm text-fg-secondary">
                           {row.timeToFirstApplicationHours == null ? "N/A" : `${row.timeToFirstApplicationHours}h`}
                         </td>
                       </tr>
@@ -309,10 +309,10 @@ export default function EmployerAnalyticsPage() {
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
             <Card>
               <CardHeader>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
                   Candidate pipeline
                 </p>
-                <h2 className="mt-2 text-xl font-semibold text-gray-900">How quickly applications are moving</h2>
+                <h2 className="mt-2 text-xl font-semibold text-fg">How quickly applications are moving</h2>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -323,9 +323,9 @@ export default function EmployerAnalyticsPage() {
                     ["Accepted", advancedAnalytics.candidatePipeline.accepted],
                     ["Rejected", advancedAnalytics.candidatePipeline.rejected],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-2xl border border-gray-200 bg-white p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
-                      <p className="mt-2 text-2xl font-semibold text-gray-900">{value as number}</p>
+                    <div key={label} className="rounded-2xl border border-line bg-surface p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-fg-muted">{label}</p>
+                      <p className="mt-2 text-2xl font-semibold text-fg">{value as number}</p>
                     </div>
                   ))}
                   <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:col-span-2 xl:col-span-1">
@@ -344,28 +344,28 @@ export default function EmployerAnalyticsPage() {
 
             <Card>
               <CardHeader>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
                   Recent applications
                 </p>
-                <h2 className="mt-2 text-xl font-semibold text-gray-900">Fresh candidate activity</h2>
+                <h2 className="mt-2 text-xl font-semibold text-fg">Fresh candidate activity</h2>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {analytics.recentApplications.length === 0 ? (
-                    <p className="text-sm text-gray-600">Applications will appear here once candidates start applying.</p>
+                    <p className="text-sm text-fg-secondary">Applications will appear here once candidates start applying.</p>
                   ) : (
                     analytics.recentApplications.map((app) => (
-                      <div key={app.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+                      <div key={app.id} className="rounded-2xl border border-line bg-surface px-4 py-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p className="font-semibold text-gray-900">{app.candidate.name}</p>
-                            <p className="text-sm text-gray-600">{app.job.title}</p>
+                            <p className="font-semibold text-fg">{app.candidate.name}</p>
+                            <p className="text-sm text-fg-secondary">{app.job.title}</p>
                           </div>
                           <Badge variant={statusVariants[app.status] || "default"}>
                             {app.status.replace(/_/g, " ")}
                           </Badge>
                         </div>
-                        <p className="mt-2 text-sm text-gray-500">
+                        <p className="mt-2 text-sm text-fg-muted">
                           Applied {new Date(app.createdAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -378,10 +378,10 @@ export default function EmployerAnalyticsPage() {
 
           <Card>
             <CardHeader>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
                 Employer brand
               </p>
-              <h2 className="mt-2 text-xl font-semibold text-gray-900">Strengthen the company story candidates see</h2>
+              <h2 className="mt-2 text-xl font-semibold text-fg">Strengthen the company story candidates see</h2>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSaveBranding} className="max-w-3xl space-y-4">
@@ -406,19 +406,19 @@ export default function EmployerAnalyticsPage() {
                   placeholder="City, Country"
                 />
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Bio</label>
+                  <label className="mb-1 block text-sm font-medium text-fg-secondary">Bio</label>
                   <textarea
-                    className="min-h-[150px] w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-emerald-500"
+                    className="min-h-[150px] w-full rounded-lg border border-line-strong px-4 py-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-emerald-500"
                     value={brandingForm.bio}
                     onChange={(e) => setBrandingForm({ ...brandingForm, bio: e.target.value })}
                     placeholder="Tell candidates about the company, product, team, and why the role matters."
                   />
                 </div>
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="rounded-xl border border-line bg-surface-sunken p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{FREE_MODE ? "Dashboard branding" : "Premium dashboard branding"}</p>
-                      <p className="mt-1 text-sm text-gray-600">
+                      <p className="text-sm font-semibold text-fg">{FREE_MODE ? "Dashboard branding" : "Premium dashboard branding"}</p>
+                      <p className="mt-1 text-sm text-fg-secondary">
                         {FREE_MODE
                           ? "Apply your logo and colors across your AfriTalent employer surfaces."
                           : "Active Employer Premium companies can apply their logo and colors across their AfriTalent employer surfaces."}
@@ -464,7 +464,7 @@ export default function EmployerAnalyticsPage() {
                     {savingBranding ? "Saving..." : "Save branding"}
                   </Button>
                   {brandingSaved && (
-                    <span className="text-sm font-medium text-emerald-600">Saved successfully</span>
+                    <span className="text-sm font-medium text-primary-text">Saved successfully</span>
                   )}
                 </div>
               </form>

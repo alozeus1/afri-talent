@@ -61,7 +61,7 @@ export function FaqSection() {
 
   return (
     <div className="max-w-3xl mx-auto" data-testid="pricing-faq">
-      <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
+      <h2 className="text-2xl font-bold text-fg text-center mb-8">
         Frequently Asked Questions
       </h2>
       <div className="space-y-2">
@@ -70,7 +70,7 @@ export function FaqSection() {
           return (
             <div
               key={i}
-              className="border border-gray-200 rounded-lg overflow-hidden"
+              className="border border-line rounded-lg overflow-hidden"
             >
               <button
                 onClick={() => {
@@ -78,10 +78,10 @@ export function FaqSection() {
                   setOpenIndex(next);
                   if (next !== null) pricingEvents.faqExpand(item.question);
                 }}
-                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition"
+                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-surface-sunken transition"
                 aria-expanded={isOpen}
               >
-                <span className="text-sm font-medium text-gray-900 pr-4">
+                <span className="text-sm font-medium text-fg pr-4">
                   {item.question}
                 </span>
                 <svg
@@ -95,7 +95,7 @@ export function FaqSection() {
               </button>
               {isOpen && (
                 <div className="px-5 pb-4">
-                  <p className="text-sm text-gray-600 leading-relaxed">{item.answer}</p>
+                  <p className="text-sm text-fg-secondary leading-relaxed">{item.answer}</p>
                 </div>
               )}
             </div>

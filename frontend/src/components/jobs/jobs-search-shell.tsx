@@ -123,7 +123,7 @@ export function JobsSearchShell({ filters, isPending = false, onNavigate, result
           })
         }
       />
-      <div className="mt-3 flex flex-col gap-2 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-3 flex flex-col gap-2 text-sm text-fg-muted sm:flex-row sm:items-center sm:justify-between">
         <p>
           {isLowBandwidth
             ? "Search is pacing requests more gently to save data on slower connections."

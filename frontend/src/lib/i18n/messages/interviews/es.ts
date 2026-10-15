@@ -1,0 +1,28 @@
+import type en from "./en";
+
+export default {
+  "interviews.title": "Perspectivas de entrevistas",
+  "interviews.subtitle": "Aprende de la comunidad. Lee experiencias reales de entrevistas y prepárate para tu próxima oportunidad.",
+  "interviews.practiceSubtitle": "Practica con escenarios de muestra claramente etiquetados ahora. Las experiencias reales de la comunidad aparecerán después de que los primeros probadores envíen entradas verificadas.",
+  "interviews.searchPlaceholder": "Buscar por nombre de empresa o título de trabajo...",
+  "interviews.clearFilters": "Borrar filtros",
+  "interviews.noMatch": "Aún no hay escenarios de entrevista coincidentes",
+  "interviews.noMatchDesc": "Intenta borrar los filtros o usar los escenarios de muestra para practicar.",
+  "interviews.shareExperience": "Comparte tu experiencia",
+  "interviews.sampleScenario": "Escenario de entrevista de muestra",
+  "interviews.viewDetails": "Ver detalles",
+  "interviews.hideDetails": "Ocultar detalles",
+  "interviews.fullProcess": "Proceso completo de entrevista",
+  "interviews.questionsLabel": "Preguntas de entrevista",
+  "interviews.tipsLabel": "Consejos",
+  "interviews.durationLabel": "Duración",
+  "interviews.shareSuccess": "¡Experiencia compartida con éxito! Gracias por ayudar a la comunidad.",
+  "interviews.companyId": "ID de empresa",
+  "interviews.jobTitle": "Título del puesto",
+  "interviews.interviewProcess": "Proceso de entrevista",
+  "interviews.interviewQuestions": "Preguntas de entrevista",
+  "interviews.tipsForOthers": "Consejos para otros",
+  "interviews.duration": "Duración",
+  "interviews.addQuestion": "+ Agregar pregunta",
+  "interviews.shareButton": "Compartir experiencia",
+} satisfies Record<keyof typeof en, string>;

@@ -149,7 +149,7 @@ export function EarlyTesterFeedback({
               <input
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
-                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full rounded-md border border-emerald-200 bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 placeholder="First name"
                 autoComplete="given-name"
               />
@@ -159,7 +159,7 @@ export function EarlyTesterFeedback({
               <input
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
-                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full rounded-md border border-emerald-200 bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 placeholder="Last name"
                 autoComplete="family-name"
               />
@@ -181,7 +181,7 @@ export function EarlyTesterFeedback({
                 className={`h-9 w-9 rounded-full border text-sm font-semibold transition-colors ${
                   rating === value
                     ? "border-emerald-700 bg-emerald-700 text-white"
-                    : "border-emerald-200 bg-white text-emerald-800 hover:border-emerald-500"
+                    : "border-emerald-200 bg-surface text-emerald-800 hover:border-emerald-500"
                 }`}
               >
                 {value}
@@ -195,7 +195,7 @@ export function EarlyTesterFeedback({
             rows={4}
             maxLength={2000}
             aria-describedby="early-tester-feedback-hint"
-            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full rounded-md border border-emerald-200 bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-emerald-500"
             placeholder="Tell us what was useful, confusing, or missing."
           />
           <p id="early-tester-feedback-hint" className="-mt-2 text-xs text-emerald-800">
@@ -280,14 +280,14 @@ export function EarlyTesterFeedback({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <div>
-                            <p className="text-sm font-semibold text-gray-900">{entry.displayName}</p>
+                            <p className="text-sm font-semibold text-fg">{entry.displayName}</p>
                             <Stars rating={entry.rating} />
                           </div>
                           <p className="text-[11px] text-gray-400">
                             {new Date(entry.createdAt).toLocaleDateString()}
                           </p>
                         </div>
-                        <p className="mt-2 text-sm text-gray-700">{entry.comment}</p>
+                        <p className="mt-2 text-sm text-fg-secondary">{entry.comment}</p>
                       </div>
                     </div>
                   </CardContent>

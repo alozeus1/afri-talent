@@ -32,11 +32,11 @@ export function PremiumGate({
         <div className="rounded-full bg-blue-100 p-3 text-2xl">✦</div>
         <div>
           <h3 className="font-semibold text-lg">{feature} requires {requiredPlan}</h3>
-          <p className="text-sm text-gray-500 mt-1 max-w-sm">
+          <p className="text-sm text-fg-muted mt-1 max-w-sm">
             {description ??
               `${feature} is available on the ${requiredPlan} plan${priceCopy}. Upgrade when you are ready to unlock this workflow.`}
           </p>
-          <ul className="mt-3 space-y-1 text-sm text-gray-600">
+          <ul className="mt-3 space-y-1 text-sm text-fg-secondary">
             {benefits.map((benefit) => (
               <li key={benefit}>{benefit}</li>
             ))}

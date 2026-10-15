@@ -24,7 +24,7 @@ import { localizePath, useLocale } from "@/lib/i18n/client";
 import { FREE_MODE } from "@/lib/free-mode";
 
 const statusVariants: Record<string, string> = {
-  DRAFT: "bg-gray-100 text-gray-700",
+  DRAFT: "bg-surface-muted text-fg-secondary",
   PENDING_REVIEW: "bg-amber-100 text-amber-800",
   PUBLISHED: "bg-emerald-100 text-emerald-800",
   REJECTED: "bg-rose-100 text-rose-800",
@@ -184,7 +184,7 @@ export default function EmployerDashboard() {
         orientation="horizontal"
         onValueChange={(val) => setSelectedTab(val)}
       >
-        <div className="mb-8 border-b border-gray-200 dark:border-zinc-800">
+        <div className="mb-8 border-b border-line dark:border-zinc-800">
           <Tabs.List
             className="flex -mb-px space-x-8 overflow-x-auto hide-scrollbar"
             aria-label="Employer Dashboard Tabs"
@@ -192,7 +192,7 @@ export default function EmployerDashboard() {
             {tabItems.map((item, idx) => (
               <Tabs.Trigger
                 key={idx}
-                className="data-[state=active]:border-emerald-600 data-[state=active]:text-emerald-600 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:data-[state=active]:text-emerald-400 dark:data-[state=active]:border-emerald-400 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+                className="data-[state=active]:border-emerald-600 data-[state=active]:text-primary-text border-transparent text-fg-muted hover:text-fg-secondary hover:border-line-strong dark:text-gray-400 dark:hover:text-gray-300 dark:data-[state=active]:text-emerald-400 dark:data-[state=active]:border-emerald-400 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
                 value={item}
               >
                 {item}
@@ -230,11 +230,11 @@ export default function EmployerDashboard() {
             helper: "Measured from first approved job",
           },
         ].map((stat) => (
-          <Card key={stat.label} className="border-gray-200 bg-white">
+          <Card key={stat.label} className="border-line bg-surface">
             <CardContent className="p-5">
-              <p className="text-sm text-gray-500">{stat.label}</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-900">{stat.value}</p>
-              <p className="mt-2 text-sm text-gray-600">{stat.helper}</p>
+              <p className="text-sm text-fg-muted">{stat.label}</p>
+              <p className="mt-2 text-3xl font-semibold text-fg">{stat.value}</p>
+              <p className="mt-2 text-sm text-fg-secondary">{stat.helper}</p>
             </CardContent>
           </Card>
         ))}
@@ -258,10 +258,10 @@ export default function EmployerDashboard() {
             <div className="space-y-6">
               <Card className={trustDashboard?.trust.postingEligibility ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/70"}>
                 <CardHeader>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
                     Trust status
                   </p>
-                  <h2 className="mt-2 text-lg font-semibold text-gray-900">
+                  <h2 className="mt-2 text-lg font-semibold text-fg">
                     {trustDashboard?.trust.postingEligibility
                       ? "Public posting is unlocked"
                       : "Verification still blocks public posting"}
@@ -270,11 +270,11 @@ export default function EmployerDashboard() {
                 <CardContent>
                   {trustDashboard ? (
                     <>
-                      <p className="text-sm text-gray-700">
+                      <p className="text-sm text-fg-secondary">
                         Authenticity score {trustDashboard.trust.authenticityScore} and risk score {trustDashboard.trust.riskScore}.
                       </p>
                       {trustDashboard.trust.warnings.length > 0 && (
-                        <ul className="mt-3 space-y-2 text-sm text-gray-700">
+                        <ul className="mt-3 space-y-2 text-sm text-fg-secondary">
                           {trustDashboard.trust.warnings.map((warning) => (
                             <li key={warning}>• {warning}</li>
                           ))}
@@ -289,13 +289,13 @@ export default function EmployerDashboard() {
                       </div>
                     </>
                   ) : (
-                    <p className="text-sm text-gray-600">Trust profile unavailable right now.</p>
+                    <p className="text-sm text-fg-secondary">Trust profile unavailable right now.</p>
                   )}
                 </CardContent>
               </Card>
 
               {!FREE_MODE && (
-                <Card className="border-slate-200 bg-slate-950 text-white">
+                <Card className="border-line bg-slate-950 text-white">
                   <CardHeader>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
                       Upgrade journey
@@ -349,10 +349,10 @@ export default function EmployerDashboard() {
           <CardHeader>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
                   Live job board
                 </p>
-                <h2 className="mt-2 text-xl font-semibold text-gray-900">Current openings and trust posture</h2>
+                <h2 className="mt-2 text-xl font-semibold text-fg">Current openings and trust posture</h2>
               </div>
               <Link href={localizePath("/employer/jobs/new", locale)}>
                 <Button>Post new job</Button>
@@ -367,9 +367,9 @@ export default function EmployerDashboard() {
             ) : loadError ? (
               <LoadErrorCard error={loadError} subject="your jobs" onRetry={retryLoadDashboard} />
             ) : myJobs.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center">
-                <p className="text-lg font-semibold text-gray-900">No jobs live yet</p>
-                <p className="mt-2 text-sm text-gray-600">
+              <div className="rounded-3xl border border-dashed border-line-strong bg-surface-sunken px-6 py-10 text-center">
+                <p className="text-lg font-semibold text-fg">No jobs live yet</p>
+                <p className="mt-2 text-sm text-fg-secondary">
                   Finish onboarding, preview quality, and publish the first role built to attract qualified applicants.
                 </p>
                 <div className="mt-5 flex justify-center gap-3">
@@ -389,12 +389,12 @@ export default function EmployerDashboard() {
                 {myJobs.map((job) => (
                   <div
                     key={job.id}
-                    className="flex flex-col gap-4 rounded-3xl border border-gray-200 bg-white px-5 py-5 lg:flex-row lg:items-center lg:justify-between"
+                    className="flex flex-col gap-4 rounded-3xl border border-line bg-surface px-5 py-5 lg:flex-row lg:items-center lg:justify-between"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusVariants[job.status] || "bg-gray-100 text-gray-700"}`}>
+                        <h3 className="text-lg font-semibold text-fg">{job.title}</h3>
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusVariants[job.status] || "bg-surface-muted text-fg-secondary"}`}>
                           {job.status.replace(/_/g, " ")}
                         </span>
                         {job.trust?.companyReviewed && (
@@ -407,14 +407,14 @@ export default function EmployerDashboard() {
                           <TrustBadge label="New employer caution" riskLevel="MEDIUM" variant="warning" />
                         )}
                       </div>
-                      <p className="mt-2 text-sm text-gray-600">
+                      <p className="mt-2 text-sm text-fg-secondary">
                         {job.location} • {job.type} • {job.seniority}
                       </p>
-                      <p className="mt-1 text-sm text-gray-500">
+                      <p className="mt-1 text-sm text-fg-muted">
                         {job._count?.applications || 0} application(s) • Created {new Date(job.createdAt).toLocaleDateString()}
                       </p>
                       {job.trust?.guidance && (
-                        <p className="mt-3 text-sm text-gray-600">{job.trust.guidance}</p>
+                        <p className="mt-3 text-sm text-fg-secondary">{job.trust.guidance}</p>
                       )}
                     </div>
                     <div className="flex flex-wrap gap-3">

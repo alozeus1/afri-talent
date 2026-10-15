@@ -17,10 +17,10 @@ const levelVariants: Record<string, "default" | "info" | "success" | "warning"> 
 };
 
 const levelColors: Record<string, string> = {
-  beginner: "text-gray-600",
+  beginner: "text-fg-secondary",
   intermediate: "text-blue-600",
   advanced: "text-purple-600",
-  expert: "text-emerald-600",
+  expert: "text-primary-text",
 };
 
 function CircularProgress({ score }: { score: number }) {
@@ -47,7 +47,7 @@ function CircularProgress({ score }: { score: number }) {
           strokeLinecap="round"
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-gray-900">
+      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-fg">
         {score}%
       </span>
     </div>
@@ -131,7 +131,7 @@ export default function CandidateSkillsPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Back Link */}
-      <Link href="/candidate" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
+      <Link href="/candidate" className="inline-flex items-center text-primary-text hover:text-emerald-700 mb-6">
         <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
@@ -140,8 +140,8 @@ export default function CandidateSkillsPage() {
 
       {/* Hero */}
       <div className="mb-10">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Validate Your Skills</h1>
-        <p className="text-gray-600 text-lg">Take assessments to stand out to employers</p>
+        <h1 className="text-3xl font-bold text-fg mb-2">Validate Your Skills</h1>
+        <p className="text-fg-secondary text-lg">Take assessments to stand out to employers</p>
       </div>
 
       {error && (
@@ -159,14 +159,14 @@ export default function CandidateSkillsPage() {
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <Card className="w-full max-w-md">
                 <CardContent className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  <h3 className="text-xl font-semibold text-fg mb-2">
                     {activeAssessment.skillName} Assessment
                   </h3>
-                  <p className="text-gray-600 mb-6">
+                  <p className="text-fg-secondary mb-6">
                     Complete the assessment and submit your score.
                   </p>
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-fg-secondary mb-2">
                       Score: {scoreInput}%
                     </label>
                     <input
@@ -208,12 +208,12 @@ export default function CandidateSkillsPage() {
 
           {/* Section 1: My Assessments */}
           <div className="mb-12">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">My Assessments</h2>
+            <h2 className="text-xl font-semibold text-fg mb-4">My Assessments</h2>
             {myAssessments.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center">
                   <div className="text-4xl mb-4">🎯</div>
-                  <p className="text-gray-600">Take your first assessment to showcase your abilities</p>
+                  <p className="text-fg-secondary">Take your first assessment to showcase your abilities</p>
                 </CardContent>
               </Card>
             ) : (
@@ -225,12 +225,12 @@ export default function CandidateSkillsPage() {
                         {assessment.score !== null ? (
                           <CircularProgress score={assessment.score} />
                         ) : (
-                          <div className="h-16 w-16 flex-shrink-0 rounded-full bg-gray-100 flex items-center justify-center">
+                          <div className="h-16 w-16 flex-shrink-0 rounded-full bg-surface-muted flex items-center justify-center">
                             <span className="text-gray-400 text-sm">—</span>
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 truncate">
+                          <h3 className="font-semibold text-fg truncate">
                             {assessment.skillName}
                           </h3>
                           <div className="flex flex-wrap gap-2 mt-1">
@@ -254,7 +254,7 @@ export default function CandidateSkillsPage() {
                       {/* Score bar */}
                       {assessment.score !== null && (
                         <div className="mt-4">
-                          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-2 bg-surface-muted rounded-full overflow-hidden">
                             <div
                               className={`h-full rounded-full transition-all ${
                                 assessment.score >= 80
@@ -268,7 +268,7 @@ export default function CandidateSkillsPage() {
                               style={{ width: `${assessment.score}%` }}
                             />
                           </div>
-                          <p className={`text-xs mt-1 ${levelColors[assessment.level?.toLowerCase() || ""] || "text-gray-500"}`}>
+                          <p className={`text-xs mt-1 ${levelColors[assessment.level?.toLowerCase() || ""] || "text-fg-muted"}`}>
                             Score: {assessment.score}/100
                           </p>
                         </div>
@@ -282,11 +282,11 @@ export default function CandidateSkillsPage() {
 
           {/* Section 2: Available Assessments */}
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Available Assessments</h2>
+            <h2 className="text-xl font-semibold text-fg mb-4">Available Assessments</h2>
             {availableSkills.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center">
-                  <p className="text-gray-600">No additional assessments available at this time.</p>
+                  <p className="text-fg-secondary">No additional assessments available at this time.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -295,11 +295,11 @@ export default function CandidateSkillsPage() {
                   <Card key={skillName} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-5 text-center">
                       <div className="h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-3">
-                        <span className="text-emerald-600 text-lg font-bold">
+                        <span className="text-primary-text text-lg font-bold">
                           {skillName.charAt(0).toUpperCase()}
                         </span>
                       </div>
-                      <h3 className="font-semibold text-gray-900 mb-3">{skillName}</h3>
+                      <h3 className="font-semibold text-fg mb-3">{skillName}</h3>
                       <Button
                         size="sm"
                         onClick={() => handleStartAssessment(skillName)}

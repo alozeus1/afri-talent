@@ -160,8 +160,8 @@ export default function AdminBlogPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">Blog Automation</h1>
-          <p className="text-gray-600 text-sm">Review AI-generated weekly blog posts before publication</p>
+          <h1 className="text-3xl font-bold text-fg mb-1">Blog Automation</h1>
+          <p className="text-fg-secondary text-sm">Review AI-generated weekly blog posts before publication</p>
         </div>
         <div className="flex flex-col gap-2 items-start sm:items-end">
           <Button
@@ -185,14 +185,14 @@ export default function AdminBlogPage() {
           onValueChange={(val) => { setFilter(val as StatusFilter); setPage(1); }}
         >
           <Tabs.List
-            className="flex items-center gap-x-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm text-sm"
+            className="flex items-center gap-x-1 p-1 bg-surface border border-line rounded-xl shadow-sm text-sm"
             aria-label="Filter Blog Posts"
           >
             {(["pending", "published", "all"] as StatusFilter[]).map((f) => (
               <Tabs.Trigger
                 key={f}
                 value={f}
-                className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-gray-500 hover:text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-medium"
+                className="data-[state=active]:bg-surface-muted data-[state=active]:text-fg data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-fg-muted hover:text-fg-secondary hover:bg-surface-sunken active:bg-surface-muted font-medium"
               >
                 {f === "pending" ? "Pending Review" : f === "published" ? "Published" : "All"}
               </Tabs.Trigger>
@@ -217,7 +217,7 @@ export default function AdminBlogPage() {
             <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">📝</span>
             </div>
-            <p className="text-gray-600 font-medium mb-2">
+            <p className="text-fg-secondary font-medium mb-2">
               {filter === "pending" ? "No posts awaiting review" : "No posts found"}
             </p>
             <p className="text-gray-400 text-sm">
@@ -235,7 +235,7 @@ export default function AdminBlogPage() {
                 <div className="flex flex-col md:flex-row">
                   {/* Cover image */}
                   {post.coverImage && (
-                    <div className="relative w-full md:w-56 h-40 md:h-auto flex-shrink-0 bg-gray-100">
+                    <div className="relative w-full md:w-56 h-40 md:h-auto flex-shrink-0 bg-surface-muted">
                       <Image
                         src={post.coverImage}
                         alt={post.title}
@@ -260,11 +260,11 @@ export default function AdminBlogPage() {
                       </span>
                     </div>
 
-                    <h2 className="text-lg font-semibold text-gray-900 mb-2 leading-snug">
+                    <h2 className="text-lg font-semibold text-fg mb-2 leading-snug">
                       {post.title}
                     </h2>
 
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{post.excerpt}</p>
+                    <p className="text-sm text-fg-secondary mb-4 line-clamp-2">{post.excerpt}</p>
 
                     {post.reviewNotes && post.reviewStatus === "REJECTED" && (
                       <p className="text-xs text-red-600 bg-red-50 rounded p-2 mb-4">
@@ -277,7 +277,7 @@ export default function AdminBlogPage() {
                       <Link
                         href={`/resources/${post.slug}`}
                         target="_blank"
-                        className="text-sm text-emerald-600 hover:text-emerald-700 underline"
+                        className="text-sm text-primary-text hover:text-emerald-700 underline"
                       >
                         Preview post →
                       </Link>
@@ -303,7 +303,7 @@ export default function AdminBlogPage() {
                           ) : (
                             <div className="w-full flex flex-col gap-2 mt-2">
                               <textarea
-                                className="w-full border border-gray-300 rounded-lg p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="w-full border border-line-strong rounded-lg p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 rows={2}
                                 placeholder="Rejection reason (required)..."
                                 value={rejectNotes[post.id] ?? ""}
@@ -350,7 +350,7 @@ export default function AdminBlogPage() {
               <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
                 Previous
               </Button>
-              <span className="flex items-center px-3 text-sm text-gray-600">
+              <span className="flex items-center px-3 text-sm text-fg-secondary">
                 Page {page} of {pagination.totalPages}
               </span>
               <Button

@@ -171,14 +171,14 @@ export default function ResumesPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="mb-8">
-        <Link href={localizePath("/candidate", locale)} className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-4">
+        <Link href={localizePath("/candidate", locale)} className="inline-flex items-center text-primary-text hover:text-emerald-700 mb-4">
           <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Back to Dashboard
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Resume Management</h1>
-        <p className="text-gray-600">Upload and manage your resumes for Quick Apply</p>
+        <h1 className="text-3xl font-bold text-fg mb-2">Resume Management</h1>
+        <p className="text-fg-secondary">Upload and manage your resumes for Quick Apply</p>
       </div>
 
       {/* Success / Error Messages */}
@@ -199,20 +199,20 @@ export default function ResumesPage() {
       {/* Section 1: Active Resume */}
       <Card className="mb-6">
         <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">Active Resume</h2>
+          <h2 className="text-xl font-semibold text-fg">Active Resume</h2>
         </CardHeader>
         <CardContent>
           {activeResume ? (
             <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg border border-emerald-200">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-6 h-6 text-primary-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900">{activeResume.fileName}</p>
-                  <p className="text-sm text-gray-600">
+                  <p className="font-semibold text-fg">{activeResume.fileName}</p>
+                  <p className="text-sm text-fg-secondary">
                     Uploaded {new Date(activeResume.uploadedAt).toLocaleDateString()}
                   </p>
                 </div>
@@ -220,7 +220,7 @@ export default function ResumesPage() {
               <Badge variant="success">Active</Badge>
             </div>
           ) : (
-            <div className="text-center py-6 text-gray-500">
+            <div className="text-center py-6 text-fg-muted">
               <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
@@ -234,10 +234,10 @@ export default function ResumesPage() {
       {/* Section 2: Upload Resume */}
       <Card className="mb-6">
         <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">Upload Resume</h2>
+          <h2 className="text-xl font-semibold text-fg">Upload Resume</h2>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-fg-muted mb-4">
             Accepted formats: .pdf, .doc, .docx. Enter your resume file name to register it.
           </p>
           <div className="flex gap-3">
@@ -262,10 +262,10 @@ export default function ResumesPage() {
       {/* Section 3: Parse Resume to Profile Draft */}
       <Card className="mb-6">
         <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">AI Resume Parsing</h2>
+          <h2 className="text-xl font-semibold text-fg">AI Resume Parsing</h2>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-fg-muted mb-4">
             Upload a PDF or DOCX to extract profile data. We never auto-overwrite your profile. Review and confirm first.
           </p>
 
@@ -274,7 +274,7 @@ export default function ResumesPage() {
               type="file"
               accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
-              className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
+              className="block w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-fg-secondary"
             />
             <Button onClick={handleParseResume} disabled={!selectedFile || parsing}>
               {parsing ? "Parsing..." : "Parse Resume"}
@@ -282,13 +282,13 @@ export default function ResumesPage() {
           </div>
 
           {draft && (
-            <div className="mt-6 rounded-lg border border-gray-200 p-4">
+            <div className="mt-6 rounded-lg border border-line p-4">
               <div className="flex items-start justify-between gap-3 mb-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900">Profile Draft Review</h3>
-                  {parsedName && <p className="text-xs text-gray-500 mt-1">Detected name: {parsedName}</p>}
+                  <h3 className="text-sm font-semibold text-fg">Profile Draft Review</h3>
+                  {parsedName && <p className="text-xs text-fg-muted mt-1">Detected name: {parsedName}</p>}
                 </div>
-                <label className="inline-flex items-center gap-2 text-xs text-gray-700">
+                <label className="inline-flex items-center gap-2 text-xs text-fg-secondary">
                   <input
                     type="checkbox"
                     checked={overwriteExisting}
@@ -352,9 +352,9 @@ export default function ResumesPage() {
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Summary / Bio</label>
+                <label className="block text-sm font-medium text-fg-secondary mb-1">Summary / Bio</label>
                 <textarea
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm"
                   rows={5}
                   value={draft.bio || ""}
                   onChange={(event) => updateDraftField("bio", event.target.value)}
@@ -374,7 +374,7 @@ export default function ResumesPage() {
       {/* Section 4: All Resumes */}
       <Card>
         <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">All Resumes</h2>
+          <h2 className="text-xl font-semibold text-fg">All Resumes</h2>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -386,22 +386,22 @@ export default function ResumesPage() {
               <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <p className="text-gray-600 mb-2">Upload your resume to enable Quick Apply</p>
+              <p className="text-fg-secondary mb-2">Upload your resume to enable Quick Apply</p>
               <p className="text-sm text-gray-400">Your resumes will appear here once uploaded</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-line">
               {resumes.map((resume) => (
                 <div key={resume.id} className="py-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="h-10 w-10 bg-surface-muted rounded-lg flex items-center justify-center">
+                      <svg className="w-5 h-5 text-fg-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">{resume.fileName}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-medium text-fg">{resume.fileName}</p>
+                      <p className="text-sm text-fg-muted">
                         Uploaded {new Date(resume.uploadedAt).toLocaleDateString()}
                       </p>
                     </div>

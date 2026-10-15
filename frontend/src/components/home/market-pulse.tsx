@@ -46,7 +46,7 @@ export function MarketPulse() {
               <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
                 This week&apos;s market pulse
               </p>
-              <h2 className="font-display mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50 md:text-3xl">
+              <h2 className="font-display mt-2 text-2xl font-bold text-fg dark:text-zinc-50 md:text-3xl">
                 Live data from {data.totalOpenJobs.toLocaleString()} open roles
               </h2>
             </div>
@@ -62,14 +62,14 @@ export function MarketPulse() {
             {stats.map((s) => (
               <div key={s.label}>
                 <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{s.value}</div>
-                <div className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{s.label}</div>
+                <div className="mt-1 text-sm text-fg-secondary dark:text-zinc-400">{s.label}</div>
               </div>
             ))}
           </div>
 
           {data.topSkills.length > 0 && (
             <div className="mt-8 border-t border-emerald-100 pt-6 dark:border-emerald-900/60">
-              <p className="mb-3 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <p className="mb-3 text-sm font-medium text-fg-secondary dark:text-zinc-300">
                 Most in-demand skills this week
               </p>
               <div className="flex flex-wrap gap-2">
@@ -77,10 +77,10 @@ export function MarketPulse() {
                   <Link
                     key={s.skill}
                     href={`/jobs?search=${encodeURIComponent(s.skill)}`}
-                    className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-sm font-medium text-emerald-800 transition hover:border-emerald-400 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    className="rounded-full border border-emerald-200 bg-surface px-3 py-1 text-sm font-medium text-emerald-800 transition hover:border-emerald-400 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
                   >
                     {s.skill}
-                    <span className="ml-1.5 text-xs text-emerald-600 dark:text-emerald-500">{s.count}</span>
+                    <span className="ml-1.5 text-xs text-primary-text dark:text-emerald-500">{s.count}</span>
                   </Link>
                 ))}
               </div>

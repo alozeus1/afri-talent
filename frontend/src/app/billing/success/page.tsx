@@ -63,12 +63,12 @@ function SuccessContent() {
 
       <Card>
         <CardContent className="p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl font-bold text-fg mb-2">
             Subscription Activated!
           </h1>
-          <p className="text-gray-600 mb-4">
+          <p className="text-fg-secondary mb-4">
             You&apos;re now on the{" "}
-            <span className="font-semibold text-emerald-600">{planName}</span> plan.
+            <span className="font-semibold text-primary-text">{planName}</span> plan.
             All premium features are ready to use.
           </p>
 

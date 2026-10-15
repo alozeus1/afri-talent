@@ -105,7 +105,7 @@ export default function CandidateAnalyticsPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Back Link */}
-      <Link href="/candidate" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
+      <Link href="/candidate" className="inline-flex items-center text-primary-text hover:text-emerald-700 mb-6">
         <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
@@ -113,8 +113,8 @@ export default function CandidateAnalyticsPage() {
       </Link>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Profile Analytics</h1>
-        <p className="text-gray-600">Insights into your visibility, trusted matches, and retention momentum</p>
+        <h1 className="text-3xl font-bold text-fg mb-2">Profile Analytics</h1>
+        <p className="text-fg-secondary">Insights into your visibility, trusted matches, and retention momentum</p>
       </div>
 
       {error && (
@@ -133,8 +133,8 @@ export default function CandidateAnalyticsPage() {
                 <CardHeader>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <h2 className="text-lg font-semibold text-gray-900">Retention control tower</h2>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <h2 className="text-lg font-semibold text-fg">Retention control tower</h2>
+                      <p className="text-sm text-fg-secondary mt-1">
                         Trusted jobs and verified employers are prioritized before AfriTalent nudges you.
                       </p>
                     </div>
@@ -146,20 +146,20 @@ export default function CandidateAnalyticsPage() {
                 <CardContent>
                   <div className="grid sm:grid-cols-4 gap-3 mb-5">
                     <div className="rounded-xl bg-white/90 p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Saved searches</p>
-                      <p className="mt-1 text-2xl font-semibold text-gray-900">{retentionSummary.snapshot.savedSearchCount}</p>
+                      <p className="text-xs uppercase tracking-wide text-fg-muted">Saved searches</p>
+                      <p className="mt-1 text-2xl font-semibold text-fg">{retentionSummary.snapshot.savedSearchCount}</p>
                     </div>
                     <div className="rounded-xl bg-white/90 p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Trust score</p>
-                      <p className="mt-1 text-2xl font-semibold text-gray-900">{retentionSummary.snapshot.trustScore}</p>
+                      <p className="text-xs uppercase tracking-wide text-fg-muted">Trust score</p>
+                      <p className="mt-1 text-2xl font-semibold text-fg">{retentionSummary.snapshot.trustScore}</p>
                     </div>
                     <div className="rounded-xl bg-white/90 p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Live applications</p>
-                      <p className="mt-1 text-2xl font-semibold text-gray-900">{retentionSummary.snapshot.openApplications}</p>
+                      <p className="text-xs uppercase tracking-wide text-fg-muted">Live applications</p>
+                      <p className="mt-1 text-2xl font-semibold text-fg">{retentionSummary.snapshot.openApplications}</p>
                     </div>
                     <div className="rounded-xl bg-white/90 p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Nudges left</p>
-                      <p className="mt-1 text-2xl font-semibold text-gray-900">{notificationBudgetRemaining}</p>
+                      <p className="text-xs uppercase tracking-wide text-fg-muted">Nudges left</p>
+                      <p className="mt-1 text-2xl font-semibold text-fg">{notificationBudgetRemaining}</p>
                     </div>
                   </div>
                   <div className="space-y-3">
@@ -167,8 +167,8 @@ export default function CandidateAnalyticsPage() {
                       <div key={journey.key} className="rounded-xl border border-white/70 bg-white/90 p-4 shadow-sm">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-gray-900">{journey.title}</p>
-                            <p className="mt-1 text-xs text-gray-600">{journey.description}</p>
+                            <p className="text-sm font-semibold text-fg">{journey.title}</p>
+                            <p className="mt-1 text-xs text-fg-secondary">{journey.description}</p>
                           </div>
                           <TrustBadge
                             label={journey.status}
@@ -199,26 +199,26 @@ export default function CandidateAnalyticsPage() {
 
               <Card>
                 <CardHeader>
-                  <h2 className="text-lg font-semibold text-gray-900">Weekly digest preview</h2>
-                  <p className="text-sm text-gray-600 mt-1">{digest?.headline}</p>
+                  <h2 className="text-lg font-semibold text-fg">Weekly digest preview</h2>
+                  <p className="text-sm text-fg-secondary mt-1">{digest?.headline}</p>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="rounded-xl border border-gray-100 p-3">
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Trusted roles</p>
-                      <p className="mt-1 text-xl font-semibold text-gray-900">{digest?.trustedJobCount ?? 0}</p>
+                    <div className="rounded-xl border border-line p-3">
+                      <p className="text-xs uppercase tracking-wide text-fg-muted">Trusted roles</p>
+                      <p className="mt-1 text-xl font-semibold text-fg">{digest?.trustedJobCount ?? 0}</p>
                     </div>
-                    <div className="rounded-xl border border-gray-100 p-3">
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Verified employers</p>
-                      <p className="mt-1 text-xl font-semibold text-gray-900">{digest?.verifiedEmployerCount ?? 0}</p>
+                    <div className="rounded-xl border border-line p-3">
+                      <p className="text-xs uppercase tracking-wide text-fg-muted">Verified employers</p>
+                      <p className="mt-1 text-xl font-semibold text-fg">{digest?.verifiedEmployerCount ?? 0}</p>
                     </div>
-                    <div className="rounded-xl border border-gray-100 p-3">
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Salary disclosed</p>
-                      <p className="mt-1 text-xl font-semibold text-gray-900">{digest?.salaryTransparentCount ?? 0}</p>
+                    <div className="rounded-xl border border-line p-3">
+                      <p className="text-xs uppercase tracking-wide text-fg-muted">Salary disclosed</p>
+                      <p className="mt-1 text-xl font-semibold text-fg">{digest?.salaryTransparentCount ?? 0}</p>
                     </div>
-                    <div className="rounded-xl border border-gray-100 p-3">
-                      <p className="text-xs uppercase tracking-wide text-gray-500">Visa-friendly</p>
-                      <p className="mt-1 text-xl font-semibold text-gray-900">{digest?.visaFriendlyCount ?? 0}</p>
+                    <div className="rounded-xl border border-line p-3">
+                      <p className="text-xs uppercase tracking-wide text-fg-muted">Visa-friendly</p>
+                      <p className="mt-1 text-xl font-semibold text-fg">{digest?.visaFriendlyCount ?? 0}</p>
                     </div>
                   </div>
                   <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
@@ -227,11 +227,11 @@ export default function CandidateAnalyticsPage() {
                   </div>
                   <div className="mt-4 space-y-3">
                     {digest?.jobs.slice(0, 3).map((job) => (
-                      <div key={job.id} className="rounded-xl border border-gray-100 p-3">
+                      <div key={job.id} className="rounded-xl border border-line p-3">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-gray-900">{job.title}</p>
-                            <p className="text-xs text-gray-600 mt-1">
+                            <p className="text-sm font-semibold text-fg">{job.title}</p>
+                            <p className="text-xs text-fg-secondary mt-1">
                               {job.employer.companyName} • {job.location}
                             </p>
                           </div>
@@ -244,7 +244,7 @@ export default function CandidateAnalyticsPage() {
                       </div>
                     ))}
                     {digest && digest.jobs.length === 0 && (
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-fg-muted">
                         Your next digest will fill in as you save searches and strengthen your profile trust signals.
                       </p>
                     )}
@@ -259,20 +259,20 @@ export default function CandidateAnalyticsPage() {
             {/* Total Views */}
             <Card>
               <CardContent className="p-6">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                <h3 className="text-sm font-semibold text-fg-muted uppercase tracking-wide mb-3">
                   Profile Views (Last 30 Days)
                 </h3>
-                <div className="text-4xl font-bold text-emerald-600 mb-1">
+                <div className="text-4xl font-bold text-primary-text mb-1">
                   {profileViews?.totalViews ?? 0}
                 </div>
-                <p className="text-sm text-gray-500">total views</p>
+                <p className="text-sm text-fg-muted">total views</p>
               </CardContent>
             </Card>
 
             {/* Weekly Chart */}
             <Card>
               <CardContent className="p-6">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                <h3 className="text-sm font-semibold text-fg-muted uppercase tracking-wide mb-3">
                   Weekly Views
                 </h3>
                 <div className="flex items-end gap-3 h-24">
@@ -285,7 +285,7 @@ export default function CandidateAnalyticsPage() {
                           minHeight: "4px",
                         }}
                       />
-                      <span className="text-xs text-gray-500">{week.count}</span>
+                      <span className="text-xs text-fg-muted">{week.count}</span>
                       <span className="text-xs text-gray-400">W{i + 1}</span>
                     </div>
                   ))}
@@ -301,12 +301,12 @@ export default function CandidateAnalyticsPage() {
             {/* Viewer Role Breakdown */}
             <Card>
               <CardContent className="p-6">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                <h3 className="text-sm font-semibold text-fg-muted uppercase tracking-wide mb-3">
                   Who&apos;s Viewing
                 </h3>
                 {totalRoleViews > 0 ? (
                   <>
-                    <div className="flex h-6 rounded-full overflow-hidden bg-gray-100 mb-3">
+                    <div className="flex h-6 rounded-full overflow-hidden bg-surface-muted mb-3">
                       {employerViews > 0 && (
                         <div
                           className="bg-emerald-500 transition-all"
@@ -323,11 +323,11 @@ export default function CandidateAnalyticsPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-sm">
                         <span className="w-3 h-3 rounded-full bg-emerald-500" />
-                        <span className="text-gray-600">Employers: {employerViews}</span>
+                        <span className="text-fg-secondary">Employers: {employerViews}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <span className="w-3 h-3 rounded-full bg-blue-400" />
-                        <span className="text-gray-600">Others: {otherViews}</span>
+                        <span className="text-fg-secondary">Others: {otherViews}</span>
                       </div>
                     </div>
                   </>
@@ -342,12 +342,12 @@ export default function CandidateAnalyticsPage() {
           {funnel && (
             <Card className="mb-8">
               <CardHeader>
-                <h2 className="text-lg font-semibold text-gray-900">Application Funnel</h2>
+                <h2 className="text-lg font-semibold text-fg">Application Funnel</h2>
               </CardHeader>
               <CardContent>
                 {funnelTotal > 0 ? (
                   <>
-                    <div className="flex h-10 rounded-full overflow-hidden bg-gray-100">
+                    <div className="flex h-10 rounded-full overflow-hidden bg-surface-muted">
                       {funnelSegments.map((seg) =>
                         seg.count > 0 ? (
                           <div
@@ -362,19 +362,19 @@ export default function CandidateAnalyticsPage() {
                     </div>
                     <div className="flex flex-wrap gap-4 mt-3">
                       {funnelSegments.map((seg) => (
-                        <div key={seg.label} className="flex items-center gap-2 text-sm text-gray-600">
+                        <div key={seg.label} className="flex items-center gap-2 text-sm text-fg-secondary">
                           <span className={`w-3 h-3 rounded-full ${seg.color}`} />
                           {seg.label}: {seg.count}
                         </div>
                       ))}
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-2 text-sm text-fg-secondary">
                         <span className="w-3 h-3 rounded-full bg-red-500" />
                         Rejected: {funnel.rejected}
                       </div>
                     </div>
                   </>
                 ) : (
-                  <p className="text-gray-500 text-sm">No applications yet to show funnel data.</p>
+                  <p className="text-fg-muted text-sm">No applications yet to show funnel data.</p>
                 )}
               </CardContent>
             </Card>
@@ -384,8 +384,8 @@ export default function CandidateAnalyticsPage() {
           <div className="mb-8">
             <div className="flex items-center justify-between gap-4 mb-4">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Recommended Jobs</h2>
-                <p className="text-sm text-gray-600 mt-1">
+                <h2 className="text-xl font-semibold text-fg">Recommended Jobs</h2>
+                <p className="text-sm text-fg-secondary mt-1">
                   Ranked by trust, fit, freshness, and employer credibility.
                 </p>
               </div>
@@ -397,7 +397,7 @@ export default function CandidateAnalyticsPage() {
               <Card>
                 <CardContent className="p-8 text-center">
                   <div className="text-4xl mb-4">🎯</div>
-                  <p className="text-gray-600 mb-4">Complete your profile to get personalized job recommendations.</p>
+                  <p className="text-fg-secondary mb-4">Complete your profile to get personalized job recommendations.</p>
                   <Link href="/candidate/profile">
                     <Button>Complete Profile</Button>
                   </Link>
@@ -426,19 +426,19 @@ export default function CandidateAnalyticsPage() {
           {/* Section 4: Resume Interest */}
           <Card>
             <CardHeader>
-              <h2 className="text-lg font-semibold text-gray-900">Resume Interest</h2>
+              <h2 className="text-lg font-semibold text-fg">Resume Interest</h2>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-6">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-emerald-600">
+                  <div className="text-3xl font-bold text-primary-text">
                     {employerViews}
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">Employer Views</p>
+                  <p className="text-sm text-fg-muted mt-1">Employer Views</p>
                 </div>
                 <div className="h-12 w-px bg-gray-200" />
                 <div>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-fg-secondary">
                     {employerViews > 0
                       ? `${employerViews} employer${employerViews > 1 ? "s" : ""} viewed your profile. Keep your resume updated to attract more attention!`
                       : "No employer views yet. Optimize your profile and take skill assessments to increase visibility."}

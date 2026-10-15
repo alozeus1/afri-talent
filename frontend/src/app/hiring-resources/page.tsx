@@ -9,8 +9,8 @@ export default function HiringResourcesPage() {
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="mb-10 max-w-3xl">
         <Badge variant="info">Employer resources</Badge>
-        <h1 className="mt-3 text-4xl font-bold text-gray-900">Hiring Resources</h1>
-        <p className="mt-3 text-lg leading-8 text-gray-600">
+        <h1 className="mt-3 text-4xl font-bold text-fg">Hiring Resources</h1>
+        <p className="mt-3 text-lg leading-8 text-fg-secondary">
           Practical guidance for employers hiring African tech talent across remote, contractor, and relocation workflows.
         </p>
       </div>
@@ -19,13 +19,13 @@ export default function HiringResourcesPage() {
         {HIRING_RESOURCE_GUIDES.map((guide) => (
           <Card key={guide.title} className="h-full">
             <CardHeader>
-              <h2 className="text-xl font-semibold text-gray-900">{guide.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-gray-600">{guide.summary}</p>
+              <h2 className="text-xl font-semibold text-fg">{guide.title}</h2>
+              <p className="mt-2 text-sm leading-6 text-fg-secondary">{guide.summary}</p>
             </CardHeader>
             <CardContent>
               <ul className="space-y-3">
                 {guide.points.map((point) => (
-                  <li key={point} className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm leading-6 text-gray-700">
+                  <li key={point} className="rounded-lg border border-line bg-surface-sunken px-4 py-3 text-sm leading-6 text-fg-secondary">
                     {point}
                   </li>
                 ))}

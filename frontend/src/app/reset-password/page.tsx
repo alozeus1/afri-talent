@@ -74,14 +74,14 @@ function ResetPasswordForm() {
     return (
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Invalid Link</h1>
+          <h1 className="text-2xl font-bold text-fg">Invalid Link</h1>
         </CardHeader>
         <CardContent>
           <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4">
             This password reset link is invalid or missing. Please request a new one.
           </div>
-          <div className="text-center text-sm text-gray-600">
-            <Link href="/forgot-password" className="text-emerald-600 hover:text-emerald-700 font-medium">
+          <div className="text-center text-sm text-fg-secondary">
+            <Link href="/forgot-password" className="text-primary-text hover:text-emerald-700 font-medium">
               Request New Reset Link
             </Link>
           </div>
@@ -93,8 +93,8 @@ function ResetPasswordForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Reset Password</h1>
-        <p className="text-gray-600">Enter your new password</p>
+        <h1 className="text-2xl font-bold text-fg">Reset Password</h1>
+        <p className="text-fg-secondary">Enter your new password</p>
       </CardHeader>
       <CardContent>
         {success ? (
@@ -102,8 +102,8 @@ function ResetPasswordForm() {
             <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm">
               Your password has been reset successfully.
             </div>
-            <div className="text-center text-sm text-gray-600">
-              <Link href="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
+            <div className="text-center text-sm text-fg-secondary">
+              <Link href="/login" className="text-primary-text hover:text-emerald-700 font-medium">
                 Sign In
               </Link>
             </div>
@@ -142,9 +142,9 @@ function ResetPasswordForm() {
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm text-gray-600">
+            <div className="mt-6 text-center text-sm text-fg-secondary">
               Remember your password?{" "}
-              <Link href="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
+              <Link href="/login" className="text-primary-text hover:text-emerald-700 font-medium">
                 Sign In
               </Link>
             </div>

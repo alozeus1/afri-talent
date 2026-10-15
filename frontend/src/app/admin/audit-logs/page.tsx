@@ -101,7 +101,7 @@ export default function AuditLogsPage() {
         if (action.includes("REJECTED") || action.includes("DELETED"))
             return "bg-red-100 text-red-800";
         if (action.includes("UPDATED")) return "bg-blue-100 text-blue-800";
-        return "bg-gray-100 text-gray-800";
+        return "bg-surface-muted text-fg";
     };
 
     if (isLoading) return <div>Loading...</div>;
@@ -111,7 +111,7 @@ export default function AuditLogsPage() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-bold">Audit Logs</h1>
-                <p className="text-gray-600">View all administrative actions</p>
+                <p className="text-fg-secondary">View all administrative actions</p>
             </div>
 
             <Card>
@@ -137,7 +137,7 @@ export default function AuditLogsPage() {
                             <select
                                 value={filterAction}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterAction(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm"
                             >
                                 <option value="ALL">All Actions</option>
                                 <option value="USER_CREATED">User Created</option>
@@ -155,7 +155,7 @@ export default function AuditLogsPage() {
                             <select
                                 value={filterTarget}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterTarget(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm"
                             >
                                 <option value="">All Types</option>
                                 <option value="USER">User</option>
@@ -179,7 +179,7 @@ export default function AuditLogsPage() {
                     {loading ? (
                         <div className="text-center py-8">Loading...</div>
                     ) : logs.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">No audit logs found</div>
+                        <div className="text-center py-8 text-fg-muted">No audit logs found</div>
                     ) : (
                         <div className="space-y-4">
                             {logs.map((log) => (
@@ -196,25 +196,25 @@ export default function AuditLogsPage() {
                                                 <p className="font-medium">
                                                     {log.admin?.name} ({log.admin?.title})
                                                 </p>
-                                                <p className="text-sm text-gray-600">
+                                                <p className="text-sm text-fg-secondary">
                                                     {log.target.type}: {log.target.name || log.target.id}
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="text-right text-sm text-gray-600">
+                                        <div className="text-right text-sm text-fg-secondary">
                                             <p>{formatDistanceToNow(new Date(log.timestamp), { addSuffix: true })}</p>
                                             {log.ipAddress && <p>{log.ipAddress}</p>}
                                         </div>
                                     </div>
 
                                     {log.reason && (
-                                        <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
+                                        <p className="text-sm text-fg-secondary bg-surface-sunken p-2 rounded">
                                             <strong>Reason:</strong> {log.reason}
                                         </p>
                                     )}
 
                                     {log.changes && Object.keys(log.changes).length > 0 && (
-                                        <p className="text-xs text-gray-600">
+                                        <p className="text-xs text-fg-secondary">
                                             <strong>Changes:</strong>{" "}
                                             {JSON.stringify(log.changes).substring(0, 100)}...
                                         </p>

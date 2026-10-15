@@ -193,7 +193,7 @@ export default function AdminUsersPage() {
               users.map((u) => (
                 <tr
                   key={u.id}
-                  className="cursor-pointer transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  className="cursor-pointer transition-colors hover:bg-surface-sunken dark:hover:bg-zinc-800/50"
                   onClick={() => setSelectedId(u.id)}
                 >
                   <Td>
@@ -203,7 +203,7 @@ export default function AdminUsersPage() {
                       checked={checked.has(u.id)}
                       onClick={(e) => e.stopPropagation()}
                       onChange={() => toggle(u.id)}
-                      className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-600 dark:bg-zinc-900"
+                      className="h-4 w-4 rounded border-line-strong dark:border-zinc-600 dark:bg-zinc-900"
                     />
                   </Td>
                   <Td>

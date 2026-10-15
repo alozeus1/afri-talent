@@ -45,7 +45,7 @@ export function ExperienceStep({ value, onChange, isActive }: ExperienceStepProp
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium text-gray-700">Work History</label>
+        <label className="text-sm font-medium text-fg-secondary">Work History</label>
         <button
           type="button"
           onClick={addRole}
@@ -55,7 +55,7 @@ export function ExperienceStep({ value, onChange, isActive }: ExperienceStepProp
         </button>
       </div>
       {value.map((entry, i) => (
-        <div key={i} className="border border-gray-200 rounded-md p-4 space-y-3 mb-3">
+        <div key={i} className="border border-line rounded-md p-4 space-y-3 mb-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <input
               ref={i === 0 ? firstFieldRef : undefined}
@@ -85,20 +85,20 @@ export function ExperienceStep({ value, onChange, isActive }: ExperienceStepProp
             value={entry.description}
             onChange={(e) => update(i, "description", e.target.value)}
             rows={2}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           {value.length > 1 && (
             <button
               type="button"
               onClick={() => removeRole(i)}
-              className="text-xs text-gray-500 hover:text-red-600"
+              className="text-xs text-fg-muted hover:text-red-600"
             >
               Remove this role
             </button>
           )}
         </div>
       ))}
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-fg-muted">
         Work history is optional. You can add roles later by editing your saved resume.
       </p>
     </div>
@@ -106,4 +106,4 @@ export function ExperienceStep({ value, onChange, isActive }: ExperienceStepProp
 }
 
 const inputClass =
-  "rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";

@@ -161,7 +161,7 @@ export default function BillingPage() {
       <div className="mx-auto max-w-xl px-4 py-16" data-testid="billing-free-mode">
         <Card>
           <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-            <p className="text-gray-700 dark:text-gray-300">
+            <p className="text-fg-secondary dark:text-gray-300">
               AfriTalent is now free for everyone. You can manage or cancel your existing subscription here.
             </p>
             <Button onClick={handlePortal} disabled={actionLoading === "portal"}>
@@ -191,30 +191,30 @@ export default function BillingPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Plans &amp; Pricing</h1>
-        <p className="text-gray-600 max-w-2xl mx-auto">
+        <h1 className="text-3xl font-bold text-fg mb-2">Plans &amp; Pricing</h1>
+        <p className="text-fg-secondary max-w-2xl mx-auto">
           Choose the plan that fits your needs. Upgrade anytime to unlock powerful features.
         </p>
 
         {/* Region badge */}
-        <div className="mt-3 flex items-center justify-center gap-2 text-sm text-gray-500">
+        <div className="mt-3 flex items-center justify-center gap-2 text-sm text-fg-muted">
           <span>Showing prices for</span>
           <Badge variant="info">{region}</Badge>
           <span>in {currency}</span>
         </div>
-        <p className="mt-3 text-sm text-gray-500">
+        <p className="mt-3 text-sm text-fg-muted">
           Checkout routing: {providerLabel}. Google Pay appears automatically on eligible Stripe devices.
         </p>
       </div>
 
       {/* Interval toggle */}
       <div className="flex justify-center mb-10">
-        <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+        <div className="inline-flex rounded-lg border border-line p-1 bg-surface-sunken">
           <button
             className={`px-4 py-2 text-sm font-medium rounded-md transition ${
               interval === "MONTHLY"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+                ? "bg-surface text-fg shadow-sm"
+                : "text-fg-muted hover:text-fg-secondary"
             }`}
             onClick={() => setInterval("MONTHLY")}
           >
@@ -223,13 +223,13 @@ export default function BillingPage() {
           <button
             className={`px-4 py-2 text-sm font-medium rounded-md transition ${
               interval === "YEARLY"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+                ? "bg-surface text-fg shadow-sm"
+                : "text-fg-muted hover:text-fg-secondary"
             }`}
             onClick={() => setInterval("YEARLY")}
           >
             Yearly
-            <span className="ml-1 text-xs text-emerald-600 font-semibold">Save ~17%</span>
+            <span className="ml-1 text-xs text-primary-text font-semibold">Save ~17%</span>
           </button>
         </div>
       </div>
@@ -240,14 +240,14 @@ export default function BillingPage() {
           <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-semibold text-gray-900">Current Plan:</span>
+                <span className="font-semibold text-fg">Current Plan:</span>
                 <Badge variant="success">{PLAN_META[currentPlan]?.name ?? currentPlan}</Badge>
                 {status.status === "ACTIVE" && currentPlan !== "FREE" && currentPlan !== "EMPLOYER_FREE" && (
                   <Badge variant="info">Active</Badge>
                 )}
               </div>
               {status.currentPeriodEnd && (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-fg-muted">
                   Renews on {new Date(status.currentPeriodEnd).toLocaleDateString()}
                 </p>
               )}
@@ -300,10 +300,10 @@ export default function BillingPage() {
               )}
 
               <CardHeader className="text-center pt-8">
-                <h2 className="text-xl font-bold text-gray-900">{meta.name}</h2>
+                <h2 className="text-xl font-bold text-fg">{meta.name}</h2>
                 <div className="mt-2">
-                  <span className="text-4xl font-extrabold text-gray-900">{displayPrice}</span>
-                  <span className="text-gray-500 ml-1">{period}</span>
+                  <span className="text-4xl font-extrabold text-fg">{displayPrice}</span>
+                  <span className="text-fg-muted ml-1">{period}</span>
                 </div>
                 {pricingData?.taxLabel && !isFree && (
                   <p className="text-xs text-gray-400 mt-1">excl. {pricingData.taxLabel}</p>
@@ -316,7 +316,7 @@ export default function BillingPage() {
               <CardContent className="flex-1">
                 <ul className="space-y-3">
                   {meta.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm text-gray-700">
+                    <li key={feature} className="flex items-start gap-2 text-sm text-fg-secondary">
                       <svg
                         className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5"
                         fill="none"
@@ -372,7 +372,7 @@ export default function BillingPage() {
       <div className="text-center mt-8">
         <Link
           href={isEmployer ? "/billing?view=candidate" : "/billing?view=employer"}
-          className="text-sm text-emerald-600 hover:underline"
+          className="text-sm text-primary-text hover:underline"
         >
           {isEmployer ? "View candidate plans" : "Looking to hire? View employer plans"}
         </Link>

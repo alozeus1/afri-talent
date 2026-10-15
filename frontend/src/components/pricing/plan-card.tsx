@@ -46,12 +46,12 @@ export function PlanCard({
 
   return (
     <div
-      className={`relative flex flex-col bg-white rounded-2xl border-2 transition-shadow ${
+      className={`relative flex flex-col bg-surface rounded-2xl border-2 transition-shadow ${
         isPopular
           ? "border-emerald-500 shadow-xl shadow-emerald-100"
           : isCurrent
             ? "border-emerald-300 shadow-md"
-            : "border-gray-100 shadow-sm hover:shadow-md"
+            : "border-line shadow-sm hover:shadow-md"
       }`}
       data-testid={`plan-card-${planKey}`}
     >
@@ -69,14 +69,14 @@ export function PlanCard({
 
       {/* Header */}
       <div className="px-6 pt-8 pb-4 text-center">
-        <h3 className="text-lg font-bold text-gray-900">{name}</h3>
-        <p className="mt-1 text-sm text-gray-500">{description}</p>
+        <h3 className="text-lg font-bold text-fg">{name}</h3>
+        <p className="mt-1 text-sm text-fg-muted">{description}</p>
 
         <div className="mt-4">
-          <span className="text-4xl font-extrabold text-gray-900 tracking-tight">
+          <span className="text-4xl font-extrabold text-fg tracking-tight">
             {displayPrice}
           </span>
-          <span className="text-gray-500 text-sm ml-1">{period}</span>
+          <span className="text-fg-muted text-sm ml-1">{period}</span>
         </div>
 
         {taxLabel && !isFree && (
@@ -108,7 +108,7 @@ export function PlanCard({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               )}
-              <span className={f.included === "no" ? "text-gray-400" : "text-gray-700"}>
+              <span className={f.included === "no" ? "text-gray-400" : "text-fg-secondary"}>
                 {f.label}
                 {f.limit && (
                   <span className="ml-1 text-xs text-gray-400">({f.limit})</span>

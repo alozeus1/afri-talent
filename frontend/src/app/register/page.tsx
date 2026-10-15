@@ -99,8 +99,8 @@ function RegisterForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create Your Account</h1>
-        <p className="text-gray-600 dark:text-gray-300">Join the AfriTalent community</p>
+        <h1 className="text-2xl font-bold text-fg dark:text-gray-100">Create Your Account</h1>
+        <p className="text-fg-secondary dark:text-gray-300">Join the AfriTalent community</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -123,31 +123,31 @@ function RegisterForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">I am a</label>
+            <label className="block text-sm font-medium text-fg-secondary dark:text-gray-300 mb-2">I am a</label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 className={`p-3 rounded-lg border-2 text-center transition-colors ${
                   formData.role === "CANDIDATE"
                     ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                    : "border-line dark:border-gray-700 hover:border-line-strong dark:hover:border-gray-600"
                 }`}
                 onClick={() => updateField("role", "CANDIDATE")}
               >
                 <span className="font-medium">Candidate</span>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Looking for jobs</p>
+                <p className="text-xs text-fg-muted dark:text-gray-400 mt-1">Looking for jobs</p>
               </button>
               <button
                 type="button"
                 className={`p-3 rounded-lg border-2 text-center transition-colors ${
                   formData.role === "EMPLOYER"
                     ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                    : "border-line dark:border-gray-700 hover:border-line-strong dark:hover:border-gray-600"
                 }`}
                 onClick={() => updateField("role", "EMPLOYER")}
               >
                 <span className="font-medium">Employer</span>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Hiring talent</p>
+                <p className="text-xs text-fg-muted dark:text-gray-400 mt-1">Hiring talent</p>
               </button>
             </div>
           </div>
@@ -182,10 +182,10 @@ function RegisterForm() {
             error={fieldErrors.password}
           />
           {formData.password && (
-            <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900">
+            <div className="rounded-lg border border-line dark:border-gray-700 p-3 bg-surface-sunken dark:bg-gray-900">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Password strength</span>
-                <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">{passwordStrength.level}</span>
+                <span className="text-xs font-medium text-fg-secondary dark:text-gray-300">Password strength</span>
+                <span className="text-xs font-semibold text-fg dark:text-gray-100">{passwordStrength.level}</span>
               </div>
               <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-800 mb-2 overflow-hidden">
                 <div
@@ -206,7 +206,7 @@ function RegisterForm() {
                   aria-label="Password strength"
                 />
               </div>
-              <p className="text-xs text-gray-600 dark:text-gray-300">
+              <p className="text-xs text-fg-secondary dark:text-gray-300">
                 {passwordStrength.score >= 3
                   ? "Great password. You're in good shape."
                   : passwordStrength.feedback.slice(0, 2).join(" ")}
@@ -244,9 +244,9 @@ function RegisterForm() {
 
         <OAuthButtons mode="register" onError={(oauthError) => setError(oauthError)} />
 
-        <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
+        <div className="mt-6 text-center text-sm text-fg-secondary dark:text-gray-300">
           {t("auth.alreadyHaveAccount")}{" "}
-          <Link href={localizePath("/login", locale)} className="text-emerald-600 hover:text-emerald-700 font-medium">
+          <Link href={localizePath("/login", locale)} className="text-primary-text hover:text-emerald-700 font-medium">
             {t("auth.signIn")}
           </Link>
         </div>

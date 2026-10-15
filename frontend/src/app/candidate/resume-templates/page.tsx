@@ -99,14 +99,14 @@ export default function ResumeTemplatesPage() {
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">Resume templates</p>
-          <h1 className="mt-1 text-3xl font-bold text-gray-900">{FREE_MODE ? "ATS-ready templates" : "Premium ATS-ready templates"}</h1>
-          <p className="mt-2 max-w-2xl text-sm text-gray-600">
+          <h1 className="mt-1 text-3xl font-bold text-fg">{FREE_MODE ? "ATS-ready templates" : "Premium ATS-ready templates"}</h1>
+          <p className="mt-2 max-w-2xl text-sm text-fg-secondary">
             Preview professional resume layouts and download the formats included with your plan.
           </p>
         </div>
         <Link
           href="/candidate/resume-builder"
-          className="inline-flex items-center justify-center rounded-md border border-zinc-200 bg-transparent px-3.5 py-2 text-sm font-medium text-zinc-900 shadow-sm transition-all duration-200 hover:bg-zinc-100"
+          className="inline-flex items-center justify-center rounded-md border border-line bg-transparent px-3.5 py-2 text-sm font-medium text-fg shadow-sm transition-all duration-200 hover:bg-surface-muted"
         >
           Back to builder
         </Link>
@@ -146,8 +146,8 @@ export default function ResumeTemplatesPage() {
       ) : (
         <Card>
           <CardContent className="p-8">
-            <h2 className="text-lg font-semibold text-gray-900">Template bundle coming online</h2>
-            <p className="mt-2 text-sm text-gray-600">
+            <h2 className="text-lg font-semibold text-fg">Template bundle coming online</h2>
+            <p className="mt-2 text-sm text-fg-secondary">
               Resume templates are being curated for this workspace. You can still generate and save an ATS-ready resume from the builder.
             </p>
             <Link

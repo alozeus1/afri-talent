@@ -94,12 +94,12 @@ export default function SalaryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-surface-sunken py-8 px-4">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Salary Negotiation Guide</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-fg">Salary Negotiation Guide</h1>
+            <p className="text-sm text-fg-muted mt-1">
               Get market-aware negotiation scripts for African and global markets
             </p>
           </div>
@@ -120,26 +120,26 @@ export default function SalaryPage() {
             <CardContent className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-fg-secondary mb-1">
                     Role / Job Title <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g. Senior Software Engineer"
                   />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-fg-secondary mb-1">
                     Location <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g. Lagos, Nigeria"
                   />
                 </div>
@@ -147,11 +147,11 @@ export default function SalaryPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                  <label className="block text-sm font-medium text-fg-secondary mb-1">Currency</label>
                   <select
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface"
                   >
                     {CURRENCIES.map((c) => (
                       <option key={c} value={c}>
@@ -161,7 +161,7 @@ export default function SalaryPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-fg-secondary mb-1">
                     Years of Experience{" "}
                     <span className="text-gray-400 text-xs font-normal">(optional)</span>
                   </label>
@@ -170,7 +170,7 @@ export default function SalaryPage() {
                     min={0}
                     value={yearsExperience}
                     onChange={(e) => setYearsExperience(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g. 5"
                   />
                 </div>
@@ -178,7 +178,7 @@ export default function SalaryPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-fg-secondary mb-1">
                     Current / Offered Salary{" "}
                     <span className="text-gray-400 text-xs font-normal">(optional)</span>
                   </label>
@@ -187,12 +187,12 @@ export default function SalaryPage() {
                     min={0}
                     value={currentSalary}
                     onChange={(e) => setCurrentSalary(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g. 150000"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-fg-secondary mb-1">
                     Target Salary{" "}
                     <span className="text-gray-400 text-xs font-normal">(optional)</span>
                   </label>
@@ -201,7 +201,7 @@ export default function SalaryPage() {
                     min={0}
                     value={targetSalary}
                     onChange={(e) => setTargetSalary(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g. 180000"
                   />
                 </div>
@@ -234,7 +234,7 @@ export default function SalaryPage() {
               </Badge>
               <Button
                 onClick={handleReset}
-                className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-4 py-2"
+                className="border border-line-strong bg-surface text-fg-secondary hover:bg-surface-sunken text-sm px-4 py-2"
               >
                 Start Over
               </Button>
@@ -259,8 +259,8 @@ export default function SalaryPage() {
             {benchmarks.length > 0 && (
               <Card>
                 <CardHeader>
-                  <h2 className="text-base font-semibold text-gray-900">Market Data</h2>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <h2 className="text-base font-semibold text-fg">Market Data</h2>
+                  <p className="text-xs text-fg-muted mt-1">
                     Salary benchmarks matching &quot;{role}&quot; from our database
                   </p>
                 </CardHeader>
@@ -268,7 +268,7 @@ export default function SalaryPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+                        <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-fg-muted">
                           <th className="py-2 pr-4 font-medium">Role</th>
                           <th className="py-2 pr-4 font-medium">Level</th>
                           <th className="py-2 pr-4 font-medium">Country</th>
@@ -280,20 +280,20 @@ export default function SalaryPage() {
                       </thead>
                       <tbody>
                         {benchmarks.map((row, i) => (
-                          <tr key={i} className="border-b border-gray-100 text-gray-700">
+                          <tr key={i} className="border-b border-line text-fg-secondary">
                             <td className="py-2 pr-4">{row.role}</td>
                             <td className="py-2 pr-4 capitalize">{row.level}</td>
                             <td className="py-2 pr-4">{row.country}</td>
                             <td className="py-2 pr-4">
                               {row.currency} {row.salaryMin.toLocaleString()}
                             </td>
-                            <td className="py-2 pr-4 font-semibold text-gray-900">
+                            <td className="py-2 pr-4 font-semibold text-fg">
                               {row.currency} {row.salaryMedian.toLocaleString()}
                             </td>
                             <td className="py-2 pr-4">
                               {row.currency} {row.salaryMax.toLocaleString()}
                             </td>
-                            <td className="py-2 text-gray-500">{row.sampleSize}</td>
+                            <td className="py-2 text-fg-muted">{row.sampleSize}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -306,12 +306,12 @@ export default function SalaryPage() {
             {/* Talking Points */}
             <Card>
               <CardHeader>
-                <h2 className="text-base font-semibold text-gray-900">Talking Points</h2>
+                <h2 className="text-base font-semibold text-fg">Talking Points</h2>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2">
                   {result.talkingPoints.map((point, i) => (
-                    <li key={i} className="flex gap-2 text-sm text-gray-700">
+                    <li key={i} className="flex gap-2 text-sm text-fg-secondary">
                       <span className="text-blue-500 mt-0.5 flex-shrink-0">•</span>
                       <span className="leading-relaxed">{point}</span>
                     </li>
@@ -323,7 +323,7 @@ export default function SalaryPage() {
             {/* Benefits to Negotiate */}
             <Card>
               <CardHeader>
-                <h2 className="text-base font-semibold text-gray-900">Benefits to Negotiate</h2>
+                <h2 className="text-base font-semibold text-fg">Benefits to Negotiate</h2>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
@@ -340,10 +340,10 @@ export default function SalaryPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-gray-900">Negotiation Script</h2>
+                  <h2 className="text-base font-semibold text-fg">Negotiation Script</h2>
                   <Button
                     onClick={handleCopy}
-                    className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1"
+                    className="border border-line-strong bg-surface text-fg-secondary hover:bg-surface-sunken text-sm px-3 py-1"
                   >
                     {copied ? "Copied!" : "Copy"}
                   </Button>
@@ -354,7 +354,7 @@ export default function SalaryPage() {
                   readOnly
                   value={result.negotiationScript}
                   rows={12}
-                  className="w-full rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none"
+                  className="w-full rounded-md border border-line bg-surface-sunken px-4 py-3 text-sm text-fg leading-relaxed resize-none focus:outline-none"
                 />
                 <p className="text-xs text-gray-400 mt-2">
                   Adapt this script to your own voice and specific situation before using it.

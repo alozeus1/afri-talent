@@ -26,14 +26,14 @@ export default function TabsComponent()  {
         {tabItems.map((item, idx) => (
           <Tabs.Trigger
             key={idx}
-            className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-700 data-[state=active]:shadow-sm outline-gray-800 py-1.5 px-3 rounded-lg duration-150 text-gray-500 hover:text-gray-700 hover:bg-gray-100 active:bg-gray-100 font-medium"
+            className="data-[state=active]:bg-surface-muted data-[state=active]:text-fg data-[state=active]:shadow-xs outline-line-strong py-1.5 px-3 rounded-lg duration-150 text-fg-muted hover:text-fg-secondary hover:bg-surface-muted active:bg-surface-muted font-medium"
             value={item}
           >
             {item}
           </Tabs.Trigger>
         ))}
       </Tabs.List>
-      <div className="relative text-gray-500 sm:hidden">
+      <div className="relative text-fg-muted sm:hidden">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 20 20"
@@ -48,7 +48,7 @@ export default function TabsComponent()  {
         </svg>
         <select
           value={selectedTab}
-          className="py-2 px-3 w-full bg-transparent appearance-none outline-none border rounded-lg shadow-sm focus:border-gray-800 text-sm"
+          className="py-2 px-3 w-full bg-transparent appearance-none outline-none border rounded-lg shadow-sm focus:border-line-strong border-line bg-surface text-fg text-sm"
           onChange={(e) => setSelectedTab(e.target.value)}
         >
           {tabItems.map((item, idx) => (

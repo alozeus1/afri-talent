@@ -48,10 +48,10 @@ export function EmployerMilestones({
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
           First-success milestones
         </p>
-        <h2 className="mt-2 text-xl font-semibold text-gray-900">{activationState.label}</h2>
+        <h2 className="mt-2 text-xl font-semibold text-fg">{activationState.label}</h2>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         {items.map((item) => {
@@ -59,21 +59,21 @@ export function EmployerMilestones({
           return (
             <Card
               key={item.key}
-              className={reached ? "border-emerald-200 bg-emerald-50/60" : "border-gray-200 bg-white"}
+              className={reached ? "border-emerald-200 bg-emerald-50/60" : "border-line bg-surface"}
             >
               <CardContent className="p-5">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-semibold text-gray-900">{item.label}</p>
+                  <p className="font-semibold text-fg">{item.label}</p>
                   <span
                     className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
-                      reached ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+                      reached ? "bg-emerald-100 text-emerald-700" : "bg-surface-muted text-fg-muted"
                     }`}
                   >
                     {reached ? "Reached" : "Pending"}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-gray-600">{item.description}</p>
-                <p className="mt-4 text-sm font-medium text-gray-900">{formatMilestone(item.value)}</p>
+                <p className="mt-2 text-sm text-fg-secondary">{item.description}</p>
+                <p className="mt-4 text-sm font-medium text-fg">{formatMilestone(item.value)}</p>
               </CardContent>
             </Card>
           );

@@ -47,15 +47,15 @@ export function EmployerActivationChecklist({
     FREE_MODE && currentStep === "subscription_choice" ? "trust_completion" : currentStep;
 
   return (
-    <Card className="border-emerald-200 bg-white shadow-sm">
+    <Card className="border-emerald-200 bg-surface shadow-sm">
       <CardHeader>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
               Employer activation
             </p>
-            <h2 className="mt-2 text-xl font-semibold text-gray-900">{title}</h2>
-            <p className="mt-2 max-w-3xl text-sm text-gray-600">{subtitle}</p>
+            <h2 className="mt-2 text-xl font-semibold text-fg">{title}</h2>
+            <p className="mt-2 max-w-3xl text-sm text-fg-secondary">{subtitle}</p>
           </div>
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
             <p className="font-semibold">{completionPct}% complete</p>
@@ -75,27 +75,27 @@ export function EmployerActivationChecklist({
             <div
               key={item.key}
               className={`rounded-2xl border px-4 py-4 ${
-                item.done ? "border-emerald-200 bg-emerald-50/70" : "border-gray-200 bg-gray-50"
+                item.done ? "border-emerald-200 bg-emerald-50/70" : "border-line bg-surface-sunken"
               }`}
             >
               <div className="flex items-start gap-3">
                 <div
                   className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-                    item.done ? "bg-emerald-600 text-white" : "bg-white text-gray-500 ring-1 ring-gray-200"
+                    item.done ? "bg-emerald-600 text-white" : "bg-surface text-fg-muted ring-1 ring-gray-200"
                   }`}
                 >
                   {item.done ? "✓" : index + 1}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-gray-900">{item.label}</p>
+                    <p className="font-semibold text-fg">{item.label}</p>
                     {item.done && (
                       <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
                         Done
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-sm text-gray-600">{item.description}</p>
+                  <p className="mt-1 text-sm text-fg-secondary">{item.description}</p>
                   <Link
                     href={localizePath(item.href, locale)}
                     className="mt-3 inline-flex text-sm font-medium text-emerald-700 hover:text-emerald-800"
@@ -108,7 +108,7 @@ export function EmployerActivationChecklist({
           ))}
         </div>
 
-        <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-950 px-5 py-5 text-white">
+        <div className="mt-6 rounded-3xl border border-line bg-slate-950 px-5 py-5 text-white">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
             Next best action
           </p>

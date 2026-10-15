@@ -44,7 +44,7 @@ export function TemplateCard({
   return (
     <Card className="group flex flex-col overflow-hidden transition-shadow hover:shadow-md">
       {/* Thumbnail */}
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-gray-100 dark:bg-gray-800">
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-surface-muted dark:bg-gray-800">
         {template.thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -61,7 +61,7 @@ export function TemplateCard({
         {isLocked && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
             <div className="rounded-full bg-white/90 p-3 dark:bg-gray-900/90">
-              <Lock className="h-6 w-6 text-gray-700 dark:text-gray-200" />
+              <Lock className="h-6 w-6 text-fg-secondary dark:text-gray-200" />
             </div>
           </div>
         )}
@@ -82,10 +82,10 @@ export function TemplateCard({
       {/* Content */}
       <CardContent className="flex flex-1 flex-col gap-3 p-4">
         <div>
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+          <h3 className="font-semibold text-fg dark:text-gray-100">
             {template.name}
           </h3>
-          <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 line-clamp-2 text-sm text-fg-muted dark:text-gray-400">
             {template.description}
           </p>
         </div>

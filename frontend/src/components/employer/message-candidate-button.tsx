@@ -73,11 +73,11 @@ export function MessageCandidateButton({ candidateUserId, candidateName, classNa
   }
 
   return (
-    <div className="w-full space-y-2 rounded-xl border border-slate-200 p-3">
+    <div className="w-full space-y-2 rounded-xl border border-line p-3">
       {jobOptions === null ? (
-        <p className="text-sm text-slate-500">Loading your jobs...</p>
+        <p className="text-sm text-fg-muted">Loading your jobs...</p>
       ) : jobOptions.length === 0 ? (
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-fg-secondary">
           Messages are tied to a published role.{" "}
           <Link href={localizePath("/employer/jobs/new", locale)} className="font-medium text-emerald-700 hover:underline">
             Post a job
@@ -86,12 +86,12 @@ export function MessageCandidateButton({ candidateUserId, candidateName, classNa
         </p>
       ) : (
         <>
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`msg-job-${candidateUserId}`}>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-fg-muted" htmlFor={`msg-job-${candidateUserId}`}>
             About role
           </label>
           <select
             id={`msg-job-${candidateUserId}`}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm"
             value={jobId}
             onChange={(event) => setJobId(event.target.value)}
           >

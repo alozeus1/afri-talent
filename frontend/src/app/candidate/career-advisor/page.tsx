@@ -74,12 +74,12 @@ export default function CareerAdvisorPage() {
   if (historyLoading) return <DashboardSkeleton />;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-surface-sunken py-8 px-4">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Career Advisor</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-fg">Career Advisor</h1>
+            <p className="text-sm text-fg-muted mt-1">
               AI-powered skill gap analysis and career path recommendations
             </p>
           </div>
@@ -89,7 +89,7 @@ export default function CareerAdvisorPage() {
         {/* Run new analysis */}
         <Card>
           <CardContent className="py-5 px-5">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-fg-secondary mb-2">
               Target Role
             </label>
             <div className="flex gap-3">
@@ -98,7 +98,7 @@ export default function CareerAdvisorPage() {
                 value={targetRole}
                 onChange={(e) => setTargetRole(e.target.value)}
                 placeholder="e.g. Senior Software Engineer, Product Manager"
-                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <Button onClick={handleAnalyse} disabled={loading || !targetRole.trim()}>
                 {loading ? "Analysing..." : advice ? "Re-Analyse" : "Analyse Career"}
@@ -137,31 +137,31 @@ export default function CareerAdvisorPage() {
             {/* Summary */}
             <Card>
               <CardHeader>
-                <h2 className="text-base font-semibold text-gray-900">Overview</h2>
+                <h2 className="text-base font-semibold text-fg">Overview</h2>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-gray-700 leading-relaxed">{advice.summary}</p>
+                <p className="text-sm text-fg-secondary leading-relaxed">{advice.summary}</p>
               </CardContent>
             </Card>
 
             {/* Salary */}
             <Card>
               <CardHeader>
-                <h2 className="text-base font-semibold text-gray-900">Salary Expectation</h2>
+                <h2 className="text-base font-semibold text-fg">Salary Expectation</h2>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold text-fg">
                   {advice.salaryRange.currency} {advice.salaryRange.min.toLocaleString()} –{" "}
                   {advice.salaryRange.max.toLocaleString()}
                 </p>
-                <p className="text-sm text-gray-500 mt-1">{advice.salaryRange.market}</p>
+                <p className="text-sm text-fg-muted mt-1">{advice.salaryRange.market}</p>
               </CardContent>
             </Card>
 
             {/* Skill Gaps */}
             <Card>
               <CardHeader>
-                <h2 className="text-base font-semibold text-gray-900">Skill Gaps</h2>
+                <h2 className="text-base font-semibold text-fg">Skill Gaps</h2>
               </CardHeader>
               <CardContent className="space-y-3">
                 {advice.skillGaps.map((gap, i) => (
@@ -170,8 +170,8 @@ export default function CareerAdvisorPage() {
                       {gap.priority}
                     </Badge>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{gap.skill}</p>
-                      <p className="text-xs text-gray-500">{gap.reason}</p>
+                      <p className="text-sm font-medium text-fg">{gap.skill}</p>
+                      <p className="text-xs text-fg-muted">{gap.reason}</p>
                     </div>
                   </div>
                 ))}
@@ -181,16 +181,16 @@ export default function CareerAdvisorPage() {
             {/* Career Paths */}
             <Card>
               <CardHeader>
-                <h2 className="text-base font-semibold text-gray-900">Career Paths</h2>
+                <h2 className="text-base font-semibold text-fg">Career Paths</h2>
               </CardHeader>
               <CardContent className="space-y-3">
                 {advice.careerPaths.map((path, i) => (
-                  <div key={i} className="border border-gray-100 rounded-md p-3">
+                  <div key={i} className="border border-line rounded-md p-3">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-sm font-semibold text-gray-900">{path.title}</p>
+                      <p className="text-sm font-semibold text-fg">{path.title}</p>
                       <Badge variant="info">{path.timeline}</Badge>
                     </div>
-                    <p className="text-xs text-gray-500">{path.description}</p>
+                    <p className="text-xs text-fg-muted">{path.description}</p>
                   </div>
                 ))}
               </CardContent>
@@ -200,14 +200,14 @@ export default function CareerAdvisorPage() {
             {advice.certifications.length > 0 && (
               <Card>
                 <CardHeader>
-                  <h2 className="text-base font-semibold text-gray-900">Recommended Certifications</h2>
+                  <h2 className="text-base font-semibold text-fg">Recommended Certifications</h2>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {advice.certifications.map((cert, i) => (
-                    <div key={i} className="border border-gray-100 rounded-md p-3">
-                      <p className="text-sm font-semibold text-gray-900">{cert.name}</p>
+                    <div key={i} className="border border-line rounded-md p-3">
+                      <p className="text-sm font-semibold text-fg">{cert.name}</p>
                       <p className="text-xs text-gray-400">{cert.provider}</p>
-                      <p className="text-xs text-gray-500 mt-1">{cert.rationale}</p>
+                      <p className="text-xs text-fg-muted mt-1">{cert.rationale}</p>
                     </div>
                   ))}
                 </CardContent>
@@ -217,13 +217,13 @@ export default function CareerAdvisorPage() {
             {/* 90-Day Action Plan */}
             <Card>
               <CardHeader>
-                <h2 className="text-base font-semibold text-gray-900">90-Day Action Plan</h2>
+                <h2 className="text-base font-semibold text-fg">90-Day Action Plan</h2>
               </CardHeader>
               <CardContent className="space-y-2">
                 {advice.actionPlan.map((step, i) => (
                   <div key={i} className="flex gap-3 items-start">
                     <Badge variant="default" className="shrink-0">{step.week}</Badge>
-                    <p className="text-sm text-gray-700">{step.action}</p>
+                    <p className="text-sm text-fg-secondary">{step.action}</p>
                   </div>
                 ))}
               </CardContent>
@@ -235,11 +235,11 @@ export default function CareerAdvisorPage() {
         {history.length > 1 && (
           <Card>
             <CardHeader>
-              <h2 className="text-sm font-medium text-gray-600">Previous Sessions</h2>
+              <h2 className="text-sm font-medium text-fg-secondary">Previous Sessions</h2>
             </CardHeader>
             <CardContent className="space-y-1">
               {history.map((session) => (
-                <p key={session.id} className="text-xs text-gray-500">
+                <p key={session.id} className="text-xs text-fg-muted">
                   {session.targetRole || "Untitled"} —{" "}
                   {new Date(session.createdAt).toLocaleDateString()}
                 </p>

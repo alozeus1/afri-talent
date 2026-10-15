@@ -150,9 +150,9 @@ export function Header() {
       {/* Logout Confirmation Modal */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-sm mx-4 shadow-xl border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Confirm Logout</h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">Are you sure you want to logout?</p>
+          <div className="bg-surface dark:bg-gray-900 rounded-xl p-6 max-w-sm mx-4 shadow-xl border border-line dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-fg dark:text-gray-100 mb-2">Confirm Logout</h3>
+            <p className="text-fg-secondary dark:text-gray-300 mb-4">Are you sure you want to logout?</p>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setShowLogoutConfirm(false)}>
                 Cancel
@@ -165,7 +165,7 @@ export function Header() {
         </div>
       )}
 
-      <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
+      <header className="sticky top-0 z-50 border-b border-line bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
         <nav className="page-frame">
           <div className="flex min-h-[72px] justify-between">
             <div className="flex items-center">
@@ -174,47 +174,47 @@ export function Header() {
                   <span className="font-display text-lg font-bold text-white">A</span>
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-display text-xl font-bold text-zinc-900 dark:text-white">AfriTalent</span>
-                  <span className="text-[11px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Trust-first hiring</span>
+                  <span className="font-display text-xl font-bold text-fg dark:text-white">AfriTalent</span>
+                  <span className="text-[11px] uppercase tracking-widest text-fg-muted dark:text-zinc-400">Trust-first hiring</span>
                 </div>
               </Link>
             </div>
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-6">
-              <Link href={href("/jobs")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/jobs")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
                 {t("nav.findJobs")}
               </Link>
-              <Link href={href("/companies")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/companies")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
                 {t("nav.companies")}
               </Link>
-              <Link href={href("/salaries")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/salaries")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
                 {t("nav.salaries")}
               </Link>
-              <Link href={href("/interviews")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/interviews")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
                 {t("nav.interviews")}
               </Link>
-              <Link href={href("/learning")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/learning")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
                 {t("nav.learn")}
               </Link>
               {showBlogLink && (
-                <Link href={href("/blog")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+                <Link href={href("/blog")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
                   Blog
                 </Link>
               )}
-              <Link href={href("/pricing")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/pricing")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
                 {FREE_MODE ? t("nav.freeForEveryone") : t("nav.pricing")}
               </Link>
-              <Link href={href("/trust")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+              <Link href={href("/trust")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
                 Trust
               </Link>
               {user?.role === "CANDIDATE" && (
-                <Link href={href("/candidate/ai-assistant")} prefetch={false} className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+                <Link href={href("/candidate/ai-assistant")} prefetch={false} className="text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
                   AI Assistant
                 </Link>
               )}
               {user && (
-                <Link href={href("/messages")} prefetch={false} className="relative text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-medium">
+                <Link href={href("/messages")} prefetch={false} className="relative text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100 font-medium">
                   {t("nav.messages")}
                   {unreadMessages > 0 && (
                     <span className="absolute -top-1 -right-3 bg-emerald-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
@@ -224,7 +224,7 @@ export function Header() {
                 </Link>
               )}
               {user && (
-                <Link href={href("/notifications")} prefetch={false} className="relative text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+                <Link href={href("/notifications")} prefetch={false} className="relative text-fg-secondary dark:text-gray-300 hover:text-fg dark:hover:text-gray-100">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
@@ -241,8 +241,8 @@ export function Header() {
               {/* Auth Buttons */}
               {isLoading ? (
                 <div className="flex items-center space-x-3">
-                  <div className="h-9 w-16 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
-                  <div className="h-9 w-24 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+                  <div className="h-9 w-16 bg-surface-muted dark:bg-gray-800 rounded-lg animate-pulse" />
+                  <div className="h-9 w-24 bg-surface-muted dark:bg-gray-800 rounded-lg animate-pulse" />
                 </div>
               ) : user ? (
                 <div className="flex items-center space-x-4">
@@ -250,7 +250,7 @@ export function Header() {
                 <Button variant="ghost">{t("nav.dashboard")}</Button>
               </Link>
                   <div className="flex items-center space-x-3">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">{user.name}</span>
+                    <span className="text-sm text-fg-secondary dark:text-gray-300">{user.name}</span>
                     <Button variant="outline" size="sm" onClick={() => setShowLogoutConfirm(true)}>
                       {t("nav.logout")}
                     </Button>
@@ -274,7 +274,7 @@ export function Header() {
               <ThemeToggle />
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="inline-flex items-center justify-center rounded-md border border-zinc-200 bg-white p-2.5 text-zinc-600 shadow-sm hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100 transition-colors"
+                className="inline-flex items-center justify-center rounded-md border border-line bg-surface p-2.5 text-fg-secondary shadow-sm hover:text-fg dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100 transition-colors"
                 aria-label="Toggle menu"
                 aria-expanded={mobileMenuOpen}
                 aria-controls="mobile-menu-panel"
@@ -303,14 +303,14 @@ export function Header() {
           />
           <div
             id="mobile-menu-panel"
-            className="absolute right-0 top-0 h-full w-[85%] max-w-sm overflow-y-auto border-l border-zinc-200 bg-white p-5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-950"
+            className="absolute right-0 top-0 h-full w-[85%] max-w-sm overflow-y-auto border-l border-line bg-surface p-5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-950"
           >
             <div className="flex items-center justify-between mb-6">
-              <p className="text-base font-semibold text-gray-900 dark:text-gray-100">Menu</p>
+              <p className="text-base font-semibold text-fg dark:text-gray-100">Menu</p>
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(false)}
-                className="rounded-md p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="rounded-md p-2 text-fg-secondary dark:text-gray-300 hover:bg-surface-muted dark:hover:bg-gray-800"
                 aria-label="Close menu"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -335,7 +335,7 @@ export function Header() {
                   href={href(item.href)}
                   prefetch={false}
                   onClick={() => setMobileMenuOpen(false)}
-                  className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-100"
+                  className="min-h-11 flex items-center py-2 text-fg-secondary dark:text-gray-200 hover:text-fg dark:hover:text-gray-100"
                 >
                   {item.label}
                 </Link>
@@ -344,18 +344,18 @@ export function Header() {
               <div className="h-px bg-gray-200 dark:bg-gray-800 my-3" />
 
               {isLoading ? (
-                <div className="h-11 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+                <div className="h-11 bg-surface-muted dark:bg-gray-800 rounded-lg animate-pulse" />
               ) : user ? (
                 <>
-                  <Link href={href(getDashboardLink())} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
+                  <Link href={href(getDashboardLink())} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-fg-secondary dark:text-gray-200">
                     {t("nav.dashboard")}
                   </Link>
                   {user.role === "CANDIDATE" && (
-                    <Link href={href("/candidate/ai-assistant")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
+                    <Link href={href("/candidate/ai-assistant")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-fg-secondary dark:text-gray-200">
                       AI Assistant
                     </Link>
                   )}
-                  <Link href={href("/messages")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
+                  <Link href={href("/messages")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-fg-secondary dark:text-gray-200">
                     {t("nav.messages")}
                     {unreadMessages > 0 && (
                       <span className="ml-2 bg-emerald-600 text-white text-xs rounded-full px-1.5">
@@ -363,7 +363,7 @@ export function Header() {
                       </span>
                     )}
                   </Link>
-                  <Link href={href("/notifications")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
+                  <Link href={href("/notifications")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-fg-secondary dark:text-gray-200">
                     {t("nav.notifications")}
                     {unreadNotifs > 0 && (
                       <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5">
@@ -372,7 +372,7 @@ export function Header() {
                     )}
                   </Link>
                   {user.role === "CANDIDATE" && (
-                    <Link href={href("/immigration")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-gray-700 dark:text-gray-200">
+                    <Link href={href("/immigration")} prefetch={false} onClick={() => setMobileMenuOpen(false)} className="min-h-11 flex items-center py-2 text-fg-secondary dark:text-gray-200">
                       Visa Tracker
                     </Link>
                   )}

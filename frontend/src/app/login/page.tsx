@@ -81,8 +81,8 @@ function LoginForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t("auth.welcomeBack")}</h1>
-        <p className="text-gray-600 dark:text-gray-300">{t("auth.signInToAccount")}</p>
+        <h1 className="text-2xl font-bold text-fg dark:text-gray-100">{t("auth.welcomeBack")}</h1>
+        <p className="text-fg-secondary dark:text-gray-300">{t("auth.signInToAccount")}</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -129,7 +129,7 @@ function LoginForm() {
           </Button>
 
           <div className="text-right">
-            <Link href={localizePath("/forgot-password", locale)} className="text-sm text-emerald-600 hover:text-emerald-700">
+            <Link href={localizePath("/forgot-password", locale)} className="text-sm text-primary-text hover:text-emerald-700">
               Forgot your password?
             </Link>
           </div>
@@ -137,15 +137,15 @@ function LoginForm() {
 
         <OAuthButtons mode="login" onError={(oauthError) => setError(oauthError)} />
 
-        <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
+        <div className="mt-6 text-center text-sm text-fg-secondary dark:text-gray-300">
           {t("auth.dontHaveAccount")}{" "}
-          <Link href={localizePath("/register", locale)} className="text-emerald-600 hover:text-emerald-700 font-medium">
+          <Link href={localizePath("/register", locale)} className="text-primary-text hover:text-emerald-700 font-medium">
             {t("auth.createAccount")}
           </Link>
         </div>
 
         {SHOW_DEMO_CREDENTIALS && (
-          <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg text-sm text-gray-600 dark:text-gray-300">
+          <div className="mt-4 p-4 bg-surface-sunken dark:bg-gray-900 rounded-lg text-sm text-fg-secondary dark:text-gray-300">
             <p className="font-medium mb-2">Demo Credentials:</p>
             <p>Candidate: candidate@example.com</p>
             <p>Employer: employer@example.com</p>

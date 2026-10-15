@@ -43,7 +43,7 @@ function Breakdown({
   const total = rows.reduce((a, b) => a + b.value, 0) || 1;
   return (
     <div className="space-y-3">
-      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800" aria-hidden>
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-muted dark:bg-zinc-800" aria-hidden>
         {rows.map((r) => (
           <div key={r.label} className={barColor[r.tone]} style={{ width: `${(r.value / total) * 100}%` }} />
         ))}
@@ -51,7 +51,7 @@ function Breakdown({
       <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
         {rows.map((r) => (
           <li key={r.label} className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300">
+            <span className="flex items-center gap-2 text-fg-secondary dark:text-zinc-300">
               <span className={`h-2 w-2 rounded-full ${barColor[r.tone]}`} aria-hidden />
               {r.label}
             </span>
@@ -196,7 +196,7 @@ export default function AdminOverviewPage() {
             {queues.map((q) => (
               <li key={q.key}>
                 <Link href={href(q.href)} className="flex items-center justify-between gap-3 py-2.5 text-sm hover:opacity-80">
-                  <span className="text-zinc-700 dark:text-zinc-300">{t(q.key)}</span>
+                  <span className="text-fg-secondary dark:text-zinc-300">{t(q.key)}</span>
                   {q.value === null ? (
                     <Pill tone="zinc">{t("overview.notConnected")}</Pill>
                   ) : (

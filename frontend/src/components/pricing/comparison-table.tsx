@@ -24,19 +24,19 @@ export function ComparisonTable({ title, plans, rows, tableType }: ComparisonTab
 
   return (
     <div className="w-full" data-testid={`comparison-table-${tableType}`}>
-      <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">{title}</h3>
+      <h3 className="text-xl font-bold text-fg mb-4 text-center">{title}</h3>
 
       {/* Mobile: stacked cards */}
       <div className="md:hidden space-y-4">
         {plans.map((plan) => (
-          <div key={plan} className="bg-white rounded-xl border border-gray-200 p-4">
-            <h4 className="font-semibold text-gray-900 mb-3">{plan}</h4>
+          <div key={plan} className="bg-surface rounded-xl border border-line p-4">
+            <h4 className="font-semibold text-fg mb-3">{plan}</h4>
             <ul className="space-y-2">
               {visibleRows.map((row) => {
                 const val = row.values[plan];
                 return (
                   <li key={row.feature} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">{row.feature}</span>
+                    <span className="text-fg-secondary">{row.feature}</span>
                     <CellValue value={val} />
                   </li>
                 );
@@ -50,10 +50,10 @@ export function ComparisonTable({ title, plans, rows, tableType }: ComparisonTab
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="border-b-2 border-gray-200">
-              <th className="text-left text-sm font-medium text-gray-500 py-3 px-4 w-[40%]">Feature</th>
+            <tr className="border-b-2 border-line">
+              <th className="text-left text-sm font-medium text-fg-muted py-3 px-4 w-[40%]">Feature</th>
               {plans.map((plan) => (
-                <th key={plan} className="text-center text-sm font-semibold text-gray-900 py-3 px-4">
+                <th key={plan} className="text-center text-sm font-semibold text-fg py-3 px-4">
                   {plan}
                 </th>
               ))}
@@ -63,9 +63,9 @@ export function ComparisonTable({ title, plans, rows, tableType }: ComparisonTab
             {visibleRows.map((row, i) => (
               <tr
                 key={row.feature}
-                className={`border-b border-gray-100 ${i % 2 === 0 ? "bg-gray-50/50" : ""}`}
+                className={`border-b border-line ${i % 2 === 0 ? "bg-gray-50/50" : ""}`}
               >
-                <td className="text-sm text-gray-700 py-3 px-4">
+                <td className="text-sm text-fg-secondary py-3 px-4">
                   {row.feature}
                   {row.tooltip && (
                     <span className="ml-1 text-gray-400 cursor-help" title={row.tooltip}>
@@ -93,7 +93,7 @@ export function ComparisonTable({ title, plans, rows, tableType }: ComparisonTab
               setExpanded(!expanded);
               if (!expanded) pricingEvents.comparisonExpand(tableType);
             }}
-            className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+            className="text-sm text-primary-text hover:text-emerald-700 font-medium"
           >
             {expanded ? "Show less" : `Show all ${rows.length} features`}
             <svg

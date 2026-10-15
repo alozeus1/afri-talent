@@ -15,12 +15,12 @@ export function JobsHero() {
             {t("jobs.hero.description")}
           </p>
         </div>
-        <div className="surface-panel gloss-card flex flex-col justify-between rounded-[1.75rem] p-5 text-gray-900 dark:text-white">
+        <div className="surface-panel gloss-card flex flex-col justify-between rounded-[1.75rem] p-5 text-fg dark:text-white">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">{t("jobs.hero.rankingSignals")}</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-fg-muted dark:text-gray-400">{t("jobs.hero.rankingSignals")}</p>
             <p className="mt-3 font-display text-2xl font-bold">{t("jobs.hero.rankingDesc")}</p>
           </div>
-          <p className="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-300">
+          <p className="mt-4 text-sm leading-6 text-fg-secondary dark:text-gray-300">
             AfriTalent prioritizes roles that feel more credible and more actionable, not just more plentiful.
           </p>
         </div>

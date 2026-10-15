@@ -81,18 +81,18 @@ export function HeroStats() {
           {items.map((item) => (
             <div key={item.label} className="text-center">
               <div className="font-display mb-2 text-4xl font-bold text-emerald-700 dark:text-emerald-300">{item.value}</div>
-              <div className="text-sm uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{item.label}</div>
+              <div className="text-sm uppercase tracking-[0.18em] text-fg-muted dark:text-gray-400">{item.label}</div>
             </div>
           ))}
         </div>
 
         {!hasLiveStats && (
-          <p className="mt-5 text-center text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-5 text-center text-sm text-fg-muted dark:text-gray-400">
             Showing verifiable product-readiness signals. Candidate outcomes, employer counts, and testimonials will appear after real early-access activity.
           </p>
         )}
         {hasLiveStats && (
-          <p className="mt-5 text-center text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-5 text-center text-sm text-fg-muted dark:text-gray-400">
             Employer validation, hiring-partner counts, and testimonials will appear only after verified early-access workflows produce real proof.
           </p>
         )}

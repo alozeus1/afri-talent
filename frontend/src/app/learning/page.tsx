@@ -362,8 +362,8 @@ function LearningPageContent() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Hero */}
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-3 dark:text-gray-100">{t("learning.title")}</h1>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto dark:text-gray-400">
+        <h1 className="text-4xl font-bold text-fg mb-3 dark:text-gray-100">{t("learning.title")}</h1>
+        <p className="text-lg text-fg-secondary max-w-2xl mx-auto dark:text-gray-400">
           {t("learning.practicalSubtitle")}
         </p>
       </div>
@@ -381,13 +381,13 @@ function LearningPageContent() {
                   setPage(1);
                 }}
                 placeholder="Search lessons, skills, or topics..."
-                className="min-w-[220px] flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm dark:border-zinc-700"
+                className="min-w-[220px] flex-1 px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm dark:border-zinc-700"
                 aria-label="Search learning lessons"
               />
 
               {/* Category Dropdown */}
               <select
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm dark:border-zinc-700"
+                className="px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm dark:border-zinc-700"
                 value={selectedCategory}
                 onChange={(e) => { setSelectedCategory(e.target.value); setPage(1); }}
               >
@@ -409,7 +409,7 @@ function LearningPageContent() {
                     className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
                       selectedDifficulty === diff
                         ? "bg-emerald-600 text-white border-emerald-600"
-                        : "bg-white text-gray-700 border-gray-300 hover:border-emerald-400"
+                        : "bg-surface text-fg-secondary border-line-strong hover:border-emerald-400"
                     }`}
                   >
                     {diff.charAt(0) + diff.slice(1).toLowerCase()}
@@ -425,11 +425,11 @@ function LearningPageContent() {
                     freeOnly ? "bg-emerald-600" : "bg-gray-300"
                   }`}
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-surface transition-transform ${
                     freeOnly ? "translate-x-6" : "translate-x-1"
                   }`} />
                 </button>
-                <span className="text-sm text-gray-700 dark:text-gray-300">{t("common.freeOnly")}</span>
+                <span className="text-sm text-fg-secondary dark:text-gray-300">{t("common.freeOnly")}</span>
               </label>
 
               {(selectedCategory || selectedDifficulty || freeOnly || query) && (
@@ -445,7 +445,7 @@ function LearningPageContent() {
       {/* Recommended for You */}
       {user && recommended.length > 0 && (
         <div className="mb-10">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4 dark:text-gray-100">{t("learning.recommendedForYou")}</h2>
+          <h2 className="text-2xl font-bold text-fg mb-4 dark:text-gray-100">{t("learning.recommendedForYou")}</h2>
           <div
             ref={scrollRef}
             className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-300"
@@ -462,14 +462,14 @@ function LearningPageContent() {
                       {course.difficulty.charAt(0) + course.difficulty.slice(1).toLowerCase()}
                     </Badge>
                   </div>
-                  <h3 className="font-semibold text-gray-900 text-sm line-clamp-2 mb-2 dark:text-gray-100">{course.title}</h3>
+                  <h3 className="font-semibold text-fg text-sm line-clamp-2 mb-2 dark:text-gray-100">{course.title}</h3>
                   {course.gapSkills && course.gapSkills.length > 0 && (
                     <p className="text-xs font-medium text-emerald-700 mb-2 dark:text-emerald-400">
                       Fills your gap: {course.gapSkills.slice(0, 3).join(", ")}
                     </p>
                   )}
                   {course.durationHours && (
-                    <p className="text-xs text-gray-500 mb-2 dark:text-gray-400">{course.durationHours}h</p>
+                    <p className="text-xs text-fg-muted mb-2 dark:text-gray-400">{course.durationHours}h</p>
                   )}
                   <a href={course.url} target="_blank" rel="noopener noreferrer">
                     <Button size="sm" variant="outline" className="w-full">{t("learning.viewLesson")}</Button>
@@ -484,7 +484,7 @@ function LearningPageContent() {
       {/* Featured Courses */}
       {featured.length > 0 && (
         <div className="mb-10">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4 dark:text-gray-100">{t("learning.featuredCourses")}</h2>
+          <h2 className="text-2xl font-bold text-fg mb-4 dark:text-gray-100">{t("learning.featuredCourses")}</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {featured.map((course) => (
               <Card key={course.id} className="overflow-hidden">
@@ -500,14 +500,14 @@ function LearningPageContent() {
                       <Badge variant="warning">{t("common.paid")}</Badge>
                     )}
                   </div>
-                  <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-2 dark:text-gray-100">{course.title}</h3>
+                  <h3 className="font-bold text-fg text-lg mb-2 line-clamp-2 dark:text-gray-100">{course.title}</h3>
                   {course.description && (
-                    <p className="text-sm text-gray-600 mb-3 line-clamp-2 dark:text-gray-400">{course.description}</p>
+                    <p className="text-sm text-fg-secondary mb-3 line-clamp-2 dark:text-gray-400">{course.description}</p>
                   )}
                   {course.skills.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-3">
                       {course.skills.slice(0, 3).map((skill) => (
-                        <span key={skill} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded dark:text-gray-400">
+                        <span key={skill} className="text-xs bg-surface-muted text-fg-secondary px-2 py-0.5 rounded dark:text-gray-400">
                           {skill}
                         </span>
                       ))}
@@ -515,7 +515,7 @@ function LearningPageContent() {
                   )}
                   <div className="flex items-center justify-between">
                     {course.durationHours && (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">{course.durationHours}h</span>
+                      <span className="text-xs text-fg-muted dark:text-gray-400">{course.durationHours}h</span>
                     )}
                     {isEarlyLesson(course) ? (
                       <span className="flex items-center gap-2">
@@ -548,14 +548,14 @@ function LearningPageContent() {
           requiredPlan="PROFESSIONAL"
           currentPlan={currentPlan}
           fallback={
-            <Card className="border-dashed border-emerald-200 bg-white dark:bg-zinc-900">
+            <Card className="border-dashed border-emerald-200 bg-surface dark:bg-zinc-900">
               <CardContent className="flex flex-col items-center justify-center gap-3 p-8 text-center">
                 <div className="rounded-full bg-emerald-100 p-3 text-emerald-700">
                   <Lock className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Premium Learning Labs</h2>
-                  <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+                  <h2 className="text-xl font-semibold text-fg dark:text-gray-100">Premium Learning Labs</h2>
+                  <p className="mt-1 max-w-2xl text-sm text-fg-secondary dark:text-gray-400">
                     Beginner, intermediate, and advanced labs are reserved for professional plan candidates.
                   </p>
                 </div>
@@ -569,8 +569,8 @@ function LearningPageContent() {
           <div className="space-y-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{FREE_MODE ? "Learning Labs" : "Premium Learning Labs"}</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <h2 className="text-2xl font-bold text-fg dark:text-gray-100">{FREE_MODE ? "Learning Labs" : "Premium Learning Labs"}</h2>
+                <p className="text-sm text-fg-secondary dark:text-gray-400">
                   Structured practice across cloud, AI, cybersecurity, DevOps, frontend, backend, Python, YAML,
                   Terraform, and containerization.
                 </p>
@@ -588,19 +588,19 @@ function LearningPageContent() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <Badge variant="info">{track.field}</Badge>
-                        <h3 className="mt-2 text-lg font-semibold text-gray-900 dark:text-gray-100">{track.field} Lab Track</h3>
-                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{track.summary}</p>
+                        <h3 className="mt-2 text-lg font-semibold text-fg dark:text-gray-100">{track.field} Lab Track</h3>
+                        <p className="mt-1 text-sm text-fg-secondary dark:text-gray-400">{track.summary}</p>
                       </div>
                       <div className="rounded-full bg-emerald-50 p-2 text-emerald-700">
                         <PlayCircle className="h-5 w-5" />
                       </div>
                     </div>
 
-                    <p className="mt-4 text-sm text-gray-700 dark:text-gray-300">{track.intro}</p>
+                    <p className="mt-4 text-sm text-fg-secondary dark:text-gray-300">{track.intro}</p>
 
                     <div className="mt-4 space-y-3">
                       {track.levels.map((level) => (
-                        <div key={level.name} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                        <div key={level.name} className="rounded-lg border border-line bg-surface-sunken p-3">
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
                               <div className="flex gap-0.5">
@@ -608,13 +608,13 @@ function LearningPageContent() {
                                   <Star key={index} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                                 ))}
                               </div>
-                              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{level.name}</span>
+                              <span className="text-sm font-semibold text-fg dark:text-gray-100">{level.name}</span>
                             </div>
                             <Badge variant={level.stars === 1 ? "success" : level.stars === 2 ? "warning" : "danger"}>
                               {level.scoreBand}
                             </Badge>
                           </div>
-                          <p className="mt-2 text-xs leading-5 text-gray-600 dark:text-gray-400">{level.focus}</p>
+                          <p className="mt-2 text-xs leading-5 text-fg-secondary dark:text-gray-400">{level.focus}</p>
                         </div>
                       ))}
                     </div>
@@ -635,7 +635,7 @@ function LearningPageContent() {
 
       {/* All Courses */}
       <div className="mb-10">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4 dark:text-gray-100">{t("learning.allCourses")}</h2>
+        <h2 className="text-2xl font-bold text-fg mb-4 dark:text-gray-100">{t("learning.allCourses")}</h2>
 
         {loading ? (
           <div className="flex justify-center py-12">
@@ -646,8 +646,8 @@ function LearningPageContent() {
             <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">📖</span>
             </div>
-            <p className="text-gray-600 mb-2 dark:text-gray-400">{t("learning.noResults")}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{t("common.tryAdjustingFilters")}</p>
+            <p className="text-fg-secondary mb-2 dark:text-gray-400">{t("learning.noResults")}</p>
+            <p className="text-sm text-fg-muted dark:text-gray-400">{t("common.tryAdjustingFilters")}</p>
             {(selectedCategory || selectedDifficulty || freeOnly || query) && (
               <Button variant="outline" size="sm" className="mt-3" onClick={resetFilters}>
                 Clear filters
@@ -674,11 +674,11 @@ function LearningPageContent() {
                         {course.difficulty.charAt(0) + course.difficulty.slice(1).toLowerCase()}
                       </Badge>
                     </div>
-                    <h3 className="font-semibold text-gray-900 text-sm line-clamp-2 mb-2 dark:text-gray-100">{course.title}</h3>
+                    <h3 className="font-semibold text-fg text-sm line-clamp-2 mb-2 dark:text-gray-100">{course.title}</h3>
                     {course.skills.length > 0 && (
                       <div className="flex flex-wrap gap-1 mb-2">
                         {course.skills.slice(0, 3).map((skill) => (
-                          <span key={skill} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded dark:text-gray-400">
+                          <span key={skill} className="text-xs bg-surface-muted text-fg-secondary px-2 py-0.5 rounded dark:text-gray-400">
                             {skill}
                           </span>
                         ))}
@@ -686,7 +686,7 @@ function LearningPageContent() {
                     )}
                     <div className="flex items-center justify-between mt-auto">
                       {course.durationHours ? (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{course.durationHours}h</span>
+                        <span className="text-xs text-fg-muted dark:text-gray-400">{course.durationHours}h</span>
                       ) : (
                         <span />
                       )}
@@ -731,7 +731,7 @@ function LearningPageContent() {
                 >
                   {t("common.previous")}
                 </Button>
-                <span className="flex items-center px-3 text-sm text-gray-600 dark:text-gray-400">
+                <span className="flex items-center px-3 text-sm text-fg-secondary dark:text-gray-400">
                   Page {page} of {totalPages}
                 </span>
                 <Button
@@ -755,13 +755,13 @@ function LearningPageContent() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <Badge variant="info">{selectedLesson.category}</Badge>
-                  <h2 className="mt-3 text-2xl font-bold text-gray-900 dark:text-gray-100">{selectedLesson.title}</h2>
-                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{selectedLesson.description}</p>
+                  <h2 className="mt-3 text-2xl font-bold text-fg dark:text-gray-100">{selectedLesson.title}</h2>
+                  <p className="mt-2 text-sm text-fg-secondary dark:text-gray-400">{selectedLesson.description}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedLesson(null)}
-                  className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-300 dark:text-gray-400"
+                  className="rounded-full p-2 text-fg-muted hover:bg-surface-muted hover:text-fg-secondary dark:text-gray-300 dark:text-gray-400"
                   aria-label="Close lesson"
                 >
                   X
@@ -778,25 +778,25 @@ function LearningPageContent() {
               </div>
 
               <section>
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">{t("learning.learningOutcomes")}</h3>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700 dark:text-gray-300">
+                <h3 className="font-semibold text-fg dark:text-gray-100">{t("learning.learningOutcomes")}</h3>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-fg-secondary dark:text-gray-300">
                   {selectedLesson.outcomes.map((item) => <li key={item}>{item}</li>)}
                 </ul>
               </section>
 
               <section>
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">{t("learning.stepByStep")}</h3>
+                <h3 className="font-semibold text-fg dark:text-gray-100">{t("learning.stepByStep")}</h3>
                 <div className="mt-3 space-y-3">
-                  <div className="rounded-xl border border-gray-200 bg-white p-4 dark:bg-zinc-900">
+                  <div className="rounded-xl border border-line bg-surface p-4 dark:bg-zinc-900">
                     <div className="mb-3 flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      <p className="text-sm font-semibold text-fg dark:text-gray-100">
                         Step {activeLessonStep + 1} of {selectedLesson.steps.length}
                       </p>
                       <Badge variant={completedLessons.has(selectedLesson.id) ? "success" : "info"}>
                         {completedLessons.has(selectedLesson.id) ? "Complete" : "In progress"}
                       </Badge>
                     </div>
-                    <p className="text-sm leading-6 text-gray-700 dark:text-gray-300">{selectedLesson.steps[activeLessonStep]}</p>
+                    <p className="text-sm leading-6 text-fg-secondary dark:text-gray-300">{selectedLesson.steps[activeLessonStep]}</p>
                     <div className="mt-4 flex items-center justify-between gap-3">
                       <Button
                         type="button"
@@ -834,10 +834,10 @@ function LearningPageContent() {
               </section>
 
               <section>
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">{t("learning.checklist")}</h3>
+                <h3 className="font-semibold text-fg dark:text-gray-100">{t("learning.checklist")}</h3>
                 <ul className="mt-2 grid gap-2 sm:grid-cols-2">
                   {selectedLesson.checklist.map((item) => (
-                    <li key={item} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
+                    <li key={item} className="rounded-lg border border-line bg-surface-sunken px-3 py-2 text-sm text-fg-secondary dark:text-gray-300">
                       {item}
                     </li>
                   ))}
@@ -852,7 +852,7 @@ function LearningPageContent() {
               )}
 
               <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-fg-muted dark:text-gray-400">
                   Progress is saved to your AfriTalent account and synced across devices.
                 </p>
                 <Button

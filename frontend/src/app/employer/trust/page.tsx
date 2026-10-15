@@ -262,8 +262,8 @@ export default function EmployerTrustPage() {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700 mb-3">
           Employer Trust
         </p>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Build a hiring presence candidates can trust on first glance</h1>
-        <p className="max-w-3xl text-lg leading-8 text-gray-600">
+        <h1 className="text-4xl font-bold text-fg mb-4">Build a hiring presence candidates can trust on first glance</h1>
+        <p className="max-w-3xl text-lg leading-8 text-fg-secondary">
           AfriTalent uses domain checks, company evidence, moderation history, and manual review before granting higher employer trust states. Strong trust signals improve apply quality and reduce review friction.
         </p>
       </section>
@@ -339,7 +339,7 @@ export default function EmployerTrustPage() {
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="space-y-4">
             <div className="rounded-2xl border border-white/80 bg-white/80 p-5">
-              <h3 className="text-lg font-semibold text-gray-900">What candidates see</h3>
+              <h3 className="text-lg font-semibold text-fg">What candidates see</h3>
               <div className="mt-4 flex flex-wrap gap-2">
                 <TrustBadge label={dashboard.trust.badge} riskLevel={dashboard.trust.riskLevel} variant="success" />
                 {dashboard.trust.verifiedDomain && (
@@ -349,13 +349,13 @@ export default function EmployerTrustPage() {
                   <TrustBadge label="Enhanced verification requested" riskLevel="MEDIUM" variant="warning" />
                 )}
               </div>
-              <p className="mt-4 text-sm text-gray-600">
+              <p className="mt-4 text-sm text-fg-secondary">
                 Public job posting is{" "}
-                <span className="font-semibold text-gray-900">
+                <span className="font-semibold text-fg">
                   {dashboard.trust.postingEligibility ? "enabled" : "blocked until minimum trust checks pass"}.
                 </span>
               </p>
-              <p className="mt-3 text-sm text-gray-600">
+              <p className="mt-3 text-sm text-fg-secondary">
                 Paid features can improve distribution and workflow depth, but they do not create trust badges without real checks.
               </p>
             </div>
@@ -373,7 +373,7 @@ export default function EmployerTrustPage() {
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Verification checklist</h3>
+            <h3 className="text-lg font-semibold text-fg mb-4">Verification checklist</h3>
             <TrustChecklist items={dashboard.trust.checklist} />
           </div>
         </div>
@@ -382,8 +382,8 @@ export default function EmployerTrustPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Company trust profile</h2>
-            <p className="text-sm text-gray-600">
+            <h2 className="text-xl font-semibold text-fg">Company trust profile</h2>
+            <p className="text-sm text-fg-secondary">
               Keep your website and LinkedIn company page aligned with your employer account. Domain mismatches increase risk.
             </p>
           </CardHeader>
@@ -393,7 +393,7 @@ export default function EmployerTrustPage() {
                 label="Company email"
                 value={dashboard.employer.email}
                 readOnly
-                className="bg-gray-50"
+                className="bg-surface-sunken"
               />
               <Input
                 label="Company website"
@@ -410,7 +410,7 @@ export default function EmployerTrustPage() {
               <Button type="submit" disabled={savingProfile}>
                 {savingProfile ? "Saving..." : "Save trust profile"}
               </Button>
-              <p className="text-xs leading-5 text-gray-500">
+              <p className="text-xs leading-5 text-fg-muted">
                 Keep company email, website, and LinkedIn details aligned. Mismatches slow approvals and can create caution labels.
               </p>
             </form>
@@ -419,22 +419,22 @@ export default function EmployerTrustPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Submit verification evidence</h2>
-            <p className="text-sm text-gray-600">
+            <h2 className="text-xl font-semibold text-fg">Submit verification evidence</h2>
+            <p className="text-sm text-fg-secondary">
               Upload business registration documents, domain ownership proof, or a LinkedIn company page for review. Reviewer notes will appear below if we need more information.
             </p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleArtifactSubmit} className="space-y-4">
               <div>
-                <label htmlFor="artifactType" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="artifactType" className="block text-sm font-medium text-fg-secondary mb-1">
                   Evidence type
                 </label>
                 <select
                   id="artifactType"
                   value={artifactType}
                   onChange={(event) => setArtifactType(event.target.value as EmployerArtifactType)}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   {artifactTypes.map((type) => (
                     <option key={type.value} value={type.value}>
@@ -446,7 +446,7 @@ export default function EmployerTrustPage() {
 
               {artifactType !== "LINKEDIN_COMPANY" && (
                 <div>
-                  <label htmlFor="artifactFile" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="artifactFile" className="block text-sm font-medium text-fg-secondary mb-1">
                     Upload document
                   </label>
                   <input
@@ -454,7 +454,7 @@ export default function EmployerTrustPage() {
                     type="file"
                     accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     onChange={(event: ChangeEvent<HTMLInputElement>) => setArtifactFile(event.target.files?.[0] || null)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700"
+                    className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm text-fg-secondary"
                   />
                 </div>
               )}
@@ -473,7 +473,7 @@ export default function EmployerTrustPage() {
               <Button type="submit" disabled={submittingArtifact}>
                 {submittingArtifact ? "Submitting..." : "Submit for review"}
               </Button>
-              <p className="text-xs leading-5 text-gray-500">
+              <p className="text-xs leading-5 text-fg-muted">
                 Clear, recent documents reduce review time. If your account is scaling quickly, we may ask for stronger evidence before broad posting continues.
               </p>
             </form>
@@ -484,26 +484,26 @@ export default function EmployerTrustPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Submitted evidence</h2>
+            <h2 className="text-xl font-semibold text-fg">Submitted evidence</h2>
           </CardHeader>
           <CardContent className="space-y-4">
             {dashboard.artifacts.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+              <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary">
                 No verification evidence has been submitted yet. Start with your business registration or domain proof so candidates see a stronger credibility trail.
               </div>
             ) : (
               dashboard.artifacts.map((artifact: VerificationArtifactItem) => (
-                <div key={artifact.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div key={artifact.id} className="rounded-2xl border border-line bg-surface-sunken p-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-gray-900">{humanizeTrustValue(artifact.type)}</p>
+                    <p className="font-medium text-fg">{humanizeTrustValue(artifact.type)}</p>
                     <TrustBadge label={humanizeTrustValue(artifact.status)} variant={artifactStatusCopy(artifact.status).tone} />
                   </div>
-                  <p className="mt-2 text-sm text-gray-500">
+                  <p className="mt-2 text-sm text-fg-muted">
                     Submitted {new Date(artifact.submittedAt).toLocaleDateString()}
                   </p>
-                  <p className="mt-2 text-sm text-gray-700">{artifactStatusCopy(artifact.status).summary}</p>
+                  <p className="mt-2 text-sm text-fg-secondary">{artifactStatusCopy(artifact.status).summary}</p>
                   {artifact.fileName && (
-                    <p className="mt-2 text-sm text-gray-700">File: {artifact.fileName}</p>
+                    <p className="mt-2 text-sm text-fg-secondary">File: {artifact.fileName}</p>
                   )}
                   {artifact.externalUrl && (
                     <a
@@ -516,7 +516,7 @@ export default function EmployerTrustPage() {
                     </a>
                   )}
                   {artifact.reviewerNotes && (
-                    <p className="mt-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600">
+                    <p className="mt-3 rounded-xl border border-line bg-surface px-3 py-2 text-sm text-fg-secondary">
                       Reviewer notes: {artifact.reviewerNotes}
                     </p>
                   )}
@@ -528,23 +528,23 @@ export default function EmployerTrustPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Recent jobs and moderation</h2>
-            <p className="text-sm text-gray-600">
+            <h2 className="text-xl font-semibold text-fg">Recent jobs and moderation</h2>
+            <p className="text-sm text-fg-secondary">
               We show moderation context here so you can see how trust affects publishing and candidate-facing visibility.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
             {dashboard.recentJobs.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600">
+              <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary">
                 No recent jobs yet. Once your minimum trust threshold passes, you can publish roles from the employer dashboard and see moderation outcomes here.
               </div>
             ) : (
               dashboard.recentJobs.map((job) => (
-                <div key={job.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                <div key={job.id} className="rounded-2xl border border-line bg-surface-sunken p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="font-medium text-gray-900">{job.title}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-medium text-fg">{job.title}</p>
+                      <p className="text-sm text-fg-muted">
                         Created {new Date(job.createdAt).toLocaleDateString()}
                       </p>
                     </div>
@@ -553,7 +553,7 @@ export default function EmployerTrustPage() {
                       <TrustBadge label={`${job.riskLevel} risk`} riskLevel={job.riskLevel} />
                     </div>
                   </div>
-                  <p className="mt-3 text-sm text-gray-600">
+                  <p className="mt-3 text-sm text-fg-secondary">
                     {job.status === "PUBLISHED"
                       ? "This role passed moderation and is visible to candidates."
                       : job.status === "REJECTED"

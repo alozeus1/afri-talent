@@ -63,7 +63,7 @@ export function UpgradeCta({ feature, requiredPlan, currentPlan, compact }: Upgr
   if (compact) {
     return (
       <Link href="/billing" onClick={handleClick}>
-        <span className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-medium cursor-pointer">
+        <span className="inline-flex items-center gap-1 text-xs text-primary-text hover:text-emerald-700 font-medium cursor-pointer">
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
           </svg>
@@ -75,18 +75,18 @@ export function UpgradeCta({ feature, requiredPlan, currentPlan, compact }: Upgr
 
   return (
     <div
-      className="flex flex-col items-center justify-center py-8 px-4 bg-gray-50 rounded-xl border border-dashed border-gray-300"
+      className="flex flex-col items-center justify-center py-8 px-4 bg-surface-sunken rounded-xl border border-dashed border-line-strong"
       data-testid={`upgrade-cta-${feature}`}
     >
       <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
-        <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+        <svg className="w-6 h-6 text-primary-text" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
         </svg>
       </div>
-      <h4 className="text-sm font-semibold text-gray-900 mb-1">
+      <h4 className="text-sm font-semibold text-fg mb-1">
         {feature} requires {planName}
       </h4>
-      <p className="text-xs text-gray-500 text-center mb-4 max-w-xs">
+      <p className="text-xs text-fg-muted text-center mb-4 max-w-xs">
         Upgrade your plan to unlock {feature.toLowerCase()} and other premium features.
       </p>
       <Link href="/billing" onClick={handleClick}>

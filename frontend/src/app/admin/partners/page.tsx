@@ -238,8 +238,8 @@ export default function AdminPartnersPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-700 mb-3">
                 Partner Operations
               </p>
-              <h1 className="text-3xl font-bold text-gray-900">Institution and training trust tooling</h1>
-              <p className="mt-3 max-w-3xl text-sm text-gray-600">
+              <h1 className="text-3xl font-bold text-fg">Institution and training trust tooling</h1>
+              <p className="mt-3 max-w-3xl text-sm text-fg-secondary">
                 Partner operations are not enabled in this environment, so this workspace is showing the admin shell only.
               </p>
             </div>
@@ -260,8 +260,8 @@ export default function AdminPartnersPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-700 mb-3">
               Partner Operations
             </p>
-            <h1 className="text-3xl font-bold text-gray-900">Institution and training trust tooling</h1>
-            <p className="mt-3 max-w-3xl text-sm text-gray-600">
+            <h1 className="text-3xl font-bold text-fg">Institution and training trust tooling</h1>
+            <p className="mt-3 max-w-3xl text-sm text-fg-secondary">
               Create approved partner organizations, review ingestion records, and issue employer-facing candidate trust markers or verified skills.
             </p>
           </div>
@@ -286,7 +286,7 @@ export default function AdminPartnersPage() {
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Create partner</h2>
+            <h2 className="text-xl font-semibold text-fg">Create partner</h2>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCreatePartner} className="space-y-4">
@@ -304,7 +304,7 @@ export default function AdminPartnersPage() {
                   placeholder="University of Lagos"
                 />
                 <div>
-                  <label htmlFor="organizationType" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="organizationType" className="block text-sm font-medium text-fg-secondary mb-1">
                     Organization type
                   </label>
                   <select
@@ -316,7 +316,7 @@ export default function AdminPartnersPage() {
                         organizationType: event.target.value as PartnerOrganizationType,
                       }))
                     }
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     {organizationTypes.map((type) => (
                       <option key={type} value={type}>
@@ -354,11 +354,11 @@ export default function AdminPartnersPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Partner directory</h2>
+            <h2 className="text-xl font-semibold text-fg">Partner directory</h2>
           </CardHeader>
           <CardContent className="space-y-3">
             {partners.length === 0 ? (
-              <p className="text-sm text-gray-600">No partners configured yet.</p>
+              <p className="text-sm text-fg-secondary">No partners configured yet.</p>
             ) : (
               partners.map((partner) => (
                 <button
@@ -368,19 +368,19 @@ export default function AdminPartnersPage() {
                   className={`w-full rounded-2xl border p-4 text-left transition ${
                     selectedPartnerId === partner.id
                       ? "border-emerald-300 bg-emerald-50"
-                      : "border-gray-200 bg-white hover:border-emerald-200"
+                      : "border-line bg-surface hover:border-emerald-200"
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-gray-900">{partner.name}</p>
+                    <p className="font-semibold text-fg">{partner.name}</p>
                     <TrustBadge label={humanizeTrustValue(partner.organizationType)} variant="info" />
                     <TrustBadge label={humanizeTrustValue(partner.status)} variant={partner.status === "ACTIVE" ? "success" : "warning"} />
                   </div>
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-sm text-fg-secondary">
                     {partner.externalId} • {partner.country}
                   </p>
                   {partner._count && (
-                    <p className="mt-2 text-xs text-gray-500">
+                    <p className="mt-2 text-xs text-fg-muted">
                       {partner._count.records} records • {partner._count.verifiedSkills} issued skills • {partner._count.partnerMarkers} markers
                     </p>
                   )}
@@ -396,7 +396,7 @@ export default function AdminPartnersPage() {
           <div className="grid gap-6 xl:grid-cols-2">
             <Card>
               <CardHeader>
-                <h2 className="text-xl font-semibold text-gray-900">Issue candidate marker</h2>
+                <h2 className="text-xl font-semibold text-fg">Issue candidate marker</h2>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleIssueMarker} className="space-y-4">
@@ -407,7 +407,7 @@ export default function AdminPartnersPage() {
                     placeholder="Candidate UUID"
                   />
                   <div>
-                    <label htmlFor="markerType" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="markerType" className="block text-sm font-medium text-fg-secondary mb-1">
                       Marker type
                     </label>
                     <select
@@ -419,7 +419,7 @@ export default function AdminPartnersPage() {
                           markerType: event.target.value as CandidatePartnerMarkerType,
                         }))
                       }
-                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     >
                       {markerTypes.map((type) => (
                         <option key={type} value={type}>
@@ -435,14 +435,14 @@ export default function AdminPartnersPage() {
                     placeholder={`${detail.partner.name} verified`}
                   />
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-fg-secondary mb-1">
                       Description
                     </label>
                     <textarea
                       value={markerForm.description}
                       onChange={(event) => setMarkerForm((current) => ({ ...current, description: event.target.value }))}
                       rows={3}
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                      className="w-full rounded-lg border border-line-strong px-4 py-2 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                       placeholder="What was validated and why employers should trust it."
                     />
                   </div>
@@ -455,7 +455,7 @@ export default function AdminPartnersPage() {
 
             <Card>
               <CardHeader>
-                <h2 className="text-xl font-semibold text-gray-900">Issue verified skill</h2>
+                <h2 className="text-xl font-semibold text-fg">Issue verified skill</h2>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleIssueSkill} className="space-y-4">
@@ -473,7 +473,7 @@ export default function AdminPartnersPage() {
                       placeholder="React"
                     />
                     <div>
-                      <label htmlFor="skillMethod" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="skillMethod" className="block text-sm font-medium text-fg-secondary mb-1">
                         Method
                       </label>
                       <select
@@ -485,7 +485,7 @@ export default function AdminPartnersPage() {
                             method: event.target.value as "PARTNER_ISSUED" | "MANUAL_REVIEW",
                           }))
                         }
-                        className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       >
                         <option value="PARTNER_ISSUED">Partner issued</option>
                         <option value="MANUAL_REVIEW">Manual review</option>
@@ -513,14 +513,14 @@ export default function AdminPartnersPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-fg-secondary mb-1">
                       Reviewer note
                     </label>
                     <textarea
                       value={skillForm.confidenceNote}
                       onChange={(event) => setSkillForm((current) => ({ ...current, confidenceNote: event.target.value }))}
                       rows={3}
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                      className="w-full rounded-lg border border-line-strong px-4 py-2 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                       placeholder="Why this skill should be trusted."
                     />
                   </div>
@@ -535,19 +535,19 @@ export default function AdminPartnersPage() {
           <div className="grid gap-6 xl:grid-cols-[1fr_1fr_1fr]">
             <Card>
               <CardHeader>
-                <h2 className="text-xl font-semibold text-gray-900">Ingestion records</h2>
+                <h2 className="text-xl font-semibold text-fg">Ingestion records</h2>
               </CardHeader>
               <CardContent className="space-y-3">
                 {detail.records.length === 0 ? (
-                  <p className="text-sm text-gray-600">No partner records received yet.</p>
+                  <p className="text-sm text-fg-secondary">No partner records received yet.</p>
                 ) : (
                   detail.records.slice(0, 10).map((record) => (
-                    <div key={record.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                    <div key={record.id} className="rounded-2xl border border-line bg-surface-sunken p-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <TrustBadge label={humanizeTrustValue(record.type)} variant="info" />
                         <TrustBadge label={humanizeTrustValue(record.status)} variant="warning" />
                       </div>
-                      <p className="mt-2 text-sm font-medium text-gray-900">{record.externalRecordId}</p>
+                      <p className="mt-2 text-sm font-medium text-fg">{record.externalRecordId}</p>
                     </div>
                   ))
                 )}
@@ -556,16 +556,16 @@ export default function AdminPartnersPage() {
 
             <Card>
               <CardHeader>
-                <h2 className="text-xl font-semibold text-gray-900">Issued markers</h2>
+                <h2 className="text-xl font-semibold text-fg">Issued markers</h2>
               </CardHeader>
               <CardContent className="space-y-3">
                 {detail.issuedMarkers.length === 0 ? (
-                  <p className="text-sm text-gray-600">No markers issued yet.</p>
+                  <p className="text-sm text-fg-secondary">No markers issued yet.</p>
                 ) : (
                   detail.issuedMarkers.slice(0, 10).map((marker) => (
-                    <div key={marker.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                      <p className="font-medium text-gray-900">{marker.user.name}</p>
-                      <p className="mt-1 text-sm text-gray-600">{marker.label}</p>
+                    <div key={marker.id} className="rounded-2xl border border-line bg-surface-sunken p-4">
+                      <p className="font-medium text-fg">{marker.user.name}</p>
+                      <p className="mt-1 text-sm text-fg-secondary">{marker.label}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <TrustBadge label={humanizeTrustValue(marker.markerType)} variant="info" />
                         <TrustBadge label={humanizeTrustValue(marker.status)} variant="success" />
@@ -578,16 +578,16 @@ export default function AdminPartnersPage() {
 
             <Card>
               <CardHeader>
-                <h2 className="text-xl font-semibold text-gray-900">Issued skills</h2>
+                <h2 className="text-xl font-semibold text-fg">Issued skills</h2>
               </CardHeader>
               <CardContent className="space-y-3">
                 {detail.issuedSkills.length === 0 ? (
-                  <p className="text-sm text-gray-600">No verified skills issued yet.</p>
+                  <p className="text-sm text-fg-secondary">No verified skills issued yet.</p>
                 ) : (
                   detail.issuedSkills.slice(0, 10).map((skill) => (
-                    <div key={skill.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                      <p className="font-medium text-gray-900">{skill.user.name}</p>
-                      <p className="mt-1 text-sm text-gray-600">{skill.skillName}</p>
+                    <div key={skill.id} className="rounded-2xl border border-line bg-surface-sunken p-4">
+                      <p className="font-medium text-fg">{skill.user.name}</p>
+                      <p className="mt-1 text-sm text-fg-secondary">{skill.skillName}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <TrustBadge label={humanizeTrustValue(skill.method)} variant="info" />
                         <TrustBadge label={humanizeTrustValue(skill.status)} variant="success" />

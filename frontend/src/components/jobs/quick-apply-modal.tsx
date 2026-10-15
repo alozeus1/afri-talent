@@ -199,7 +199,7 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
               type="button"
               aria-label="Close Quick Apply"
               onClick={onClose}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+              className="absolute top-4 right-4 text-gray-400 hover:text-fg-secondary transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -210,7 +210,7 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
             {isOnPlatformApply && loading && (
               <div className="flex flex-col items-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-4"></div>
-                <p className="text-gray-600">Checking eligibility...</p>
+                <p className="text-fg-secondary">Checking eligibility...</p>
               </div>
             )}
 
@@ -223,8 +223,8 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">External Application</h3>
-                    <p className="text-sm text-gray-600">{job.title}</p>
+                    <h3 className="text-lg font-semibold text-fg">External Application</h3>
+                    <p className="text-sm text-fg-secondary">{job.title}</p>
                   </div>
                 </div>
 
@@ -284,12 +284,12 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
             {success && (
               <div className="flex flex-col items-center py-8">
                 <div className="h-16 w-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
-                  <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-8 h-8 text-primary-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">Application Sent!</h3>
-                <p className="text-sm text-gray-600 text-center">
+                <h3 className="text-lg font-semibold text-fg mb-1">Application Sent!</h3>
+                <p className="text-sm text-fg-secondary text-center">
                   {preview?.resume
                     ? "Your profile, resume and cover letter have been sent to the employer."
                     : "Your profile and cover letter have been sent to the employer."}
@@ -302,21 +302,21 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
               <div>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-5 h-5 text-primary-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Quick Apply</h3>
-                    <p className="text-sm text-gray-600">{job.title}</p>
+                    <h3 className="text-lg font-semibold text-fg">Quick Apply</h3>
+                    <p className="text-sm text-fg-secondary">{job.title}</p>
                   </div>
                 </div>
 
                 {/* Profile completeness */}
                 <div className="mb-4">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Profile completeness</span>
-                    <span className="font-medium text-gray-900">{eligibility.profileCompleteness}%</span>
+                    <span className="text-fg-secondary">Profile completeness</span>
+                    <span className="font-medium text-fg">{eligibility.profileCompleteness}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
@@ -327,9 +327,9 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                 </div>
 
                 {previewLoading && (
-                  <div className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 mb-4" data-testid="quick-apply-preview-loading">
+                  <div className="flex items-center gap-3 rounded-lg border border-line p-4 mb-4" data-testid="quick-apply-preview-loading">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-600"></div>
-                    <p className="text-sm text-gray-600">Drafting your cover letter...</p>
+                    <p className="text-sm text-fg-secondary">Drafting your cover letter...</p>
                   </div>
                 )}
 
@@ -367,20 +367,20 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
 
                     <div className="mb-4">
                       <div className="mb-1 flex items-baseline justify-between">
-                        <label htmlFor="quick-apply-cover-letter" className="text-sm font-medium text-gray-900">
+                        <label htmlFor="quick-apply-cover-letter" className="text-sm font-medium text-fg">
                           Cover letter
                         </label>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-fg-muted">
                           {coverLetter.length}/{COVER_LETTER_MAX}
                         </span>
                       </div>
-                      <p className="mb-2 text-xs text-gray-500">
+                      <p className="mb-2 text-xs text-fg-muted">
                         We drafted this from your profile. Edit it so it sounds like you; the employer sees exactly this text.
                       </p>
                       <textarea
                         id="quick-apply-cover-letter"
                         data-testid="quick-apply-cover-letter"
-                        className="w-full min-h-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full min-h-[200px] rounded-lg border border-line-strong px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         value={coverLetter}
                         maxLength={COVER_LETTER_MAX}
                         onChange={(e) => setCoverLetter(e.target.value)}
@@ -409,7 +409,7 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
 
                 <label
                   htmlFor="quick-apply-consent"
-                  className="flex items-start gap-3 p-3 mb-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  className="flex items-start gap-3 p-3 mb-4 border border-line rounded-lg cursor-pointer hover:bg-surface-sunken transition-colors"
                 >
                   <input
                     id="quick-apply-consent"
@@ -417,9 +417,9 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                     data-testid="quick-apply-consent-checkbox"
                     checked={consented}
                     onChange={(e) => setConsented(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                    className="mt-0.5 h-4 w-4 text-primary-text border-line-strong rounded focus:ring-emerald-500"
                   />
-                  <span className="text-sm text-gray-700">
+                  <span className="text-sm text-fg-secondary">
                     I&apos;ve reviewed my cover letter{preview?.resume ? " and the resume being attached" : ""}, and I want AfriTalent to send this application on my behalf.
                   </span>
                 </label>
@@ -446,8 +446,8 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Not Eligible Yet</h3>
-                    <p className="text-sm text-gray-600">{job.title}</p>
+                    <h3 className="text-lg font-semibold text-fg">Not Eligible Yet</h3>
+                    <p className="text-sm text-fg-secondary">{job.title}</p>
                   </div>
                 </div>
 
@@ -460,8 +460,8 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                 {/* Profile completeness */}
                 <div className="mb-4">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Profile completeness</span>
-                    <span className="font-medium text-gray-900">{eligibility.profileCompleteness}%</span>
+                    <span className="text-fg-secondary">Profile completeness</span>
+                    <span className="font-medium text-fg">{eligibility.profileCompleteness}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
@@ -477,7 +477,7 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                   {eligibility.profileCompleteness < 80 && (
                     <Link
                       href="/candidate/profile"
-                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      className="flex items-center gap-3 p-3 bg-surface-sunken rounded-lg hover:bg-surface-muted transition-colors"
                     >
                       <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
                         <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -485,8 +485,8 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">Complete your profile</p>
-                        <p className="text-xs text-gray-500">Add missing details to your profile</p>
+                        <p className="text-sm font-medium text-fg">Complete your profile</p>
+                        <p className="text-xs text-fg-muted">Add missing details to your profile</p>
                       </div>
                       <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -496,7 +496,7 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                   {!eligibility.hasActiveResume && (
                     <Link
                       href="/candidate/resumes"
-                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      className="flex items-center gap-3 p-3 bg-surface-sunken rounded-lg hover:bg-surface-muted transition-colors"
                     >
                       <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
                         <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -504,8 +504,8 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">Upload a resume</p>
-                        <p className="text-xs text-gray-500">Add an active resume for Quick Apply</p>
+                        <p className="text-sm font-medium text-fg">Upload a resume</p>
+                        <p className="text-xs text-fg-muted">Add an active resume for Quick Apply</p>
                       </div>
                       <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

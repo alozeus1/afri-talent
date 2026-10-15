@@ -142,7 +142,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
     <>
       <Card className="sticky top-24">
         <CardContent className="p-6">
-          <h3 className="font-semibold text-gray-900 mb-4 dark:text-gray-100">Apply for this position</h3>
+          <h3 className="font-semibold text-fg mb-4 dark:text-gray-100">Apply for this position</h3>
 
           <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4">
             <p className="text-sm font-semibold text-blue-900">Stay safe while applying</p>
@@ -166,7 +166,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
           )}
 
           {isLowBandwidth && (
-            <div className="mb-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
+            <div className="mb-4 rounded-lg bg-surface-sunken p-4 text-sm text-fg-secondary">
               Lite network mode is on, so quick apply checks may take a little longer on this connection.
             </div>
           )}
@@ -177,7 +177,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
               <p className="mt-1">Only candidates can apply to jobs.</p>
             </div>
           ) : user && user.role === "ADMIN" ? (
-            <div className="bg-gray-50 text-gray-700 p-4 rounded-lg mb-4 text-sm">
+            <div className="bg-surface-sunken text-fg-secondary p-4 rounded-lg mb-4 text-sm">
               <p className="font-medium">You&apos;re logged in as an admin.</p>
               <p className="mt-1">Admins cannot apply to jobs.</p>
             </div>
@@ -198,7 +198,7 @@ export function JobApplyPanel({ job }: JobApplyPanelProps) {
                 </div>
               )}
               {!user && (
-                <div className="mb-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-700">
+                <div className="mb-4 rounded-lg bg-surface-sunken p-4 text-sm text-fg-secondary">
                   {isOnPlatformApply
                     ? "Sign in to apply and track your application from your candidate dashboard."
                     : "Sign in to save this role and continue to the verified employer application page."}

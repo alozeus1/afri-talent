@@ -49,22 +49,22 @@ export function HomePageContent() {
     <div className="pb-12 bg-[var(--background)]">
       <section className="section-shell relative overflow-hidden px-0 pt-8 md:pt-12">
         <div className="page-frame">
-          <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white px-6 py-16 shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:px-10 md:py-20 lg:px-14">
+          <div className="relative overflow-hidden rounded-3xl border border-line bg-surface px-6 py-16 shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:px-10 md:py-20 lg:px-14">
             <div className="relative grid items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]">
               <div>
-                <div className="eyebrow-pill mb-6 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                <div className="eyebrow-pill mb-6 bg-surface-sunken dark:bg-zinc-900 border border-line dark:border-zinc-800">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span className="text-xs font-semibold uppercase tracking-widest text-zinc-600 dark:text-zinc-400">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-fg-secondary dark:text-zinc-400">
                     {t("home.hero.tagline")}
                   </span>
                 </div>
 
-                <h1 className="font-display max-w-4xl text-5xl font-bold leading-[1.05] text-zinc-900 dark:text-zinc-50 md:text-6xl lg:text-7xl">
+                <h1 className="font-display max-w-4xl text-5xl font-bold leading-[1.05] text-fg dark:text-zinc-50 md:text-6xl lg:text-7xl">
                   {t("home.hero.heading").replace("global opportunities.", "")}{" "}
                   <span className="text-emerald-700 dark:text-emerald-400">global opportunities.</span>
                 </h1>
 
-                <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-600 dark:text-zinc-400 md:text-xl">
+                <p className="mt-6 max-w-2xl text-lg leading-8 text-fg-secondary dark:text-zinc-400 md:text-xl">
                   {t("home.hero.description")}
                 </p>
 
@@ -93,32 +93,32 @@ export function HomePageContent() {
                   </Link>
                 )}
 
-                <div className="mt-8 flex flex-wrap gap-3 text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                  <Link href={localizePath("/jobs?remote=true", locale)} prefetch={false} className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                <div className="mt-8 flex flex-wrap gap-3 text-sm font-medium text-fg-secondary dark:text-zinc-400">
+                  <Link href={localizePath("/jobs?remote=true", locale)} prefetch={false} className="rounded-full border border-line bg-surface-sunken px-4 py-2 hover:bg-surface-muted dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     {t("home.hero.remoteFirstRoles")}
                   </Link>
-                  <Link href={localizePath("/jobs?visaSponsorship=YES", locale)} prefetch={false} className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                  <Link href={localizePath("/jobs?visaSponsorship=YES", locale)} prefetch={false} className="rounded-full border border-line bg-surface-sunken px-4 py-2 hover:bg-surface-muted dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     {t("home.hero.visaSupported")}
                   </Link>
-                  <Link href="/trust" prefetch={false} className="rounded-full border border-zinc-200 bg-zinc-50 px-4 py-2 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                  <Link href="/trust" prefetch={false} className="rounded-full border border-line bg-surface-sunken px-4 py-2 hover:bg-surface-muted dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
                     {t("home.hero.seeTrustModel")}
                   </Link>
                 </div>
               </div>
 
               <div className="relative hidden lg:block">
-                <div className="surface-panel absolute -left-10 top-8 z-20 max-w-[14rem] rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg">
-                  <p className="text-xs uppercase tracking-widest font-semibold text-zinc-500 dark:text-zinc-400">{t("home.launchThesis")}</p>
-                  <p className="font-display mt-2 text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                <div className="surface-panel absolute -left-10 top-8 z-20 max-w-[14rem] rounded-2xl p-5 border border-line dark:border-zinc-800 bg-surface dark:bg-zinc-900 shadow-lg">
+                  <p className="text-xs uppercase tracking-widest font-semibold text-fg-muted dark:text-zinc-400">{t("home.launchThesis")}</p>
+                  <p className="font-display mt-2 text-2xl font-bold text-fg dark:text-zinc-50">
                     {t("home.smallerShortlists")}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+                  <p className="mt-2 text-sm leading-6 text-fg-secondary dark:text-zinc-400">
                     {t("home.launchThesisDesc")}
                   </p>
                 </div>
 
-                <div className="surface-panel relative ml-auto w-full max-w-[36rem] rounded-3xl p-5 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
-                  <div className="relative flex h-[540px] items-center justify-center overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+                <div className="surface-panel relative ml-auto w-full max-w-[36rem] rounded-3xl p-5 border border-line dark:border-zinc-800 bg-surface-sunken dark:bg-zinc-900">
+                  <div className="relative flex h-[540px] items-center justify-center overflow-hidden rounded-2xl border border-line dark:border-zinc-800 bg-surface dark:bg-zinc-950">
                     <img
                       src="/images/hero/homepage-design-preview.webp"
                       alt="AfriTalent platform preview"
@@ -133,7 +133,7 @@ export function HomePageContent() {
                     {signalLabels.map((label) => (
                       <div
                         key={label}
-                        className="rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm font-medium text-zinc-700 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
+                        className="rounded-xl border border-line bg-surface px-3 py-3 text-sm font-medium text-fg-secondary shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
                       >
                         {label}
                       </div>
@@ -156,22 +156,22 @@ export function HomePageContent() {
             <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
               {t("home.why.tagline")}
             </p>
-            <h2 className="font-display mt-4 text-3xl font-bold text-zinc-900 dark:text-zinc-50 md:text-5xl">
+            <h2 className="font-display mt-4 text-3xl font-bold text-fg dark:text-zinc-50 md:text-5xl">
               {t("home.why.heading")}
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-fg-secondary dark:text-zinc-400">
               {t("home.why.subtitle")}
             </p>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {productSignals.map((item) => (
-              <div key={item.titleKey} className="surface-panel interactive-card rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+              <div key={item.titleKey} className="surface-panel interactive-card rounded-2xl p-6 border border-line dark:border-zinc-800 bg-surface dark:bg-zinc-900">
                 <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl font-bold text-lg ${item.tone}`}>
                   <item.Icon className="w-6 h-6" strokeWidth={2.5} />
                 </div>
-                <h3 className="mb-2 text-lg font-bold text-zinc-900 dark:text-zinc-100">{t(item.titleKey)}</h3>
-                <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{t(item.descKey)}</p>
+                <h3 className="mb-2 text-lg font-bold text-fg dark:text-zinc-100">{t(item.titleKey)}</h3>
+                <p className="text-sm leading-relaxed text-fg-secondary dark:text-zinc-400">{t(item.descKey)}</p>
               </div>
             ))}
           </div>
@@ -180,7 +180,7 @@ export function HomePageContent() {
 
       <section className="section-shell py-16">
         <div className="page-frame">
-          <div className="surface-panel overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="surface-panel overflow-hidden rounded-3xl border border-line bg-surface shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <div className="grid items-stretch lg:grid-cols-[0.95fr_1.05fr]">
               <div className="relative min-h-[320px] overflow-hidden bg-zinc-950 lg:min-h-[420px]">
                 <img
@@ -196,18 +196,18 @@ export function HomePageContent() {
                 <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
                   {t("home.sources.tagline")}
                 </p>
-                <h2 className="font-display mt-4 text-2xl font-bold text-zinc-900 dark:text-zinc-50 md:text-3xl">
+                <h2 className="font-display mt-4 text-2xl font-bold text-fg dark:text-zinc-50 md:text-3xl">
                   {t("home.sources.heading")}
                 </h2>
-                <p className="mt-4 text-zinc-600 dark:text-zinc-400">
+                <p className="mt-4 text-fg-secondary dark:text-zinc-400">
                   {t("home.sources.description")}
                 </p>
 
                 <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-3">
                   {sourceLabels.map(([label, sublabel]) => (
                     <div key={label}>
-                      <div className="font-bold text-zinc-800 dark:text-zinc-200">{label}</div>
-                      <div className="mt-1 text-xs font-medium text-zinc-500 dark:text-zinc-300">{sublabel}</div>
+                      <div className="font-bold text-fg dark:text-zinc-200">{label}</div>
+                      <div className="mt-1 text-xs font-medium text-fg-muted dark:text-zinc-300">{sublabel}</div>
                     </div>
                   ))}
                 </div>

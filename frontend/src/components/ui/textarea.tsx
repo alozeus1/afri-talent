@@ -7,7 +7,7 @@ const Textarea = forwardRef<
     return (
         <textarea
             ref={ref}
-            className={`px-3 py-2 border border-[var(--border-soft)] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
+            className={`px-3 py-2 border border-line-strong rounded-[var(--radius-control)] bg-surface-raised text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-focus ${className}`}
             {...props}
         />
     );

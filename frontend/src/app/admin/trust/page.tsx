@@ -266,12 +266,12 @@ export default function AdminTrustPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
-      <section className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-100 via-white to-red-50 p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700 mb-3">
+      <section className="rounded-3xl border border-line bg-gradient-to-br from-slate-100 via-white to-red-50 p-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-fg-secondary mb-3">
           Admin Trust Operations
         </p>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Verification, fraud risk, and abuse moderation</h1>
-        <p className="max-w-3xl text-lg text-gray-600">
+        <h1 className="text-4xl font-bold text-fg mb-4">Verification, fraud risk, and abuse moderation</h1>
+        <p className="max-w-3xl text-lg text-fg-secondary">
           Review identity evidence, manage scam and impersonation cases, and keep a complete action history with reason codes for every moderation decision.
         </p>
       </section>
@@ -291,47 +291,47 @@ export default function AdminTrustPage() {
       <div className="grid gap-6 md:grid-cols-3 xl:grid-cols-6">
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Pending artifacts</p>
-            <p className="mt-3 text-3xl font-bold text-gray-900">{dashboard.pendingVerificationArtifacts}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Pending artifacts</p>
+            <p className="mt-3 text-3xl font-bold text-fg">{dashboard.pendingVerificationArtifacts}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Open cases</p>
-            <p className="mt-3 text-3xl font-bold text-gray-900">{dashboard.openRiskCases}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Open cases</p>
+            <p className="mt-3 text-3xl font-bold text-fg">{dashboard.openRiskCases}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Open reports</p>
-            <p className="mt-3 text-3xl font-bold text-gray-900">{dashboard.openReports}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Open reports</p>
+            <p className="mt-3 text-3xl font-bold text-fg">{dashboard.openReports}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Limited accounts</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Limited accounts</p>
             <p className="mt-3 text-3xl font-bold text-amber-700">{dashboard.limitedAccounts}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Suspended accounts</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Suspended accounts</p>
             <p className="mt-3 text-3xl font-bold text-red-700">{dashboard.suspendedAccounts}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Held jobs</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">Held jobs</p>
             <p className="mt-3 text-3xl font-bold text-blue-700">{dashboard.heldJobs}</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="border-slate-200">
+      <Card className="border-line">
         <CardContent className="p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Trust operations summary</h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <h2 className="text-lg font-semibold text-fg">Trust operations summary</h2>
+            <p className="text-sm text-fg-secondary mt-1">
               {verificationQueue.length} artifact review item(s), {riskQueue.length} risk case(s), {reports.length} abuse report(s), and {actionHistoryPreview} recent action log entries in view.
             </p>
           </div>
@@ -346,19 +346,19 @@ export default function AdminTrustPage() {
           <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Verification review queue</h2>
-                <p className="text-sm text-gray-600">Review employer and candidate evidence before granting badges or trust upgrades.</p>
+                <h2 className="text-xl font-semibold text-fg">Verification review queue</h2>
+                <p className="text-sm text-fg-secondary">Review employer and candidate evidence before granting badges or trust upgrades.</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="verificationStatusFilter" className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-1">
+                  <label htmlFor="verificationStatusFilter" className="block text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted mb-1">
                     Status
                   </label>
                   <select
                     id="verificationStatusFilter"
                     value={verificationStatusFilter}
                     onChange={(event) => setVerificationStatusFilter(event.target.value as typeof verificationStatusFilter)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
+                    className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm"
                   >
                     {["PENDING", "ALL", "APPROVED", "REJECTED", "NEEDS_MORE_INFO"].map((status) => (
                       <option key={status} value={status}>{humanizeTrustValue(status)}</option>
@@ -366,14 +366,14 @@ export default function AdminTrustPage() {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="verificationSubjectFilter" className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-1">
+                  <label htmlFor="verificationSubjectFilter" className="block text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted mb-1">
                     Subject
                   </label>
                   <select
                     id="verificationSubjectFilter"
                     value={verificationSubjectFilter}
                     onChange={(event) => setVerificationSubjectFilter(event.target.value as typeof verificationSubjectFilter)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
+                    className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm"
                   >
                     {["ALL", "EMPLOYER", "CANDIDATE"].map((subject) => (
                       <option key={subject} value={subject}>{humanizeTrustValue(subject)}</option>
@@ -385,23 +385,23 @@ export default function AdminTrustPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             {verificationQueue.length === 0 ? (
-              <p className="text-sm text-gray-600">No verification items match the current filters.</p>
+              <p className="text-sm text-fg-secondary">No verification items match the current filters.</p>
             ) : (
               verificationQueue.map((artifact) => {
                 const form = getArtifactForm(artifact.id);
                 return (
-                  <div key={artifact.id} className="rounded-3xl border border-gray-200 bg-gray-50 p-5 space-y-4">
+                  <div key={artifact.id} className="rounded-3xl border border-line bg-surface-sunken p-5 space-y-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-lg font-semibold text-gray-900">{humanizeTrustValue(artifact.type)}</p>
+                          <p className="text-lg font-semibold text-fg">{humanizeTrustValue(artifact.type)}</p>
                           <TrustBadge label={humanizeTrustValue(artifact.status)} variant={artifact.status === "APPROVED" ? "success" : artifact.status === "REJECTED" ? "danger" : "warning"} />
                         </div>
-                        <p className="mt-2 text-sm text-gray-600">
+                        <p className="mt-2 text-sm text-fg-secondary">
                           {artifact.employer?.companyName || artifact.user?.name || "Unknown subject"} • submitted {new Date(artifact.submittedAt).toLocaleDateString()}
                         </p>
                         {artifact.fileName && (
-                          <p className="mt-2 text-sm text-gray-500">File: {artifact.fileName}</p>
+                          <p className="mt-2 text-sm text-fg-muted">File: {artifact.fileName}</p>
                         )}
                         {artifact.externalUrl && (
                           <a href={artifact.externalUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex text-sm text-emerald-700 hover:text-emerald-800">
@@ -409,8 +409,8 @@ export default function AdminTrustPage() {
                           </a>
                         )}
                       </div>
-                      <div className="rounded-2xl border border-white bg-white px-4 py-3 text-sm text-gray-600">
-                        <p className="font-semibold text-gray-900">Current reviewer</p>
+                      <div className="rounded-2xl border border-white bg-surface px-4 py-3 text-sm text-fg-secondary">
+                        <p className="font-semibold text-fg">Current reviewer</p>
                         <p className="mt-1">{artifact.reviewer?.name || "Unassigned"}</p>
                       </div>
                     </div>
@@ -423,7 +423,7 @@ export default function AdminTrustPage() {
                           onChange={(event) => updateArtifactForm(artifact.id, { reasonCode: event.target.value })}
                         />
                         <div>
-                          <label htmlFor={`artifact-notes-${artifact.id}`} className="block text-sm font-medium text-gray-700 mb-1">
+                          <label htmlFor={`artifact-notes-${artifact.id}`} className="block text-sm font-medium text-fg-secondary mb-1">
                             Reviewer notes
                           </label>
                           <textarea
@@ -431,7 +431,7 @@ export default function AdminTrustPage() {
                             value={form.reviewerNotes}
                             onChange={(event) => updateArtifactForm(artifact.id, { reviewerNotes: event.target.value })}
                             rows={4}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900"
+                            className="w-full rounded-lg border border-line-strong bg-surface px-4 py-3 text-sm text-fg"
                           />
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -448,14 +448,14 @@ export default function AdminTrustPage() {
                       </div>
 
                       <div className="space-y-3">
-                        <p className="text-sm font-semibold text-gray-900">Action history</p>
+                        <p className="text-sm font-semibold text-fg">Action history</p>
                         {artifact.trustCase?.actions.length ? (
                           artifact.trustCase.actions.map((action) => (
-                            <div key={action.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+                            <div key={action.id} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm text-fg-secondary">
                               <div className="flex flex-wrap items-center gap-2">
                                 <TrustBadge label={humanizeTrustValue(action.actionType)} variant="info" />
                                 {action.reasonCode && (
-                                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{action.reasonCode}</span>
+                                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">{action.reasonCode}</span>
                                 )}
                               </div>
                               <p className="mt-2">{action.notes || "No notes provided."}</p>
@@ -465,7 +465,7 @@ export default function AdminTrustPage() {
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-gray-500">No actions recorded yet.</p>
+                          <p className="text-sm text-fg-muted">No actions recorded yet.</p>
                         )}
                       </div>
                     </div>
@@ -480,18 +480,18 @@ export default function AdminTrustPage() {
           <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Fraud and risk queue</h2>
-                <p className="text-sm text-gray-600">Escalate, hold, limit, suspend, or reinstate accounts with full action history.</p>
+                <h2 className="text-xl font-semibold text-fg">Fraud and risk queue</h2>
+                <p className="text-sm text-fg-secondary">Escalate, hold, limit, suspend, or reinstate accounts with full action history.</p>
               </div>
               <div>
-                <label htmlFor="riskStatusFilter" className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-1">
+                <label htmlFor="riskStatusFilter" className="block text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted mb-1">
                   Queue scope
                 </label>
                 <select
                   id="riskStatusFilter"
                   value={riskStatusFilter}
                   onChange={(event) => setRiskStatusFilter(event.target.value as typeof riskStatusFilter)}
-                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
+                  className="rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm"
                 >
                   {["ACTIVE", "ALL"].map((status) => (
                     <option key={status} value={status}>{humanizeTrustValue(status)}</option>
@@ -502,7 +502,7 @@ export default function AdminTrustPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             {riskQueue.length === 0 ? (
-              <p className="text-sm text-gray-600">No trust cases match the current filter.</p>
+              <p className="text-sm text-fg-secondary">No trust cases match the current filter.</p>
             ) : (
               riskQueue.map((trustCase) => {
                 const form = getCaseForm(trustCase.id);
@@ -514,23 +514,23 @@ export default function AdminTrustPage() {
                   trustCase.title;
 
                 return (
-                  <div key={trustCase.id} className="rounded-3xl border border-gray-200 bg-gray-50 p-5 space-y-4">
+                  <div key={trustCase.id} className="rounded-3xl border border-line bg-surface-sunken p-5 space-y-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-lg font-semibold text-gray-900">{trustCase.title}</p>
+                          <p className="text-lg font-semibold text-fg">{trustCase.title}</p>
                           <TrustBadge label={trustCase.priority} riskLevel={trustCase.priority} />
                           <TrustBadge label={humanizeTrustValue(trustCase.status)} variant={trustCase.status === "DISMISSED" ? "default" : trustCase.status === "ACTIONED" ? "success" : "warning"} />
                         </div>
-                        <p className="mt-2 text-sm text-gray-600">
+                        <p className="mt-2 text-sm text-fg-secondary">
                           {humanizeTrustValue(trustCase.entityType)} • {subject}
                         </p>
                         {trustCase.summary && (
-                          <p className="mt-3 text-sm text-gray-500">{trustCase.summary}</p>
+                          <p className="mt-3 text-sm text-fg-muted">{trustCase.summary}</p>
                         )}
                       </div>
-                      <div className="rounded-2xl border border-white bg-white px-4 py-3 text-sm text-gray-600">
-                        <p className="font-semibold text-gray-900">Assigned admin</p>
+                      <div className="rounded-2xl border border-white bg-surface px-4 py-3 text-sm text-fg-secondary">
+                        <p className="font-semibold text-fg">Assigned admin</p>
                         <p className="mt-1">{trustCase.assignedAdmin?.name || "Unassigned"}</p>
                       </div>
                     </div>
@@ -538,14 +538,14 @@ export default function AdminTrustPage() {
                     <form onSubmit={(event) => handleCaseAction(event, trustCase)} className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                          <label htmlFor={`case-action-${trustCase.id}`} className="block text-sm font-medium text-gray-700 mb-1">
+                          <label htmlFor={`case-action-${trustCase.id}`} className="block text-sm font-medium text-fg-secondary mb-1">
                             Action
                           </label>
                           <select
                             id={`case-action-${trustCase.id}`}
                             value={form.actionType}
                             onChange={(event) => updateCaseForm(trustCase.id, { actionType: event.target.value as CaseFormState[string]["actionType"] })}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
+                            className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm"
                           >
                             {["NOTE", "APPROVE", "REJECT", "HOLD", "LIMIT", "SUSPEND", "REINSTATE", "ESCALATE"].map((actionType) => (
                               <option key={actionType} value={actionType}>{humanizeTrustValue(actionType)}</option>
@@ -553,14 +553,14 @@ export default function AdminTrustPage() {
                           </select>
                         </div>
                         <div>
-                          <label htmlFor={`case-status-${trustCase.id}`} className="block text-sm font-medium text-gray-700 mb-1">
+                          <label htmlFor={`case-status-${trustCase.id}`} className="block text-sm font-medium text-fg-secondary mb-1">
                             Case status
                           </label>
                           <select
                             id={`case-status-${trustCase.id}`}
                             value={form.status}
                             onChange={(event) => updateCaseForm(trustCase.id, { status: event.target.value as CaseFormState[string]["status"] })}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
+                            className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm"
                           >
                             {["OPEN", "IN_REVIEW", "ACTIONED", "DISMISSED"].map((status) => (
                               <option key={status} value={status}>{humanizeTrustValue(status)}</option>
@@ -568,14 +568,14 @@ export default function AdminTrustPage() {
                           </select>
                         </div>
                         <div>
-                          <label htmlFor={`case-priority-${trustCase.id}`} className="block text-sm font-medium text-gray-700 mb-1">
+                          <label htmlFor={`case-priority-${trustCase.id}`} className="block text-sm font-medium text-fg-secondary mb-1">
                             Priority
                           </label>
                           <select
                             id={`case-priority-${trustCase.id}`}
                             value={form.priority}
                             onChange={(event) => updateCaseForm(trustCase.id, { priority: event.target.value as CaseFormState[string]["priority"] })}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
+                            className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm"
                           >
                             {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((priority) => (
                               <option key={priority} value={priority}>{humanizeTrustValue(priority)}</option>
@@ -588,7 +588,7 @@ export default function AdminTrustPage() {
                           onChange={(event) => updateCaseForm(trustCase.id, { reasonCode: event.target.value })}
                         />
                         <div className="sm:col-span-2">
-                          <label htmlFor={`case-notes-${trustCase.id}`} className="block text-sm font-medium text-gray-700 mb-1">
+                          <label htmlFor={`case-notes-${trustCase.id}`} className="block text-sm font-medium text-fg-secondary mb-1">
                             Internal notes
                           </label>
                           <textarea
@@ -596,7 +596,7 @@ export default function AdminTrustPage() {
                             value={form.notes}
                             onChange={(event) => updateCaseForm(trustCase.id, { notes: event.target.value })}
                             rows={4}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900"
+                            className="w-full rounded-lg border border-line-strong bg-surface px-4 py-3 text-sm text-fg"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -607,14 +607,14 @@ export default function AdminTrustPage() {
                       </div>
 
                       <div className="space-y-3">
-                        <p className="text-sm font-semibold text-gray-900">Action history</p>
+                        <p className="text-sm font-semibold text-fg">Action history</p>
                         {trustCase.actions.length ? (
                           trustCase.actions.map((action) => (
-                            <div key={action.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+                            <div key={action.id} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm text-fg-secondary">
                               <div className="flex flex-wrap items-center gap-2">
                                 <TrustBadge label={humanizeTrustValue(action.actionType)} variant="info" />
                                 {action.reasonCode && (
-                                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{action.reasonCode}</span>
+                                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">{action.reasonCode}</span>
                                 )}
                               </div>
                               <p className="mt-2">{action.notes || "No notes provided."}</p>
@@ -624,7 +624,7 @@ export default function AdminTrustPage() {
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-gray-500">No moderation actions recorded yet.</p>
+                          <p className="text-sm text-fg-muted">No moderation actions recorded yet.</p>
                         )}
                       </div>
                     </form>
@@ -639,18 +639,18 @@ export default function AdminTrustPage() {
           <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Abuse reports queue</h2>
-                <p className="text-sm text-gray-600">Triage user reports and link them to moderation actions when needed.</p>
+                <h2 className="text-xl font-semibold text-fg">Abuse reports queue</h2>
+                <p className="text-sm text-fg-secondary">Triage user reports and link them to moderation actions when needed.</p>
               </div>
               <div>
-                <label htmlFor="reportStatusFilter" className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-1">
+                <label htmlFor="reportStatusFilter" className="block text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted mb-1">
                   Report scope
                 </label>
                 <select
                   id="reportStatusFilter"
                   value={reportStatusFilter}
                   onChange={(event) => setReportStatusFilter(event.target.value as typeof reportStatusFilter)}
-                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
+                  className="rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm"
                 >
                   {["ACTIVE", "ALL", "OPEN", "TRIAGED", "RESOLVED", "DISMISSED"].map((status) => (
                     <option key={status} value={status}>{humanizeTrustValue(status)}</option>
@@ -661,27 +661,27 @@ export default function AdminTrustPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             {reports.length === 0 ? (
-              <p className="text-sm text-gray-600">No abuse reports match the current filter.</p>
+              <p className="text-sm text-fg-secondary">No abuse reports match the current filter.</p>
             ) : (
               reports.map((report) => {
                 const form = getReportForm(report.id);
                 return (
-                  <div key={report.id} className="rounded-3xl border border-gray-200 bg-gray-50 p-5 space-y-4">
+                  <div key={report.id} className="rounded-3xl border border-line bg-surface-sunken p-5 space-y-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-lg font-semibold text-gray-900">{humanizeTrustValue(report.reason)}</p>
+                          <p className="text-lg font-semibold text-fg">{humanizeTrustValue(report.reason)}</p>
                           <TrustBadge label={humanizeTrustValue(report.status)} variant={report.status === "RESOLVED" ? "success" : report.status === "DISMISSED" ? "default" : "warning"} />
                         </div>
-                        <p className="mt-2 text-sm text-gray-600">
+                        <p className="mt-2 text-sm text-fg-secondary">
                           Reporter: {report.reporter.name} • Reported user: {report.reportedUser?.name || report.employer?.companyName || "Unknown"}
                         </p>
                         {report.details && (
-                          <p className="mt-3 text-sm text-gray-500">{report.details}</p>
+                          <p className="mt-3 text-sm text-fg-muted">{report.details}</p>
                         )}
                       </div>
-                      <div className="rounded-2xl border border-white bg-white px-4 py-3 text-sm text-gray-600">
-                        <p className="font-semibold text-gray-900">Assigned admin</p>
+                      <div className="rounded-2xl border border-white bg-surface px-4 py-3 text-sm text-fg-secondary">
+                        <p className="font-semibold text-fg">Assigned admin</p>
                         <p className="mt-1">{report.assignedAdmin?.name || "Unassigned"}</p>
                       </div>
                     </div>
@@ -689,14 +689,14 @@ export default function AdminTrustPage() {
                     <form onSubmit={(event) => handleReportAction(event, report)} className="grid gap-4 lg:grid-cols-[1fr_1fr]">
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                          <label htmlFor={`report-status-${report.id}`} className="block text-sm font-medium text-gray-700 mb-1">
+                          <label htmlFor={`report-status-${report.id}`} className="block text-sm font-medium text-fg-secondary mb-1">
                             Report status
                           </label>
                           <select
                             id={`report-status-${report.id}`}
                             value={form.status}
                             onChange={(event) => updateReportForm(report.id, { status: event.target.value as ReportFormState[string]["status"] })}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
+                            className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm"
                           >
                             {["TRIAGED", "RESOLVED", "DISMISSED"].map((status) => (
                               <option key={status} value={status}>{humanizeTrustValue(status)}</option>
@@ -704,14 +704,14 @@ export default function AdminTrustPage() {
                           </select>
                         </div>
                         <div>
-                          <label htmlFor={`report-action-${report.id}`} className="block text-sm font-medium text-gray-700 mb-1">
+                          <label htmlFor={`report-action-${report.id}`} className="block text-sm font-medium text-fg-secondary mb-1">
                             Linked moderation action
                           </label>
                           <select
                             id={`report-action-${report.id}`}
                             value={form.actionType}
                             onChange={(event) => updateReportForm(report.id, { actionType: event.target.value as ReportFormState[string]["actionType"] })}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
+                            className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm"
                           >
                             <option value="">No linked action</option>
                             {["NOTE", "APPROVE", "REJECT", "HOLD", "LIMIT", "SUSPEND", "REINSTATE", "ESCALATE"].map((actionType) => (
@@ -725,7 +725,7 @@ export default function AdminTrustPage() {
                           onChange={(event) => updateReportForm(report.id, { reasonCode: event.target.value })}
                         />
                         <div className="sm:col-span-2">
-                          <label htmlFor={`report-notes-${report.id}`} className="block text-sm font-medium text-gray-700 mb-1">
+                          <label htmlFor={`report-notes-${report.id}`} className="block text-sm font-medium text-fg-secondary mb-1">
                             Resolution notes
                           </label>
                           <textarea
@@ -733,7 +733,7 @@ export default function AdminTrustPage() {
                             value={form.notes}
                             onChange={(event) => updateReportForm(report.id, { notes: event.target.value })}
                             rows={4}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900"
+                            className="w-full rounded-lg border border-line-strong bg-surface px-4 py-3 text-sm text-fg"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -744,14 +744,14 @@ export default function AdminTrustPage() {
                       </div>
 
                       <div className="space-y-3">
-                        <p className="text-sm font-semibold text-gray-900">Connected case history</p>
+                        <p className="text-sm font-semibold text-fg">Connected case history</p>
                         {report.trustCase?.actions.length ? (
                           report.trustCase.actions.map((action) => (
-                            <div key={action.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+                            <div key={action.id} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm text-fg-secondary">
                               <div className="flex flex-wrap items-center gap-2">
                                 <TrustBadge label={humanizeTrustValue(action.actionType)} variant="info" />
                                 {action.reasonCode && (
-                                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{action.reasonCode}</span>
+                                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">{action.reasonCode}</span>
                                 )}
                               </div>
                               <p className="mt-2">{action.notes || "No notes provided."}</p>
@@ -761,7 +761,7 @@ export default function AdminTrustPage() {
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-gray-500">No linked case history yet.</p>
+                          <p className="text-sm text-fg-muted">No linked case history yet.</p>
                         )}
                       </div>
                     </form>

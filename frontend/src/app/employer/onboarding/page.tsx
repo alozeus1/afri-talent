@@ -254,10 +254,10 @@ export default function EmployerOnboardingPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-700">
           Guided employer onboarding
         </p>
-        <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">
+        <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
           Move from signup to first qualified shortlist
         </h1>
-        <p className="max-w-3xl text-sm leading-6 text-gray-600 sm:text-base">
+        <p className="max-w-3xl text-sm leading-6 text-fg-secondary sm:text-base">
           This flow is designed around the first employer success moment: a credible job, a real candidate view, and a shortlist worth acting on.
         </p>
       </div>
@@ -275,17 +275,17 @@ export default function EmployerOnboardingPage() {
 
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="space-y-6">
-              <Card className="overflow-hidden border-slate-200">
-                <CardHeader className="border-b border-gray-100 bg-gray-50">
+              <Card className="overflow-hidden border-line">
+                <CardHeader className="border-b border-line bg-surface-sunken">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
                         Current step
                       </p>
-                      <h2 className="mt-2 text-2xl font-semibold text-gray-900">
+                      <h2 className="mt-2 text-2xl font-semibold text-fg">
                         {currentStepMeta.title}
                       </h2>
-                      <p className="mt-2 max-w-2xl text-sm text-gray-600">
+                      <p className="mt-2 max-w-2xl text-sm text-fg-secondary">
                         {currentStepMeta.subtitle}
                       </p>
                     </div>
@@ -307,13 +307,13 @@ export default function EmployerOnboardingPage() {
                         className={`rounded-2xl border px-3 py-3 text-left transition ${
                           activeStep === step.key
                             ? "border-emerald-300 bg-emerald-50"
-                            : "border-gray-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"
+                            : "border-line bg-surface hover:border-emerald-200 hover:bg-emerald-50/50"
                         }`}
                       >
-                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
                           Step {index + 1}
                         </p>
-                        <p className="mt-1 text-sm font-semibold text-gray-900">{step.title}</p>
+                        <p className="mt-1 text-sm font-semibold text-fg">{step.title}</p>
                       </button>
                     ))}
                   </div>
@@ -355,12 +355,12 @@ export default function EmployerOnboardingPage() {
                         placeholder="Lagos, Nigeria"
                       />
                       <div>
-                        <label htmlFor="bio" className="mb-1 block text-sm font-medium text-gray-700">
+                        <label htmlFor="bio" className="mb-1 block text-sm font-medium text-fg-secondary">
                           Company story
                         </label>
                         <textarea
                           id="bio"
-                          className="min-h-[180px] w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-emerald-500"
+                          className="min-h-[180px] w-full rounded-lg border border-line-strong px-4 py-3 text-sm text-fg outline-none transition focus:border-transparent focus:ring-2 focus:ring-emerald-500"
                           placeholder="What does your company do, who do you hire, and why should strong candidates trust this opportunity?"
                           value={companyForm.bio}
                           onChange={(event) => setCompanyForm((prev) => ({ ...prev, bio: event.target.value }))}
@@ -387,12 +387,12 @@ export default function EmployerOnboardingPage() {
                           <TrustBadge label="Enhanced verification required" riskLevel="MEDIUM" variant="warning" />
                         )}
                       </div>
-                      <Card className="border-gray-200 bg-gray-50">
+                      <Card className="border-line bg-surface-sunken">
                         <CardContent className="p-5">
-                          <p className="text-sm text-gray-700">
+                          <p className="text-sm text-fg-secondary">
                             Verification determines whether jobs publish publicly, how fast moderation clears new listings, and how credible your brand looks to cross-border candidates.
                           </p>
-                          <ul className="mt-4 space-y-2 text-sm text-gray-700">
+                          <ul className="mt-4 space-y-2 text-sm text-fg-secondary">
                             {onboarding.trust.checklist.map((item) => (
                               <li key={item.key}>• {item.label}: {item.done ? "Complete" : "Pending"}</li>
                             ))}
@@ -423,21 +423,21 @@ export default function EmployerOnboardingPage() {
                   {activeStep === "team_setup" && (
                     <div className="space-y-5">
                       <div>
-                        <label htmlFor="teamMemberEmails" className="mb-1 block text-sm font-medium text-gray-700">
+                        <label htmlFor="teamMemberEmails" className="mb-1 block text-sm font-medium text-fg-secondary">
                           Hiring teammate emails
                         </label>
                         <textarea
                           id="teamMemberEmails"
-                          className="min-h-[180px] w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-emerald-500"
+                          className="min-h-[180px] w-full rounded-lg border border-line-strong px-4 py-3 text-sm text-fg outline-none transition focus:border-transparent focus:ring-2 focus:ring-emerald-500"
                           placeholder={"recruiter@company.com\nhiring-manager@company.com"}
                           value={teamMemberEmails}
                           onChange={(event) => setTeamMemberEmails(event.target.value)}
                         />
-                        <p className="mt-2 text-sm text-gray-500">
+                        <p className="mt-2 text-sm text-fg-muted">
                           Separate each email with a comma or a new line. This captures the hiring team setup even before invite workflows are fully automated.
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm text-gray-700">
+                      <div className="rounded-2xl border border-line bg-surface-sunken px-4 py-4 text-sm text-fg-secondary">
                         Teams that add a reviewer early tend to move faster from first candidate view to first qualified shortlist because follow-up does not bottleneck on one person.
                       </div>
                     </div>
@@ -524,12 +524,12 @@ export default function EmployerOnboardingPage() {
                           Only show verified candidates when premium filters are available
                         </label>
                         <div>
-                          <label htmlFor="visaPreference" className="mb-1 block text-sm font-medium text-gray-700">
+                          <label htmlFor="visaPreference" className="mb-1 block text-sm font-medium text-fg-secondary">
                             Visa or relocation preference
                           </label>
                           <select
                             id="visaPreference"
-                            className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-emerald-500"
+                            className="w-full rounded-lg border border-line-strong px-4 py-2 text-sm text-fg outline-none transition focus:border-transparent focus:ring-2 focus:ring-emerald-500"
                             value={visaPreference}
                             onChange={(event) => setVisaPreference(event.target.value as EmployerCandidateFilters["visaPreference"])}
                           >
@@ -538,7 +538,7 @@ export default function EmployerOnboardingPage() {
                           </select>
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm text-gray-700">
+                      <div className="rounded-2xl border border-line bg-surface-sunken px-4 py-4 text-sm text-fg-secondary">
                         Filters improve shortlist quality most when they are specific enough to reduce noise but not so narrow that they kill early discovery.
                       </div>
                     </div>
@@ -574,12 +574,12 @@ export default function EmployerOnboardingPage() {
                               type="button"
                               onClick={() => setSelectedPlan(plan.plan)}
                               className={`rounded-3xl border px-5 py-5 text-left transition ${
-                                selected ? "border-emerald-300 bg-emerald-50 shadow-sm" : "border-gray-200 bg-white hover:border-emerald-200"
+                                selected ? "border-emerald-300 bg-emerald-50 shadow-sm" : "border-line bg-surface hover:border-emerald-200"
                               }`}
                             >
-                              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">{plan.title}</p>
-                              <p className="mt-3 text-sm text-gray-700">{plan.blurb}</p>
-                              <ul className="mt-4 space-y-2 text-sm text-gray-600">
+                              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">{plan.title}</p>
+                              <p className="mt-3 text-sm text-fg-secondary">{plan.blurb}</p>
+                              <ul className="mt-4 space-y-2 text-sm text-fg-secondary">
                                 {plan.points.map((point) => (
                                   <li key={point}>• {point}</li>
                                 ))}
@@ -588,7 +588,7 @@ export default function EmployerOnboardingPage() {
                           );
                         })}
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-950 px-5 py-5 text-white">
+                      <div className="rounded-2xl border border-line bg-slate-950 px-5 py-5 text-white">
                         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">Plan framing</p>
                         <h3 className="mt-2 text-lg font-semibold">{onboarding.upgradeJourney.headline}</h3>
                         <p className="mt-2 text-sm text-slate-300">{onboarding.upgradeJourney.body}</p>
@@ -627,10 +627,10 @@ export default function EmployerOnboardingPage() {
                               variant={onboarding.trust.postingEligibility ? "success" : "warning"}
                             />
                           </div>
-                          <p className="mt-3 text-sm text-gray-700">
+                          <p className="mt-3 text-sm text-fg-secondary">
                             Finish the remaining trust tasks so candidates see a credible employer, jobs publish with less friction, and moderation holds stay rare.
                           </p>
-                          <ul className="mt-4 space-y-2 text-sm text-gray-700">
+                          <ul className="mt-4 space-y-2 text-sm text-fg-secondary">
                             {onboarding.trust.checklist.map((item) => (
                               <li key={item.key}>• {item.label}: {item.done ? "Complete" : "Still pending"}</li>
                             ))}
@@ -651,7 +651,7 @@ export default function EmployerOnboardingPage() {
                     </div>
                   )}
 
-                  <div className="mt-8 flex flex-wrap justify-between gap-3 border-t border-gray-100 pt-6">
+                  <div className="mt-8 flex flex-wrap justify-between gap-3 border-t border-line pt-6">
                     <div className="flex gap-3">
                       <Button
                         type="button"

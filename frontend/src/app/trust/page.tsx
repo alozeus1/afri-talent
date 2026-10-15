@@ -117,10 +117,10 @@ export default function TrustCenterPage() {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700 mb-3">
           Trust Center
         </p>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        <h1 className="text-4xl font-bold text-fg mb-4">
           How AfriTalent makes hiring feel real, safer, and professionally run
         </h1>
-        <p className="max-w-3xl text-lg leading-8 text-gray-600">
+        <p className="max-w-3xl text-lg leading-8 text-fg-secondary">
           We combine verification, moderation, fraud detection, and visible trust signals so candidates and employers can move faster without being asked to trust blindly.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
@@ -151,16 +151,16 @@ export default function TrustCenterPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="border-emerald-200">
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Employer verification</h2>
-            <p className="text-sm leading-6 text-gray-600">
+            <h2 className="text-xl font-semibold text-fg">Employer verification</h2>
+            <p className="text-sm leading-6 text-fg-secondary">
               Employers move through increasingly strict trust tiers before they can post broadly and hire at scale.
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
             {employerBadgeItems.slice(0, 3).map((badge) => (
-              <div key={badge.title} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <p className="font-medium text-gray-900">{badge.title}</p>
-                <p className="mt-1 text-sm text-gray-600">{badge.description}</p>
+              <div key={badge.title} className="rounded-2xl border border-line bg-surface-sunken p-4">
+                <p className="font-medium text-fg">{badge.title}</p>
+                <p className="mt-1 text-sm text-fg-secondary">{badge.description}</p>
               </div>
             ))}
             <TrustExplainerModal
@@ -174,16 +174,16 @@ export default function TrustCenterPage() {
 
         <Card className="border-blue-200">
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Candidate authenticity</h2>
-            <p className="text-sm leading-6 text-gray-600">
+            <h2 className="text-xl font-semibold text-fg">Candidate authenticity</h2>
+            <p className="text-sm leading-6 text-fg-secondary">
               Employers can see stronger proof when candidates verify identity, skills, linked profiles, and employment evidence.
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
             {candidateBadgeItems.slice(0, 3).map((badge) => (
-              <div key={badge.title} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <p className="font-medium text-gray-900">{badge.title}</p>
-                <p className="mt-1 text-sm text-gray-600">{badge.description}</p>
+              <div key={badge.title} className="rounded-2xl border border-line bg-surface-sunken p-4">
+                <p className="font-medium text-fg">{badge.title}</p>
+                <p className="mt-1 text-sm text-fg-secondary">{badge.description}</p>
               </div>
             ))}
             <TrustExplainerModal
@@ -199,28 +199,28 @@ export default function TrustCenterPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200">
+        <Card className="border-line">
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">{FREE_MODE ? "Free vs verified" : "Free vs paid vs verified"}</h2>
-            <p className="text-sm leading-6 text-gray-600">
+            <h2 className="text-xl font-semibold text-fg">{FREE_MODE ? "Free vs verified" : "Free vs paid vs verified"}</h2>
+            <p className="text-sm leading-6 text-fg-secondary">
               {FREE_MODE
                 ? "AfriTalent is free for everyone. Trust is earned through checks, not bought."
                 : "Pricing and trust are connected in UX, but they are not the same thing."}
             </p>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm leading-6 text-gray-600">
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <p className="font-semibold text-gray-900">Free</p>
+          <CardContent className="space-y-3 text-sm leading-6 text-fg-secondary">
+            <div className="rounded-2xl border border-line bg-surface-sunken p-4">
+              <p className="font-semibold text-fg">Free</p>
               <p className="mt-1">Users can join, complete basics, and begin building trust signals.</p>
             </div>
             {!FREE_MODE && (
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <p className="font-semibold text-gray-900">Paid</p>
+              <div className="rounded-2xl border border-line bg-surface-sunken p-4">
+                <p className="font-semibold text-fg">Paid</p>
                 <p className="mt-1">Paid features can unlock visibility, workflow tools, or premium filters.</p>
               </div>
             )}
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <p className="font-semibold text-gray-900">Verified</p>
+            <div className="rounded-2xl border border-line bg-surface-sunken p-4">
+              <p className="font-semibold text-fg">Verified</p>
               <p className="mt-1">
                 {FREE_MODE
                   ? "Verified badges require evidence, checks, or review outcomes."
@@ -234,14 +234,14 @@ export default function TrustCenterPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Why a job or employer may look trusted</h2>
-            <p className="text-sm leading-6 text-gray-600">
+            <h2 className="text-xl font-semibold text-fg">Why a job or employer may look trusted</h2>
+            <p className="text-sm leading-6 text-fg-secondary">
               Trust cues are most helpful when they explain the reason, not just show a badge.
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
             {trustedJobReasons.map((reason) => (
-              <div key={reason} className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+              <div key={reason} className="rounded-2xl border border-line bg-surface-sunken px-4 py-3 text-sm text-fg-secondary">
                 {reason}
               </div>
             ))}
@@ -250,16 +250,16 @@ export default function TrustCenterPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Moderation transparency</h2>
-            <p className="text-sm leading-6 text-gray-600">
+            <h2 className="text-xl font-semibold text-fg">Moderation transparency</h2>
+            <p className="text-sm leading-6 text-fg-secondary">
               We try to show review context when it helps people make safer choices without overwhelming onboarding.
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
             {moderationItems.map((item) => (
-              <div key={item.title} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                <p className="font-medium text-gray-900">{item.title}</p>
-                <p className="mt-1 text-sm text-gray-600">{item.description}</p>
+              <div key={item.title} className="rounded-2xl border border-line bg-surface-sunken p-4">
+                <p className="font-medium text-fg">{item.title}</p>
+                <p className="mt-1 text-sm text-fg-secondary">{item.description}</p>
               </div>
             ))}
             <TrustExplainerModal
@@ -276,8 +276,8 @@ export default function TrustCenterPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Safety tips</h2>
-            <p className="text-sm leading-6 text-gray-600">
+            <h2 className="text-xl font-semibold text-fg">Safety tips</h2>
+            <p className="text-sm leading-6 text-fg-secondary">
               A few simple checks can prevent the most common scam patterns on recruiting platforms.
             </p>
           </CardHeader>
@@ -297,18 +297,18 @@ export default function TrustCenterPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">How reporting works</h2>
-            <p className="text-sm leading-6 text-gray-600">
+            <h2 className="text-xl font-semibold text-fg">How reporting works</h2>
+            <p className="text-sm leading-6 text-fg-secondary">
               Fast, specific reports give moderators enough context to act quickly.
             </p>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm leading-6 text-gray-600">
+          <CardContent className="space-y-3 text-sm leading-6 text-fg-secondary">
             {[
               "Choose one primary reason code so the report lands in the right queue.",
               "Include IDs, links, screenshots, timestamps, payment requests, or the exact off-platform contact request.",
               "AfriTalent combines your report with account history, verification evidence, and other risk signals before action is taken.",
             ].map((item, index) => (
-              <div key={item} className="flex gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div key={item} className="flex gap-3 rounded-2xl border border-line bg-surface-sunken px-4 py-3">
                 <span className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
                   {index + 1}
                 </span>

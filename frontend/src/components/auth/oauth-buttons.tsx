@@ -112,10 +112,10 @@ export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
     <div className="mt-6">
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200 dark:border-gray-700" />
+          <div className="w-full border-t border-line dark:border-gray-700" />
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="bg-white dark:bg-gray-900 px-4 text-gray-500 dark:text-gray-400">Or continue with</span>
+          <span className="bg-surface dark:bg-gray-900 px-4 text-fg-muted dark:text-gray-400">Or continue with</span>
         </div>
       </div>
 
@@ -125,10 +125,10 @@ export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
             type="button"
             onClick={handleGoogleLogin}
             disabled={loading !== null}
-            className="w-full flex items-center justify-center gap-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-100 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 disabled:opacity-50 transition-colors"
+            className="w-full flex items-center justify-center gap-3 rounded-lg border border-line-strong dark:border-gray-700 bg-surface dark:bg-gray-900 px-4 py-2.5 text-sm font-medium text-fg-secondary dark:text-gray-100 shadow-sm hover:bg-surface-sunken dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 disabled:opacity-50 transition-colors"
           >
             {loading === "google" ? (
-              <div className="w-5 h-5 border-2 border-gray-300 border-t-emerald-600 rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-line-strong border-t-emerald-600 rounded-full animate-spin" />
             ) : (
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
@@ -146,7 +146,7 @@ export function OAuthButtons({ mode, onError }: OAuthButtonsProps) {
             type="button"
             onClick={handleGithubLogin}
             disabled={loading !== null}
-            className="w-full flex items-center justify-center gap-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-900 dark:bg-gray-100 px-4 py-2.5 text-sm font-medium text-white dark:text-gray-900 shadow-sm hover:bg-black dark:hover:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 disabled:opacity-50 transition-colors"
+            className="w-full flex items-center justify-center gap-3 rounded-lg border border-line-strong dark:border-gray-700 bg-gray-900 dark:bg-gray-100 px-4 py-2.5 text-sm font-medium text-white dark:text-gray-900 shadow-sm hover:bg-black dark:hover:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 disabled:opacity-50 transition-colors"
           >
             {loading === "github" ? (
               <div className="w-5 h-5 border-2 border-gray-500 border-t-white rounded-full animate-spin" />

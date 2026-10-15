@@ -28,7 +28,7 @@ export function ATSScoreDisplay({ score, size = "md" }: ATSScoreDisplayProps) {
     >
       <span className={`font-bold ${sizeClass} ${color}`}>{clampedScore}%</span>
       <span className={`text-xs font-medium mt-0.5 ${color}`}>{label}</span>
-      <span className="text-xs text-gray-500 mt-0.5">ATS Score</span>
+      <span className="text-xs text-fg-muted mt-0.5">ATS Score</span>
     </div>
   );
 }

@@ -30,8 +30,8 @@ export function TemplateStep({
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-sm font-medium text-gray-700">Choose a template</p>
-        <p className="mt-0.5 text-xs text-gray-500">
+        <p className="text-sm font-medium text-fg-secondary">Choose a template</p>
+        <p className="mt-0.5 text-xs text-fg-muted">
           Templates only change the visual layout. The same content appears in each.
         </p>
       </div>
@@ -50,11 +50,11 @@ export function TemplateStep({
               className={`rounded-lg border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 isSelected
                   ? "border-blue-600 bg-blue-50 ring-2 ring-blue-200"
-                  : "border-gray-200 bg-white hover:border-gray-300"
+                  : "border-line bg-surface hover:border-line-strong"
               }`}
             >
-              <p className="text-sm font-semibold text-gray-900">{tpl.label}</p>
-              <p className="mt-1 text-xs text-gray-500">{tpl.description}</p>
+              <p className="text-sm font-semibold text-fg">{tpl.label}</p>
+              <p className="mt-1 text-xs text-fg-muted">{tpl.description}</p>
             </button>
           );
         })}

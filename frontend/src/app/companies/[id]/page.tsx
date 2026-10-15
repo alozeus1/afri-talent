@@ -103,8 +103,8 @@ const EMPTY_FORM: ReviewFormState = {
 };
 
 const textareaClass =
-  "w-full resize-y rounded-xl border border-zinc-200 bg-white px-4 py-3 text-zinc-900 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-400";
-const labelClass = "mb-1 block text-sm font-medium text-zinc-800 dark:text-zinc-200";
+  "w-full resize-y rounded-xl border border-line bg-surface px-4 py-3 text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-400";
+const labelClass = "mb-1 block text-sm font-medium text-fg dark:text-zinc-200";
 
 function StarRating({ rating, size = "md" }: { rating: number; size?: "sm" | "md" }) {
   const sizeClass = size === "sm" ? "w-4 h-4" : "w-5 h-5";
@@ -121,7 +121,7 @@ function StarRating({ rating, size = "md" }: { rating: number; size?: "sm" | "md
           <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
         </svg>
       ))}
-      <span className="ml-1 text-sm text-zinc-700 dark:text-zinc-300">{rating.toFixed(1)}</span>
+      <span className="ml-1 text-sm text-fg-secondary dark:text-zinc-300">{rating.toFixed(1)}</span>
     </div>
   );
 }
@@ -168,11 +168,11 @@ function RatingBar({ label, value }: { label: string; value: number }) {
   const percentage = (value / 5) * 100;
   return (
     <div className="flex items-center gap-3">
-      <span className="w-32 shrink-0 text-sm text-zinc-700 dark:text-zinc-300">{label}</span>
+      <span className="w-32 shrink-0 text-sm text-fg-secondary dark:text-zinc-300">{label}</span>
       <div className="h-2.5 flex-1 rounded-full bg-zinc-200 dark:bg-zinc-800">
         <div className="h-2.5 rounded-full bg-emerald-500 transition-all" style={{ width: `${percentage}%` }} />
       </div>
-      <span className="w-8 text-right text-sm font-medium text-zinc-800 dark:text-zinc-200">{value.toFixed(1)}</span>
+      <span className="w-8 text-right text-sm font-medium text-fg dark:text-zinc-200">{value.toFixed(1)}</span>
     </div>
   );
 }
@@ -327,7 +327,7 @@ export default function CompanyDetailPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex-1">
               <div className="mb-2 flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-bold text-zinc-950 dark:text-zinc-50">{company.companyName}</h1>
+                <h1 className="text-3xl font-bold text-fg dark:text-zinc-50">{company.companyName}</h1>
                 {company.trustBadge ? (
                   <Badge variant={company.trustBadge === "Unverified employer" ? "default" : "info"}>
                     {company.trustBadge}
@@ -336,8 +336,8 @@ export default function CompanyDetailPage() {
                   company.verified && <Badge variant="info">Verified</Badge>
                 )}
               </div>
-              {company.industry && <p className="mb-1 text-zinc-700 dark:text-zinc-300">{company.industry}</p>}
-              <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+              {company.industry && <p className="mb-1 text-fg-secondary dark:text-zinc-300">{company.industry}</p>}
+              <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-fg-secondary dark:text-zinc-400">
                 {company.size && <span>👥 {company.size}</span>}
                 {company.headquarters && <span>📍 {company.headquarters}</span>}
               </div>
@@ -352,9 +352,9 @@ export default function CompanyDetailPage() {
                 </a>
               )}
               {company.bio ? (
-                <p className="mt-3 text-zinc-700 dark:text-zinc-300">{company.bio}</p>
+                <p className="mt-3 text-fg-secondary dark:text-zinc-300">{company.bio}</p>
               ) : (
-                <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+                <p className="mt-3 text-sm text-fg-secondary dark:text-zinc-400">
                   About this company: not enough verified data yet.
                 </p>
               )}
@@ -374,19 +374,19 @@ export default function CompanyDetailPage() {
         <div className="lg:col-span-1">
           <Card>
             <CardHeader>
-              <h2 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">Ratings</h2>
+              <h2 className="text-lg font-semibold text-fg dark:text-zinc-50">Ratings</h2>
             </CardHeader>
             <CardContent>
               {ratings && ratings.totalReviews > 0 && ratings.averageOverall != null ? (
                 <div className="space-y-4">
                   <div className="mb-4 text-center">
-                    <div className="mb-1 text-4xl font-bold text-zinc-950 dark:text-zinc-50">
+                    <div className="mb-1 text-4xl font-bold text-fg dark:text-zinc-50">
                       {ratings.averageOverall.toFixed(1)}
                     </div>
                     <div className="flex justify-center">
                       <StarRating rating={ratings.averageOverall} />
                     </div>
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                    <p className="mt-1 text-sm text-fg-secondary dark:text-zinc-400">
                       {ratings.totalReviews} review{ratings.totalReviews !== 1 ? "s" : ""}
                       {ratings.recommendationPct != null && ` · ${Math.round(ratings.recommendationPct)}% would recommend`}
                     </p>
@@ -400,7 +400,7 @@ export default function CompanyDetailPage() {
                   </div>
                 </div>
               ) : (
-                <p className="py-4 text-center text-zinc-600 dark:text-zinc-400">
+                <p className="py-4 text-center text-fg-secondary dark:text-zinc-400">
                   Not enough verified data yet — no approved reviews so far.
                 </p>
               )}
@@ -421,7 +421,7 @@ export default function CompanyDetailPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">Reviews</h2>
+                <h2 className="text-lg font-semibold text-fg dark:text-zinc-50">Reviews</h2>
                 {user && user.role === "CANDIDATE" && !showReviewForm && !reviewSubmitted && (
                   <Button size="sm" onClick={() => setShowReviewForm(true)}>
                     Write a Review
@@ -453,11 +453,11 @@ export default function CompanyDetailPage() {
                 <form
                   onSubmit={handleSubmitReview}
                   noValidate
-                  className="mb-8 space-y-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900/60"
+                  className="mb-8 space-y-5 rounded-2xl border border-line bg-surface-sunken p-5 dark:border-zinc-800 dark:bg-zinc-900/60"
                 >
                   <div>
-                    <h3 className="font-semibold text-zinc-950 dark:text-zinc-50">Write your review</h3>
-                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                    <h3 className="font-semibold text-fg dark:text-zinc-50">Write your review</h3>
+                    <p className="mt-1 text-sm text-fg-secondary dark:text-zinc-400">
                       Reviews are anonymous and checked by our team before they are published.
                     </p>
                   </div>
@@ -493,12 +493,12 @@ export default function CompanyDetailPage() {
                       placeholder="e.g. Software Engineer"
                       maxLength={100}
                     />
-                    <label className="flex items-center gap-2 self-end pb-3 text-sm text-zinc-800 dark:text-zinc-200">
+                    <label className="flex items-center gap-2 self-end pb-3 text-sm text-fg dark:text-zinc-200">
                       <input
                         type="checkbox"
                         checked={reviewForm.isCurrentEmployee}
                         onChange={(e) => update("isCurrentEmployee", e.target.checked)}
-                        className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                        className="h-4 w-4 rounded border-line-strong text-primary-text focus:ring-emerald-500"
                       />
                       I currently work here
                     </label>
@@ -531,7 +531,7 @@ export default function CompanyDetailPage() {
                         maxLength={key === "advice" ? 1000 : 2000}
                       />
                       {key !== "advice" && (
-                        <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                        <p className="mt-1 text-xs text-fg-secondary dark:text-zinc-400">
                           {reviewForm[key].trim().length}/{MIN_PROS_CONS} characters minimum
                         </p>
                       )}
@@ -551,12 +551,12 @@ export default function CompanyDetailPage() {
 
               {company.reviews.length === 0 ? (
                 <div className="py-8 text-center">
-                  <p className="text-zinc-600 dark:text-zinc-400">
+                  <p className="text-fg-secondary dark:text-zinc-400">
                     No verified reviews yet. Be the first to share your experience!
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                <div className="divide-y divide-line dark:divide-zinc-800">
                   {company.reviews.map((review) => {
                     const vote = votes[review.id] ?? { voted: false, count: review.helpfulCount ?? 0 };
                     return (
@@ -564,39 +564,39 @@ export default function CompanyDetailPage() {
                         <div className="mb-2 flex items-start justify-between gap-3">
                           <div>
                             {review.title && (
-                              <h3 className="font-semibold text-zinc-950 dark:text-zinc-50">{review.title}</h3>
+                              <h3 className="font-semibold text-fg dark:text-zinc-50">{review.title}</h3>
                             )}
                             <StarRating rating={review.overallRating} size="sm" />
                             {(review.jobTitle || review.isCurrentEmployee !== undefined) && (
-                              <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                              <p className="mt-1 text-xs text-fg-secondary dark:text-zinc-400">
                                 {review.jobTitle ?? "Employee"}
                                 {review.isCurrentEmployee ? " · Current employee" : " · Former employee"}
                               </p>
                             )}
                           </div>
-                          <time className="shrink-0 text-xs text-zinc-600 dark:text-zinc-400" dateTime={review.createdAt}>
+                          <time className="shrink-0 text-xs text-fg-secondary dark:text-zinc-400" dateTime={review.createdAt}>
                             {new Date(review.createdAt).toLocaleDateString()}
                           </time>
                         </div>
                         {review.pros && (
                           <p className="mb-2 text-sm">
                             <span className="font-medium text-emerald-700 dark:text-emerald-400">Pros: </span>
-                            <span className="text-zinc-700 dark:text-zinc-300">{review.pros}</span>
+                            <span className="text-fg-secondary dark:text-zinc-300">{review.pros}</span>
                           </p>
                         )}
                         {review.cons && (
                           <p className="mb-2 text-sm">
                             <span className="font-medium text-red-700 dark:text-red-400">Cons: </span>
-                            <span className="text-zinc-700 dark:text-zinc-300">{review.cons}</span>
+                            <span className="text-fg-secondary dark:text-zinc-300">{review.cons}</span>
                           </p>
                         )}
                         {review.advice && (
                           <p className="mb-2 text-sm">
-                            <span className="font-medium text-zinc-800 dark:text-zinc-200">Advice: </span>
-                            <span className="text-zinc-700 dark:text-zinc-300">{review.advice}</span>
+                            <span className="font-medium text-fg dark:text-zinc-200">Advice: </span>
+                            <span className="text-fg-secondary dark:text-zinc-300">{review.advice}</span>
                           </p>
                         )}
-                        <div className="mt-3 flex items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400">
+                        <div className="mt-3 flex items-center gap-3 text-xs text-fg-secondary dark:text-zinc-400">
                           {user ? (
                             <button
                               type="button"
@@ -606,7 +606,7 @@ export default function CompanyDetailPage() {
                               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium transition-colors disabled:opacity-60 ${
                                 vote.voted
                                   ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:border-emerald-500 dark:bg-emerald-500/15 dark:text-emerald-300"
-                                  : "border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                                  : "border-line-strong text-fg-secondary hover:bg-surface-muted dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
                               }`}
                             >
                               👍 Helpful{vote.count > 0 ? ` · ${vote.count}` : ""}

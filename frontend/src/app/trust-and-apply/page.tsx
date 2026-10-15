@@ -42,42 +42,42 @@ export default function TrustAndApplyPage() {
   return (
     <main className="max-w-3xl mx-auto px-4 py-12">
       <div className="mb-8">
-        <Link href="/" className="text-sm text-emerald-600 hover:underline">
+        <Link href="/" className="text-sm text-primary-text hover:underline">
           ← Back to Home
         </Link>
       </div>
 
-      <h1 className="text-3xl font-bold text-gray-900 mb-3">Trust & Apply</h1>
-      <p className="text-base text-gray-600 mb-8">
+      <h1 className="text-3xl font-bold text-fg mb-3">Trust & Apply</h1>
+      <p className="text-base text-fg-secondary mb-8">
         How AfriTalent submits applications on your behalf, the proof we keep for every one, and the limits we
         enforce so employers don&apos;t see a flood.
       </p>
 
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-3">What AfriTalent does (and doesn&apos;t) do</h2>
-        <p className="text-gray-700 leading-relaxed mb-3">
+        <h2 className="text-xl font-semibold text-fg mb-3">What AfriTalent does (and doesn&apos;t) do</h2>
+        <p className="text-fg-secondary leading-relaxed mb-3">
           AfriTalent classifies each job into one of four <em>apply tracks</em> at ingest time. Every track requires
           your explicit Draft → Preview → Submit consent — we never submit anything before you&apos;ve seen the
           final version and ticked the acknowledgements. There is no &quot;set it and forget it&quot; mode.
         </p>
-        <p className="text-gray-700 leading-relaxed">
+        <p className="text-fg-secondary leading-relaxed">
           We don&apos;t spam employers, we don&apos;t fabricate qualifications in your cover letter, and we don&apos;t
           apply to jobs you haven&apos;t reviewed.
         </p>
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">The four tracks</h2>
+        <h2 className="text-xl font-semibold text-fg mb-4">The four tracks</h2>
         <ul className="space-y-5">
           {TRACKS.map((track) => (
-            <li key={track.badge} className="border border-gray-200 rounded-xl p-5 bg-white">
+            <li key={track.badge} className="border border-line rounded-xl p-5 bg-surface">
               <div className="flex items-baseline justify-between mb-2">
-                <h3 className="text-lg font-semibold text-gray-900">{track.name}</h3>
-                <span className="text-xs font-mono text-gray-500">{track.badge}</span>
+                <h3 className="text-lg font-semibold text-fg">{track.name}</h3>
+                <span className="text-xs font-mono text-fg-muted">{track.badge}</span>
               </div>
-              <p className="text-gray-700 leading-relaxed mb-3">{track.summary}</p>
-              <p className="text-sm text-gray-500">
-                <span className="font-semibold text-gray-700">Proof we keep:</span> {track.proof}
+              <p className="text-fg-secondary leading-relaxed mb-3">{track.summary}</p>
+              <p className="text-sm text-fg-muted">
+                <span className="font-semibold text-fg-secondary">Proof we keep:</span> {track.proof}
               </p>
             </li>
           ))}
@@ -85,8 +85,8 @@ export default function TrustAndApplyPage() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-3">Apply limits</h2>
-        <ul className="list-disc pl-5 space-y-2 text-gray-700 leading-relaxed">
+        <h2 className="text-xl font-semibold text-fg mb-3">Apply limits</h2>
+        <ul className="list-disc pl-5 space-y-2 text-fg-secondary leading-relaxed">
           <li>At most <strong>one application per role per 60 days</strong> from any one candidate.</li>
           <li>At most <strong>three distinct roles per employer per 30 days</strong> from any one candidate.</li>
           <li>Hard rate-limits on the autopilot batch flow so a single user cannot fan out to thousands of jobs.</li>
@@ -94,33 +94,33 @@ export default function TrustAndApplyPage() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-3">For employers — how to opt out</h2>
-        <p className="text-gray-700 leading-relaxed mb-3">
+        <h2 className="text-xl font-semibold text-fg mb-3">For employers — how to opt out</h2>
+        <p className="text-fg-secondary leading-relaxed mb-3">
           If you don&apos;t want AfriTalent to send candidate applications to email addresses on your domain, send
           a message from <em>any</em> address on that domain to{" "}
-          <a className="text-emerald-600 hover:underline" href="mailto:optout@afri-talent.com">
+          <a className="text-primary-text hover:underline" href="mailto:optout@afri-talent.com">
             optout@afri-talent.com
           </a>
           . We&apos;ll exclude every email-route application against your domain for 12 months, starting from the
           message you sent. Candidates can still apply via the other tracks (direct API, redirect, supervised
           operator) — the opt-out only covers email.
         </p>
-        <p className="text-gray-700 leading-relaxed">
+        <p className="text-fg-secondary leading-relaxed">
           To extend or lift the opt-out, contact{" "}
-          <a className="text-emerald-600 hover:underline" href="mailto:support@afri-talent.com">
+          <a className="text-primary-text hover:underline" href="mailto:support@afri-talent.com">
             support@afri-talent.com
           </a>
           .
         </p>
       </section>
 
-      <section className="text-sm text-gray-500 border-t pt-6">
+      <section className="text-sm text-fg-muted border-t pt-6">
         Last updated: May 2026. See also our{" "}
-        <Link href="/privacy-policy" className="text-emerald-600 hover:underline">
+        <Link href="/privacy-policy" className="text-primary-text hover:underline">
           Privacy Policy
         </Link>{" "}
         and{" "}
-        <Link href="/terms-of-service" className="text-emerald-600 hover:underline">
+        <Link href="/terms-of-service" className="text-primary-text hover:underline">
           Terms of Service
         </Link>
         .

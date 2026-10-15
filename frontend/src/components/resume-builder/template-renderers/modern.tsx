@@ -6,13 +6,13 @@ import type { ResumePreviewData } from "@/components/resume-builder/types";
 export function ModernTemplate({ data }: { data: ResumePreviewData }): ReactNode {
   if (data.generatedRawText) {
     return (
-      <pre className="whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-gray-900">
+      <pre className="whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-fg">
         {data.generatedRawText}
       </pre>
     );
   }
   return (
-    <div className="font-sans text-gray-900">
+    <div className="font-sans text-fg">
       <header className="grid grid-cols-1 gap-2 border-b-2 border-blue-600 pb-3 sm:grid-cols-[2fr_1fr]">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{data.fullName || "Your Name"}</h1>
@@ -20,7 +20,7 @@ export function ModernTemplate({ data }: { data: ResumePreviewData }): ReactNode
             {data.targetRole || "Target role"}
           </p>
         </div>
-        <div className="space-y-0.5 text-xs text-gray-600 sm:text-right">
+        <div className="space-y-0.5 text-xs text-fg-secondary sm:text-right">
           {data.email && <p>{data.email}</p>}
           {data.phone && <p>{data.phone}</p>}
           {data.location && <p>{data.location}</p>}
@@ -31,7 +31,7 @@ export function ModernTemplate({ data }: { data: ResumePreviewData }): ReactNode
         <Block title="Skills">
           <div className="flex flex-wrap gap-1.5">
             {data.skills.map((s) => (
-              <span key={s} className="rounded bg-gray-100 px-2 py-0.5 text-xs">
+              <span key={s} className="rounded bg-surface-muted px-2 py-0.5 text-xs">
                 {s}
               </span>
             ))}
@@ -46,7 +46,7 @@ export function ModernTemplate({ data }: { data: ResumePreviewData }): ReactNode
               <div key={i} className="mb-3">
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="text-sm font-semibold">{w.title || "Role"}</p>
-                  {w.period && <span className="text-xs text-gray-500">{w.period}</span>}
+                  {w.period && <span className="text-xs text-fg-muted">{w.period}</span>}
                 </div>
                 {w.company && <p className="text-sm text-blue-700">{w.company}</p>}
                 {w.description && <p className="mt-1 text-sm leading-relaxed">{w.description}</p>}
@@ -61,8 +61,8 @@ export function ModernTemplate({ data }: { data: ResumePreviewData }): ReactNode
             .map((e, i) => (
               <div key={i} className="mb-1.5 text-sm">
                 <span className="font-semibold">{e.degree}</span>
-                {e.institution && <span className="text-gray-700">, {e.institution}</span>}
-                {e.period && <span className="text-gray-500"> — {e.period}</span>}
+                {e.institution && <span className="text-fg-secondary">, {e.institution}</span>}
+                {e.period && <span className="text-fg-muted"> — {e.period}</span>}
               </div>
             ))}
         </Block>

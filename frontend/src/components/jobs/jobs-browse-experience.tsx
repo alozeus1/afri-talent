@@ -46,8 +46,8 @@ function buildPathAwareJobsHref(pathname: string, state: Partial<JobSearchState>
 
 function StatPill({ label, value }: { label: string; value: number }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[rgba(255,255,255,0.62)] px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] dark:bg-[rgba(7,17,29,0.58)] dark:text-gray-200">
-      <span className="font-display text-sm text-gray-950 dark:text-white">{value}</span>
+    <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[rgba(255,255,255,0.62)] px-3 py-1.5 text-xs font-semibold text-fg-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] dark:bg-[rgba(7,17,29,0.58)] dark:text-gray-200">
+      <span className="font-display text-sm text-fg dark:text-white">{value}</span>
       {label}
     </span>
   );
@@ -154,16 +154,16 @@ export function JobsBrowseExperience({
       >
         <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-2">
-            <p className="font-display text-2xl font-bold text-gray-950 dark:text-white">
+            <p className="font-display text-2xl font-bold text-fg dark:text-white">
               {pagination.total} job{pagination.total !== 1 ? "s" : ""} found
             </p>
-            <p className="text-sm text-gray-600 dark:text-gray-300">
+            <p className="text-sm text-fg-secondary dark:text-gray-300">
               Search stays anchored while results refresh, so you can keep refining without losing context.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            <label className="inline-flex items-center gap-2 text-sm font-medium text-fg-secondary dark:text-gray-200">
               <span>Sort</span>
               <select
                 value={filters.sortBy || DEFAULT_JOB_SORT}
@@ -173,7 +173,7 @@ export function JobsBrowseExperience({
                     { scrollToResults: false },
                   )
                 }
-                className="rounded-full border border-[var(--border-soft)] bg-white/80 px-3 py-1.5 text-sm text-gray-900 dark:bg-[rgba(7,17,29,0.58)] dark:text-gray-100"
+                className="rounded-full border border-[var(--border-soft)] bg-white/80 px-3 py-1.5 text-sm text-fg dark:bg-[rgba(7,17,29,0.58)] dark:text-gray-100"
                 aria-label="Sort jobs"
               >
                 {JOB_SORT_OPTIONS.map((option) => (
@@ -201,10 +201,10 @@ export function JobsBrowseExperience({
 
         {error ? (
           <div className="surface-panel-strong rounded-[1.75rem] border border-red-200 px-6 py-8 dark:border-red-500/20">
-            <p className="font-display text-2xl font-bold text-gray-950 dark:text-white">
+            <p className="font-display text-2xl font-bold text-fg dark:text-white">
               We couldn&apos;t load the latest roles just now.
             </p>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-gray-600 dark:text-gray-300">
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-secondary dark:text-gray-300">
               The search controls above are still available. Retry in a moment, or broaden the filters if the market is refreshing.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
@@ -238,10 +238,10 @@ export function JobsBrowseExperience({
           <JobResultsSkeletonGrid count={Math.min(filters.limit, 6)} />
         ) : (
           <div className="surface-panel-strong rounded-[1.75rem] px-6 py-10 text-center">
-            <p className="font-display text-2xl font-bold text-gray-950 dark:text-white">
+            <p className="font-display text-2xl font-bold text-fg dark:text-white">
               No roles matched this search yet.
             </p>
-            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-gray-600 dark:text-gray-300">
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-fg-secondary dark:text-gray-300">
               Try a broader title, a wider location, or clear the mobility filters to see more opportunities.
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-3">
@@ -274,7 +274,7 @@ export function JobsBrowseExperience({
                 Previous
               </Button>
             )}
-            <span className="flex items-center justify-center px-4 text-sm text-gray-600 dark:text-gray-300">
+            <span className="flex items-center justify-center px-4 text-sm text-fg-secondary dark:text-gray-300">
               Page {filters.page} of {pagination.totalPages}
             </span>
             {filters.page < pagination.totalPages && !isPending ? (

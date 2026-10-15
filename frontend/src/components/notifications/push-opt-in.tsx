@@ -73,9 +73,9 @@ export function PushOptInCard() {
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Push Notifications</h3>
-      <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+    <div className="rounded-xl border border-line dark:border-gray-700 bg-surface dark:bg-gray-900 p-5">
+      <h3 className="text-lg font-semibold text-fg dark:text-gray-100">Push Notifications</h3>
+      <p className="text-sm text-fg-secondary dark:text-gray-300 mt-1">
         Get saved-search alerts, interview reminders, application updates, and other urgent candidate nudges in real time.
       </p>
 
@@ -101,13 +101,13 @@ export function PushOptInCard() {
               ["subscriptionNotices", "Subscription notices"],
             ] as Array<[keyof NotificationPreference, string]>
           ).map(([key, label]) => (
-            <label key={key} className="flex items-center justify-between text-sm text-gray-700 dark:text-gray-200">
+            <label key={key} className="flex items-center justify-between text-sm text-fg-secondary dark:text-gray-200">
               <span>{label}</span>
               <input
                 type="checkbox"
                 checked={Boolean(preferences[key])}
                 onChange={(event) => updatePreference(key, event.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-emerald-600"
+                className="h-4 w-4 rounded border-line-strong text-primary-text"
               />
             </label>
           ))}
@@ -115,7 +115,7 @@ export function PushOptInCard() {
       )}
 
       <div className="mt-4">
-        <Link href="/candidate/preferences" className="text-sm font-medium text-emerald-600 hover:text-emerald-700">
+        <Link href="/candidate/preferences" className="text-sm font-medium text-primary-text hover:text-emerald-700">
           Manage all alert preferences
         </Link>
       </div>

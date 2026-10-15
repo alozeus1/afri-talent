@@ -20,13 +20,13 @@ export function EmployerJobPostingPreview({
   loading = false,
 }: EmployerJobPostingPreviewProps) {
   return (
-    <Card className="border-slate-200 bg-white shadow-sm">
+    <Card className="border-line bg-surface shadow-sm">
       <CardHeader>
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
           Credibility preview
         </p>
-        <h2 className="mt-2 text-lg font-semibold text-gray-900">Job quality before publish</h2>
-        <p className="mt-2 text-sm text-gray-600">
+        <h2 className="mt-2 text-lg font-semibold text-fg">Job quality before publish</h2>
+        <p className="mt-2 text-sm text-fg-secondary">
           See how trustworthy and moderation-ready this draft looks before it reaches candidates.
         </p>
       </CardHeader>
@@ -36,7 +36,7 @@ export function EmployerJobPostingPreview({
             <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-emerald-600" />
           </div>
         ) : !preview ? (
-          <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-sm text-gray-600">
+          <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-6 text-sm text-fg-secondary">
             Fill in the role basics to unlock your quality score, moderation guidance, and credibility tips.
           </div>
         ) : (
@@ -76,8 +76,8 @@ export function EmployerJobPostingPreview({
 
             {preview.strengths.length > 0 && (
               <div>
-                <p className="text-sm font-semibold text-gray-900">What is already helping</p>
-                <ul className="mt-2 space-y-2 text-sm text-gray-600">
+                <p className="text-sm font-semibold text-fg">What is already helping</p>
+                <ul className="mt-2 space-y-2 text-sm text-fg-secondary">
                   {preview.strengths.map((item) => (
                     <li key={item}>• {item}</li>
                   ))}
@@ -87,8 +87,8 @@ export function EmployerJobPostingPreview({
 
             {preview.tips.length > 0 && (
               <div>
-                <p className="text-sm font-semibold text-gray-900">Fix these before publish</p>
-                <ul className="mt-2 space-y-2 text-sm text-gray-600">
+                <p className="text-sm font-semibold text-fg">Fix these before publish</p>
+                <ul className="mt-2 space-y-2 text-sm text-fg-secondary">
                   {preview.tips.map((item) => (
                     <li key={item}>• {item}</li>
                   ))}

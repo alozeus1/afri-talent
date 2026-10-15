@@ -189,7 +189,7 @@ export default function NewJobPage() {
   if (!user || user.role !== "EMPLOYER") {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 text-center">
-        <p className="mb-4 text-gray-600">You must be logged in as an employer to post jobs.</p>
+        <p className="mb-4 text-fg-secondary">You must be logged in as an employer to post jobs.</p>
         <Link href={localizePath("/login", locale)}>
           <Button>Login</Button>
         </Link>
@@ -206,15 +206,15 @@ export default function NewJobPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           ) : (
-            <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-8 h-8 text-primary-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           )}
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">
+        <h1 className="text-2xl font-bold text-fg mb-3">
           {submitted.pending ? "Job submitted for review" : "Job published!"}
         </h1>
-        <p className="text-gray-600 mb-8">
+        <p className="text-fg-secondary mb-8">
           {submitted.pending
             ? submitted.pendingReason
             : "Your job is live and visible to candidates now."}
@@ -235,7 +235,7 @@ export default function NewJobPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <Link href={localizePath("/employer", locale)} className="mb-6 inline-flex items-center text-emerald-600 hover:text-emerald-700">
+      <Link href={localizePath("/employer", locale)} className="mb-6 inline-flex items-center text-primary-text hover:text-emerald-700">
         <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
@@ -245,11 +245,11 @@ export default function NewJobPage() {
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
         <Card>
           <CardHeader>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
               Guided job launch
             </p>
-            <h1 className="mt-2 text-2xl font-semibold text-gray-900">Post a credible job that can get to shortlist fast</h1>
-            <p className="mt-2 text-sm text-gray-600">
+            <h1 className="mt-2 text-2xl font-semibold text-fg">Post a credible job that can get to shortlist fast</h1>
+            <p className="mt-2 text-sm text-fg-secondary">
               Trusted employers publish faster. Inline moderation guidance helps you fix risky or low-signal drafts before candidates ever see them.
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2">
@@ -261,7 +261,7 @@ export default function NewJobPage() {
                 <div
                   key={item.n}
                   className={`rounded-2xl px-3 py-3 text-center text-xs font-medium ${
-                    step >= item.n ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-500"
+                    step >= item.n ? "bg-emerald-600 text-white" : "bg-surface-muted text-fg-muted"
                   }`}
                 >
                   {item.n}. {item.label}
@@ -288,13 +288,13 @@ export default function NewJobPage() {
                         <TrustBadge label={`Domain matched: ${trustDashboard.trust.verifiedDomain}`} variant="info" />
                       )}
                     </div>
-                    <p className="mt-3 text-sm text-gray-700">
+                    <p className="mt-3 text-sm text-fg-secondary">
                       {trustDashboard.trust.postingEligibility
                         ? "Your account meets the current minimum threshold for public posting."
                         : "Public posting is blocked until the minimum employer trust threshold is met."}
                     </p>
                     {trustDashboard.trust.warnings.length > 0 && (
-                      <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                      <ul className="mt-2 space-y-1 text-sm text-fg-secondary">
                         {trustDashboard.trust.warnings.map((warning) => (
                           <li key={warning}>• {warning}</li>
                         ))}
@@ -327,12 +327,12 @@ export default function NewJobPage() {
                   />
 
                   <div>
-                    <label htmlFor="description" className="mb-1 block text-sm font-medium text-gray-700">
+                    <label htmlFor="description" className="mb-1 block text-sm font-medium text-fg-secondary">
                       Job description
                     </label>
                     <textarea
                       id="description"
-                      className="min-h-[220px] w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="min-h-[220px] w-full rounded-lg border border-line-strong px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       placeholder="Describe the mission, responsibilities, outcomes, requirements, and candidate fit."
                       value={formData.description}
                       onChange={(e) => updateField("description", e.target.value)}
@@ -355,12 +355,12 @@ export default function NewJobPage() {
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label htmlFor="type" className="mb-1 block text-sm font-medium text-gray-700">
+                      <label htmlFor="type" className="mb-1 block text-sm font-medium text-fg-secondary">
                         Job type
                       </label>
                       <select
                         id="type"
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full rounded-lg border border-line-strong px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         value={formData.type}
                         onChange={(e) => updateField("type", e.target.value)}
                       >
@@ -370,12 +370,12 @@ export default function NewJobPage() {
                       </select>
                     </div>
                     <div>
-                      <label htmlFor="seniority" className="mb-1 block text-sm font-medium text-gray-700">
+                      <label htmlFor="seniority" className="mb-1 block text-sm font-medium text-fg-secondary">
                         Seniority level
                       </label>
                       <select
                         id="seniority"
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full rounded-lg border border-line-strong px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         value={formData.seniority}
                         onChange={(e) => updateField("seniority", e.target.value)}
                       >
@@ -404,12 +404,12 @@ export default function NewJobPage() {
                       onChange={(e) => updateField("salaryMax", e.target.value)}
                     />
                     <div>
-                      <label htmlFor="currency" className="mb-1 block text-sm font-medium text-gray-700">
+                      <label htmlFor="currency" className="mb-1 block text-sm font-medium text-fg-secondary">
                         Currency
                       </label>
                       <select
                         id="currency"
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full rounded-lg border border-line-strong px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         value={formData.currency}
                         onChange={(e) => updateField("currency", e.target.value)}
                       >
@@ -439,7 +439,7 @@ export default function NewJobPage() {
                     value={formData.applicationUrl}
                     onChange={(e) => updateField("applicationUrl", e.target.value)}
                   />
-                  <p className="-mt-2 text-sm text-gray-500">
+                  <p className="-mt-2 text-sm text-fg-muted">
                     Leave this blank to receive applications directly on AfriTalent. Add it when candidates should also be able to continue on your company careers site.
                   </p>
                 </>
@@ -447,7 +447,7 @@ export default function NewJobPage() {
 
               {step === 3 && (
                 <div className="space-y-5">
-                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                  <div className="rounded-2xl border border-line bg-surface-sunken p-4 text-sm text-fg-secondary">
                     <p className="mb-2 font-semibold">Publish review</p>
                     <p><strong>Title:</strong> {formData.title}</p>
                     <p><strong>Location:</strong> {formData.location}</p>
@@ -512,15 +512,15 @@ export default function NewJobPage() {
         <div className="space-y-6">
           <EmployerJobPostingPreview preview={preview} loading={previewLoading} />
 
-          <Card className="border-gray-200 bg-gray-50">
+          <Card className="border-line bg-surface-sunken">
             <CardHeader>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-fg-muted">
                 Moderation rules
               </p>
-              <h2 className="mt-2 text-lg font-semibold text-gray-900">Inline trust guidance</h2>
+              <h2 className="mt-2 text-lg font-semibold text-fg">Inline trust guidance</h2>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-2 text-sm text-gray-700">
+              <ul className="space-y-2 text-sm text-fg-secondary">
                 <li>• Add compensation ranges where possible to improve credibility.</li>
                 <li>• Clarify remote, onsite, or hybrid expectations and eligible countries.</li>
                 <li>• Avoid off-platform contact instructions in the description.</li>

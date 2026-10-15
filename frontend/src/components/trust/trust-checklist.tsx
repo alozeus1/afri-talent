@@ -46,7 +46,7 @@ export function TrustChecklist({
 
   if (!items.length) {
     return (
-      <div className="rounded-2xl border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500">
+      <div className="rounded-2xl border border-dashed border-line-strong px-4 py-3 text-sm text-fg-muted">
         {emptyMessage}
       </div>
     );
@@ -68,7 +68,7 @@ export function TrustChecklist({
             className={`flex items-start gap-3 rounded-2xl border px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
               item.done
                 ? "border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50"
-                : "border-amber-200 bg-white hover:bg-amber-50/40"
+                : "border-amber-200 bg-surface hover:bg-amber-50/40"
             }`}
             aria-label={`${item.label}${item.done ? " — completed" : " — action required"}`}
           >
@@ -83,8 +83,8 @@ export function TrustChecklist({
               {item.done ? "✓" : "!"}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-gray-900">{item.label}</p>
-              <p className="text-sm text-gray-500">{subtitle}</p>
+              <p className="font-medium text-fg">{item.label}</p>
+              <p className="text-sm text-fg-muted">{subtitle}</p>
             </div>
             {!item.done && (
               <span className="self-center text-amber-600 text-xs font-semibold flex-shrink-0" aria-hidden="true">

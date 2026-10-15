@@ -98,7 +98,7 @@ function ResumePanel({ result }: { result: OrchestratorRunResponse }) {
   return (
     <div>
       <SectionLabel>Resume Analysis</SectionLabel>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-sm text-gray-600">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-sm text-fg-secondary">
         {r.name && (
           <span>
             <span className="font-medium">Name:</span> {r.name}
@@ -136,7 +136,7 @@ function ResumePanel({ result }: { result: OrchestratorRunResponse }) {
       {result.notes_for_ui.length > 0 && (
         <ul className="space-y-1">
           {result.notes_for_ui.map((note, i) => (
-            <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+            <li key={i} className="flex items-start gap-2 text-sm text-fg-secondary">
               <span className="text-emerald-500 mt-0.5 shrink-0">•</span>
               {note}
             </li>
@@ -169,7 +169,7 @@ function RankedJobRow({
       className={`rounded-lg border p-3 transition-colors ${
         isSelected
           ? "border-emerald-400 bg-emerald-50"
-          : "border-gray-200 bg-white hover:border-gray-300"
+          : "border-line bg-surface hover:border-line-strong"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -179,20 +179,20 @@ function RankedJobRow({
             className={`shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
               isSelected
                 ? "bg-emerald-500 text-white"
-                : "bg-gray-100 text-gray-500"
+                : "bg-surface-muted text-fg-muted"
             }`}
           >
             {rank}
           </span>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">
+            <p className="text-sm font-medium text-fg truncate">
               {title}
               {company && (
-                <span className="font-normal text-gray-500"> · {company}</span>
+                <span className="font-normal text-fg-muted"> · {company}</span>
               )}
             </p>
             {job_json.visa_sponsorship === "YES" && (
-              <span className="text-xs text-emerald-600 font-medium">
+              <span className="text-xs text-primary-text font-medium">
                 ✓ Visa sponsored
               </span>
             )}
@@ -213,13 +213,13 @@ function RankedJobRow({
       {/* Score bars */}
       <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5">
         <div>
-          <div className="flex justify-between text-xs text-gray-500 mb-0.5">
+          <div className="flex justify-between text-xs text-fg-muted mb-0.5">
             <span>Match score</span>
           </div>
           <ScoreBar value={match.score} color="emerald" />
         </div>
         <div>
-          <div className="flex justify-between text-xs text-gray-500 mb-0.5">
+          <div className="flex justify-between text-xs text-fg-muted mb-0.5">
             <span>Must-have coverage</span>
           </div>
           <ScoreBar value={match.must_have_coverage_pct} color="blue" />
@@ -246,8 +246,8 @@ function SelectedJobDetail({ job }: { job: RankedJob }) {
   const { match, job_json } = job;
 
   return (
-    <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+    <div className="mt-4 border-t border-line pt-4 space-y-3">
+      <p className="text-xs font-medium text-fg-muted uppercase tracking-wide">
         Why it matches
       </p>
       {match.matched_skills.length > 0 && (
@@ -264,7 +264,7 @@ function SelectedJobDetail({ job }: { job: RankedJob }) {
       )}
       {match.missing_must_haves.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+          <p className="text-xs font-medium text-fg-muted uppercase tracking-wide mb-1.5">
             Gaps (required skills)
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -292,18 +292,18 @@ function SelectedJobDetail({ job }: { job: RankedJob }) {
         </div>
       )}
       {match.explanation && (
-        <p className="text-sm text-gray-600 italic border-l-2 border-emerald-300 pl-3">
+        <p className="text-sm text-fg-secondary italic border-l-2 border-emerald-300 pl-3">
           {match.explanation}
         </p>
       )}
       {job_json.requirements.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+          <p className="text-xs font-medium text-fg-muted uppercase tracking-wide mb-1.5">
             Key requirements
           </p>
           <ul className="space-y-1">
             {job_json.requirements.slice(0, 5).map((r, i) => (
-              <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+              <li key={i} className="flex items-start gap-2 text-xs text-fg-secondary">
                 <span className="text-gray-400 mt-0.5 shrink-0">•</span>
                 {r}
               </li>
@@ -419,11 +419,11 @@ function ApplyPackPanel({
 
       {/* Tailored resume */}
       <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+        <p className="text-xs font-medium text-fg-muted uppercase tracking-wide mb-2">
           Tailored Resume
         </p>
         {tailored_resume.summary && (
-          <p className="text-sm text-gray-600 mb-3">{tailored_resume.summary}</p>
+          <p className="text-sm text-fg-secondary mb-3">{tailored_resume.summary}</p>
         )}
         {tailored_resume.skills.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
@@ -437,14 +437,14 @@ function ApplyPackPanel({
         {tailored_resume.experience.length > 0 && (
           <div className="space-y-3">
             {tailored_resume.experience.map((exp, i) => (
-              <div key={i} className="bg-gray-50 rounded-lg p-3">
-                <p className="text-sm font-medium text-gray-900">
+              <div key={i} className="bg-surface-sunken rounded-lg p-3">
+                <p className="text-sm font-medium text-fg">
                   {exp.title} · {exp.company}
                 </p>
-                <p className="text-xs text-gray-500 mb-2">{exp.period}</p>
+                <p className="text-xs text-fg-muted mb-2">{exp.period}</p>
                 <ul className="space-y-1">
                   {exp.bullets.map((b, j) => (
-                    <li key={j} className="flex items-start gap-2 text-xs text-gray-600">
+                    <li key={j} className="flex items-start gap-2 text-xs text-fg-secondary">
                       <span className="text-emerald-500 mt-0.5 shrink-0">•</span>
                       {b}
                     </li>
@@ -473,17 +473,17 @@ function ApplyPackPanel({
       {/* Cover letter */}
       <div>
         <div className="flex items-center justify-between mb-1">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          <p className="text-xs font-medium text-fg-muted uppercase tracking-wide">
             Cover Letter
           </p>
           <button
             onClick={() => setShowCoverLetter((v) => !v)}
-            className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+            className="text-xs text-primary-text hover:text-emerald-700 font-medium"
           >
             {showCoverLetter ? "Hide" : "Show"}
           </button>
         </div>
-        <div className="flex flex-wrap gap-2 text-xs text-gray-500 mb-2">
+        <div className="flex flex-wrap gap-2 text-xs text-fg-muted mb-2">
           <span className="truncate max-w-xs">{cover_letter_pack.subject_line}</span>
           <span>·</span>
           <span>{cover_letter_pack.word_count} words</span>
@@ -491,7 +491,7 @@ function ApplyPackPanel({
           <span className="capitalize">{cover_letter_pack.tone} tone</span>
         </div>
         {showCoverLetter && (
-          <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+          <div className="bg-surface-sunken rounded-lg p-4 text-sm text-fg-secondary whitespace-pre-wrap leading-relaxed">
             {cover_letter_pack.salutation}
             {"\n\n"}
             {cover_letter_pack.body}
@@ -534,8 +534,8 @@ function ApplyPackPanel({
       )}
 
       {/* Downloads */}
-      <div className="border-t border-gray-100 pt-4">
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2.5">
+      <div className="border-t border-line pt-4">
+        <p className="text-xs font-medium text-fg-muted uppercase tracking-wide mb-2.5">
           Download
         </p>
         <div className="flex flex-wrap gap-2">
@@ -668,7 +668,7 @@ export default function AIAssistantPage() {
   if (isLoading || !user) {
     return (
       <div className="flex justify-center py-24">
-        <Spinner className="h-8 w-8 text-emerald-600" />
+        <Spinner className="h-8 w-8 text-primary-text" />
       </div>
     );
   }
@@ -854,7 +854,7 @@ export default function AIAssistantPage() {
       <div className="mb-8">
         <Link
           href="/candidate"
-          className="inline-flex items-center text-sm text-emerald-600 hover:text-emerald-700 mb-3"
+          className="inline-flex items-center text-sm text-primary-text hover:text-emerald-700 mb-3"
         >
           <svg
             className="w-4 h-4 mr-1.5"
@@ -871,8 +871,8 @@ export default function AIAssistantPage() {
           </svg>
           Dashboard
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Assistant</h1>
-        <p className="text-gray-600">
+        <h1 className="text-3xl font-bold text-fg mb-2">AI Assistant</h1>
+        <p className="text-fg-secondary">
           Paste your resume and up to {MAX_JOBS} job descriptions to get ranked
           match scores, gap analysis, and a tailored apply pack for your best fit.
         </p>
@@ -887,12 +887,12 @@ export default function AIAssistantPage() {
             <CardHeader>
               <div className="flex items-center gap-2.5">
                 <StepBadge n={1} />
-                <h2 className="font-semibold text-gray-900">Your Resume</h2>
+                <h2 className="font-semibold text-fg">Your Resume</h2>
               </div>
             </CardHeader>
             <CardContent>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-fg-secondary mb-2">
                   Upload Resume (PDF, DOCX, TXT, or MD)
                 </label>
                 <input
@@ -903,9 +903,9 @@ export default function AIAssistantPage() {
                     if (!file) return;
                     void handleResumeUpload(file);
                   }}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                  className="block w-full text-sm text-fg-muted file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
                 />
-                <p className="mt-1.5 text-xs text-gray-500">
+                <p className="mt-1.5 text-xs text-fg-muted">
                   PDF/DOCX files are converted to text first. Review the extracted text before running AI analysis.
                 </p>
                 {resumeUploadStatus && (
@@ -920,7 +920,7 @@ export default function AIAssistantPage() {
                 onChange={(e) => setResumeText(e.target.value)}
                 placeholder="Paste your resume text here (plain text or Markdown)…"
                 rows={10}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-y"
+                className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm text-fg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-y"
               />
               <FieldError errors={fieldErrors} field="resume_text" />
               <div className="mt-3 flex items-center justify-between">
@@ -949,7 +949,7 @@ export default function AIAssistantPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <StepBadge n={2} />
-                  <h2 className="font-semibold text-gray-900">
+                  <h2 className="font-semibold text-fg">
                     Job Descriptions
                   </h2>
                 </div>
@@ -961,7 +961,7 @@ export default function AIAssistantPage() {
             <CardContent className="space-y-4">
               {/* Job Picker */}
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-fg-secondary mb-1">
                   Search jobs from database
                 </label>
                 <div className="relative">
@@ -970,7 +970,7 @@ export default function AIAssistantPage() {
                     value={jobSearchQuery}
                     onChange={(e) => setJobSearchQuery(e.target.value)}
                     placeholder="Search by title, company, or keyword…"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3 py-2 border border-line-strong rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   {jobSearchLoading && (
                     <span className="absolute right-3 top-2.5">
@@ -979,7 +979,7 @@ export default function AIAssistantPage() {
                   )}
                 </div>
                 {showJobDropdown && jobSearchResults.length > 0 && (
-                  <ul className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                  <ul className="absolute z-20 w-full mt-1 bg-surface border border-line rounded-lg shadow-lg max-h-56 overflow-y-auto">
                     {jobSearchResults.map((job) => (
                       <li key={job.id}>
                         <button
@@ -988,7 +988,7 @@ export default function AIAssistantPage() {
                           onClick={() => handleSelectJob(job)}
                         >
                           <span className="font-medium">{job.title}</span>
-                          <span className="text-gray-500 ml-2">@ {job.company}</span>
+                          <span className="text-fg-muted ml-2">@ {job.company}</span>
                           <span className="text-gray-400 ml-2 text-xs">{job.location}</span>
                         </button>
                       </li>
@@ -1003,7 +1003,7 @@ export default function AIAssistantPage() {
               {jobSlots.map((slot, idx) => (
                 <div key={slot.id}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-medium text-gray-500">
+                    <span className="text-xs font-medium text-fg-muted">
                       Job {idx + 1}
                     </span>
                     {jobSlots.length > 1 && (
@@ -1022,7 +1022,7 @@ export default function AIAssistantPage() {
                     onChange={(e) => updateSlot(slot.id, e.target.value)}
                     placeholder="Paste the full job description here…"
                     rows={5}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-y"
+                    className="w-full rounded-lg border border-line-strong px-3 py-2 text-sm text-fg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-y"
                   />
                   <div className="mt-1 flex items-center justify-between">
                     <CharCount current={slot.text.length} max={20_000} min={50} />
@@ -1039,7 +1039,7 @@ export default function AIAssistantPage() {
                   size="sm"
                   onClick={addSlot}
                   disabled={jobSlots.length >= MAX_JOBS || activeOp !== null}
-                  className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                  className="text-primary-text hover:text-emerald-700 hover:bg-emerald-50"
                 >
                   + Add Job
                   {jobSlots.length >= MAX_JOBS && (
@@ -1074,9 +1074,9 @@ export default function AIAssistantPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2.5 mb-1">
                     <StepBadge n={3} />
-                    <h2 className="font-semibold text-gray-900">Apply Pack</h2>
+                    <h2 className="font-semibold text-fg">Apply Pack</h2>
                   </div>
-                  <p className="text-xs text-gray-500 ml-9 truncate">
+                  <p className="text-xs text-fg-muted ml-9 truncate">
                     {!matchResult
                       ? "Match jobs first, then select one"
                       : !selectedJob
@@ -1087,7 +1087,7 @@ export default function AIAssistantPage() {
                   </p>
                   {selectedJob &&
                     selectedJob.match.score >= APPLY_PACK_THRESHOLD && (
-                      <p className="text-xs text-emerald-600 font-medium mt-1 ml-9">
+                      <p className="text-xs text-primary-text font-medium mt-1 ml-9">
                         ✓ Score {selectedJob.match.score}/100 — eligible
                       </p>
                     )}
@@ -1135,8 +1135,8 @@ export default function AIAssistantPage() {
           {activeOp !== null && !hasAnyResult && (
             <Card>
               <CardContent className="py-16">
-                <div className="flex flex-col items-center gap-3 text-gray-500">
-                  <Spinner className="h-8 w-8 text-emerald-600" />
+                <div className="flex flex-col items-center gap-3 text-fg-muted">
+                  <Spinner className="h-8 w-8 text-primary-text" />
                   <p className="text-sm font-medium">
                     {activeOp === "analyze" && "Analyzing your resume…"}
                     {activeOp === "match" &&
@@ -1167,10 +1167,10 @@ export default function AIAssistantPage() {
                   />
                 </svg>
               </div>
-              <p className="text-gray-600 font-medium mb-1">Ready when you are</p>
+              <p className="text-fg-secondary font-medium mb-1">Ready when you are</p>
               <p className="text-gray-400 text-sm max-w-xs">
                 Paste your resume, add one or more job descriptions, then click{" "}
-                <span className="text-gray-500 font-medium">Match Jobs</span>.
+                <span className="text-fg-muted font-medium">Match Jobs</span>.
               </p>
             </div>
           )}
@@ -1181,9 +1181,9 @@ export default function AIAssistantPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <h2 className="font-semibold text-gray-900">Results</h2>
+                    <h2 className="font-semibold text-fg">Results</h2>
                     {activeOp !== null && (
-                      <Spinner className="h-4 w-4 text-emerald-600" />
+                      <Spinner className="h-4 w-4 text-primary-text" />
                     )}
                     {activeOp === null && !error && latestResult && (
                       <Badge
@@ -1215,7 +1215,7 @@ export default function AIAssistantPage() {
                 </div>
               </CardHeader>
 
-              <CardContent className="divide-y divide-gray-100">
+              <CardContent className="divide-y divide-line">
 
                 {/* Resume facts */}
                 {resumeResult?.resume_json && (
@@ -1234,7 +1234,7 @@ export default function AIAssistantPage() {
                       {selectedJob && (
                         <button
                           onClick={() => setSelectedJobId(null)}
-                          className="text-xs text-gray-400 hover:text-gray-600"
+                          className="text-xs text-gray-400 hover:text-fg-secondary"
                         >
                           Clear selection
                         </button>
@@ -1297,12 +1297,12 @@ export default function AIAssistantPage() {
                   !analyzeResult.resume_json &&
                   analyzeResult.notes_for_ui.length > 0 && (
                     <div className="py-5">
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                      <p className="text-xs font-medium text-fg-muted uppercase tracking-wide mb-2">
                         Notes
                       </p>
                       <ul className="space-y-1">
                         {analyzeResult.notes_for_ui.map((note, i) => (
-                          <li key={i} className="flex gap-2 text-sm text-gray-600">
+                          <li key={i} className="flex gap-2 text-sm text-fg-secondary">
                             <span className="text-emerald-500 shrink-0">•</span>
                             {note}
                           </li>
@@ -1319,7 +1319,7 @@ export default function AIAssistantPage() {
             <button
               type="button"
               onClick={() => setShowHistory(!showHistory)}
-              className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-emerald-600"
+              className="flex items-center gap-2 text-sm font-medium text-fg-secondary hover:text-primary-text"
             >
               <span>{showHistory ? "\u25B2" : "\u25BC"}</span>
               <span>Recent Runs ({runHistory.length})</span>
@@ -1329,7 +1329,7 @@ export default function AIAssistantPage() {
             {showHistory && (
               <div className="mt-3 space-y-2">
                 {runHistory.length === 0 && !historyLoading && (
-                  <p className="text-sm text-gray-500 italic">
+                  <p className="text-sm text-fg-muted italic">
                     No previous runs found.
                   </p>
                 )}
@@ -1349,7 +1349,7 @@ export default function AIAssistantPage() {
                   return (
                     <div
                       key={run.id}
-                      className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm cursor-pointer hover:bg-gray-100"
+                      className="p-3 bg-surface-sunken rounded-lg border border-line text-sm cursor-pointer hover:bg-surface-muted"
                       onClick={() => {
                         alert(
                           `Run ${run.runId.slice(0, 8)}: ${run.notes.join(", ") || "No notes"}`
@@ -1363,11 +1363,11 @@ export default function AIAssistantPage() {
                           >
                             {run.status}
                           </span>
-                          <span className="text-gray-600">
+                          <span className="text-fg-secondary">
                             {run.runType.replace("_", " ")}
                           </span>
                           {topJob?.jobTitle && (
-                            <span className="text-gray-500">
+                            <span className="text-fg-muted">
                               — {topJob.jobTitle}
                               {topJob.jobCompany
                                 ? ` @ ${topJob.jobCompany}`
@@ -1377,7 +1377,7 @@ export default function AIAssistantPage() {
                         </div>
                         <div className="flex items-center gap-3 text-gray-400">
                           {topScore !== null && (
-                            <span className="font-semibold text-emerald-600">
+                            <span className="font-semibold text-primary-text">
                               {topScore}%
                             </span>
                           )}
@@ -1422,7 +1422,7 @@ function StepBadge({ n }: { n: number }) {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+    <p className="text-sm font-semibold text-fg-secondary uppercase tracking-wide">
       {children}
     </p>
   );
@@ -1479,7 +1479,7 @@ function DownloadButton({
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 transition-colors"
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-xs font-medium text-fg-secondary bg-surface hover:bg-surface-sunken hover:border-line-strong transition-colors"
     >
       <svg
         className="w-3.5 h-3.5 text-gray-400"

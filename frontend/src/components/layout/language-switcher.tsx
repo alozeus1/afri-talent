@@ -36,7 +36,7 @@ export function LanguageSwitcher() {
         aria-label="Language selector"
         value={locale}
         onChange={(event) => onChange(event.target.value as SupportedLocale)}
-        className="h-10 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+        className="h-10 rounded-lg border border-line bg-surface px-2 text-sm text-fg-secondary focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
       >
         {OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>

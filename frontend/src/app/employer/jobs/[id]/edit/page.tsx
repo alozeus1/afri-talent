@@ -170,8 +170,8 @@ export default function EditJobPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <CardContent className="p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Delete Job</h3>
-              <p className="text-gray-600 mb-6">
+              <h3 className="text-xl font-semibold text-fg mb-2">Delete Job</h3>
+              <p className="text-fg-secondary mb-6">
                 Are you sure you want to delete this job? This action cannot be undone. Jobs that already have applicants are closed instead, so candidates keep their application history.
                 All associated applications will also be affected.
               </p>
@@ -197,7 +197,7 @@ export default function EditJobPage() {
         </div>
       )}
 
-      <Link href="/employer" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
+      <Link href="/employer" className="inline-flex items-center text-primary-text hover:text-emerald-700 mb-6">
         <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
@@ -208,8 +208,8 @@ export default function EditJobPage() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Edit Job</h1>
-              <p className="text-gray-600">Update your job posting details</p>
+              <h1 className="text-2xl font-bold text-fg">Edit Job</h1>
+              <p className="text-fg-secondary">Update your job posting details</p>
             </div>
             <Button
               variant="danger"
@@ -236,12 +236,12 @@ export default function EditJobPage() {
             />
 
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="description" className="block text-sm font-medium text-fg-secondary mb-1">
                 Job Description
               </label>
               <textarea
                 id="description"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[200px]"
+                className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[200px]"
                 placeholder="Describe the role, responsibilities, requirements, and benefits..."
                 value={formData.description}
                 onChange={(e) => updateField("description", e.target.value)}
@@ -260,12 +260,12 @@ export default function EditJobPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="type" className="block text-sm font-medium text-fg-secondary mb-1">
                   Job Type
                 </label>
                 <select
                   id="type"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   value={formData.type}
                   onChange={(e) => updateField("type", e.target.value)}
                 >
@@ -275,12 +275,12 @@ export default function EditJobPage() {
                 </select>
               </div>
               <div>
-                <label htmlFor="seniority" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="seniority" className="block text-sm font-medium text-fg-secondary mb-1">
                   Seniority Level
                 </label>
                 <select
                   id="seniority"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   value={formData.seniority}
                   onChange={(e) => updateField("seniority", e.target.value)}
                 >
@@ -309,12 +309,12 @@ export default function EditJobPage() {
                 onChange={(e) => updateField("salaryMax", e.target.value)}
               />
               <div>
-                <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="currency" className="block text-sm font-medium text-fg-secondary mb-1">
                   Currency
                 </label>
                 <select
                   id="currency"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   value={formData.currency}
                   onChange={(e) => updateField("currency", e.target.value)}
                 >

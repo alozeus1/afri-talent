@@ -6,19 +6,19 @@ import type { ResumePreviewData } from "@/components/resume-builder/types";
 export function MinimalTemplate({ data }: { data: ResumePreviewData }): ReactNode {
   if (data.generatedRawText) {
     return (
-      <pre className="whitespace-pre-wrap font-mono text-[12.5px] leading-relaxed text-gray-900">
+      <pre className="whitespace-pre-wrap font-mono text-[12.5px] leading-relaxed text-fg">
         {data.generatedRawText}
       </pre>
     );
   }
   return (
-    <div className="font-mono text-[13px] text-gray-900">
+    <div className="font-mono text-[13px] text-fg">
       <h1 className="text-xl font-semibold">{data.fullName || "Your Name"}</h1>
-      <p className="mt-0.5 text-gray-700">{data.targetRole || "Target role"}</p>
-      <p className="mt-0.5 text-xs text-gray-500">
+      <p className="mt-0.5 text-fg-secondary">{data.targetRole || "Target role"}</p>
+      <p className="mt-0.5 text-xs text-fg-muted">
         {[data.email, data.phone, data.location].filter(Boolean).join(" / ")}
       </p>
-      <hr className="my-3 border-gray-200" />
+      <hr className="my-3 border-line" />
       {data.summary && (
         <Row label="summary">
           <p className="leading-relaxed">{data.summary}</p>
@@ -32,9 +32,9 @@ export function MinimalTemplate({ data }: { data: ResumePreviewData }): ReactNod
             <p>
               <strong>{w.title}</strong>
               {w.company && ` — ${w.company}`}
-              {w.period && <span className="text-gray-500"> ({w.period})</span>}
+              {w.period && <span className="text-fg-muted"> ({w.period})</span>}
             </p>
-            {w.description && <p className="mt-0.5 text-gray-700">{w.description}</p>}
+            {w.description && <p className="mt-0.5 text-fg-secondary">{w.description}</p>}
           </Row>
         ))}
       {data.educationHistory
@@ -44,7 +44,7 @@ export function MinimalTemplate({ data }: { data: ResumePreviewData }): ReactNod
             <p>
               <strong>{e.degree}</strong>
               {e.institution && ` — ${e.institution}`}
-              {e.period && <span className="text-gray-500"> ({e.period})</span>}
+              {e.period && <span className="text-fg-muted"> ({e.period})</span>}
             </p>
           </Row>
         ))}

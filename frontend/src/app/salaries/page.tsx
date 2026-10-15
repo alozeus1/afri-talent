@@ -175,8 +175,8 @@ export default function SalariesPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Hero Section */}
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">{t("salaries.title")}</h1>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+        <h1 className="text-4xl font-bold text-fg mb-4">{t("salaries.title")}</h1>
+        <p className="text-lg text-fg-secondary max-w-2xl mx-auto">
           {t("salaries.practicalSubtitle")}
         </p>
       </div>
@@ -184,7 +184,7 @@ export default function SalariesPage() {
       {/* Search Section */}
       <Card className="mb-10">
         <CardContent className="p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">{t("salaries.searchSalaries")}</h2>
+          <h2 className="text-xl font-bold text-fg mb-4">{t("salaries.searchSalaries")}</h2>
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <Input
@@ -195,7 +195,7 @@ export default function SalariesPage() {
               />
             </div>
             <select
-              className="w-full md:w-48 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full md:w-48 px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               value={searchCountry}
               onChange={(e) => setSearchCountry(e.target.value)}
             >
@@ -216,8 +216,8 @@ export default function SalariesPage() {
         <CardHeader>
           <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Top Paying Roles: Market Guidance</h2>
-              <p className="text-sm text-gray-500">
+              <h2 className="text-xl font-bold text-fg">Top Paying Roles: Market Guidance</h2>
+              <p className="text-sm text-fg-muted">
                 Educational estimates for high-opportunity roles. These are not AfriTalent placement outcomes.
               </p>
             </div>
@@ -233,12 +233,12 @@ export default function SalariesPage() {
             {TOP_PAYING_ROLE_GUIDANCE.map((role) => (
               <article
                 key={role.role}
-                className="interactive-card rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+                className="interactive-card rounded-2xl border border-line bg-surface p-5 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-bold text-gray-900">{role.role}</h3>
-                    <p className="mt-2 text-sm leading-6 text-gray-600">{role.description}</p>
+                    <h3 className="text-lg font-bold text-fg">{role.role}</h3>
+                    <p className="mt-2 text-sm leading-6 text-fg-secondary">{role.description}</p>
                   </div>
                   <Badge variant={role.remoteFriendliness === "High" ? "success" : "info"}>
                     {role.remoteFriendliness} remote fit
@@ -246,7 +246,7 @@ export default function SalariesPage() {
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {role.commonSkills.map((skill) => (
-                    <span key={skill} className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                    <span key={skill} className="rounded-full bg-surface-muted px-3 py-1 text-xs font-semibold text-fg-secondary">
                       {skill}
                     </span>
                   ))}
@@ -258,7 +258,7 @@ export default function SalariesPage() {
                   <p className="mt-1 text-xl font-bold text-emerald-800">{role.marketEstimate}</p>
                   <p className="mt-2 text-xs leading-5 text-emerald-900">{role.salaryNote}</p>
                 </div>
-                <p className="mt-4 text-sm text-gray-600">Typical level: {role.experienceLevel}</p>
+                <p className="mt-4 text-sm text-fg-secondary">Typical level: {role.experienceLevel}</p>
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                   <Link href={role.searchPath} className="flex-1">
                     <Button size="sm" className="w-full">Search jobs</Button>
@@ -290,7 +290,7 @@ export default function SalariesPage() {
           {searchData.stats && (
             <Card className="mb-6">
               <CardHeader>
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-fg">
                   Salary Overview for &quot;{searchTitle}&quot;
                   {searchCountry && ` in ${searchCountry}`}
                 </h3>
@@ -298,32 +298,32 @@ export default function SalariesPage() {
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="text-center">
-                    <p className="text-sm text-gray-500">Average</p>
-                    <p className="text-xl font-bold text-emerald-600">
+                    <p className="text-sm text-fg-muted">Average</p>
+                    <p className="text-xl font-bold text-primary-text">
                       {formatCurrency(searchData.stats.avg)}
                     </p>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm text-gray-500">Minimum</p>
-                    <p className="text-xl font-bold text-gray-900">
+                    <p className="text-sm text-fg-muted">Minimum</p>
+                    <p className="text-xl font-bold text-fg">
                       {formatCurrency(searchData.stats.min)}
                     </p>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm text-gray-500">Maximum</p>
-                    <p className="text-xl font-bold text-gray-900">
+                    <p className="text-sm text-fg-muted">Maximum</p>
+                    <p className="text-xl font-bold text-fg">
                       {formatCurrency(searchData.stats.max)}
                     </p>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm text-gray-500">Median</p>
-                    <p className="text-xl font-bold text-gray-900">
+                    <p className="text-sm text-fg-muted">Median</p>
+                    <p className="text-xl font-bold text-fg">
                       {formatCurrency(searchData.stats.median)}
                     </p>
                   </div>
                   <div className="text-center">
-                    <p className="text-sm text-gray-500">Reports</p>
-                    <p className="text-xl font-bold text-gray-900">
+                    <p className="text-sm text-fg-muted">Reports</p>
+                    <p className="text-xl font-bold text-fg">
                       {searchData.stats.count}
                     </p>
                   </div>
@@ -335,19 +335,19 @@ export default function SalariesPage() {
           {/* Individual Reports */}
           {searchData.reports.length > 0 ? (
             <div className="space-y-3">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Individual Reports</h3>
+              <h3 className="text-lg font-semibold text-fg mb-3">Individual Reports</h3>
               {searchData.reports.map((report) => (
                 <Card key={report.id}>
                   <CardContent className="p-4">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                       <div>
-                        <p className="font-medium text-gray-900">{report.jobTitle}</p>
-                        <p className="text-sm text-gray-500">
+                        <p className="font-medium text-fg">{report.jobTitle}</p>
+                        <p className="text-sm text-fg-muted">
                           {report.location} · {report.country}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-lg font-bold text-emerald-600">
+                        <span className="text-lg font-bold text-primary-text">
                           {new Intl.NumberFormat("en-US", {
                             style: "currency",
                             currency: report.salaryCurrency || "USD",
@@ -368,7 +368,7 @@ export default function SalariesPage() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-fg-muted">
               {t("salaries.noReportsFound")}
             </div>
           )}
@@ -378,8 +378,8 @@ export default function SalariesPage() {
       {/* Compare Across Countries */}
       <Card className="mb-10">
         <CardHeader>
-          <h2 className="text-xl font-bold text-gray-900">{t("salaries.compareCountries")}</h2>
-          <p className="text-sm text-gray-500">
+          <h2 className="text-xl font-bold text-fg">{t("salaries.compareCountries")}</h2>
+          <p className="text-sm text-fg-muted">
             Select a job title to see average salaries across different countries
           </p>
         </CardHeader>
@@ -431,12 +431,12 @@ export default function SalariesPage() {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-white p-4 rounded-xl shadow-xl border border-gray-100">
-                            <p className="font-bold text-gray-900 mb-1">{data.country}</p>
-                            <p className="text-emerald-600 font-bold text-lg">
+                          <div className="bg-surface p-4 rounded-xl shadow-xl border border-line">
+                            <p className="font-bold text-fg mb-1">{data.country}</p>
+                            <p className="text-primary-text font-bold text-lg">
                               {formatCurrency(data.avgSalary)}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">Based on {data.count} reports</p>
+                            <p className="text-xs text-fg-muted mt-1">Based on {data.count} reports</p>
                           </div>
                         );
                       }
@@ -459,7 +459,7 @@ export default function SalariesPage() {
           )}
 
           {compareData && compareData.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-fg-muted">
               {t("salaries.noCompareData")}
             </div>
           )}
@@ -469,8 +469,8 @@ export default function SalariesPage() {
       {/* Salary Distribution by Level */}
       <Card className="mb-10">
         <CardHeader>
-          <h2 className="text-xl font-bold text-gray-900">{t("salaries.distributionByLevel")}</h2>
-          <p className="text-sm text-gray-500">
+          <h2 className="text-xl font-bold text-fg">{t("salaries.distributionByLevel")}</h2>
+          <p className="text-sm text-fg-muted">
             Real market benchmark bands for comparison. These are research references, not AfriTalent placement outcomes.
           </p>
         </CardHeader>
@@ -503,10 +503,10 @@ export default function SalariesPage() {
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
                       return (
-                        <div className="bg-white p-4 rounded-xl shadow-xl border border-gray-100 dark:bg-zinc-900 dark:border-zinc-800">
-                          <p className="font-bold text-gray-900 dark:text-gray-100 mb-1">{data.level}</p>
-                          <p className="text-emerald-600 font-bold">Avg: {formatCurrency(data.avg)}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Range: {formatCurrency(data.min)} - {formatCurrency(data.max)}</p>
+                        <div className="bg-surface p-4 rounded-xl shadow-xl border border-line dark:bg-zinc-900 dark:border-zinc-800">
+                          <p className="font-bold text-fg dark:text-gray-100 mb-1">{data.level}</p>
+                          <p className="text-primary-text font-bold">Avg: {formatCurrency(data.avg)}</p>
+                          <p className="text-xs text-fg-muted dark:text-gray-400 mt-1">Range: {formatCurrency(data.min)} - {formatCurrency(data.max)}</p>
                         </div>
                       );
                     }
@@ -523,8 +523,8 @@ export default function SalariesPage() {
       {/* Top Paying Roles */}
       <Card className="mb-10">
         <CardHeader>
-          <h2 className="text-xl font-bold text-gray-900">{t("salaries.topPayingRoles")}</h2>
-          <p className="text-sm text-gray-500">
+          <h2 className="text-xl font-bold text-fg">{t("salaries.topPayingRoles")}</h2>
+          <p className="text-sm text-fg-muted">
             Live community salary reports when available. No fallback reports are invented.
           </p>
         </CardHeader>
@@ -542,17 +542,17 @@ export default function SalariesPage() {
               {topPaying.slice(0, 10).map((job, index) => (
                 <div
                   key={job.jobTitle}
-                  className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 animate-in fade-in slide-in-from-bottom-4 duration-700"
+                  className="flex items-center justify-between py-3 border-b border-line last:border-0 animate-in fade-in slide-in-from-bottom-4 duration-700"
                   style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-8 h-8 flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-sm font-bold">
                       {index + 1}
                     </span>
-                    <span className="font-medium text-gray-900">{job.jobTitle}</span>
+                    <span className="font-medium text-fg">{job.jobTitle}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-bold text-emerald-600">
+                    <span className="font-bold text-primary-text">
                       {formatCurrency(job.avgSalary)}
                     </span>
                     <svg className="w-16 h-6 text-emerald-500 opacity-60 hidden sm:block" viewBox="0 0 50 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -566,8 +566,8 @@ export default function SalariesPage() {
           )}
 
           {!topPayingLoading && topPaying.length === 0 && !topPayingError && (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-gray-600">
-              <h3 className="text-lg font-semibold text-gray-900">{t("salaries.noVerifiedReports")}</h3>
+            <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken p-8 text-center text-fg-secondary">
+              <h3 className="text-lg font-semibold text-fg">{t("salaries.noVerifiedReports")}</h3>
               <p className="mx-auto mt-2 max-w-xl text-sm leading-6">
                 AfriTalent will show live top-paying roles after enough real salary submissions exist.
                 Until then, use the market guidance cards above as planning support, not verified platform data.
@@ -597,8 +597,8 @@ export default function SalariesPage() {
       {showSubmitForm && (
         <Card className="mb-10">
           <CardHeader>
-            <h2 className="text-xl font-bold text-gray-900">{t("salaries.submitSalary")}</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-xl font-bold text-fg">{t("salaries.submitSalary")}</h2>
+            <p className="text-sm text-fg-muted">
               All submissions are anonymous and help the community
             </p>
           </CardHeader>
@@ -632,12 +632,12 @@ export default function SalariesPage() {
                   required
                 />
                 <div className="w-full">
-                  <label htmlFor="submit-country" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="submit-country" className="block text-sm font-medium text-fg-secondary mb-1">
                     Country
                   </label>
                   <select
                     id="submit-country"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     value={formData.country}
                     onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                     required
@@ -658,12 +658,12 @@ export default function SalariesPage() {
                   required
                 />
                 <div className="w-full">
-                  <label htmlFor="submit-currency" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="submit-currency" className="block text-sm font-medium text-fg-secondary mb-1">
                     Currency
                   </label>
                   <select
                     id="submit-currency"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     value={formData.salaryCurrency}
                     onChange={(e) => setFormData({ ...formData, salaryCurrency: e.target.value })}
                   >
@@ -673,12 +673,12 @@ export default function SalariesPage() {
                   </select>
                 </div>
                 <div className="w-full">
-                  <label htmlFor="submit-period" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="submit-period" className="block text-sm font-medium text-fg-secondary mb-1">
                     Salary Period
                   </label>
                   <select
                     id="submit-period"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     value={formData.salaryPeriod}
                     onChange={(e) => setFormData({ ...formData, salaryPeriod: e.target.value })}
                   >
@@ -696,12 +696,12 @@ export default function SalariesPage() {
                   onChange={(e) => setFormData({ ...formData, yearsExperience: e.target.value })}
                 />
                 <div className="w-full">
-                  <label htmlFor="submit-employment" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="submit-employment" className="block text-sm font-medium text-fg-secondary mb-1">
                     Employment Type
                   </label>
                   <select
                     id="submit-employment"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     value={formData.employmentType}
                     onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
                   >

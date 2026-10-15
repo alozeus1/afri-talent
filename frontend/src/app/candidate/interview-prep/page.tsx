@@ -165,12 +165,12 @@ export default function InterviewPrepPage() {
   const currentQuestion = questions[currentIndex];
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8">
+    <div className="min-h-screen bg-surface-sunken px-4 py-8">
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">AI Interview Prep</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-2xl font-bold text-fg">AI Interview Prep</h1>
+            <p className="mt-1 text-sm text-fg-muted">
               Practice with role-specific questions, structured feedback, and starter interview insights.
             </p>
           </div>
@@ -194,7 +194,7 @@ export default function InterviewPrepPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="mb-2 block text-sm font-medium text-fg-secondary">
                   Choose a role track *
                 </label>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -209,11 +209,11 @@ export default function InterviewPrepPage() {
                       className={`rounded-lg border p-3 text-left transition-colors ${
                         role === track.role && !customRole
                           ? "border-blue-500 bg-blue-50 text-blue-900"
-                          : "border-gray-200 bg-white text-gray-700 hover:border-blue-300"
+                          : "border-line bg-surface text-fg-secondary hover:border-blue-300"
                       }`}
                     >
                       <span className="block text-sm font-semibold">{track.role}</span>
-                      <span className="mt-1 block text-xs text-gray-500">{track.focus}</span>
+                      <span className="mt-1 block text-xs text-fg-muted">{track.focus}</span>
                     </button>
                   ))}
                 </div>
@@ -221,14 +221,14 @@ export default function InterviewPrepPage() {
                   type="text"
                   value={customRole}
                   onChange={(e) => setCustomRole(e.target.value)}
-                  className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-3 w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Or enter a custom role"
                   aria-label="Custom interview role"
                 />
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="mb-2 block text-sm font-medium text-fg-secondary">
                   Difficulty
                 </label>
                 <div className="flex gap-3">
@@ -240,7 +240,7 @@ export default function InterviewPrepPage() {
                       className={`flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
                         difficulty === d.value
                           ? d.color
-                          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                          : "border-line bg-surface text-fg-secondary hover:border-line-strong"
                       }`}
                     >
                       {d.label}
@@ -266,7 +266,7 @@ export default function InterviewPrepPage() {
 
         {stage === "question" && currentQuestion && !loading && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between text-sm text-gray-500">
+            <div className="flex items-center justify-between text-sm text-fg-muted">
               <span>Question {currentIndex + 1} of {questions.length}</span>
               <div className="flex gap-2">
                 <Badge variant="default">{currentQuestion.category}</Badge>
@@ -286,7 +286,7 @@ export default function InterviewPrepPage() {
 
             <Card>
               <CardContent className="pt-6">
-                <p className="text-base font-medium leading-relaxed text-gray-900">
+                <p className="text-base font-medium leading-relaxed text-fg">
                   {currentQuestion.question}
                 </p>
                 {currentQuestion.expectedPoints.length > 0 && (
@@ -304,12 +304,12 @@ export default function InterviewPrepPage() {
 
             <Card>
               <CardContent className="space-y-3 pt-6">
-                <label className="block text-sm font-medium text-gray-700">Your Answer</label>
+                <label className="block text-sm font-medium text-fg-secondary">Your Answer</label>
                 <textarea
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
                   rows={7}
-                  className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full resize-none rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Use the STAR method: describe the Situation, your Task, Actions taken, and Results achieved..."
                 />
                 <Button onClick={handleSubmitAnswer} disabled={loading || !answer.trim()} className="w-full">
@@ -347,14 +347,14 @@ export default function InterviewPrepPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm leading-relaxed text-gray-700">{feedback.feedback}</p>
+                <p className="text-sm leading-relaxed text-fg-secondary">{feedback.feedback}</p>
 
                 {feedback.strengths.length > 0 && (
                   <div>
                     <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-green-700">
                       Strengths
                     </p>
-                    <ul className="list-inside list-disc space-y-0.5 text-sm text-gray-700">
+                    <ul className="list-inside list-disc space-y-0.5 text-sm text-fg-secondary">
                       {feedback.strengths.map((s) => (
                         <li key={s}>{s}</li>
                       ))}
@@ -366,7 +366,7 @@ export default function InterviewPrepPage() {
                   <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-orange-600">
                     Improvements
                   </p>
-                  <ul className="list-inside list-disc space-y-0.5 text-sm text-gray-700">
+                  <ul className="list-inside list-disc space-y-0.5 text-sm text-fg-secondary">
                     {feedback.improvements.map((s) => (
                       <li key={s}>{s}</li>
                     ))}
@@ -377,7 +377,7 @@ export default function InterviewPrepPage() {
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-700">
                     Suggested Answer Shape
                   </p>
-                  <p className="text-sm italic leading-relaxed text-gray-600">
+                  <p className="text-sm italic leading-relaxed text-fg-secondary">
                     {feedback.suggestedAnswer}
                   </p>
                 </div>
@@ -395,14 +395,14 @@ export default function InterviewPrepPage() {
             <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
               <div className="text-4xl">Done</div>
               <h2 className="text-xl font-semibold">Session Complete</h2>
-              <p className="max-w-sm text-sm text-gray-500">
+              <p className="max-w-sm text-sm text-fg-muted">
                 You completed a practice session for <strong>{targetRole}</strong>. Review your feedback and repeat the session with a harder difficulty when ready.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Button onClick={handleRestart}>Practice Again</Button>
                 <Button
                   onClick={() => router.push("/candidate/applications")}
-                  className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  className="border border-line-strong bg-surface text-fg-secondary hover:bg-surface-sunken"
                 >
                   View Applications
                 </Button>
@@ -417,9 +417,9 @@ export default function InterviewPrepPage() {
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             {INTERVIEW_INSIGHTS.slice(0, 8).map((insight) => (
-              <div key={insight.id} className="rounded-lg border border-gray-200 bg-white p-3">
-                <p className="text-sm font-semibold text-gray-900">{insight.title}</p>
-                <p className="mt-1 text-xs text-gray-600">{insight.summary}</p>
+              <div key={insight.id} className="rounded-lg border border-line bg-surface p-3">
+                <p className="text-sm font-semibold text-fg">{insight.title}</p>
+                <p className="mt-1 text-xs text-fg-secondary">{insight.summary}</p>
               </div>
             ))}
           </CardContent>

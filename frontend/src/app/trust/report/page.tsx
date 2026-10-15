@@ -96,8 +96,8 @@ function ReportAbusePageContent() {
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-red-700 mb-3">
           Safety Report
         </p>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Report scams, impersonation, or suspicious behavior</h1>
-        <p className="max-w-3xl text-lg text-gray-600">
+        <h1 className="text-4xl font-bold text-fg mb-4">Report scams, impersonation, or suspicious behavior</h1>
+        <p className="max-w-3xl text-lg text-fg-secondary">
           AfriTalent uses reports to trigger risk scoring, moderation review, and account holds when needed. Give us enough detail to investigate quickly.
         </p>
       </section>
@@ -118,8 +118,8 @@ function ReportAbusePageContent() {
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Submit a report</h2>
-            <p className="text-sm text-gray-600">
+            <h2 className="text-xl font-semibold text-fg">Submit a report</h2>
+            <p className="text-sm text-fg-secondary">
               Use one clear reason code. Include links, payment requests, off-platform contact requests, or identity concerns in the details.
             </p>
           </CardHeader>
@@ -142,14 +142,14 @@ function ReportAbusePageContent() {
               )}
 
               <div>
-                <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="reason" className="block text-sm font-medium text-fg-secondary mb-1">
                   Reason
                 </label>
                 <select
                   id="reason"
                   value={reason}
                   onChange={(event) => setReason(event.target.value as AbuseReportInput["reason"])}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   {reportReasons.map((value) => (
                     <option key={value} value={value}>
@@ -191,7 +191,7 @@ function ReportAbusePageContent() {
               />
 
               <div>
-                <label htmlFor="details" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="details" className="block text-sm font-medium text-fg-secondary mb-1">
                   What happened?
                 </label>
                 <textarea
@@ -200,7 +200,7 @@ function ReportAbusePageContent() {
                   onChange={(event) => setDetails(event.target.value)}
                   rows={8}
                   placeholder="Describe the suspicious behavior, payment request, impersonation claim, or scam pattern you saw."
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full rounded-lg border border-line-strong bg-surface px-4 py-3 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
@@ -214,20 +214,20 @@ function ReportAbusePageContent() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <h2 className="text-xl font-semibold text-gray-900">Current targets</h2>
+              <h2 className="text-xl font-semibold text-fg">Current targets</h2>
             </CardHeader>
             <CardContent className="space-y-3">
               {activeTargets.length ? (
                 activeTargets.map((target) => (
-                  <div key={`${target.label}-${target.value}`} className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+                  <div key={`${target.label}-${target.value}`} className="rounded-2xl border border-line bg-surface-sunken px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">
                       {target.label}
                     </p>
-                    <p className="mt-2 break-all text-sm font-medium text-gray-900">{target.value}</p>
+                    <p className="mt-2 break-all text-sm font-medium text-fg">{target.value}</p>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-fg-secondary">
                   No target IDs were prefilled. You can still submit a report if you provide at least one identifier above.
                 </p>
               )}
@@ -236,16 +236,16 @@ function ReportAbusePageContent() {
 
           <Card>
             <CardHeader>
-              <h2 className="text-xl font-semibold text-gray-900">What happens next</h2>
+              <h2 className="text-xl font-semibold text-fg">What happens next</h2>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm text-gray-600">
-              <p className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+            <CardContent className="space-y-3 text-sm text-fg-secondary">
+              <p className="rounded-2xl border border-line bg-surface-sunken px-4 py-3">
                 Moderators use your report together with account behavior, verification evidence, and other trust signals before taking action.
               </p>
-              <p className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="rounded-2xl border border-line bg-surface-sunken px-4 py-3">
                 Screenshots are useful, but IDs, links, timestamps, and the exact off-platform request usually help moderators act faster.
               </p>
-              <p className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="rounded-2xl border border-line bg-surface-sunken px-4 py-3">
                 We use reports as one signal among many. A badge is never removed or granted based on a single self-assertion alone.
               </p>
             </CardContent>
@@ -267,7 +267,7 @@ export default function ReportAbusePage() {
     <Suspense
       fallback={
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="h-48 animate-pulse rounded-3xl bg-gray-100 dark:bg-gray-800" />
+          <div className="h-48 animate-pulse rounded-3xl bg-surface-muted dark:bg-gray-800" />
         </div>
       }
     >

@@ -104,7 +104,7 @@ export default function CandidatePreferencesPage() {
       <div className="mx-auto max-w-3xl px-4 py-16">
         <Card>
           <CardContent className="p-8 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-fg-secondary">
               We could not load your retention settings right now.
             </p>
             <div className="mt-4">
@@ -122,11 +122,11 @@ export default function CandidatePreferencesPage() {
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <Link href="/candidate" className="text-sm font-medium text-emerald-600 hover:text-emerald-700">
+          <Link href="/candidate" className="text-sm font-medium text-primary-text hover:text-emerald-700">
             Back to dashboard
           </Link>
-          <h1 className="mt-2 text-3xl font-bold text-gray-900">Alerts and retention preferences</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="mt-2 text-3xl font-bold text-fg">Alerts and retention preferences</h1>
+          <p className="mt-2 text-fg-secondary">
             Control how AfriTalent keeps your search warm, trusted, and high-signal.
           </p>
         </div>
@@ -160,8 +160,8 @@ export default function CandidatePreferencesPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="border-amber-200 bg-amber-50/40">
           <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">This week&apos;s digest preview</h2>
-            <p className="text-sm text-gray-600">{summary.weeklyDigest.headline}</p>
+            <h2 className="text-xl font-semibold text-fg">This week&apos;s digest preview</h2>
+            <p className="text-sm text-fg-secondary">{summary.weeklyDigest.headline}</p>
           </CardHeader>
           <CardContent>
             <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -171,9 +171,9 @@ export default function CandidatePreferencesPage() {
                 ["Salary disclosed", summary.weeklyDigest.salaryTransparentCount],
                 ["Visa-friendly", summary.weeklyDigest.visaFriendlyCount],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-white p-3 shadow-sm">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
-                  <p className="mt-1 text-lg font-semibold text-gray-900">{value}</p>
+                <div key={label} className="rounded-xl bg-surface p-3 shadow-sm">
+                  <p className="text-xs uppercase tracking-wide text-fg-muted">{label}</p>
+                  <p className="mt-1 text-lg font-semibold text-fg">{value}</p>
                 </div>
               ))}
             </div>
@@ -182,7 +182,7 @@ export default function CandidatePreferencesPage() {
                 <div key={job.id} className="rounded-xl border border-white/70 bg-white/90 p-4 shadow-sm">
                   <Link
                     href={`/jobs/${job.slug}`}
-                    className="text-sm font-semibold text-gray-900 hover:text-emerald-600"
+                    className="text-sm font-semibold text-fg hover:text-primary-text"
                     onClick={() =>
                       candidateRetentionEvents.recommendationClicked({
                         source: "preferences_digest_preview",
@@ -192,10 +192,10 @@ export default function CandidatePreferencesPage() {
                   >
                     {job.title}
                   </Link>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-fg-muted">
                     {job.employer?.companyName} • {job.location}
                   </p>
-                  <p className="mt-2 text-xs text-gray-600">{job.rankingExplanation?.summary}</p>
+                  <p className="mt-2 text-xs text-fg-secondary">{job.rankingExplanation?.summary}</p>
                 </div>
               ))}
             </div>
@@ -207,9 +207,9 @@ export default function CandidatePreferencesPage() {
 
           <Card>
             <CardHeader>
-              <h2 className="text-lg font-semibold text-gray-900">Why these loops matter</h2>
+              <h2 className="text-lg font-semibold text-fg">Why these loops matter</h2>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm text-gray-600">
+            <CardContent className="space-y-2 text-sm text-fg-secondary">
               <p>Trusted jobs and verified employers are prioritized before anything reaches your digest.</p>
               <p>Freshness and fit shape the order of recommendations so alerts stay useful.</p>
               <p>Volume controls stop AfriTalent from turning every weak signal into a notification.</p>
