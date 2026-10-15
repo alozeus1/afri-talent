@@ -16,6 +16,8 @@ export default {
   "site.header.menu": "Menu",
   "site.header.openMenu": "Open menu",
   "site.header.closeMenu": "Close menu",
+  "site.header.accountMenu": "Account menu",
+  "site.header.moreMenu": "More links",
 
   "site.footer.brandTagline": "Africa to global",
   "site.footer.about": "A trust-first hiring platform helping global teams discover African talent with stronger credibility, better workflow, and more signal than a generic job board.",

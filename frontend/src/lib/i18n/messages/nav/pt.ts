@@ -16,4 +16,5 @@ export default {
   "nav.logout": "Sair",
   "nav.trust": "Confiança",
   "nav.blog": "Blog",
+  "nav.more": "Mais",
 } satisfies Record<keyof typeof en, string>;

@@ -14,6 +14,8 @@ export default {
   "site.header.menu": "القائمة",
   "site.header.openMenu": "فتح القائمة",
   "site.header.closeMenu": "إغلاق القائمة",
+  "site.header.accountMenu": "قائمة الحساب",
+  "site.header.moreMenu": "روابط إضافية",
 
   "site.footer.brandTagline": "من أفريقيا إلى العالم",
   "site.footer.about": "منصة توظيف قائمة على الثقة تساعد الفرق العالمية على اكتشاف المواهب الأفريقية بمصداقية أعلى وسير عمل أفضل وإشارات أوضح من أي موقع وظائف عام.",

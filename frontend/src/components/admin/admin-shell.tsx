@@ -1,11 +1,14 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
+import { FormEvent, ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { isSupportedLocale } from "@/lib/i18n/config";
 import { AdminMessageKey, useAdminT } from "@/lib/i18n/admin-messages";
+import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { initialsOf, useDropdown } from "@/components/layout/use-dropdown";
 import { muted, strong } from "./console-ui";
 import "./admin-console.css";
 
@@ -58,9 +61,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const t = useAdminT();
   const router = useRouter();
   const pathname = usePathname() ?? "/";
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const { prefix, strip } = useAdminPrefix();
   const current = strip(pathname);
+  const { open: accountOpen, toggle: toggleAccount, close: closeAccount, containerRef: accountRef } = useDropdown();
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "ADMIN")) {
@@ -70,7 +75,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   if (isLoading || !user || user.role !== "ADMIN") {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center" aria-busy="true">
+      <div className="flex min-h-screen items-center justify-center" aria-busy="true">
         <p className={`text-sm ${muted}`}>{isLoading ? t("common.loading") : t("common.signInRequired")}</p>
       </div>
     );
@@ -97,36 +102,136 @@ export function AdminShell({ children }: { children: ReactNode }) {
     );
   };
 
+  const onSearch = (event: FormEvent) => {
+    event.preventDefault();
+    const q = query.trim();
+    const target = `${prefix}/admin/users${q ? `?search=${encodeURIComponent(q)}` : ""}`;
+    // The People page reads its filters on mount, so reload it when already there.
+    if (current === "/admin/users") window.location.assign(target);
+    else router.push(target);
+  };
+
+  const onSignOut = async () => {
+    closeAccount();
+    await logout();
+  };
+
+  const menuItem =
+    "flex min-h-10 w-full items-center whitespace-nowrap rounded-lg px-3 py-2 text-start text-sm text-fg-secondary transition-colors hover:bg-surface-muted hover:text-fg focus:outline-none focus-visible:bg-surface-muted focus-visible:text-fg";
+
   return (
-    <div className="admin-console mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 lg:flex-row lg:px-6 lg:py-8">
-      <aside className="lg:w-60 lg:shrink-0">
-        <div className="lg:sticky lg:top-24">
-          <div className="mb-4 hidden lg:block">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-text">{BRAND}</p>
-            <p className={`mt-1 text-lg font-semibold ${strong}`}>{t("shell.title")}</p>
-            <p className={`text-xs ${muted}`}>{t("shell.subtitle")}</p>
+    <div className="admin-console">
+      {/* Compact console top bar: replaces the public marketing header. */}
+      <div className="sticky top-0 z-50 border-b border-line bg-surface/90 backdrop-blur-md supports-[backdrop-filter]:bg-surface/80">
+        <div className="mx-auto flex h-14 w-full max-w-[1440px] items-center gap-3 px-4 lg:px-6">
+          <Link
+            href={`${prefix}/admin`}
+            aria-label={t("shell.home")}
+            className="flex shrink-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          >
+            <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 font-display text-sm font-bold text-white">A</span>
+            <span className={`hidden whitespace-nowrap font-display text-base font-bold sm:inline ${strong}`}>{BRAND}</span>
+            <span className="hidden whitespace-nowrap rounded-md border border-line px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-fg-secondary md:inline">
+              {t("shell.title")}
+            </span>
+          </Link>
+
+          <form role="search" onSubmit={onSearch} className="mx-auto min-w-0 flex-1 md:max-w-md">
+            <label htmlFor="admin-global-search" className="sr-only">{t("shell.searchLabel")}</label>
+            <div className="relative">
+              <svg aria-hidden className={`pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 ${muted}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z" />
+              </svg>
+              <input
+                id="admin-global-search"
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t("shell.searchPlaceholder")}
+                className="h-9 w-full min-w-0 rounded-lg border border-line bg-surface ps-9 pe-3 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              />
+            </div>
+          </form>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="hidden sm:block">
+              <LanguageSwitcher />
+            </div>
+            <ThemeToggle />
+            <div ref={accountRef} className="relative">
+              <button
+                type="button"
+                onClick={toggleAccount}
+                aria-haspopup="menu"
+                aria-expanded={accountOpen}
+                aria-controls="admin-account-menu"
+                aria-label={t("shell.accountMenu")}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+              >
+                {initialsOf(user.name)}
+              </button>
+              {accountOpen && (
+                <div
+                  id="admin-account-menu"
+                  role="menu"
+                  className="absolute end-0 top-full z-[60] mt-2 w-64 rounded-xl border border-line bg-surface p-1.5 shadow-xl ring-1 ring-black/5"
+                >
+                  <div className="border-b border-line px-3 pb-2 pt-1">
+                    <p className={`truncate text-sm font-semibold ${strong}`}>{user.name}</p>
+                    {user.email && <p className={`truncate text-xs ${muted}`}>{user.email}</p>}
+                  </div>
+                  <div className="py-1 sm:hidden">
+                    <div className="px-3 py-1">
+                      <LanguageSwitcher />
+                    </div>
+                  </div>
+                  <div className="py-1">
+                    <Link role="menuitem" href={prefix || "/"} onClick={closeAccount} className={menuItem}>
+                      {t("shell.viewSite")}
+                    </Link>
+                  </div>
+                  <div className="border-t border-line pt-1">
+                    <button type="button" role="menuitem" onClick={onSignOut} className={`${menuItem} font-medium text-red-700 dark:text-red-300`}>
+                      {t("shell.signOut")}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          {/* Mobile: horizontal scroller */}
-          <nav aria-label={t("shell.menu")} className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 lg:hidden">
-            {[...MANAGE, ...PLATFORM].map((item) => renderLink(item, true))}
-          </nav>
-          {/* Desktop: grouped sidebar */}
-          <nav aria-label={t("shell.menu")} className="hidden space-y-6 lg:block">
-            <div>
-              <p className={`mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider ${muted}`}>{t("nav.sectionManage")}</p>
-              <div className="space-y-0.5">{MANAGE.map((item) => renderLink(item))}</div>
-            </div>
-            <div>
-              <p className={`mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider ${muted}`}>{t("nav.sectionPlatform")}</p>
-              <div className="space-y-0.5">{PLATFORM.map((item) => renderLink(item))}</div>
-            </div>
-            <Link href={prefix || "/"} className={`block rounded-sm px-3 text-xs underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${muted}`}>
-              <span aria-hidden className="inline-block rtl:rotate-180">←</span> {t("shell.backToSite")}
-            </Link>
-          </nav>
         </div>
-      </aside>
-      <div className="min-w-0 flex-1">{children}</div>
+      </div>
+
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 lg:flex-row lg:px-6 lg:py-8">
+        <aside className="lg:w-60 lg:shrink-0">
+          <div className="lg:sticky lg:top-20">
+            <div className="mb-4 hidden lg:block">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-text">{BRAND}</p>
+              <p className={`mt-1 text-lg font-semibold ${strong}`}>{t("shell.title")}</p>
+              <p className={`text-xs ${muted}`}>{t("shell.subtitle")}</p>
+            </div>
+            {/* Mobile: horizontal scroller */}
+            <nav aria-label={t("shell.menu")} className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 lg:hidden">
+              {[...MANAGE, ...PLATFORM].map((item) => renderLink(item, true))}
+            </nav>
+            {/* Desktop: grouped sidebar */}
+            <nav aria-label={t("shell.menu")} className="hidden space-y-6 lg:block">
+              <div>
+                <p className={`mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider ${muted}`}>{t("nav.sectionManage")}</p>
+                <div className="space-y-0.5">{MANAGE.map((item) => renderLink(item))}</div>
+              </div>
+              <div>
+                <p className={`mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider ${muted}`}>{t("nav.sectionPlatform")}</p>
+                <div className="space-y-0.5">{PLATFORM.map((item) => renderLink(item))}</div>
+              </div>
+              <Link href={prefix || "/"} className={`block rounded-sm px-3 text-xs underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${muted}`}>
+                <span aria-hidden className="inline-block rtl:rotate-180">←</span> {t("shell.backToSite")}
+              </Link>
+            </nav>
+          </div>
+        </aside>
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
     </div>
   );
 }

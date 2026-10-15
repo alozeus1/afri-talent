@@ -17,4 +17,5 @@ export default {
   "nav.logout": "Logout",
   "nav.trust": "Trust",
   "nav.blog": "Blog",
+  "nav.more": "More",
 } satisfies Record<string, string>;

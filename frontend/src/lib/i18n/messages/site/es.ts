@@ -14,6 +14,8 @@ export default {
   "site.header.menu": "Menú",
   "site.header.openMenu": "Abrir menú",
   "site.header.closeMenu": "Cerrar menú",
+  "site.header.accountMenu": "Menú de la cuenta",
+  "site.header.moreMenu": "Más enlaces",
 
   "site.footer.brandTagline": "De África al mundo",
   "site.footer.about": "Una plataforma de contratación basada en la confianza que ayuda a equipos de todo el mundo a descubrir talento africano con más credibilidad, mejores procesos y más señal que un portal de empleo genérico.",

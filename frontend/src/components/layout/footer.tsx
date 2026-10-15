@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { isAdminPath } from "@/components/layout/use-dropdown";
 import { FREE_MODE } from "@/lib/free-mode";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 import { usePublicT } from "@/lib/i18n/public-messages";
@@ -32,7 +34,14 @@ const socialLinks = [
   },
 ];
 
+/** Marketing footer. The admin console is a dedicated app shell and omits it. */
 export function Footer() {
+  const pathname = usePathname();
+  if (isAdminPath(pathname)) return null;
+  return <SiteFooter />;
+}
+
+function SiteFooter() {
   const t = useT();
   const tp = usePublicT();
   const locale = useLocale();
