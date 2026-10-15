@@ -188,6 +188,7 @@ export default {
   "discover.card.saved": "محفوظة",
   "discover.card.salaryDisclosed": "الراتب معلن",
   "discover.card.directAts": "تقديم مباشر عبر ATS",
+  "discover.card.via": "عبر {source}",
   "discover.card.visa": "رعاية التأشيرة",
   "discover.card.relocation": "دعم الانتقال",
   "discover.card.verifiedPath": "مسار تقديم موثّق",

@@ -131,6 +131,7 @@ router.get("/", async (req, res) => {
         },
         include: {
           trustProfile: true,
+          user: { select: { deletedAt: true } },
           _count: { select: { jobs: { where: { status: "PUBLISHED" } } } },
         },
         orderBy: { companyName: "asc" },
@@ -169,7 +170,9 @@ router.get("/", async (req, res) => {
       jobCount: 0,
     }));
 
-    const normalizedEmployers = employers.map((employer) => ({
+    // Erased (soft-deleted) accounts are no longer live employers. They stay in
+    // employerIds above so their review-only shadow company is hidden too.
+    const normalizedEmployers = employers.filter((employer) => !employer.user?.deletedAt).map((employer) => ({
       id: employer.id,
       companyName: employer.companyName,
       industry: null,

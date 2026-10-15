@@ -18,6 +18,9 @@ const jobTitle = `Senior Backend Engineer ${stamp}`;
 const candidateName = `Ada Candidate ${stamp}`;
 // Unique per run: a domain already used by another employer is held for review.
 const companyDomain = `acme${stamp}.com`;
+// Reserved "e2e-" prefix: global-teardown.ts purges these accounts and their jobs.
+const employerEmail = `e2e-hr@${companyDomain}`;
+const candidateEmail = `e2e-cand${stamp}@example.com`;
 const PAYWALL = /upgrade to|subscribe now|checkout|payment required|choose a plan|start free trial|unlock with/i;
 
 test.describe.configure({ mode: "serial" });
@@ -93,7 +96,7 @@ test("pricing page says free for everyone, no paywall", async ({ page }) => {
 });
 
 test("employer registers, verifies company domain and posts a job (no payment prompt)", async () => {
-  await register(employer, { role: "employer", name: "Grace Employer", email: `hr@${companyDomain}` });
+  await register(employer, { role: "employer", name: "Grace Employer", email: employerEmail });
   await expectNoPaywall(employer);
 
   await employer.goto("/en/employer/onboarding");
@@ -121,7 +124,7 @@ test("employer registers, verifies company domain and posts a job (no payment pr
 });
 
 test("candidate registers, verifies email and completes profile", async () => {
-  await register(candidate, { role: "candidate", name: candidateName, email: `cand${stamp}@example.com` });
+  await register(candidate, { role: "candidate", name: candidateName, email: candidateEmail });
   await expect(candidate.locator("body")).toContainText("Verify your email");
   await candidate.waitForTimeout(1000);
   await candidate.goto(latestVerifyLink());

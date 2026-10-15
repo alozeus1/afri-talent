@@ -9,6 +9,8 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e/local-docker",
+  // Purges the run's "e2e-" accounts and their jobs (E2E_KEEP_DATA=1 keeps them).
+  globalTeardown: "./e2e/local-docker/global-teardown.ts",
   timeout: 90_000,
   expect: { timeout: 15_000 },
   retries: 0,

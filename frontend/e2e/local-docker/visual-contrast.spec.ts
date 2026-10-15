@@ -102,7 +102,7 @@ test.beforeAll(async ({ browser }, testInfo) => {
     await page.goto("/en/register");
     await page.waitForTimeout(3500); // bot shield rejects instant submissions
     await page.getByLabel("Full Name").fill("Contrast Check");
-    await page.getByLabel("Email").fill(`contrast-${Date.now()}@example.com`);
+    await page.getByLabel("Email").fill(`e2e-contrast-${Date.now()}@example.com`);
     await page.getByLabel("Password").fill("Password123!x");
     await page.getByRole("button", { name: "Create Account" }).click();
   }

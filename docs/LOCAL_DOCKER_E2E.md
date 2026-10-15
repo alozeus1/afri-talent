@@ -97,7 +97,18 @@ APP_BASE_URL=http://localhost:3000 API_BASE_URL=http://localhost:4000 \
   npx playwright test -c playwright.local-docker.config.ts
 ```
 
-Each run creates new uniquely named accounts and a job; it does not need a reset.
+Each run creates new uniquely named accounts (reserved `e2e-` email prefix) and a
+job. The suite's global teardown (`e2e/local-docker/global-teardown.ts`) then runs
+`backend/scripts/purge-e2e-data.ts --apply`, which removes those jobs from listings
+and anonymizes + soft-deletes the accounts. Set `E2E_KEEP_DATA=1` to keep them, and
+`DB_HOST_PORT` / `E2E_DATABASE_URL` if the database is not on 127.0.0.1:55432.
+To clean up by hand (dry run without `--apply`):
+
+```bash
+cd backend
+# LOCAL_DATABASE_URL: the compose database (x-backend-database-url in docker-compose.yml) with host 127.0.0.1:$DB_HOST_PORT
+DATABASE_URL="$LOCAL_DATABASE_URL" npx tsx scripts/purge-e2e-data.ts --apply
+```
 
 ## Reset / re-seed
 
@@ -113,8 +124,11 @@ docker compose run --rm -e SEED_FORCE=1 seed
 - **Employer posting needs trust verification**: company-domain email + matching
   website. A domain already used by another employer account is held for review,
   so use a different domain per test employer.
-- Job aggregator off (`DISABLE_SCHEDULER=1`): only seeded and locally posted jobs
-  appear. Set `DISABLE_SCHEDULER=0` in `.env` to crawl public job boards.
+- Job aggregator scheduler off (`DISABLE_SCHEDULER=1`). Run one crawl on demand
+  with `POST /api/aggregator/sync` as admin, or from the host:
+  `cd backend && DATABASE_URL="$LOCAL_DATABASE_URL" MOCK_AI=1 npx tsx -e 'import("./src/lib/prisma.ts").then(async ({prisma}) => { const {runIngestion} = await import("./src/lib/jobs/aggregator/engine/pipeline.ts"); const r = await runIngestion({prisma, trigger: "manual", ignoreMinInterval: true}); console.log(r.totals); await prisma.$disconnect(); })'`.
+  `npx tsx scripts/aggregator-dry-run.ts` shows per-feed counts without writing.
+  Set `DISABLE_SCHEDULER=0` in `.env` to crawl on the normal schedule.
 - Auto-apply and phase-4 bots are disabled (`AUTO_APPLY_ENABLED=0`,
   `PHASE4_BOTS_ENABLED=0`).
 

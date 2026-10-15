@@ -191,6 +191,7 @@ export default {
   "discover.card.saved": "Saved",
   "discover.card.salaryDisclosed": "Salary disclosed",
   "discover.card.directAts": "Direct ATS apply",
+  "discover.card.via": "via {source}",
   "discover.card.visa": "Visa sponsored",
   "discover.card.relocation": "Relocation support",
   "discover.card.verifiedPath": "Verified application path",

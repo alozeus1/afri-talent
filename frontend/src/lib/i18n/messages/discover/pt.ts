@@ -188,6 +188,7 @@ export default {
   "discover.card.saved": "Salva",
   "discover.card.salaryDisclosed": "Salário informado",
   "discover.card.directAts": "Candidatura direta via ATS",
+  "discover.card.via": "via {source}",
   "discover.card.visa": "Visto patrocinado",
   "discover.card.relocation": "Apoio à mudança",
   "discover.card.verifiedPath": "Caminho de candidatura verificado",

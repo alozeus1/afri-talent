@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { africaPill } from "@/lib/job-trust-labels";
+import { jobSourceDisplayName } from "@/lib/job-source";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { formatSalaryRange } from "@/lib/salary";
 import { jobDiscoveryEvents } from "@/lib/analytics";
@@ -111,6 +112,7 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
   const freshnessLabel = job.discovery?.freshnessLabel?.toLowerCase() ?? null;
   const discoverySummary = job.rankingExplanation?.summary || job.trust?.guidance;
   const companyName = job.employer?.companyName || job.sourceName || null;
+  const sourceName = jobSourceDisplayName(job);
   const { trust: trustBadges, caution: cautionBadge } = selectCardBadges(job);
   const cardBadges = cautionBadge ? [...trustBadges, cautionBadge] : trustBadges;
 
@@ -172,6 +174,11 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
               </h3>
               {companyName && (
                 <p className="font-medium text-primary-text">{companyName}</p>
+              )}
+              {sourceName && (
+                <p data-testid="job-source-badge" className="mt-0.5 text-xs font-medium text-fg-muted">
+                  {tp("discover.card.via", { source: sourceName })}
+                </p>
               )}
               {cardBadges.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">

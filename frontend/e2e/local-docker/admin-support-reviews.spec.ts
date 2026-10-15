@@ -19,10 +19,11 @@ const API = process.env.API_BASE_URL ?? "http://localhost:4000";
 const SEEDED_PASSWORD = "Password123!";
 const PASSWORD = "Password123!x";
 const stamp = Date.now();
-const candidateEmail = `admin-e2e-cand${stamp}@example.com`;
+// Reserved "e2e-" prefix: global-teardown.ts purges these accounts afterwards.
+const candidateEmail = `e2e-admin-cand${stamp}@example.com`;
 const candidateName = `Kofi Reviewer ${stamp}`;
 const companyDomain = `adm${stamp}.com`;
-const employerEmail = `hr@${companyDomain}`;
+const employerEmail = `e2e-hr@${companyDomain}`;
 const companyName = `Admin E2E Co ${stamp}`;
 
 test.describe.configure({ mode: "serial" });
@@ -338,4 +339,20 @@ test("crawler metrics endpoints and Operations panel render", async () => {
   await expect(panel.getByRole("heading", { name: "Job crawler" })).toBeVisible();
   await expect(panel).toContainText("Feeds");
   await expect(panel.locator("[role=alert]")).toHaveCount(0);
+
+  // A real ingestion run has been recorded with per-feed metrics.
+  const latest = await api<{ run: { status: string; sources: Array<{ source: string; fetched: number }> } | null }>(
+    admin,
+    "GET",
+    "/api/aggregator/runs/latest",
+  );
+  expect(latest.status).toBe(200);
+  expect(latest.data.run, "an AggregatorRun row (run POST /api/aggregator/sync first)").toBeTruthy();
+  expect(latest.data.run!.sources.filter((s) => s.fetched > 0).length).toBeGreaterThanOrEqual(6);
+
+  // Crawled jobs reach the public board with their source attribution.
+  await admin.goto("/en/jobs");
+  const source = admin.getByTestId("job-source-badge").first();
+  await expect(source).toBeVisible();
+  await expect(source).toHaveText(/^via \S/);
 });
