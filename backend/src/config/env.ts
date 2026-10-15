@@ -57,8 +57,12 @@ export function validateRuntimeEnv(): void {
     // callback rejects everything (fail closed). Fail the deploy instead of
     // shipping an unauthenticated approval path.
     // Same for the support-ticket hand-off: never ship unsigned events.
-    if (process.env.N8N_SUPPORT_WEBHOOK_URL?.trim()) {
-      requireEnv("N8N_SUPPORT_HMAC_SECRET");
+    if (
+      process.env.N8N_SUPPORT_WEBHOOK_URL?.trim() &&
+      !process.env.N8N_SUPPORT_HMAC_SECRET?.trim() &&
+      !process.env.N8N_WEBHOOK_SECRET?.trim()
+    ) {
+      throw new Error("N8N_WEBHOOK_SECRET or N8N_SUPPORT_HMAC_SECRET must be set");
     }
     if (process.env.N8N_APPROVAL_WEBHOOK_URL?.trim()) {
       requireEnv("N8N_APPROVAL_HMAC_SECRET");

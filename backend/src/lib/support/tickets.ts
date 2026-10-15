@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { randomBytes } from "node:crypto";
+import jwt from "jsonwebtoken";
 import type { SupportTicket } from "@prisma/client";
 import logger from "../logger.js";
 import { sendEmail } from "../email.js";
@@ -142,24 +143,58 @@ export async function sendTicketReplyEmail(
 
 export type SupportWebhookEvent = "support.ticket_created" | "support.ticket_updated" | "support.ticket_replied";
 
+type WebhookConfig = { url: string; hmacSecret: string | null; jwtSecret: string | null };
+
 /** Read at call time so tests and secret rotation behave. */
-function readWebhookConfig(): { url: string; secret: string } | null {
+function readWebhookConfig(): WebhookConfig | null {
   const url = process.env.N8N_SUPPORT_WEBHOOK_URL?.trim();
   if (!url) return null;
-  const secret = process.env.N8N_SUPPORT_HMAC_SECRET?.trim();
-  if (!secret) {
-    logger.warn("[support] N8N_SUPPORT_WEBHOOK_URL set without N8N_SUPPORT_HMAC_SECRET — webhook disabled");
+  const hmacSecret = process.env.N8N_SUPPORT_HMAC_SECRET?.trim() || null;
+  const jwtSecret = process.env.N8N_WEBHOOK_SECRET?.trim() || null;
+  if (!hmacSecret && !jwtSecret) {
+    logger.warn(
+      "[support] N8N_SUPPORT_WEBHOOK_URL set without N8N_WEBHOOK_SECRET or N8N_SUPPORT_HMAC_SECRET — webhook disabled",
+    );
     return null;
   }
-  return { url, secret };
+  return { url, hmacSecret, jwtSecret };
+}
+
+/**
+ * Flat fields expected by the n8n "Route AfriTalent support and review events"
+ * workflow (docs/n8n/README.md). Only ticket creation has an n8n contract.
+ */
+function n8nContractFields(event: SupportWebhookEvent, data: Record<string, unknown>): Record<string, unknown> {
+  if (event !== "support.ticket_created") return { kind: event.replace("support.", "support_") };
+  return {
+    kind: "support_ticket_created",
+    ticketId: data.id,
+    reference: data.reference,
+    category: typeof data.topic === "string" ? data.topic.toLowerCase() : undefined,
+    subject: data.subject,
+    message: data.messagePreview,
+    name: data.name,
+    email: data.email,
+    locale: data.locale,
+    role: data.userRole ?? null,
+    adminUrl: data.adminUrl,
+    // The backend sends its own localized acknowledgement when SES is configured.
+    ackRequested: !process.env.SES_FROM_EMAIL?.trim(),
+    createdAt: data.createdAt,
+  };
 }
 
 /**
  * POST a signed event to the optional n8n support workflow.
  *
- * Headers: x-afritalent-event, x-afritalent-timestamp (unix seconds) and
- * x-afritalent-signature = hex HMAC-SHA256(secret, `${timestamp}.${rawBody}`).
- * The receiver must recompute over the raw body and reject stale timestamps.
+ * Auth (at least one is configured, never unsigned):
+ * - N8N_WEBHOOK_SECRET: `Authorization: Bearer <HS256 JWT, 60s expiry>`, checked
+ *   by the n8n Webhook node's JWT Auth credential. In JWT-only mode only
+ *   support.ticket_created is sent (the n8n workflow 400s other kinds).
+ * - N8N_SUPPORT_HMAC_SECRET: x-afritalent-event, x-afritalent-timestamp (unix
+ *   seconds) and x-afritalent-signature = hex HMAC-SHA256(secret,
+ *   `${timestamp}.${rawBody}`). The receiver must recompute over the raw body
+ *   and reject stale timestamps.
  * Never throws; 5s timeout.
  */
 export async function emitSupportWebhook(
@@ -168,22 +203,30 @@ export async function emitSupportWebhook(
 ): Promise<void> {
   const cfg = readWebhookConfig();
   if (!cfg) return;
+  if (!cfg.hmacSecret && event !== "support.ticket_created") return;
 
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  const rawBody = JSON.stringify({ event, emittedAt: new Date().toISOString(), data });
-  const signature = signBody(`${timestamp}.${rawBody}`, cfg.secret);
+  const rawBody = JSON.stringify({ ...n8nContractFields(event, data), event, emittedAt: new Date().toISOString(), data });
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    "x-afritalent-event": event,
+    "x-afritalent-timestamp": timestamp,
+  };
+  if (cfg.hmacSecret) headers["x-afritalent-signature"] = signBody(`${timestamp}.${rawBody}`, cfg.hmacSecret);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
   try {
+    if (cfg.jwtSecret) {
+      const kind = event.replace("support.", "support_");
+      headers.authorization = `Bearer ${jwt.sign({ iss: "afritalent-backend", kind }, cfg.jwtSecret, {
+        algorithm: "HS256",
+        expiresIn: 60,
+      })}`;
+    }
     const res = await fetch(cfg.url, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-afritalent-event": event,
-        "x-afritalent-timestamp": timestamp,
-        "x-afritalent-signature": signature,
-      },
+      headers,
       body: rawBody,
       signal: controller.signal,
     });

@@ -1,3 +1,4 @@
+import jwt from "jsonwebtoken";
 /**
  * Customer support desk:
  *   - POST /api/support/tickets: validation, bot shield, guest + signed-in context,
@@ -312,6 +313,7 @@ describe("support helpers", () => {
     global.fetch = originalFetch;
     delete process.env.N8N_SUPPORT_WEBHOOK_URL;
     delete process.env.N8N_SUPPORT_HMAC_SECRET;
+    delete process.env.N8N_WEBHOOK_SECRET;
   });
 
   it("generates unambiguous references and escapes HTML", () => {
@@ -352,5 +354,40 @@ describe("support helpers", () => {
 
     fetchMock.mockRejectedValueOnce(new Error("boom"));
     await expect(emitSupportWebhook("support.ticket_created", { id: "tkt_2" })).resolves.toBeUndefined();
+  });
+
+  it("sends a JWT bearer and the n8n contract fields when N8N_WEBHOOK_SECRET is set", async () => {
+    process.env.N8N_SUPPORT_WEBHOOK_URL = "https://n8n.example/webhook/afritalent-support-events";
+    process.env.N8N_WEBHOOK_SECRET = "jwt-secret";
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 202 });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await emitSupportWebhook("support.ticket_created", {
+      id: "tkt_9",
+      reference: "AT-ABCDEF",
+      email: "ada@example.com",
+      messagePreview: "Checkout fails",
+      topic: "BILLING",
+    });
+
+    const [, init] = fetchMock.mock.calls[0];
+    const token = String(init.headers.authorization).replace(/^Bearer /, "");
+    const claims = jwt.verify(token, "jwt-secret", { algorithms: ["HS256"] }) as jwt.JwtPayload;
+    expect(claims.iss).toBe("afritalent-backend");
+    expect(claims.kind).toBe("support_ticket_created");
+    expect(init.headers["x-afritalent-signature"]).toBeUndefined();
+    const body = JSON.parse(init.body);
+    expect(body).toMatchObject({
+      kind: "support_ticket_created",
+      ticketId: "tkt_9",
+      email: "ada@example.com",
+      message: "Checkout fails",
+      category: "billing",
+    });
+
+    // JWT-only mode: the n8n workflow has no contract for updates/replies.
+    fetchMock.mockClear();
+    await emitSupportWebhook("support.ticket_replied", { id: "tkt_9" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
