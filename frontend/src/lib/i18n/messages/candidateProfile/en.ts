@@ -417,4 +417,5 @@ export default {
   "tv.BOOTCAMP": "Bootcamp",
   "tv.TRAINING_INSTITUTE": "Training institute",
   "tv.SCHOLARSHIP_PARTNER": "Scholarship partner",
+  "trust.skills.skillPlaceholder": "e.g. TypeScript",
 } satisfies Record<string, string>;

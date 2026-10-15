@@ -77,8 +77,6 @@ export default function CandidateApplicationsPage() {
   }, [user, isLoading, router, locale]);
 
   const load = useCallback(() => {
-    setLoading(true);
-    setError(null);
     Promise.all([
       applications.my(),
       candidateAnalytics.applicationFunnel(),
@@ -157,7 +155,16 @@ export default function CandidateApplicationsPage() {
       />
 
       {error ? (
-        <CandidateLoadError className="mb-6" error={error} subject={t("ui.subject.applications")} onRetry={load} />
+        <CandidateLoadError
+          className="mb-6"
+          error={error}
+          subject={t("ui.subject.applications")}
+          onRetry={() => {
+            setLoading(true);
+            setError(null);
+            load();
+          }}
+        />
       ) : null}
 
       {loading ? (

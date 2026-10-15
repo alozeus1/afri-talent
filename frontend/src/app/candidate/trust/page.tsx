@@ -26,6 +26,7 @@ import {
   CandidateBackLink,
   CandidateLoadError,
   CandidateSpinner,
+  URL_PLACEHOLDERS,
   candidateFieldClass,
   candidateLabelClass,
 } from "@/components/candidate/candidate-ui";
@@ -535,7 +536,7 @@ export default function CandidateTrustPage() {
                   label={t("trust.skills.skill")}
                   value={skillName}
                   onChange={(event) => setSkillName(event.target.value)}
-                  placeholder="TypeScript"
+                  placeholder={t("trust.skills.skillPlaceholder")}
                 />
                 <div>
                   <label htmlFor="skillMethod" className={candidateLabelClass}>
@@ -608,7 +609,7 @@ export default function CandidateTrustPage() {
                     label={skillMethod === "CERTIFICATE" ? t("trust.skills.credentialUrl") : t("trust.skills.portfolioUrl")}
                     value={skillEvidenceUrl}
                     onChange={(event) => setSkillEvidenceUrl(event.target.value)}
-                    placeholder="https://"
+                    placeholder={URL_PLACEHOLDERS.generic}
                   />
                 </>
               )}

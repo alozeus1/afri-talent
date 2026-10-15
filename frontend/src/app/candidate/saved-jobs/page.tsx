@@ -33,8 +33,6 @@ export default function SavedJobsPage() {
   const href = (path: string) => localizePath(path, locale);
 
   const load = useCallback(() => {
-    setLoading(true);
-    setError(null);
     savedJobs
       .list()
       .then((data) => setItems(data.saved))
@@ -81,7 +79,15 @@ export default function SavedJobsPage() {
       {loading ? (
         <JobListSkeleton count={3} />
       ) : error ? (
-        <CandidateLoadError error={error} subject={t("ui.subject.savedJobs")} onRetry={load} />
+        <CandidateLoadError
+          error={error}
+          subject={t("ui.subject.savedJobs")}
+          onRetry={() => {
+            setLoading(true);
+            setError(null);
+            load();
+          }}
+        />
       ) : items.length === 0 ? (
         <EmptyState
           icon={<Bookmark className="h-6 w-6" />}

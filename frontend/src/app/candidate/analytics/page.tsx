@@ -56,8 +56,6 @@ export default function CandidateAnalyticsPage() {
   }, [user, isLoading, router, locale]);
 
   const load = useCallback(() => {
-    setLoading(true);
-    setError(null);
     Promise.all([
       candidateAnalytics.profileViews(),
       candidateAnalytics.applicationFunnel(),
@@ -126,7 +124,16 @@ export default function CandidateAnalyticsPage() {
       <CandidatePageHeader title={t("an.title")} description={t("an.subtitle")} />
 
       {error ? (
-        <CandidateLoadError className="mb-6" error={error} subject={t("ui.subject.analytics")} onRetry={load} />
+        <CandidateLoadError
+          className="mb-6"
+          error={error}
+          subject={t("ui.subject.analytics")}
+          onRetry={() => {
+            setLoading(true);
+            setError(null);
+            load();
+          }}
+        />
       ) : null}
 
       {loading ? (

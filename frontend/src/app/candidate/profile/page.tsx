@@ -25,6 +25,7 @@ import {
   CandidateSpinner,
   CandidateSwitch,
   CandidateTagInput,
+  URL_PLACEHOLDERS,
   candidateFieldClass,
   candidateLabelClass,
   useCountryName,
@@ -598,7 +599,7 @@ export default function CandidateProfilePage() {
                 type="url"
                 value={item.credentialUrl || ""}
                 onChange={(event) => updateCertification(index, "credentialUrl", event.target.value)}
-                placeholder="https://"
+                placeholder={URL_PLACEHOLDERS.generic}
               />
             </RepeatableItem>
           ))
@@ -612,7 +613,7 @@ export default function CandidateProfilePage() {
           type="url"
           value={linkedinUrl}
           onChange={(e) => setLinkedinUrl(e.target.value)}
-          placeholder="https://linkedin.com/in/…"
+          placeholder={URL_PLACEHOLDERS.linkedin}
         />
         <Input
           id="githubUrl"
@@ -620,7 +621,7 @@ export default function CandidateProfilePage() {
           type="url"
           value={githubUrl}
           onChange={(e) => setGithubUrl(e.target.value)}
-          placeholder="https://github.com/…"
+          placeholder={URL_PLACEHOLDERS.github}
         />
         <Input
           id="portfolioUrl"
@@ -628,7 +629,7 @@ export default function CandidateProfilePage() {
           type="url"
           value={portfolioUrl}
           onChange={(e) => setPortfolioUrl(e.target.value)}
-          placeholder="https://"
+          placeholder={URL_PLACEHOLDERS.generic}
         />
       </SectionCard>
 

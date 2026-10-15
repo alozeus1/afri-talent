@@ -416,4 +416,5 @@ export default {
   "tv.BOOTCAMP": "Bootcamp",
   "tv.TRAINING_INSTITUTE": "Institut de formation",
   "tv.SCHOLARSHIP_PARTNER": "Partenaire de bourses",
+  "trust.skills.skillPlaceholder": "ex. TypeScript",
 } satisfies Record<keyof typeof en, string>;

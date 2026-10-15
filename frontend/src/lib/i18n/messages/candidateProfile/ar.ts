@@ -416,4 +416,5 @@ export default {
   "tv.BOOTCAMP": "معسكر تدريبي",
   "tv.TRAINING_INSTITUTE": "معهد تدريب",
   "tv.SCHOLARSHIP_PARTNER": "شريك منح",
+  "trust.skills.skillPlaceholder": "مثال: TypeScript",
 } satisfies Record<keyof typeof en, string>;

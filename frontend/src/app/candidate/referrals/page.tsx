@@ -16,6 +16,7 @@ import {
   CandidatePageHeader,
   CandidateSpinner,
   CandidateStat,
+  URL_PLACEHOLDERS,
   candidateFieldClass,
   candidateLabelClass,
 } from "@/components/candidate/candidate-ui";
@@ -176,7 +177,7 @@ export default function ReferralsPage() {
                 id="referee-job-link"
                 label={t("ref.form.jobLink")}
                 type="url"
-                placeholder="https://"
+                placeholder={URL_PLACEHOLDERS.generic}
                 value={jobLink}
                 onChange={(e) => setJobLink(e.target.value)}
               />

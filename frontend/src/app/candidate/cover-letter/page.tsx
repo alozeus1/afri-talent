@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Check, Copy, Info } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { skills } from "@/lib/api";
 import { searchJobs } from "@/lib/api/orchestratorClient";
@@ -9,28 +10,41 @@ import type { SearchJobResult } from "@/lib/api/orchestratorTypes";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PlanBadge } from "@/components/ui/plan-badge";
 import { LoadingState } from "@/components/ui/loading-state";
-import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
 import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
 import { buildFallbackCoverLetter } from "@/lib/early-tester-content";
+import { FREE_MODE } from "@/lib/free-mode";
+import {
+  CandidateBackLink,
+  CandidateErrorAlert,
+  CandidatePageHeader,
+  CandidateSpinner,
+  candidateFieldClass,
+  candidateLabelClass,
+  toCandidateFriendly,
+  type CandidateFriendlyError,
+} from "@/components/candidate/candidate-ui";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { enumLabel, useCandidateT, type CandidateMessageKey } from "@/lib/i18n/candidate-messages";
 
 type Tone = "professional" | "conversational" | "executive" | "confident" | "short" | "entry" | "senior";
 
-const TONES: { value: Tone; apiTone: "professional" | "conversational" | "executive"; label: string; description: string }[] = [
-  { value: "professional", apiTone: "professional", label: "Professional", description: "Formal and polished" },
-  { value: "conversational", apiTone: "conversational", label: "Warm and human", description: "Approachable and sincere" },
-  { value: "confident", apiTone: "professional", label: "Confident", description: "Direct without exaggeration" },
-  { value: "short", apiTone: "professional", label: "Short and direct", description: "Concise application note" },
-  { value: "entry", apiTone: "conversational", label: "Entry-level", description: "Growth-focused and honest" },
-  { value: "senior", apiTone: "executive", label: "Senior-level", description: "Strategic and experienced" },
-  { value: "executive", apiTone: "executive", label: "Executive", description: "Leadership-oriented" },
+const TONES: { value: Tone; apiTone: "professional" | "conversational" | "executive" }[] = [
+  { value: "professional", apiTone: "professional" },
+  { value: "conversational", apiTone: "conversational" },
+  { value: "confident", apiTone: "professional" },
+  { value: "short", apiTone: "professional" },
+  { value: "entry", apiTone: "conversational" },
+  { value: "senior", apiTone: "executive" },
+  { value: "executive", apiTone: "executive" },
 ];
 
 function CoverLetterPageContent() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const locale = useLocale();
+  const t = useCandidateT();
 
   const [jobId, setJobId] = useState("");
   const [selectedJob, setSelectedJob] = useState<SearchJobResult | null>(null);
@@ -42,20 +56,22 @@ function CoverLetterPageContent() {
   const [coverLetter, setCoverLetter] = useState<string | null>(null);
   const [source, setSource] = useState<"ai" | "template" | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<FriendlyError | null>(null);
+  const [error, setError] = useState<CandidateFriendlyError | null>(null);
   const [copied, setCopied] = useState(false);
   const [edited, setEdited] = useState(false);
 
   useEffect(() => {
+    if (!authLoading && !user) router.push(localizePath("/login", locale));
+  }, [authLoading, user, router, locale]);
+
+  useEffect(() => {
     const fromJobId = searchParams.get("jobId");
-    const title = searchParams.get("title");
-    const company = searchParams.get("company");
     if (fromJobId) {
       setJobId(fromJobId);
       setSelectedJob({
         id: fromJobId,
-        title: title || "Selected job",
-        company: company || "AfriTalent job",
+        title: searchParams.get("title") || "",
+        company: searchParams.get("company") || "",
         location: searchParams.get("location") || "",
         type: "",
         seniority: "",
@@ -80,42 +96,33 @@ function CoverLetterPageContent() {
     return () => clearTimeout(timer);
   }, [jobQuery]);
 
-  if (authLoading) return null;
-  if (!user) {
-    router.push("/login");
-    return null;
-  }
+  if (authLoading || !user) return <CandidateSpinner className="py-24" />;
 
   async function handleGenerate() {
     const effectiveJobId = selectedJob?.id || jobId.trim();
     if (!effectiveJobId) {
-      setError({
-        title: "Choose a job",
-        description: "Search and select a job first. If needed, use Advanced to paste a known job ID.",
-        tone: "info",
-      });
+      setError({ title: t("cl.chooseJob.title"), description: t("cl.chooseJob.body"), tone: "info" });
       return;
     }
     setLoading(true);
-      setError(null);
-      setCoverLetter(null);
-      setEdited(false);
-      try {
-        const selectedTone = TONES.find((item) => item.value === tone) ?? TONES[0];
+    setError(null);
+    setCoverLetter(null);
+    setEdited(false);
+    const selectedTone = TONES.find((item) => item.value === tone) ?? TONES[0];
+    try {
       const result = await skills.generateCoverLetter({ jobId: effectiveJobId, tone: selectedTone.apiTone });
       setCoverLetter(result.coverLetter);
       setSource(result.source);
     } catch (err) {
-      const friendly = toFriendlyError(err);
-      setError({
-        ...friendly,
-        description: `${friendly.description} A safe editable fallback template is shown below so you can continue drafting without inventing experience.`,
-      });
-      setCoverLetter(buildFallbackCoverLetter({
-        toneLabel: TONES.find((item) => item.value === tone)?.label ?? "Professional",
-        jobId: effectiveJobId,
-        candidateName: user?.name || user?.email,
-      }));
+      const friendly = toCandidateFriendly(err, t);
+      setError({ ...friendly, description: `${friendly.description} ${t("cl.fallbackNote")}` });
+      setCoverLetter(
+        buildFallbackCoverLetter({
+          toneLabel: t(`cl.tone.${tone}` as CandidateMessageKey),
+          jobId: effectiveJobId,
+          candidateName: user?.name || user?.email,
+        }),
+      );
       setSource("template");
     } finally {
       setLoading(false);
@@ -124,149 +131,142 @@ function CoverLetterPageContent() {
 
   async function handleCopy() {
     if (!coverLetter) return;
-    await navigator.clipboard.writeText(coverLetter);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(coverLetter);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
   }
 
   return (
-    <div className="min-h-screen bg-surface-sunken py-8 px-4">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-fg">AI Cover Letter Generator</h1>
-            <p className="text-sm text-fg-muted mt-1">
-              Generate an editable draft from your profile, resume, and a selected job without inventing experience.
-            </p>
-          </div>
-          <PlanBadge />
-        </div>
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:py-12">
+      <CandidateBackLink href={localizePath("/candidate", locale)}>{t("ai.backToDashboard")}</CandidateBackLink>
+      <CandidatePageHeader
+        title={t("cl.title")}
+        description={t("cl.subtitle")}
+        actions={<Badge variant={FREE_MODE ? "success" : "info"}>{FREE_MODE ? t("ui.includedFree") : t("ui.premium")}</Badge>}
+      />
 
-        {error && (
-          <div
-            role="alert"
-            aria-live="assertive"
-            data-testid="cover-letter-error"
-            className={`rounded-md border p-4 text-sm ${
-              error.tone === "error"
-                ? "bg-red-50 border-red-200 text-red-800"
-                : error.tone === "warning"
-                  ? "bg-amber-50 border-amber-200 text-amber-900"
-                  : "bg-blue-50 border-blue-200 text-blue-900"
-            }`}
-          >
-            <p className="font-medium">{error.title}</p>
-            <p className="mt-0.5">{error.description}</p>
-          </div>
-        )}
+      <div className="space-y-6">
+        {error && <CandidateErrorAlert error={error} testId="cover-letter-error" />}
 
         <Card>
           <CardHeader>
-            <h2 className="text-lg font-semibold">Job Details</h2>
+            <h2 className="text-lg font-semibold text-fg">{t("cl.jobDetails")}</h2>
           </CardHeader>
           <CardContent className="space-y-5">
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-              Use this as an application assistant, not an auto-submit tool. Review every claim before sending and replace placeholders if fallback mode is used.
+            <div className="flex gap-3 rounded-xl border border-info-line bg-info-soft p-4 text-sm text-fg-secondary">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-info" aria-hidden="true" />
+              <p>{t("cl.assistantNote")}</p>
             </div>
             <div>
-              <label htmlFor="cover-letter-job-search" className="block text-sm font-medium text-fg-secondary mb-1">
-                Select a job
+              <label htmlFor="cover-letter-job-search" className={candidateLabelClass}>
+                {t("cl.selectJob")}
               </label>
               <input
                 id="cover-letter-job-search"
-                type="text"
+                type="search"
                 value={jobQuery}
                 onChange={(e) => setJobQuery(e.target.value)}
-                className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Search by title, company, location, or keyword"
+                className={candidateFieldClass}
+                placeholder={t("cl.searchPlaceholder")}
+                autoComplete="off"
               />
-              {jobSearchLoading && <p className="mt-2 text-xs text-fg-muted">Searching jobs...</p>}
+              {jobSearchLoading && (
+                <p role="status" className="mt-2 text-xs text-fg-muted">
+                  {t("cl.searching")}
+                </p>
+              )}
               {jobResults.length > 0 && (
-                <div className="mt-3 space-y-2">
+                <ul className="mt-3 space-y-2">
                   {jobResults.map((job) => (
-                    <button
-                      key={job.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedJob(job);
-                        setJobId(job.id);
-                        setJobQuery("");
-                        setJobResults([]);
-                      }}
-                      className="w-full rounded-lg border border-line bg-surface p-3 text-left text-sm hover:border-emerald-300 hover:bg-emerald-50"
-                    >
-                      <span className="block font-semibold text-fg">{job.title}</span>
-                      <span className="mt-1 block text-xs text-fg-secondary">
-                        {job.company} • {job.location || "Location not listed"} • {job.type || "Role"}
-                      </span>
-                    </button>
+                    <li key={job.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedJob(job);
+                          setJobId(job.id);
+                          setJobQuery("");
+                          setJobResults([]);
+                        }}
+                        className="w-full rounded-xl border border-line bg-surface p-3 text-start text-sm transition hover:border-success-line hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                      >
+                        <span className="block font-semibold text-fg">{job.title}</span>
+                        <span className="mt-1 block text-xs text-fg-secondary">
+                          {[job.company, job.location || t("cl.noLocation"), job.type ? enumLabel(t, "jobType", job.type) : t("cl.role")].join(" · ")}
+                        </span>
+                      </button>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
               {selectedJob && (
-                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
-                  <p className="font-semibold">{selectedJob.title}</p>
-                  <p className="mt-1 text-xs">
-                    {selectedJob.company} • {selectedJob.location || "Location not listed"}
-                  </p>
+                <div className="mt-3 flex items-start gap-2 rounded-xl border border-success-line bg-success-soft p-3 text-sm">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+                  <div>
+                    <p className="font-semibold text-fg">{selectedJob.title || t("cl.selectedJob")}</p>
+                    <p className="mt-1 text-xs text-fg-secondary">
+                      {[selectedJob.company || t("cl.afritalentJob"), selectedJob.location || t("cl.noLocation")].join(" · ")}
+                    </p>
+                  </div>
                 </div>
               )}
               <button
                 type="button"
                 onClick={() => setShowAdvanced((value) => !value)}
-                className="mt-3 text-sm font-medium text-fg-secondary hover:text-fg"
+                aria-expanded={showAdvanced}
+                className="mt-3 text-sm font-medium text-fg-secondary underline-offset-2 hover:text-fg hover:underline"
               >
-                {showAdvanced ? "Hide advanced job ID" : "Advanced: paste job ID"}
+                {showAdvanced ? t("cl.advancedHide") : t("cl.advancedShow")}
               </button>
               {showAdvanced && (
                 <div className="mt-3">
-                  <label htmlFor="cover-letter-job-id" className="block text-sm font-medium text-fg-secondary mb-1">
-                    Manual Job ID
+                  <label htmlFor="cover-letter-job-id" className={candidateLabelClass}>
+                    {t("cl.manualId")}
                   </label>
                   <input
                     id="cover-letter-job-id"
                     type="text"
+                    dir="ltr"
                     value={jobId}
                     onChange={(e) => {
                       setJobId(e.target.value);
                       setSelectedJob(null);
                     }}
-                    className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Paste a known job UUID"
+                    className={candidateFieldClass}
+                    placeholder={t("cl.manualIdPlaceholder")}
                   />
                 </div>
               )}
             </div>
 
-            <div role="radiogroup" aria-label="Cover letter tone">
-              <p className="block text-sm font-medium text-fg-secondary mb-2">Tone</p>
+            <div role="radiogroup" aria-label={t("cl.toneLabel")}>
+              <p className="mb-2 block text-sm font-medium text-fg-secondary">{t("cl.tone")}</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {TONES.map((t) => (
+                {TONES.map((item) => (
                   <button
-                    key={t.value}
+                    key={item.value}
                     type="button"
                     role="radio"
-                    aria-checked={tone === t.value}
-                    onClick={() => setTone(t.value)}
-                    className={`rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
-                      tone === t.value
-                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                    aria-checked={tone === item.value}
+                    onClick={() => setTone(item.value)}
+                    className={`rounded-xl border px-4 py-3 text-start text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                      tone === item.value
+                        ? "border-primary bg-primary-soft text-primary-text"
                         : "border-line bg-surface text-fg-secondary hover:border-line-strong"
                     }`}
                   >
-                    <div className="font-medium">{t.label}</div>
-                    <div className="text-xs text-fg-muted mt-0.5">{t.description}</div>
+                    <div className="font-medium">{t(`cl.tone.${item.value}` as CandidateMessageKey)}</div>
+                    <div className="mt-0.5 text-xs text-fg-muted">{t(`cl.tone.${item.value}.desc` as CandidateMessageKey)}</div>
                   </button>
                 ))}
               </div>
             </div>
 
-            <Button
-              onClick={handleGenerate}
-              disabled={loading || !(selectedJob?.id || jobId.trim())}
-              className="w-full"
-            >
-              {loading ? "Generating..." : "Generate Cover Letter"}
+            <Button onClick={handleGenerate} disabled={loading || !(selectedJob?.id || jobId.trim())} className="w-full">
+              {loading ? t("cl.generating") : t("cl.generate")}
             </Button>
           </CardContent>
         </Card>
@@ -282,36 +282,32 @@ function CoverLetterPageContent() {
         {coverLetter && !loading && (
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Your Cover Letter</h2>
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-fg">{t("cl.yours")}</h2>
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge variant={source === "ai" ? "success" : "default"}>
-                    {source === "ai" ? "AI Generated" : "Template"}
+                    {source === "ai" ? t("ai.source.ai") : t("ai.source.template")}
                   </Badge>
-                  <Button
-                    onClick={handleCopy}
-                    className="border border-line-strong bg-surface text-fg-secondary hover:bg-surface-sunken text-sm px-3 py-1"
-                  >
-                    {copied ? "Copied!" : "Copy"}
+                  <Button variant="outline" size="sm" onClick={handleCopy} aria-live="polite">
+                    <Copy className="h-4 w-4" aria-hidden="true" />
+                    {copied ? t("ui.copied") : t("ui.copy")}
                   </Button>
                   <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       setCoverLetter(null);
                       setSource(null);
                     }}
-                    className="border border-line-strong bg-surface text-fg-secondary hover:bg-surface-sunken text-sm px-3 py-1"
                   >
-                    Regenerate
+                    {t("cl.regenerate")}
                   </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <label htmlFor="cover-letter-textarea" className="block text-sm font-medium text-fg-secondary mb-2">
-                Cover Letter{" "}
-                <span className="text-gray-400 font-normal">
-                  (editable — personalise before sending)
-                </span>
+              <label htmlFor="cover-letter-textarea" className={candidateLabelClass}>
+                {t("cl.letterLabel")} <span className="font-normal text-fg-muted">{t("cl.letterHint")}</span>
               </label>
               <textarea
                 id="cover-letter-textarea"
@@ -322,13 +318,9 @@ function CoverLetterPageContent() {
                 }}
                 rows={18}
                 data-testid="cover-letter-textarea"
-                className="w-full rounded-md border border-line-strong px-4 py-3 text-sm text-fg leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`${candidateFieldClass} leading-relaxed`}
               />
-              <p className="text-xs text-gray-400 mt-2">
-                {edited
-                  ? "Your edits are preserved. Copy or paste into the application when ready."
-                  : "Review and personalise before sending. Do not include experience, employers, certifications, or outcomes you cannot verify."}
-              </p>
+              <p className="mt-2 text-xs text-fg-muted">{edited ? t("cl.edited") : t("cl.review")}</p>
             </CardContent>
           </Card>
         )}

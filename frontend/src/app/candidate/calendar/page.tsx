@@ -15,6 +15,7 @@ import {
   CandidateNotice,
   CandidatePageHeader,
   CandidateSpinner,
+  URL_PLACEHOLDERS,
   candidateFieldClass,
   candidateLabelClass,
 } from "@/components/candidate/candidate-ui";
@@ -478,12 +479,7 @@ export default function CalendarPage() {
       </div>
 
       {showModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowModal(false);
-          }}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div
             role="dialog"
             aria-modal="true"
@@ -511,7 +507,6 @@ export default function CalendarPage() {
                 onChange={(e) => updateField("title", e.target.value)}
                 placeholder={t("cal.form.titlePlaceholder")}
                 required
-                autoFocus
               />
               <div>
                 <label htmlFor="event-description" className={candidateLabelClass}>
@@ -573,7 +568,7 @@ export default function CalendarPage() {
                 type="url"
                 value={form.meetingUrl}
                 onChange={(e) => updateField("meetingUrl", e.target.value)}
-                placeholder="https://meet.google.com/…"
+                placeholder={URL_PLACEHOLDERS.meeting}
               />
               <Input
                 id="event-reminder"

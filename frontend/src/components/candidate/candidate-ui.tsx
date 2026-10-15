@@ -11,6 +11,14 @@ import { countryDisplayName, WORLDWIDE_CODE } from "@/lib/countries";
 import { useLocale } from "@/lib/i18n/client";
 import { useCandidateT, type CandidateMessageKey, type CandidateT } from "@/lib/i18n/candidate-messages";
 
+/** Non-translatable URL placeholders (protocol/domain examples, not copy). */
+export const URL_PLACEHOLDERS = {
+  generic: "https://",
+  linkedin: "https://linkedin.com/in/…",
+  github: "https://github.com/…",
+  meeting: "https://meet.google.com/…",
+} as const;
+
 /** Token-only classes for native inputs/selects/textareas on candidate pages. */
 export const candidateFieldClass =
   "w-full rounded-[var(--radius-control)] border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg placeholder:text-fg-muted shadow-xs transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-60";
@@ -48,6 +56,45 @@ export function describeCandidateError(error: unknown, t: CandidateT): { title: 
     title: t(`ui.error.${kind}.title` as CandidateMessageKey),
     description: t(`ui.error.${kind}.description` as CandidateMessageKey),
   };
+}
+
+export interface CandidateFriendlyError {
+  title: string;
+  description: string;
+  tone: "info" | "warning" | "error";
+}
+
+/** describeCandidateError plus a severity tone (rate limits warn, the rest error). */
+export function toCandidateFriendly(error: unknown, t: CandidateT): CandidateFriendlyError {
+  const meta = (error && typeof error === "object" ? error : {}) as { status?: unknown; code?: unknown };
+  const isRate = meta.status === 429 || meta.code === "QUOTA_EXCEEDED";
+  return { ...describeCandidateError(error, t), tone: isRate ? "warning" : "error" };
+}
+
+/** Alert box for an already-translated friendly error. */
+export function CandidateErrorAlert({
+  error,
+  testId,
+  className = "",
+  children,
+}: {
+  error: CandidateFriendlyError;
+  testId?: string;
+  className?: string;
+  children?: ReactNode;
+}) {
+  const tone = {
+    error: "border-danger-line bg-danger-soft",
+    warning: "border-warning-line bg-warning-soft",
+    info: "border-info-line bg-info-soft",
+  }[error.tone];
+  return (
+    <div role="alert" aria-live="assertive" data-testid={testId} className={`rounded-xl border p-4 text-sm ${tone} ${className}`}>
+      <p className="font-medium text-fg">{error.title}</p>
+      <p className="mt-0.5 text-fg-secondary">{error.description}</p>
+      {children}
+    </div>
+  );
 }
 
 interface PageHeaderProps {
