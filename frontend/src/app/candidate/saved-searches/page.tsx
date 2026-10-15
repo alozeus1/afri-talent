@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useId } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BellRing, MapPin, Plus, Search, X } from "lucide-react";
+import { BellRing, MapPin, Plus, Search } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { savedSearches, SavedSearchItem } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import {
   CandidatePageHeader,
   CandidateSpinner,
   CandidateSwitch,
+  CandidateTagInput,
   candidateFieldClass,
   candidateLabelClass,
 } from "@/components/candidate/candidate-ui";
@@ -56,82 +57,6 @@ const defaultForm: FormState = {
 
 const checkboxClass =
   "h-4 w-4 rounded border-line-strong bg-surface-raised accent-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
-
-function TagInput({
-  label,
-  tags,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  tags: string[];
-  onChange: (tags: string[]) => void;
-  placeholder?: string;
-}) {
-  const t = useCandidateT();
-  const id = useId();
-  const [inputValue, setInputValue] = useState("");
-
-  const addTags = (value: string) => {
-    const newTags = value
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter((tag) => tag.length > 0 && !tags.includes(tag));
-    if (newTags.length > 0) {
-      onChange([...tags, ...newTags]);
-    }
-    setInputValue("");
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      addTags(inputValue);
-    }
-    if (e.key === "Backspace" && inputValue === "" && tags.length > 0) {
-      onChange(tags.slice(0, -1));
-    }
-  };
-
-  return (
-    <div>
-      <label htmlFor={id} className={candidateLabelClass}>
-        {label}
-      </label>
-      {tags.length > 0 ? (
-        <div className="mb-2 flex flex-wrap gap-2">
-          {tags.map((tag) => (
-            <span
-              key={tag}
-              className="inline-flex items-center gap-1 rounded-full border border-success-line bg-primary-soft py-1 pe-1.5 ps-3 text-sm text-primary-text"
-            >
-              {tag}
-              <button
-                type="button"
-                onClick={() => onChange(tags.filter((x) => x !== tag))}
-                aria-label={t("searches.form.removeTag", { tag })}
-                className="rounded-full p-0.5 hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-              >
-                <X className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : null}
-      <input
-        id={id}
-        type="text"
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={() => inputValue.trim() && addTags(inputValue)}
-        placeholder={placeholder || t("searches.form.tagHint")}
-        className={candidateFieldClass}
-      />
-      <p className="mt-1 text-xs text-fg-muted">{t("searches.form.tagHint")}</p>
-    </div>
-  );
-}
 
 export default function SavedSearchesPage() {
   const router = useRouter();
@@ -339,14 +264,14 @@ export default function SavedSearchesPage() {
                 required
               />
 
-              <TagInput
+              <CandidateTagInput
                 label={t("searches.form.keywords")}
                 tags={form.keywords}
                 onChange={(keywords) => setForm({ ...form, keywords })}
                 placeholder={t("searches.form.keywordsPlaceholder")}
               />
 
-              <TagInput
+              <CandidateTagInput
                 label={t("searches.form.locations")}
                 tags={form.locations}
                 onChange={(locations) => setForm({ ...form, locations })}

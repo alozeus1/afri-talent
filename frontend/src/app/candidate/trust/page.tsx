@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ExternalLink } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
   CandidatePartnerMarkerItem,
@@ -14,63 +15,63 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { LoadingState } from "@/components/ui/loading-state";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { TrustChecklist } from "@/components/trust/trust-checklist";
 import { TrustExplainerModal } from "@/components/trust/trust-explainer-modal";
 import { TrustScoreCard } from "@/components/trust/trust-score-card";
 import { TrustStatusBanner } from "@/components/trust/trust-status-banner";
 import { TrustSupportCard } from "@/components/trust/trust-support-card";
+import {
+  CandidateBackLink,
+  CandidateLoadError,
+  CandidateSpinner,
+  candidateFieldClass,
+  candidateLabelClass,
+} from "@/components/candidate/candidate-ui";
 import { uploadVerificationFile } from "@/lib/trust-files";
-import { humanizeTrustValue } from "@/lib/trust-labels";
 import { localizePath, useLocale } from "@/lib/i18n/client";
-import { FREE_MODE } from "@/lib/free-mode";
+import {
+  enumLabel,
+  useCandidateFormatters,
+  useCandidateT,
+  type CandidateMessageKey,
+  type CandidateVars,
+} from "@/lib/i18n/candidate-messages";
 
-const candidateArtifactTypes = [
-  { value: "IDENTITY_DOCUMENT", label: "Identity document" },
-  { value: "CERTIFICATION", label: "Certification or skills proof" },
-  { value: "EMPLOYMENT_PROOF", label: "Employment proof" },
-] as const;
-
-type CandidateArtifactType = (typeof candidateArtifactTypes)[number]["value"];
+const ARTIFACT_TYPES = ["IDENTITY_DOCUMENT", "CERTIFICATION", "EMPLOYMENT_PROOF"] as const;
+type CandidateArtifactType = (typeof ARTIFACT_TYPES)[number];
 type CandidateSkillMethod = "CERTIFICATE" | "PORTFOLIO" | "ASSESSMENT";
+const SKILL_METHODS: CandidateSkillMethod[] = ["ASSESSMENT", "CERTIFICATE", "PORTFOLIO"];
 
-function artifactStatusCopy(status: VerificationArtifactItem["status"]) {
-  if (status === "APPROVED") {
-    return {
-      tone: "success" as const,
-      summary: "Approved and now strengthening your employer-facing trust profile.",
-    };
-  }
+type Feedback = { tone: "success" | "danger"; key: CandidateMessageKey; vars?: CandidateVars };
 
-  if (status === "REJECTED") {
-    return {
-      tone: "danger" as const,
-      summary: "This evidence was not accepted. Update it before resubmitting.",
-    };
-  }
+function artifactTone(status: VerificationArtifactItem["status"]) {
+  if (status === "APPROVED") return "success" as const;
+  if (status === "REJECTED") return "danger" as const;
+  return "warning" as const;
+}
 
-  if (status === "NEEDS_MORE_INFO") {
-    return {
-      tone: "warning" as const,
-      summary: "A reviewer needs more detail before this trust signal can be approved.",
-    };
-  }
+function signalVariant(status: string) {
+  return status === "verified" ? ("success" as const) : status === "needs_attention" ? ("warning" as const) : ("info" as const);
+}
 
-  return {
-    tone: "warning" as const,
-    summary: "Submitted and waiting for review.",
-  };
+function isUploadUnavailable(error: unknown) {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes("S3_NOT_CONFIGURED") || msg.includes("not configured on this server");
 }
 
 export default function CandidateTrustPage() {
   const locale = useLocale();
+  const t = useCandidateT();
+  const fmt = useCandidateFormatters();
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   const [dashboard, setDashboard] = useState<CandidateTrustDashboard | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pageError, setPageError] = useState<string | null>(null);
-  const [pageSuccess, setPageSuccess] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [otpPreview, setOtpPreview] = useState<string | null>(null);
@@ -95,19 +96,26 @@ export default function CandidateTrustPage() {
     }
   }, [isLoading, locale, router, user]);
 
-  useEffect(() => {
-    if (user?.role === "CANDIDATE") {
-      loadDashboard();
+  const loadDashboard = useCallback(async () => {
+    setLoadError(null);
+    try {
+      const result = await trust.candidateSummary();
+      setDashboard(result);
+    } catch (error) {
+      setLoadError(error);
+    } finally {
+      setLoading(false);
     }
-  }, [user]);
+  }, []);
+
+  useEffect(() => {
+    if (user?.role === "CANDIDATE") loadDashboard();
+  }, [user, loadDashboard]);
 
   const linkedSignalCount = useMemo(() => {
     if (!dashboard?.profile) return 0;
-    return [
-      dashboard.profile.linkedinUrl,
-      dashboard.profile.githubUrl,
-      dashboard.profile.portfolioUrl,
-    ].filter(Boolean).length;
+    return [dashboard.profile.linkedinUrl, dashboard.profile.githubUrl, dashboard.profile.portfolioUrl].filter(Boolean)
+      .length;
   }, [dashboard?.profile]);
 
   const completedAssessments = useMemo(
@@ -115,90 +123,45 @@ export default function CandidateTrustPage() {
     [dashboard?.assessments],
   );
 
-  const artifactSummary = useMemo(() => {
-    return (dashboard?.artifacts || []).reduce(
-      (summary, artifact) => {
-        if (artifact.status === "APPROVED") summary.approved += 1;
-        if (artifact.status === "REJECTED") summary.rejected += 1;
-        if (artifact.status === "PENDING" || artifact.status === "NEEDS_MORE_INFO") summary.pending += 1;
-        return summary;
-      },
-      { approved: 0, rejected: 0, pending: 0 },
-    );
-  }, [dashboard?.artifacts]);
+  const artifactSummary = useMemo(
+    () =>
+      (dashboard?.artifacts || []).reduce(
+        (summary, artifact) => {
+          if (artifact.status === "APPROVED") summary.approved += 1;
+          if (artifact.status === "REJECTED") summary.rejected += 1;
+          if (artifact.status === "PENDING" || artifact.status === "NEEDS_MORE_INFO") summary.pending += 1;
+          return summary;
+        },
+        { approved: 0, rejected: 0, pending: 0 },
+      ),
+    [dashboard?.artifacts],
+  );
 
   const trustState = useMemo(() => {
-    if (!dashboard) {
-      return {
-        tone: "info" as const,
-        title: "Loading your trust profile",
-        body: "We are preparing your current authenticity summary.",
-      };
-    }
-
-    if (artifactSummary.rejected > 0) {
-      return {
-        tone: "danger" as const,
-        title: "Some verification evidence needs attention",
-        body: "At least one submission was rejected or needs more information. Updating it is the fastest way to avoid a confusing employer-facing trust profile.",
-      };
-    }
-
-    if (artifactSummary.pending > 0) {
-      return {
-        tone: "info" as const,
-        title: "Review in progress",
-        body: "Your latest verification evidence is being assessed. Employers still see your current approved signals while review is underway.",
-      };
-    }
-
-    if (!dashboard.trust.premiumFilterEligible) {
-      return {
-        tone: "warning" as const,
-        title: "Your trust profile is still building",
-        body: FREE_MODE
-          ? "Verification is optional at first, but stronger evidence helps employers feel safer shortlisting you and makes you eligible for verified-candidate filters."
-          : "Verification is optional at first, but stronger evidence helps employers feel safer shortlisting you and unlocks premium verified-candidate filters.",
-      };
-    }
-
-    return {
-      tone: "success" as const,
-      title: "Your trust profile is employer-ready",
-      body: "Your current evidence gives employers a stronger reason to trust your profile beyond self-reported information.",
-    };
+    if (!dashboard) return { tone: "info" as const, id: "loading" };
+    if (artifactSummary.rejected > 0) return { tone: "danger" as const, id: "rejected" };
+    if (artifactSummary.pending > 0) return { tone: "info" as const, id: "pending" };
+    if (!dashboard.trust.premiumFilterEligible) return { tone: "warning" as const, id: "building" };
+    return { tone: "success" as const, id: "ready" };
   }, [artifactSummary.pending, artifactSummary.rejected, dashboard]);
-
-  const loadDashboard = async () => {
-    setLoading(true);
-    setPageError(null);
-    try {
-      const result = await trust.candidateSummary();
-      setDashboard(result);
-    } catch (error) {
-      setPageError(error instanceof Error ? error.message : "Failed to load candidate trust data.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleRequestOtp = async () => {
     setRequestingOtp(true);
-    setPageError(null);
-    setPageSuccess(null);
-
+    setFeedback(null);
     try {
       const result = await trust.requestPhoneOtp(phoneNumber);
       setOtpPreview(result.previewCode || null);
       setOtpExpiresAt(result.expiresAt);
-      setPageSuccess("Verification code created. Enter it below to complete phone verification.");
+      setFeedback({ tone: "success", key: "trust.phone.sent" });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      setPageError(
-        msg === "sms_provider_unconfigured" || msg.includes("SMS_DISABLED")
-          ? "Phone verification is not available in this environment. Contact support."
-          : msg || "Failed to request verification code.",
-      );
+      setFeedback({
+        tone: "danger",
+        key:
+          msg === "sms_provider_unconfigured" || msg.includes("SMS_DISABLED")
+            ? "trust.phone.unavailable"
+            : "trust.phone.requestFailed",
+      });
     } finally {
       setRequestingOtp(false);
     }
@@ -207,18 +170,16 @@ export default function CandidateTrustPage() {
   const handleVerifyOtp = async (event: FormEvent) => {
     event.preventDefault();
     setVerifyingOtp(true);
-    setPageError(null);
-    setPageSuccess(null);
-
+    setFeedback(null);
     try {
       await trust.verifyPhoneOtp(phoneNumber, otpCode);
       setOtpCode("");
       setOtpPreview(null);
       setOtpExpiresAt(null);
       await loadDashboard();
-      setPageSuccess("Phone verification completed.");
-    } catch (error) {
-      setPageError(error instanceof Error ? error.message : "Failed to verify code.");
+      setFeedback({ tone: "success", key: "trust.phone.verified" });
+    } catch {
+      setFeedback({ tone: "danger", key: "trust.phone.verifyFailed" });
     } finally {
       setVerifyingOtp(false);
     }
@@ -227,15 +188,12 @@ export default function CandidateTrustPage() {
   const handleArtifactSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setSubmittingArtifact(true);
-    setPageError(null);
-    setPageSuccess(null);
-
+    setFeedback(null);
     try {
       let uploaded: { fileKey?: string; fileName?: string } = {};
       if (artifactFile) {
         uploaded = await uploadVerificationFile(artifactFile, "candidate-verification");
       }
-
       await trust.submitCandidateArtifact({
         type: artifactType,
         fileKey: uploaded.fileKey,
@@ -245,14 +203,12 @@ export default function CandidateTrustPage() {
       setArtifactFile(null);
       setArtifactUrl("");
       await loadDashboard();
-      setPageSuccess("Verification evidence submitted for review.");
+      setFeedback({ tone: "success", key: "trust.evidence.submitted" });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      setPageError(
-        msg.includes("S3_NOT_CONFIGURED") || msg.includes("not configured on this server")
-          ? "Document upload is not available in this environment. Contact your administrator."
-          : msg || "Failed to submit candidate verification evidence.",
-      );
+      setFeedback({
+        tone: "danger",
+        key: isUploadUnavailable(error) ? "trust.evidence.uploadUnavailable" : "trust.evidence.failed",
+      });
     } finally {
       setSubmittingArtifact(false);
     }
@@ -261,15 +217,12 @@ export default function CandidateTrustPage() {
   const handleSkillVerificationSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setSubmittingSkill(true);
-    setPageError(null);
-    setPageSuccess(null);
-
+    setFeedback(null);
     try {
       let uploaded: { fileKey?: string; fileName?: string } = {};
       if (skillEvidenceFile) {
         uploaded = await uploadVerificationFile(skillEvidenceFile, "candidate-verification");
       }
-
       await trust.submitCandidateSkillVerification({
         skillName,
         method: skillMethod,
@@ -279,95 +232,89 @@ export default function CandidateTrustPage() {
         externalUrl: skillEvidenceUrl.trim() || undefined,
         assessmentId: skillMethod === "ASSESSMENT" ? selectedAssessmentId || undefined : undefined,
       });
-
       setSkillName("");
       setSkillEvidenceLabel("");
       setSkillEvidenceFile(null);
       setSkillEvidenceUrl("");
       setSelectedAssessmentId("");
       await loadDashboard();
-      setPageSuccess(
-        skillMethod === "ASSESSMENT"
-          ? "Assessment-backed skill verification processed."
-          : "Skill evidence submitted for trust review.",
-      );
+      setFeedback({ tone: "success", key: skillMethod === "ASSESSMENT" ? "trust.skills.processed" : "trust.skills.submitted" });
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      setPageError(
-        msg.includes("S3_NOT_CONFIGURED") || msg.includes("not configured on this server")
-          ? "Document upload is not available in this environment. Contact your administrator."
-          : msg || "Failed to submit skill verification evidence.",
-      );
+      setFeedback({
+        tone: "danger",
+        key: isUploadUnavailable(error) ? "trust.evidence.uploadUnavailable" : "trust.skills.failed",
+      });
     } finally {
       setSubmittingSkill(false);
     }
   };
 
   if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-      </div>
-    );
+    return <CandidateSpinner className="py-24" />;
   }
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex justify-center py-24">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-        </div>
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+        <LoadingState lines={8} />
       </div>
     );
   }
 
   if (!dashboard) {
     return (
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <TrustStatusBanner
-          tone="danger"
-          title="We couldn't load your trust profile"
-          body={pageError ?? "Try again in a moment."}
-          actions={<Button size="sm" onClick={loadDashboard}>Retry</Button>}
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+        <CandidateLoadError
+          error={loadError}
+          subject={t("ui.subject.trust")}
+          onRetry={() => {
+            setLoading(true);
+            loadDashboard();
+          }}
         />
       </div>
     );
   }
 
+  const emptyBox = "rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary";
+  const linkRow =
+    "flex items-center justify-between gap-2 rounded-2xl border border-line bg-surface-sunken px-4 py-3 text-sm font-medium text-primary-text hover:border-line-strong hover:underline";
+
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
-      <section className="rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-emerald-50 p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-700 mb-3">
-          Candidate Trust
-        </p>
-        <h1 className="text-4xl font-bold text-fg mb-4">Show employers proof, not just profile claims</h1>
-        <p className="max-w-3xl text-lg leading-8 text-fg-secondary">
-          Verification stays optional at first, but stronger trust signals help recruiters move faster with more confidence. AfriTalent combines multiple signals so no single link or upload decides everything.
-        </p>
-      </section>
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+      <div>
+        <CandidateBackLink href={localizePath("/candidate", locale)}>{t("nav.backToDashboard")}</CandidateBackLink>
+        <section className="rounded-3xl border border-line bg-surface p-6 shadow-card sm:p-8">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary-text">{t("trust.eyebrow")}</p>
+          <h1 className="mb-4 text-3xl font-semibold tracking-tight text-fg sm:text-4xl">{t("trust.title")}</h1>
+          <p className="max-w-3xl text-base leading-7 text-fg-secondary sm:text-lg sm:leading-8">{t("trust.subtitle")}</p>
+        </section>
+      </div>
 
-      {pageError && (
-        <TrustStatusBanner tone="danger" title="We couldn't update your trust profile" body={pageError} />
-      )}
-
-      {pageSuccess && (
-        <TrustStatusBanner tone="success" title="Trust update saved" body={pageSuccess} />
+      {feedback && (
+        <TrustStatusBanner
+          tone={feedback.tone}
+          title={feedback.tone === "danger" ? t("trust.err.title") : t("trust.ok.title")}
+          body={t(feedback.key, feedback.vars)}
+        />
       )}
 
       <TrustStatusBanner
         tone={trustState.tone}
-        title={trustState.title}
-        body={trustState.body}
+        title={t(`trust.state.${trustState.id}.title` as CandidateMessageKey)}
+        body={t(`trust.state.${trustState.id}.body` as CandidateMessageKey)}
         actions={
           <Link href={localizePath("/trust", locale)}>
-            <Button size="sm" variant="outline">Open trust center</Button>
+            <Button size="sm" variant="outline">
+              {t("trust.openCenter")}
+            </Button>
           </Link>
         }
       />
 
       <TrustScoreCard
         title={dashboard.profile?.headline || user.name}
-        subtitle="We use email, phone, identity, skills, employment evidence, profile completeness, and linked profiles together instead of trusting a single self-asserted signal."
+        subtitle={t("trust.scoreSubtitle")}
         badge={dashboard.trust.badge}
         authenticityScore={dashboard.trust.authenticityScore}
         riskScore={dashboard.trust.riskScore}
@@ -375,82 +322,61 @@ export default function CandidateTrustPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href={localizePath("/candidate/profile", locale)}>
-              <Button size="sm">Update profile</Button>
+              <Button size="sm">{t("trust.updateProfile")}</Button>
             </Link>
             <TrustExplainerModal
-              title="How employers interpret your trust profile"
-              description="Recruiters should be able to see which parts of your profile are verified, which are still improving, and which need more evidence."
+              title={t("trust.explainer.title")}
+              description={t("trust.explainer.body")}
               items={dashboard.trust.explainability.map((signal) => ({
                 title: signal.label,
                 description: signal.detail,
-                statusLabel:
-                  signal.status === "verified"
-                    ? "Verified"
-                    : signal.status === "needs_attention"
-                      ? "Needs attention"
-                      : "Strengthening",
-                statusVariant:
-                  signal.status === "verified"
-                    ? "success"
-                    : signal.status === "needs_attention"
-                      ? "warning"
-                      : "info",
+                statusLabel: enumLabel(t, "tv", signal.status),
+                statusVariant: signalVariant(signal.status),
               }))}
-              triggerLabel="What employers see"
+              triggerLabel={t("trust.explainer.trigger")}
             />
             <Link href={localizePath("/trust", locale)}>
-              <Button size="sm" variant="outline">Trust center</Button>
+              <Button size="sm" variant="outline">
+                {t("trust.trustCenter")}
+              </Button>
             </Link>
           </div>
         }
       >
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="space-y-4">
-            <div className="rounded-2xl border border-white/80 bg-white/80 p-5">
-              <h3 className="text-lg font-semibold text-fg">Employer-facing trust signals</h3>
+            <div className="rounded-2xl border border-line bg-surface-sunken p-5">
+              <h3 className="text-lg font-semibold text-fg">{t("trust.signals.title")}</h3>
               <div className="mt-4 flex flex-wrap gap-2">
                 <TrustBadge label={dashboard.trust.badge} riskLevel={dashboard.trust.riskLevel} variant="success" />
                 {dashboard.trust.maskedPhone && (
-                  <TrustBadge label={`Phone verified: ${dashboard.trust.maskedPhone}`} variant="info" />
+                  <TrustBadge label={t("trust.signals.phone", { phone: dashboard.trust.maskedPhone })} variant="info" />
                 )}
-                {dashboard.trust.premiumFilterEligible && (
-                  <TrustBadge label="Eligible for verified-candidate filters" variant="success" />
-                )}
+                {dashboard.trust.premiumFilterEligible && <TrustBadge label={t("trust.signals.filters")} variant="success" />}
                 {dashboard.trust.verifiedSkillCount > 0 && (
-                  <TrustBadge label={`${dashboard.trust.verifiedSkillCount} verified skill badge${dashboard.trust.verifiedSkillCount === 1 ? "" : "s"}`} variant="success" />
+                  <TrustBadge label={t("trust.signals.skills", { count: dashboard.trust.verifiedSkillCount })} variant="success" />
                 )}
                 {dashboard.trust.partnerSignalCount > 0 && (
-                  <TrustBadge label={`${dashboard.trust.partnerSignalCount} partner trust marker${dashboard.trust.partnerSignalCount === 1 ? "" : "s"}`} variant="info" />
+                  <TrustBadge label={t("trust.signals.partners", { count: dashboard.trust.partnerSignalCount })} variant="info" />
                 )}
-                {dashboard.trust.assessmentBacked && (
-                  <TrustBadge label="Assessment-verified" variant="success" />
-                )}
-                {dashboard.trust.fullyCompletedProfile && (
-                  <TrustBadge label="Complete profile" variant="success" />
-                )}
+                {dashboard.trust.assessmentBacked && <TrustBadge label={t("trust.signals.assessment")} variant="success" />}
+                {dashboard.trust.fullyCompletedProfile && <TrustBadge label={t("trust.signals.complete")} variant="success" />}
               </div>
               <p className="mt-4 text-sm text-fg-secondary">
-                Profile completeness is{" "}
-                <span className="font-semibold text-fg">
-                  {dashboard.profile?.profileCompleteness ?? 0}%
-                </span>
-                {" "}and you currently have{" "}
-                <span className="font-semibold text-fg">{linkedSignalCount}</span>
-                {" "}linked profile signal{linkedSignalCount === 1 ? "" : "s"}.
+                {t("trust.signals.summary", {
+                  percent: dashboard.profile?.profileCompleteness ?? 0,
+                  count: linkedSignalCount,
+                })}
               </p>
-              <p className="mt-3 text-sm text-fg-secondary">
-                {FREE_MODE
-                  ? "Employers can filter for verified candidates, but they only see verified-candidate badges when your evidence actually clears AfriTalent trust checks."
-                  : "Employers may pay for premium filters, but they only see verified-candidate badges when your evidence actually clears AfriTalent trust checks."}
-              </p>
+              <p className="mt-3 text-sm text-fg-secondary">{t("trust.signals.note")}</p>
             </div>
 
             {dashboard.trust.warnings.length > 0 && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-                <h3 className="text-lg font-semibold text-amber-900">Trust warnings</h3>
-                <ul className="mt-3 space-y-2 text-sm text-amber-900">
+              <div className="rounded-2xl border border-warning-line bg-warning-soft p-5">
+                <h3 className="text-lg font-semibold text-fg">{t("trust.warnings")}</h3>
+                <ul className="mt-3 list-disc space-y-2 ps-5 text-sm text-fg-secondary">
                   {dashboard.trust.warnings.map((warning) => (
-                    <li key={warning}>• {warning}</li>
+                    <li key={warning}>{warning}</li>
                   ))}
                 </ul>
               </div>
@@ -458,7 +384,7 @@ export default function CandidateTrustPage() {
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold text-fg mb-4">Verification checklist</h3>
+            <h3 className="mb-4 text-lg font-semibold text-fg">{t("trust.checklist")}</h3>
             <TrustChecklist items={dashboard.trust.checklist} />
           </div>
         </div>
@@ -473,16 +399,7 @@ export default function CandidateTrustPage() {
                   <p className="text-sm font-semibold text-fg">{signal.label}</p>
                   <p className="mt-2 text-sm text-fg-secondary">{signal.detail}</p>
                 </div>
-                <TrustBadge
-                  label={humanizeTrustValue(signal.status)}
-                  variant={
-                    signal.status === "verified"
-                      ? "success"
-                      : signal.status === "needs_attention"
-                        ? "warning"
-                        : "info"
-                  }
-                />
+                <TrustBadge label={enumLabel(t, "tv", signal.status)} variant={signalVariant(signal.status)} />
               </div>
             </CardContent>
           </Card>
@@ -492,60 +409,57 @@ export default function CandidateTrustPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-fg">Phone verification</h2>
-            <p className="text-sm text-fg-secondary">
-              Add a phone number and verify it with a one-time code. This is one of the fastest ways to strengthen your profile.
-            </p>
+            <h2 className="text-lg font-semibold text-fg">{t("trust.phone.title")}</h2>
+            <p className="text-sm text-fg-secondary">{t("trust.phone.body")}</p>
           </CardHeader>
           <CardContent className="space-y-4">
             {dashboard.trust.maskedPhone ? (
               <TrustStatusBanner
                 tone="success"
-                title="Phone verification already completed"
-                body={`Employers currently see a verified phone signal tied to ${dashboard.trust.maskedPhone}.`}
+                title={t("trust.phone.done.title")}
+                body={t("trust.phone.done.body", { phone: dashboard.trust.maskedPhone })}
               />
             ) : (
-              <TrustStatusBanner
-                tone="info"
-                title="Phone verification is one of the fastest trust wins"
-                body="It gives employers one more real-world signal that your profile belongs to a reachable person."
-              />
+              <TrustStatusBanner tone="info" title={t("trust.phone.tip.title")} body={t("trust.phone.tip.body")} />
             )}
 
             <Input
-              label="Phone number"
+              id="trust-phone"
+              label={t("trust.phone.number")}
+              type="tel"
+              autoComplete="tel"
+              dir="ltr"
               value={phoneNumber}
               onChange={(event) => setPhoneNumber(event.target.value)}
               placeholder="+2348012345678"
             />
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Button type="button" onClick={handleRequestOtp} disabled={requestingOtp || !phoneNumber.trim()}>
-                {requestingOtp ? "Creating code..." : "Send verification code"}
+                {requestingOtp ? t("trust.phone.creating") : t("trust.phone.send")}
               </Button>
-              {otpExpiresAt && (
-                <p className="flex items-center text-sm text-fg-muted">
-                  Expires {new Date(otpExpiresAt).toLocaleTimeString()}
-                </p>
-              )}
+              {otpExpiresAt && <p className="text-sm text-fg-muted">{t("trust.phone.expires", { time: fmt.time(otpExpiresAt) })}</p>}
             </div>
 
             {otpPreview && (
-              <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                Development preview code: <span className="font-semibold">{otpPreview}</span>
+              <div className="rounded-2xl border border-info-line bg-info-soft px-4 py-3 text-sm text-fg-secondary">
+                {t("trust.phone.preview")} <span className="font-semibold text-fg">{otpPreview}</span>
               </div>
             )}
 
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <Input
-                label="6-digit code"
+                id="trust-otp"
+                label={t("trust.phone.code")}
                 value={otpCode}
                 onChange={(event) => setOtpCode(event.target.value)}
                 placeholder="123456"
                 inputMode="numeric"
+                autoComplete="one-time-code"
+                dir="ltr"
               />
               <Button type="submit" disabled={verifyingOtp || !otpCode.trim()}>
-                {verifyingOtp ? "Verifying..." : "Verify phone"}
+                {verifyingOtp ? t("trust.phone.verifying") : t("trust.phone.verify")}
               </Button>
             </form>
           </CardContent>
@@ -553,57 +467,55 @@ export default function CandidateTrustPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-fg">Submit verification evidence</h2>
-            <p className="text-sm text-fg-secondary">
-              Upload identity, certification, or employment evidence. You can also provide a verification URL when relevant.
-            </p>
+            <h2 className="text-lg font-semibold text-fg">{t("trust.evidence.title")}</h2>
+            <p className="text-sm text-fg-secondary">{t("trust.evidence.body")}</p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleArtifactSubmit} className="space-y-4">
               <div>
-                <label htmlFor="artifactType" className="block text-sm font-medium text-fg-secondary mb-1">
-                  Evidence type
+                <label htmlFor="artifactType" className={candidateLabelClass}>
+                  {t("trust.evidence.type")}
                 </label>
                 <select
                   id="artifactType"
                   value={artifactType}
                   onChange={(event) => setArtifactType(event.target.value as CandidateArtifactType)}
-                  className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className={candidateFieldClass}
                 >
-                  {candidateArtifactTypes.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
+                  {ARTIFACT_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {enumLabel(t, "tv", type)}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label htmlFor="artifactFile" className="block text-sm font-medium text-fg-secondary mb-1">
-                  Upload document
+                <label htmlFor="artifactFile" className={candidateLabelClass}>
+                  {t("trust.evidence.upload")}
                 </label>
                 <input
                   id="artifactFile"
                   type="file"
                   accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   onChange={(event: ChangeEvent<HTMLInputElement>) => setArtifactFile(event.target.files?.[0] || null)}
-                  className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm text-fg-secondary"
+                  className={`${candidateFieldClass} file:me-3 file:rounded-md file:border-0 file:bg-surface-muted file:px-3 file:py-1 file:text-sm file:font-medium file:text-fg`}
                 />
               </div>
 
               <Input
-                label="Supporting URL"
+                id="artifactUrl"
+                label={t("trust.evidence.url")}
+                type="url"
                 value={artifactUrl}
                 onChange={(event) => setArtifactUrl(event.target.value)}
-                placeholder="Optional credential URL or public verification page"
+                placeholder={t("trust.evidence.urlPlaceholder")}
               />
 
               <Button type="submit" disabled={submittingArtifact}>
-                {submittingArtifact ? "Submitting..." : "Submit for review"}
+                {submittingArtifact ? t("trust.evidence.submitting") : t("trust.evidence.submit")}
               </Button>
-              <p className="text-xs leading-5 text-fg-muted">
-                Submissions are reviewed before they become visible to employers. If we need more detail, reviewer notes will appear in your evidence history below.
-              </p>
+              <p className="text-xs leading-5 text-fg-muted">{t("trust.evidence.note")}</p>
             </form>
           </CardContent>
         </Card>
@@ -612,65 +524,65 @@ export default function CandidateTrustPage() {
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-fg">Verified skills</h2>
-            <p className="text-sm text-fg-secondary">
-              Submit certificate-backed, portfolio-backed, or assessment-backed skills. Only approved checks become employer-facing badges.
-            </p>
+            <h2 className="text-lg font-semibold text-fg">{t("trust.skills.title")}</h2>
+            <p className="text-sm text-fg-secondary">{t("trust.skills.body")}</p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSkillVerificationSubmit} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
-                  label="Skill"
+                  id="trust-skill"
+                  label={t("trust.skills.skill")}
                   value={skillName}
                   onChange={(event) => setSkillName(event.target.value)}
                   placeholder="TypeScript"
                 />
                 <div>
-                  <label htmlFor="skillMethod" className="block text-sm font-medium text-fg-secondary mb-1">
-                    Verification method
+                  <label htmlFor="skillMethod" className={candidateLabelClass}>
+                    {t("trust.skills.method")}
                   </label>
                   <select
                     id="skillMethod"
                     value={skillMethod}
                     onChange={(event) => setSkillMethod(event.target.value as CandidateSkillMethod)}
-                    className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className={candidateFieldClass}
                   >
-                    <option value="ASSESSMENT">Assessment-backed</option>
-                    <option value="CERTIFICATE">Certificate-backed</option>
-                    <option value="PORTFOLIO">Portfolio-backed</option>
+                    {SKILL_METHODS.map((method) => (
+                      <option key={method} value={method}>
+                        {enumLabel(t, "tv", method)}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               <Input
-                label="Evidence label"
+                id="trust-evidence-label"
+                label={t("trust.skills.evidenceLabel")}
                 value={skillEvidenceLabel}
                 onChange={(event) => setSkillEvidenceLabel(event.target.value)}
-                placeholder="AWS Certified Developer or Production case study"
+                placeholder={t("trust.skills.evidencePlaceholder")}
               />
 
               {skillMethod === "ASSESSMENT" && (
                 <div>
-                  <label htmlFor="selectedAssessmentId" className="block text-sm font-medium text-fg-secondary mb-1">
-                    Completed assessment
+                  <label htmlFor="selectedAssessmentId" className={candidateLabelClass}>
+                    {t("trust.skills.assessment")}
                   </label>
                   <select
                     id="selectedAssessmentId"
                     value={selectedAssessmentId}
                     onChange={(event) => setSelectedAssessmentId(event.target.value)}
-                    className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-fg focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className={candidateFieldClass}
                   >
-                    <option value="">Choose an assessment</option>
+                    <option value="">{t("trust.skills.chooseAssessment")}</option>
                     {completedAssessments.map((assessment) => (
                       <option key={assessment.id} value={assessment.id}>
                         {assessment.skillName} {assessment.score != null ? `(${assessment.score})` : ""}
                       </option>
                     ))}
                   </select>
-                  <p className="mt-2 text-xs text-fg-muted">
-                    Assessment-backed badges are only granted when the result clears AfriTalent&apos;s verification threshold.
-                  </p>
+                  <p className="mt-2 text-xs text-fg-muted">{t("trust.skills.assessmentNote")}</p>
                 </div>
               )}
 
@@ -678,77 +590,57 @@ export default function CandidateTrustPage() {
                 <>
                   {skillMethod === "CERTIFICATE" && (
                     <div>
-                      <label htmlFor="skillEvidenceFile" className="block text-sm font-medium text-fg-secondary mb-1">
-                        Upload certificate
+                      <label htmlFor="skillEvidenceFile" className={candidateLabelClass}>
+                        {t("trust.skills.uploadCert")}
                       </label>
                       <input
                         id="skillEvidenceFile"
                         type="file"
                         accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         onChange={(event: ChangeEvent<HTMLInputElement>) => setSkillEvidenceFile(event.target.files?.[0] || null)}
-                        className="w-full rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm text-fg-secondary"
+                        className={`${candidateFieldClass} file:me-3 file:rounded-md file:border-0 file:bg-surface-muted file:px-3 file:py-1 file:text-sm file:font-medium file:text-fg`}
                       />
                     </div>
                   )}
                   <Input
-                    label={skillMethod === "CERTIFICATE" ? "Public credential URL" : "Portfolio or GitHub URL"}
+                    id="trust-skill-url"
+                    type="url"
+                    label={skillMethod === "CERTIFICATE" ? t("trust.skills.credentialUrl") : t("trust.skills.portfolioUrl")}
                     value={skillEvidenceUrl}
                     onChange={(event) => setSkillEvidenceUrl(event.target.value)}
-                    placeholder={
-                      skillMethod === "CERTIFICATE"
-                        ? "https://credential.example"
-                        : "https://github.com/you/project"
-                    }
+                    placeholder="https://"
                   />
                 </>
               )}
 
               <Button
                 type="submit"
-                disabled={
-                  submittingSkill ||
-                  !skillName.trim() ||
-                  (skillMethod === "ASSESSMENT" && !selectedAssessmentId)
-                }
+                disabled={submittingSkill || !skillName.trim() || (skillMethod === "ASSESSMENT" && !selectedAssessmentId)}
               >
-                {submittingSkill ? "Submitting..." : "Submit skill verification"}
+                {submittingSkill ? t("trust.evidence.submitting") : t("trust.skills.submit")}
               </Button>
-              <p className="text-xs leading-5 text-fg-muted">
-                Skill badges are evidence-based. Uploading a file or link alone does not guarantee approval.
-              </p>
+              <p className="text-xs leading-5 text-fg-muted">{t("trust.skills.note")}</p>
             </form>
 
             <div className="mt-6 space-y-3">
               {dashboard.skillVerifications.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary">
-                  No skill verification records yet. Start with one high-confidence skill that you can prove clearly.
-                </div>
+                <div className={emptyBox}>{t("trust.skills.empty")}</div>
               ) : (
                 dashboard.skillVerifications.map((skill: CandidateVerifiedSkillItem) => (
                   <div key={skill.id} className="rounded-2xl border border-line bg-surface-sunken p-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium text-fg">{skill.skillName}</p>
                       <TrustBadge
-                        label={humanizeTrustValue(skill.status)}
-                        variant={
-                          skill.status === "VERIFIED"
-                            ? "success"
-                            : skill.status === "REJECTED"
-                              ? "danger"
-                              : "warning"
-                        }
+                        label={enumLabel(t, "tv", skill.status)}
+                        variant={skill.status === "VERIFIED" ? "success" : skill.status === "REJECTED" ? "danger" : "warning"}
                       />
-                      <TrustBadge label={humanizeTrustValue(skill.method)} variant="info" />
+                      <TrustBadge label={enumLabel(t, "tv", skill.method)} variant="info" />
                     </div>
                     {(skill.evidenceLabel || skill.confidenceNote) && (
-                      <p className="mt-2 text-sm text-fg-secondary">
-                        {skill.evidenceLabel || skill.confidenceNote}
-                      </p>
+                      <p className="mt-2 text-sm text-fg-secondary">{skill.evidenceLabel || skill.confidenceNote}</p>
                     )}
                     {skill.partner && (
-                      <p className="mt-2 text-xs text-fg-muted">
-                        Verified via {skill.partner.name}
-                      </p>
+                      <p className="mt-2 text-xs text-fg-muted">{t("trust.skills.via", { partner: skill.partner.name })}</p>
                     )}
                   </div>
                 ))
@@ -759,52 +651,48 @@ export default function CandidateTrustPage() {
 
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-fg">Partner-issued trust markers</h2>
-            <p className="text-sm text-fg-secondary">
-              Universities, bootcamps, training providers, and scholarship partners can issue high-confidence markers to your profile.
-            </p>
+            <h2 className="text-lg font-semibold text-fg">{t("trust.partners.title")}</h2>
+            <p className="text-sm text-fg-secondary">{t("trust.partners.body")}</p>
           </CardHeader>
           <CardContent className="space-y-4">
             {dashboard.partnerMarkers.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary">
-                No partner markers yet. These are issued through approved universities, bootcamps, training institutes, and scholarship partners.
-              </div>
+              <div className={emptyBox}>{t("trust.partners.empty")}</div>
             ) : (
               dashboard.partnerMarkers.map((marker: CandidatePartnerMarkerItem) => (
                 <div key={marker.id} className="rounded-2xl border border-line bg-surface-sunken p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium text-fg">{marker.label}</p>
-                    <TrustBadge
-                      label={humanizeTrustValue(marker.status)}
-                      variant={marker.status === "ACTIVE" ? "success" : "warning"}
-                    />
+                    <TrustBadge label={enumLabel(t, "tv", marker.status)} variant={marker.status === "ACTIVE" ? "success" : "warning"} />
                   </div>
                   <p className="mt-2 text-sm text-fg-secondary">
-                    {marker.description || `${marker.partner.name} issued this trust marker.`}
+                    {marker.description || t("trust.partners.issued", { partner: marker.partner.name })}
                   </p>
                   <p className="mt-2 text-xs text-fg-muted">
-                    {marker.partner.name} • {humanizeTrustValue(marker.partner.organizationType)}
+                    {marker.partner.name} · {enumLabel(t, "tv", marker.partner.organizationType)}
                   </p>
                 </div>
               ))
             )}
 
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-              <p className="text-sm font-semibold text-blue-900">Assessment history</p>
+            <div className="rounded-2xl border border-info-line bg-info-soft p-4">
+              <p className="text-sm font-semibold text-fg">{t("trust.history.title")}</p>
               <div className="mt-3 space-y-2">
                 {dashboard.assessments.length === 0 ? (
-                  <p className="text-sm text-blue-800">No skill assessments completed yet.</p>
+                  <p className="text-sm text-fg-secondary">{t("trust.history.empty")}</p>
                 ) : (
                   dashboard.assessments.slice(0, 5).map((assessment) => (
                     <div key={assessment.id} className="flex items-center justify-between gap-4 rounded-xl bg-surface px-3 py-2 text-sm">
                       <div>
                         <p className="font-medium text-fg">{assessment.skillName}</p>
                         <p className="text-xs text-fg-muted">
-                          {humanizeTrustValue(assessment.status)} via {assessment.provider}
+                          {t("trust.history.via", {
+                            status: enumLabel(t, "tv", assessment.status),
+                            provider: assessment.provider,
+                          })}
                         </p>
                       </div>
                       {assessment.score != null && (
-                        <TrustBadge label={`Score ${assessment.score}`} variant="info" />
+                        <TrustBadge label={t("trust.history.score", { score: assessment.score })} variant="info" />
                       )}
                     </div>
                   ))
@@ -820,76 +708,74 @@ export default function CandidateTrustPage() {
           <CardHeader>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-fg">Linked authenticity signals</h2>
-                <p className="mt-1 text-sm text-fg-secondary">
-                  LinkedIn, GitHub, and portfolio links help employers cross-check that your work history and skill claims are real.
-                </p>
+                <h2 className="text-lg font-semibold text-fg">{t("trust.links.title")}</h2>
+                <p className="mt-1 text-sm text-fg-secondary">{t("trust.links.body")}</p>
               </div>
-              <Link href={localizePath("/candidate/profile", locale)}>
-                <Button size="sm" variant="outline">Edit links</Button>
+              <Link href={localizePath("/candidate/profile", locale)} className="shrink-0">
+                <Button size="sm" variant="outline">
+                  {t("trust.links.edit")}
+                </Button>
               </Link>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {dashboard.profile?.linkedinUrl && (
-              <a href={dashboard.profile.linkedinUrl} target="_blank" rel="noopener noreferrer" className="block rounded-2xl border border-line bg-surface-sunken px-4 py-3 text-sm text-emerald-700 hover:text-emerald-800">
-                LinkedIn profile
+              <a href={dashboard.profile.linkedinUrl} target="_blank" rel="noopener noreferrer" className={linkRow}>
+                {t("trust.links.linkedin")}
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
               </a>
             )}
             {dashboard.profile?.githubUrl && (
-              <a href={dashboard.profile.githubUrl} target="_blank" rel="noopener noreferrer" className="block rounded-2xl border border-line bg-surface-sunken px-4 py-3 text-sm text-emerald-700 hover:text-emerald-800">
-                GitHub profile
+              <a href={dashboard.profile.githubUrl} target="_blank" rel="noopener noreferrer" className={linkRow}>
+                {t("trust.links.github")}
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
               </a>
             )}
             {dashboard.profile?.portfolioUrl && (
-              <a href={dashboard.profile.portfolioUrl} target="_blank" rel="noopener noreferrer" className="block rounded-2xl border border-line bg-surface-sunken px-4 py-3 text-sm text-emerald-700 hover:text-emerald-800">
-                Portfolio
+              <a href={dashboard.profile.portfolioUrl} target="_blank" rel="noopener noreferrer" className={linkRow}>
+                {t("trust.links.portfolio")}
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
               </a>
             )}
             {!dashboard.profile?.linkedinUrl && !dashboard.profile?.githubUrl && !dashboard.profile?.portfolioUrl && (
-              <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary">
-                Add LinkedIn, GitHub, or a portfolio in your profile to strengthen authenticity and give employers more confidence in your work history.
-              </div>
+              <div className={emptyBox}>{t("trust.links.empty")}</div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <h2 className="text-xl font-semibold text-fg">Submitted evidence</h2>
+            <h2 className="text-lg font-semibold text-fg">{t("trust.submitted.title")}</h2>
           </CardHeader>
           <CardContent className="space-y-4">
             {dashboard.artifacts.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary">
-                No verification evidence has been submitted yet. A clear ID, certification, or employment proof is usually the best first step.
-              </div>
+              <div className={emptyBox}>{t("trust.submitted.empty")}</div>
             ) : (
               dashboard.artifacts.map((artifact: VerificationArtifactItem) => (
                 <div key={artifact.id} className="rounded-2xl border border-line bg-surface-sunken p-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-fg">{humanizeTrustValue(artifact.type)}</p>
-                    <TrustBadge label={humanizeTrustValue(artifact.status)} variant={artifactStatusCopy(artifact.status).tone} />
+                    <p className="font-medium text-fg">{enumLabel(t, "tv", artifact.type)}</p>
+                    <TrustBadge label={enumLabel(t, "tv", artifact.status)} variant={artifactTone(artifact.status)} />
                   </div>
-                  <p className="mt-2 text-sm text-fg-muted">
-                    Submitted {new Date(artifact.submittedAt).toLocaleDateString()}
-                  </p>
-                  <p className="mt-2 text-sm text-fg-secondary">{artifactStatusCopy(artifact.status).summary}</p>
+                  <p className="mt-2 text-sm text-fg-muted">{t("trust.submitted.on", { date: fmt.date(artifact.submittedAt) })}</p>
+                  <p className="mt-2 text-sm text-fg-secondary">{enumLabel(t, "trust.artifact", artifact.status)}</p>
                   {artifact.fileName && (
-                    <p className="mt-2 text-sm text-fg-secondary">File: {artifact.fileName}</p>
+                    <p className="mt-2 text-sm text-fg-secondary">{t("trust.submitted.file", { name: artifact.fileName })}</p>
                   )}
                   {artifact.externalUrl && (
                     <a
                       href={artifact.externalUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-2 inline-flex text-sm text-emerald-700 hover:text-emerald-800"
+                      className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary-text hover:underline"
                     >
-                      View supporting link
+                      {t("trust.submitted.link")}
+                      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                     </a>
                   )}
                   {artifact.reviewerNotes && (
                     <p className="mt-3 rounded-xl border border-line bg-surface px-3 py-2 text-sm text-fg-secondary">
-                      Reviewer notes: {artifact.reviewerNotes}
+                      {t("trust.submitted.notes", { notes: artifact.reviewerNotes })}
                     </p>
                   )}
                 </div>
@@ -901,8 +787,8 @@ export default function CandidateTrustPage() {
 
       <TrustSupportCard
         reportHref={localizePath("/trust/report", locale)}
-        title="Need help with a trust review?"
-        description="If a verification outcome looks wrong, you are dealing with suspicious outreach, or you need help understanding what employers can see, contact support or file a trust report."
+        title={t("trust.support.title")}
+        description={t("trust.support.body")}
       />
     </div>
   );
