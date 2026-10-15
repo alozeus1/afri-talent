@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { EarlyAccessProof } from "@/components/home/early-access-proof";
 import { HeroStats } from "@/components/home/hero-stats";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Globe, Plane, ShieldCheck, Sparkles } from "lucide-react";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 import { FREE_MODE } from "@/lib/free-mode";
+import { usePublicT } from "@/lib/i18n/public-messages";
 
 const featureIcons = [Globe, Plane, ShieldCheck, Sparkles];
 const featureTones = [
@@ -19,18 +21,20 @@ const featureTones = [
 ];
 
 const sourceLabels = [
-  ["RemoteOK", "Remote global"],
-  ["We Work Remotely", "Remote global"],
-  ["Jobberman", "Africa"],
-  ["Himalayas", "Remote global"],
-  ["Arbeitnow", "Europe + visa"],
-  ["Remotive", "Remote global"],
-  ["Adzuna", "US, UK, EU, CA"],
-];
+  ["RemoteOK", "site.home.source.remoteGlobal"],
+  ["We Work Remotely", "site.home.source.remoteGlobal"],
+  ["Jobberman", "site.home.source.africa"],
+  ["Himalayas", "site.home.source.remoteGlobal"],
+  ["Arbeitnow", "site.home.source.europeVisa"],
+  ["Remotive", "site.home.source.remoteGlobal"],
+  ["Adzuna", "site.home.source.adzuna"],
+] as const;
 
 export function HomePageContent() {
   const t = useT();
+  const tp = usePublicT();
   const locale = useLocale();
+  const href = (path: string) => localizePath(path, locale);
 
   const productSignals = [
     { titleKey: "home.feature.remoteTitle" as const, descKey: "home.feature.remoteDesc" as const, tone: featureTones[0], Icon: featureIcons[0] },
@@ -49,32 +53,32 @@ export function HomePageContent() {
     <div className="pb-12 bg-[var(--background)]">
       <section className="section-shell relative overflow-hidden px-0 pt-8 md:pt-12">
         <div className="page-frame">
-          <div className="relative overflow-hidden rounded-3xl border border-line bg-surface px-6 py-16 shadow-xl dark:border-zinc-800 dark:bg-zinc-950 md:px-10 md:py-20 lg:px-14">
+          <div className="relative overflow-hidden rounded-3xl border border-line bg-surface px-6 py-16 shadow-xl md:px-10 md:py-20 lg:px-14">
             <div className="relative grid items-center gap-12 lg:grid-cols-[1.08fr_0.92fr]">
               <div>
-                <div className="eyebrow-pill mb-6 bg-surface-sunken dark:bg-zinc-900 border border-line dark:border-zinc-800">
+                <div className="eyebrow-pill mb-6 bg-surface-sunken border border-line">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span className="text-xs font-semibold uppercase tracking-widest text-fg-secondary dark:text-zinc-400">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-fg-secondary">
                     {t("home.hero.tagline")}
                   </span>
                 </div>
 
-                <h1 className="font-display max-w-4xl text-5xl font-bold leading-[1.05] text-fg dark:text-zinc-50 md:text-6xl lg:text-7xl">
-                  {t("home.hero.heading").replace("global opportunities.", "")}{" "}
-                  <span className="text-emerald-700 dark:text-emerald-400">global opportunities.</span>
+                <h1 className="font-display max-w-4xl text-5xl font-bold leading-[1.05] text-fg md:text-6xl lg:text-7xl">
+                  {tp("site.home.headingLead")}{" "}
+                  <span className="text-primary-text">{tp("site.home.headingAccent")}</span>
                 </h1>
 
-                <p className="mt-6 max-w-2xl text-lg leading-8 text-fg-secondary dark:text-zinc-400 md:text-xl">
+                <p className="mt-6 max-w-2xl text-lg leading-8 text-fg-secondary md:text-xl">
                   {t("home.hero.description")}
                 </p>
 
                 <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-                  <Link href="/jobs" prefetch={false}>
+                  <Link href={href("/jobs")} prefetch={false}>
                     <Button size="lg" className="w-full sm:w-auto">
                       {t("home.hero.exploreCta")}
                     </Button>
                   </Link>
-                  <Link href="/register?role=employer" prefetch={false}>
+                  <Link href={href("/register?role=employer")} prefetch={false}>
                     <Button size="lg" variant="outline" className="w-full sm:w-auto">
                       {t("home.hero.employerCta")}
                     </Button>
@@ -93,39 +97,39 @@ export function HomePageContent() {
                   </Link>
                 )}
 
-                <div className="mt-8 flex flex-wrap gap-3 text-sm font-medium text-fg-secondary dark:text-zinc-400">
-                  <Link href={localizePath("/jobs?remote=true", locale)} prefetch={false} className="rounded-full border border-line bg-surface-sunken px-4 py-2 hover:bg-surface-muted dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                <div className="mt-8 flex flex-wrap gap-3 text-sm font-medium text-fg-secondary">
+                  <Link href={localizePath("/jobs?remote=true", locale)} prefetch={false} className="rounded-full border border-line bg-surface-sunken px-4 py-2 hover:bg-surface-muted transition-colors">
                     {t("home.hero.remoteFirstRoles")}
                   </Link>
-                  <Link href={localizePath("/jobs?visaSponsorship=YES", locale)} prefetch={false} className="rounded-full border border-line bg-surface-sunken px-4 py-2 hover:bg-surface-muted dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                  <Link href={localizePath("/jobs?visaSponsorship=YES", locale)} prefetch={false} className="rounded-full border border-line bg-surface-sunken px-4 py-2 hover:bg-surface-muted transition-colors">
                     {t("home.hero.visaSupported")}
                   </Link>
-                  <Link href="/trust" prefetch={false} className="rounded-full border border-line bg-surface-sunken px-4 py-2 hover:bg-surface-muted dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800 transition-colors">
+                  <Link href={href("/trust")} prefetch={false} className="rounded-full border border-line bg-surface-sunken px-4 py-2 hover:bg-surface-muted transition-colors">
                     {t("home.hero.seeTrustModel")}
                   </Link>
                 </div>
               </div>
 
               <div className="relative hidden lg:block">
-                <div className="surface-panel absolute -left-10 top-8 z-20 max-w-[14rem] rounded-2xl p-5 border border-line dark:border-zinc-800 bg-surface dark:bg-zinc-900 shadow-lg">
-                  <p className="text-xs uppercase tracking-widest font-semibold text-fg-muted dark:text-zinc-400">{t("home.launchThesis")}</p>
-                  <p className="font-display mt-2 text-2xl font-bold text-fg dark:text-zinc-50">
+                <div className="surface-panel absolute -left-10 top-8 z-20 max-w-[14rem] rounded-2xl p-5 border border-line bg-surface shadow-lg">
+                  <p className="text-xs uppercase tracking-widest font-semibold text-fg-muted">{t("home.launchThesis")}</p>
+                  <p className="font-display mt-2 text-2xl font-bold text-fg">
                     {t("home.smallerShortlists")}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-fg-secondary dark:text-zinc-400">
+                  <p className="mt-2 text-sm leading-6 text-fg-secondary">
                     {t("home.launchThesisDesc")}
                   </p>
                 </div>
 
-                <div className="surface-panel relative ml-auto w-full max-w-[36rem] rounded-3xl p-5 border border-line dark:border-zinc-800 bg-surface-sunken dark:bg-zinc-900">
-                  <div className="relative flex h-[540px] items-center justify-center overflow-hidden rounded-2xl border border-line dark:border-zinc-800 bg-surface dark:bg-zinc-950">
-                    <img
+                <div className="surface-panel relative ml-auto w-full max-w-[36rem] rounded-3xl p-5 border border-line bg-surface-sunken">
+                  <div className="relative flex h-[540px] items-center justify-center overflow-hidden rounded-2xl border border-line bg-surface">
+                    <Image
                       src="/images/hero/homepage-design-preview.webp"
-                      alt="AfriTalent platform preview"
+                      alt={tp("site.home.previewAlt")}
                       width={190}
                       height={600}
                       className="h-full w-auto object-contain p-4"
-                      fetchPriority="high"
+                      priority
                     />
                   </div>
 
@@ -133,7 +137,7 @@ export function HomePageContent() {
                     {signalLabels.map((label) => (
                       <div
                         key={label}
-                        className="rounded-xl border border-line bg-surface px-3 py-3 text-sm font-medium text-fg-secondary shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
+                        className="rounded-xl border border-line bg-surface px-3 py-3 text-sm font-medium text-fg-secondary shadow-sm"
                       >
                         {label}
                       </div>
@@ -153,25 +157,25 @@ export function HomePageContent() {
       <section className="section-shell py-20">
         <div className="page-frame">
           <div className="mb-16 text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+            <p className="text-sm font-semibold uppercase tracking-widest text-primary-text">
               {t("home.why.tagline")}
             </p>
-            <h2 className="font-display mt-4 text-3xl font-bold text-fg dark:text-zinc-50 md:text-5xl">
+            <h2 className="font-display mt-4 text-3xl font-bold text-fg md:text-5xl">
               {t("home.why.heading")}
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-lg text-fg-secondary dark:text-zinc-400">
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-fg-secondary">
               {t("home.why.subtitle")}
             </p>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {productSignals.map((item) => (
-              <div key={item.titleKey} className="surface-panel interactive-card rounded-2xl p-6 border border-line dark:border-zinc-800 bg-surface dark:bg-zinc-900">
+              <div key={item.titleKey} className="surface-panel interactive-card rounded-2xl p-6 border border-line bg-surface">
                 <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl font-bold text-lg ${item.tone}`}>
                   <item.Icon className="w-6 h-6" strokeWidth={2.5} />
                 </div>
-                <h3 className="mb-2 text-lg font-bold text-fg dark:text-zinc-100">{t(item.titleKey)}</h3>
-                <p className="text-sm leading-relaxed text-fg-secondary dark:text-zinc-400">{t(item.descKey)}</p>
+                <h3 className="mb-2 text-lg font-bold text-fg">{t(item.titleKey)}</h3>
+                <p className="text-sm leading-relaxed text-fg-secondary">{t(item.descKey)}</p>
               </div>
             ))}
           </div>
@@ -180,34 +184,35 @@ export function HomePageContent() {
 
       <section className="section-shell py-16">
         <div className="page-frame">
-          <div className="surface-panel overflow-hidden rounded-3xl border border-line bg-surface shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="surface-panel overflow-hidden rounded-3xl border border-line bg-surface shadow-sm">
             <div className="grid items-stretch lg:grid-cols-[0.95fr_1.05fr]">
               <div className="relative min-h-[320px] overflow-hidden bg-zinc-950 lg:min-h-[420px]">
-                <img
+                <Image
                   src="/images/generated/afritalent-smart-search-workspace.webp"
-                  alt="Smart job search workspace with hiring signals and candidate notes"
-                  loading="lazy"
-                  className="absolute inset-0 h-full w-full object-cover opacity-90"
+                  alt={tp("site.home.searchImageAlt")}
+                  fill
+                  sizes="(min-width: 1024px) 45vw, 100vw"
+                  className="object-cover opacity-90"
                 />
                 <div className="absolute inset-0 bg-gradient-to-tr from-emerald-950/55 via-transparent to-amber-500/15" />
               </div>
 
               <div className="px-6 py-12 md:px-10 lg:px-12">
-                <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+                <p className="text-sm font-semibold uppercase tracking-widest text-primary-text">
                   {t("home.sources.tagline")}
                 </p>
-                <h2 className="font-display mt-4 text-2xl font-bold text-fg dark:text-zinc-50 md:text-3xl">
+                <h2 className="font-display mt-4 text-2xl font-bold text-fg md:text-3xl">
                   {t("home.sources.heading")}
                 </h2>
-                <p className="mt-4 text-fg-secondary dark:text-zinc-400">
+                <p className="mt-4 text-fg-secondary">
                   {t("home.sources.description")}
                 </p>
 
                 <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-3">
                   {sourceLabels.map(([label, sublabel]) => (
                     <div key={label}>
-                      <div className="font-bold text-fg dark:text-zinc-200">{label}</div>
-                      <div className="mt-1 text-xs font-medium text-fg-muted dark:text-zinc-300">{sublabel}</div>
+                      <div className="font-bold text-fg">{label}</div>
+                      <div className="mt-1 text-xs font-medium text-fg-muted">{tp(sublabel)}</div>
                     </div>
                   ))}
                 </div>
@@ -221,11 +226,12 @@ export function HomePageContent() {
       <section className="px-0 py-20">
         <div className="page-frame text-center">
           <div className="relative overflow-hidden rounded-3xl border border-emerald-900 bg-emerald-950 px-6 py-16 text-white shadow-2xl md:px-12">
-            <img
+            <Image
               src="/images/generated/afritalent-collaboration-hiring.webp"
-              alt="Hiring team collaborating with a remote teammate"
-              loading="lazy"
-              className="absolute inset-0 h-full w-full object-cover opacity-20 mix-blend-overlay pointer-events-none"
+              alt=""
+              fill
+              sizes="100vw"
+              className="pointer-events-none object-cover opacity-20 mix-blend-overlay"
             />
             <div className="relative text-center z-10">
               <p className="text-sm font-semibold uppercase tracking-widest text-emerald-300">
@@ -240,12 +246,12 @@ export function HomePageContent() {
             </div>
 
             <div className="relative mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link href="/register" prefetch={false}>
+              <Link href={href("/register")} prefetch={false}>
                 <Button size="lg" className="w-full sm:w-auto bg-emerald-700 text-white hover:bg-emerald-800 border-transparent">
                   {t("home.cta.candidateCta")}
                 </Button>
               </Link>
-              <Link href="/resources" prefetch={false}>
+              <Link href={href("/resources")} prefetch={false}>
                 <Button size="lg" variant="outline" className="w-full border-emerald-700 bg-emerald-900 text-emerald-100 hover:bg-emerald-800 hover:text-white sm:w-auto">
                   {t("home.cta.resourcesCta")}
                 </Button>

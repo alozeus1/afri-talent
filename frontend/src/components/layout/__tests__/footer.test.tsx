@@ -22,11 +22,11 @@ describe('Footer Component', () => {
         render(<Footer />)
 
         // For Candidates
-        expect(screen.getByText('Browse Jobs')).toBeInTheDocument()
-        expect(screen.getByText('Career Resources')).toBeInTheDocument()
+        expect(screen.getByText('Browse jobs')).toBeInTheDocument()
+        expect(screen.getByText('Career resources')).toBeInTheDocument()
 
         // For Employers
-        expect(screen.getByText('Post a Job')).toBeInTheDocument()
+        expect(screen.getByText('Post a job')).toBeInTheDocument()
         expect(screen.getByText('Pricing')).toBeInTheDocument()
     })
 })

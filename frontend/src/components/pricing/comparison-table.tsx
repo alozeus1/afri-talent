@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { pricingEvents } from "@/lib/analytics";
+import { usePublicT } from "@/lib/i18n/public-messages";
+import { usePublicLabel } from "@/lib/i18n/public-labels";
 
 interface ComparisonRow {
   feature: string;
@@ -19,6 +21,8 @@ interface ComparisonTableProps {
 
 export function ComparisonTable({ title, plans, rows, tableType }: ComparisonTableProps) {
   const [expanded, setExpanded] = useState(false);
+  const tp = usePublicT();
+  const label = usePublicLabel();
 
   const visibleRows = expanded ? rows : rows.slice(0, 6);
 
@@ -30,13 +34,13 @@ export function ComparisonTable({ title, plans, rows, tableType }: ComparisonTab
       <div className="md:hidden space-y-4">
         {plans.map((plan) => (
           <div key={plan} className="bg-surface rounded-xl border border-line p-4">
-            <h4 className="font-semibold text-fg mb-3">{plan}</h4>
+            <h4 className="font-semibold text-fg mb-3">{label(plan)}</h4>
             <ul className="space-y-2">
               {visibleRows.map((row) => {
                 const val = row.values[plan];
                 return (
                   <li key={row.feature} className="flex items-center justify-between text-sm">
-                    <span className="text-fg-secondary">{row.feature}</span>
+                    <span className="text-fg-secondary">{label(row.feature)}</span>
                     <CellValue value={val} />
                   </li>
                 );
@@ -51,10 +55,10 @@ export function ComparisonTable({ title, plans, rows, tableType }: ComparisonTab
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b-2 border-line">
-              <th className="text-left text-sm font-medium text-fg-muted py-3 px-4 w-[40%]">Feature</th>
+              <th scope="col" className="text-start text-sm font-medium text-fg-muted py-3 px-4 w-[40%]">{tp("discover.pricing.feature")}</th>
               {plans.map((plan) => (
-                <th key={plan} className="text-center text-sm font-semibold text-fg py-3 px-4">
-                  {plan}
+                <th key={plan} scope="col" className="text-center text-sm font-semibold text-fg py-3 px-4">
+                  {label(plan)}
                 </th>
               ))}
             </tr>
@@ -63,13 +67,13 @@ export function ComparisonTable({ title, plans, rows, tableType }: ComparisonTab
             {visibleRows.map((row, i) => (
               <tr
                 key={row.feature}
-                className={`border-b border-line ${i % 2 === 0 ? "bg-gray-50/50" : ""}`}
+                className={`border-b border-line ${i % 2 === 0 ? "bg-surface-sunken" : ""}`}
               >
                 <td className="text-sm text-fg-secondary py-3 px-4">
-                  {row.feature}
+                  {label(row.feature)}
                   {row.tooltip && (
-                    <span className="ml-1 text-gray-400 cursor-help" title={row.tooltip}>
-                      <svg className="inline w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <span className="ms-1 text-fg-muted cursor-help" title={label(row.tooltip)} aria-label={label(row.tooltip)}>
+                      <svg aria-hidden="true" className="inline w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827m0 4.5h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </span>
@@ -93,11 +97,12 @@ export function ComparisonTable({ title, plans, rows, tableType }: ComparisonTab
               setExpanded(!expanded);
               if (!expanded) pricingEvents.comparisonExpand(tableType);
             }}
-            className="text-sm text-primary-text hover:text-emerald-700 font-medium"
+            className="text-sm text-primary-text hover:underline font-medium"
           >
-            {expanded ? "Show less" : `Show all ${rows.length} features`}
+            {expanded ? tp("discover.pricing.showLess") : tp("discover.pricing.showAll", { count: rows.length })}
             <svg
-              className={`inline w-4 h-4 ml-1 transition-transform ${expanded ? "rotate-180" : ""}`}
+              aria-hidden="true"
+              className={`inline w-4 h-4 ms-1 transition-transform ${expanded ? "rotate-180" : ""}`}
               fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -110,20 +115,22 @@ export function ComparisonTable({ title, plans, rows, tableType }: ComparisonTab
 }
 
 function CellValue({ value }: { value: string | boolean | undefined }) {
+  const tp = usePublicT();
+  const label = usePublicLabel();
   if (value === true) {
     return (
-      <svg className="mx-auto w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+      <svg role="img" aria-label={tp("discover.pricing.included")} className="mx-auto w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
       </svg>
     );
   }
   if (value === false || value === undefined) {
     return (
-      <svg className="mx-auto w-5 h-5 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <svg role="img" aria-label={tp("discover.pricing.notIncluded")} className="mx-auto w-5 h-5 text-fg-muted" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
       </svg>
     );
   }
   // String value — could be "5/mo", "Unlimited", etc.
-  return <Badge variant={value === "Unlimited" ? "success" : "default"}>{value}</Badge>;
+  return <Badge variant={value === "Unlimited" ? "success" : "default"}>{label(value)}</Badge>;
 }

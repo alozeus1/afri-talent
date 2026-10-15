@@ -3,10 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { ArrowLeft, ArrowRight, Newspaper } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { usePublicT, type PublicT } from "@/lib/i18n/public-messages";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 const BLOG_CATEGORY = "Weekly Hiring Trends";
@@ -36,47 +39,54 @@ interface BlogListResponse {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
+function formatDate(iso: string, locale: string) {
+  return new Date(iso).toLocaleDateString(locale, {
     month: "long",
     day: "numeric",
     year: "numeric",
   });
 }
 
-function readTime(post: BlogPost) {
-  return post.readMinutes ?? 4; // API-computed from full content; digests average ~4 min
+function readTime(post: BlogPost, tp: PublicT) {
+  // API-computed from full content; digests average ~4 min
+  return tp("guides.blog.readTime", { count: post.readMinutes ?? 4 });
 }
 
 // ── Hero / Featured post ──────────────────────────────────────────────────────
 
 function FeaturedPost({ post }: { post: BlogPost }) {
+  const tp = usePublicT();
+  const locale = useLocale();
   return (
-    <Link href={`/resources/${post.slug}`} className="block group">
-      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 min-h-[400px] flex flex-col justify-end">
+    <Link
+      href={localizePath(`/resources/${post.slug}`, locale)}
+      className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+    >
+      <div className="relative flex min-h-[400px] flex-col justify-end overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900">
         {post.coverImage && (
           <Image
             src={post.coverImage}
-            alt={post.title}
+            alt=""
             fill
-            className="object-cover opacity-40 group-hover:opacity-50 transition-opacity duration-300"
+            className="object-cover opacity-40 transition-opacity duration-300 group-hover:opacity-50"
             sizes="(max-width: 768px) 100vw, 1200px"
             priority
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" aria-hidden="true" />
         <div className="relative p-8 md:p-12">
-          <Badge className="bg-emerald-500 text-white border-0 mb-4">Latest Issue</Badge>
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-3 leading-snug group-hover:text-emerald-200 transition-colors">
+          <Badge className="mb-4 border-0 bg-emerald-500 text-white">{tp("guides.blog.latest")}</Badge>
+          <h2 className="mb-3 text-2xl font-bold leading-snug text-white transition-colors group-hover:text-emerald-200 md:text-3xl">
             {post.title}
           </h2>
-          <p className="text-gray-300 text-base mb-4 max-w-2xl line-clamp-2">{post.excerpt}</p>
-          <div className="flex items-center gap-4 text-gray-400 text-sm">
-            {post.publishedAt && <span>{formatDate(post.publishedAt)}</span>}
-            <span>·</span>
-            <span>{readTime(post)} min read</span>
-            <span className="ml-2 text-emerald-400 group-hover:underline font-medium">
-              Read now →
+          <p className="mb-4 line-clamp-2 max-w-2xl text-base text-zinc-200">{post.excerpt}</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-300">
+            {post.publishedAt && <span>{formatDate(post.publishedAt, locale)}</span>}
+            <span aria-hidden="true">·</span>
+            <span>{readTime(post, tp)}</span>
+            <span className="inline-flex items-center gap-1 font-medium text-emerald-300 group-hover:underline">
+              {tp("guides.blog.readNow")}
+              <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
             </span>
           </div>
         </div>
@@ -88,39 +98,46 @@ function FeaturedPost({ post }: { post: BlogPost }) {
 // ── Post card ─────────────────────────────────────────────────────────────────
 
 function PostCard({ post }: { post: BlogPost }) {
+  const tp = usePublicT();
+  const locale = useLocale();
   return (
-    <Link href={`/resources/${post.slug}`} className="block group h-full">
-      <Card className="h-full hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 overflow-hidden border-line">
-        <div className="relative h-48 bg-gradient-to-br from-emerald-50 to-teal-100 overflow-hidden">
+    <Link
+      href={localizePath(`/resources/${post.slug}`, locale)}
+      className="group block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+    >
+      <Card className="h-full overflow-hidden border-line transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-raised">
+        <div className="relative h-48 overflow-hidden bg-gradient-to-br from-emerald-500/10 to-teal-500/20">
           {post.coverImage ? (
             <Image
               src={post.coverImage}
-              alt={post.title}
+              alt=""
               fill
-              className="object-cover group-hover:scale-105 transition-transform duration-300"
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-4xl opacity-30">📰</span>
+              <Newspaper className="h-10 w-10 text-primary-text opacity-40" aria-hidden="true" />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
         </div>
         <CardContent className="p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Badge variant="info" className="text-xs">Weekly Digest</Badge>
-            {post.publishedAt && (
-              <span className="text-xs text-gray-400">{formatDate(post.publishedAt)}</span>
-            )}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Badge variant="info" className="text-xs">
+              {tp("guides.blog.digest")}
+            </Badge>
+            {post.publishedAt && <span className="text-xs text-fg-muted">{formatDate(post.publishedAt, locale)}</span>}
           </div>
-          <h3 className="font-semibold text-fg text-base leading-snug mb-2 group-hover:text-emerald-700 transition-colors line-clamp-2">
+          <h3 className="mb-2 line-clamp-2 text-base font-semibold leading-snug text-fg transition-colors group-hover:text-primary-text">
             {post.title}
           </h3>
-          <p className="text-fg-muted text-sm line-clamp-3 leading-relaxed">{post.excerpt}</p>
+          <p className="line-clamp-3 text-sm leading-relaxed text-fg-muted">{post.excerpt}</p>
           <div className="mt-4 flex items-center justify-between">
-            <span className="text-xs text-gray-400">{readTime(post)} min read</span>
-            <span className="text-xs text-primary-text font-medium group-hover:underline">Read →</span>
+            <span className="text-xs text-fg-muted">{readTime(post, tp)}</span>
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-primary-text group-hover:underline">
+              {tp("guides.blog.read")}
+              <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" aria-hidden="true" />
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -131,6 +148,8 @@ function PostCard({ post }: { post: BlogPost }) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function BlogPage() {
+  const tp = usePublicT();
+  const locale = useLocale();
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -151,17 +170,17 @@ export default function BlogPage() {
       if (search.trim()) params.set("search", search.trim());
 
       const res = await fetch(`${API_URL}/api/resources?${params}`);
-      if (!res.ok) throw new Error("Failed to load blog posts");
+      if (!res.ok) throw new Error(tp("guides.blog.loadError"));
       const data: BlogListResponse = await res.json();
 
       setPosts(data.resources);
       setPagination({ totalPages: data.pagination.totalPages, total: data.pagination.total });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load blog");
+      setError(err instanceof Error ? err.message : tp("guides.blog.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [search, page]);
+  }, [search, page, tp]);
 
   useEffect(() => {
     const timeout = setTimeout(fetchPosts, search ? 300 : 0);
@@ -171,89 +190,84 @@ export default function BlogPage() {
   const featured = page === 1 && !search ? posts[0] : null;
   const rest = featured ? posts.slice(1) : posts;
 
+  const goToPage = (next: number) => {
+    setPage(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
-    <div className="min-h-screen bg-surface-sunken dark:bg-gray-950">
+    <div className="min-h-screen bg-canvas">
       {/* Page header */}
-      <div className="bg-surface dark:bg-gray-900 border-b border-line dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+      <div className="border-b border-line bg-surface">
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-primary-text font-semibold text-sm tracking-wide uppercase">
-                  AfriTalent Blog
-                </span>
-              </div>
-              <h1 className="text-4xl md:text-5xl font-bold text-fg dark:text-white mb-3">
-                Weekly Hiring Trends
-              </h1>
-              <p className="text-fg-muted dark:text-gray-400 text-lg max-w-xl">
-                Every week, our AI research team curates the most important remote job market
-                insights — fact-checked and tailored for African tech professionals.
-              </p>
+              <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-primary-text">{tp("guides.blog.eyebrow")}</p>
+              <h1 className="font-display mb-3 text-4xl font-bold tracking-tight text-fg md:text-5xl">{tp("guides.blog.title")}</h1>
+              <p className="max-w-xl text-lg text-fg-secondary">{tp("guides.blog.subtitle")}</p>
             </div>
             <div className="flex-shrink-0">
-              <div className="bg-emerald-50 dark:bg-emerald-900/30 rounded-xl p-4 text-center">
-                <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
-                  {pagination.total}
-                </div>
-                <div className="text-sm text-primary-text dark:text-emerald-500 font-medium">
-                  Issues published
-                </div>
+              <div className="rounded-xl border border-success-line bg-success-soft p-4 text-center">
+                <div className="text-3xl font-bold text-primary-text">{pagination.total}</div>
+                <div className="text-sm font-medium text-fg-secondary">{tp("guides.blog.issues")}</div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         {/* Search */}
         <div className="mb-8 max-w-md">
           <Input
-            placeholder="Search blog posts..."
+            type="search"
+            aria-label={tp("guides.blog.search")}
+            placeholder={tp("guides.blog.search")}
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="bg-surface dark:bg-gray-800"
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
 
         {error && (
-          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
-            {error}
+          <div role="alert" className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger-line bg-danger-soft p-4 text-danger">
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={() => void fetchPosts()}>
+              {tp("site.error.retry")}
+            </Button>
           </div>
         )}
 
         {loading ? (
-          <div className="flex flex-col items-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600 mb-4" />
-            <p className="text-gray-400 text-sm">Loading insights...</p>
+          <div role="status" aria-busy="true" aria-label={tp("guides.blog.loading")} className="space-y-6">
+            <div className="h-[400px] animate-pulse rounded-2xl bg-surface-muted" />
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="h-72 animate-pulse rounded-xl bg-surface-muted" />
+              ))}
+            </div>
           </div>
         ) : posts.length === 0 && search ? (
-          <div className="text-center py-20">
-            <div className="text-6xl mb-4">📰</div>
-            <h2 className="text-2xl font-bold text-fg dark:text-white mb-2">
-              No matching posts
-            </h2>
-            <p className="text-fg-muted max-w-md mx-auto">
-              Try a different search term.
-            </p>
+          <div className="py-20 text-center">
+            <Newspaper className="mx-auto mb-4 h-12 w-12 text-fg-muted" aria-hidden="true" />
+            <h2 className="mb-2 text-2xl font-bold text-fg">{tp("guides.blog.noMatch")}</h2>
+            <p className="mx-auto max-w-md text-fg-muted">{tp("guides.blog.noMatchBody")}</p>
             <Button variant="outline" className="mt-4" onClick={() => setSearch("")}>
-              Clear search
+              {tp("guides.blog.clear")}
             </Button>
           </div>
-        ) : posts.length === 0 && !loading ? (
-          <div className="col-span-full py-20 text-center">
+        ) : posts.length === 0 && !error ? (
+          <div className="py-20 text-center">
             <div className="mx-auto max-w-md">
-              <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-emerald-50 flex items-center justify-center">
-                <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 12h6M7 8h2" />
-                </svg>
+              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-success-soft">
+                <Newspaper className="h-8 w-8 text-primary-text" aria-hidden="true" />
               </div>
-              <h2 className="text-xl font-semibold text-fg mb-3">Insights coming soon</h2>
-              <p className="text-fg-secondary mb-6">
-                We&apos;re curating weekly hiring trends, remote work guides, and salary insights for African professionals. Check back soon.
-              </p>
-              <Link href="/resources">
-                <Button variant="outline">Browse resources</Button>
+              <h2 className="mb-3 text-xl font-semibold text-fg">{tp("guides.blog.soonTitle")}</h2>
+              <p className="mb-6 text-fg-secondary">{tp("guides.blog.soonBody")}</p>
+              <Link href={localizePath("/resources", locale)}>
+                <Button variant="outline">{tp("guides.blog.browseResources")}</Button>
               </Link>
             </div>
           </div>
@@ -270,12 +284,12 @@ export default function BlogPage() {
             {rest.length > 0 && (
               <>
                 {featured && (
-                  <div className="flex items-center gap-4 mb-6">
-                    <h2 className="text-xl font-bold text-fg dark:text-white">Archive</h2>
-                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                  <div className="mb-6 flex items-center gap-4">
+                    <h2 className="text-xl font-bold text-fg">{tp("guides.blog.archive")}</h2>
+                    <div className="h-px flex-1 bg-line" aria-hidden="true" />
                   </div>
                 )}
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                <div className="mb-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {rest.map((post) => (
                     <PostCard key={post.id} post={post} />
                   ))}
@@ -285,43 +299,32 @@ export default function BlogPage() {
 
             {/* Pagination */}
             {pagination.totalPages > 1 && (
-              <div className="flex justify-center gap-2">
-                <Button
-                  variant="outline"
-                  disabled={page <= 1}
-                  onClick={() => { setPage(page - 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                >
-                  ← Previous
+              <nav aria-label={tp("guides.blog.pagination")} className="flex justify-center gap-2">
+                <Button variant="outline" disabled={page <= 1} onClick={() => goToPage(page - 1)}>
+                  <ArrowLeft className="me-1 h-4 w-4 rtl:rotate-180" aria-hidden="true" />
+                  {tp("discover.page.previous")}
                 </Button>
-                <span className="flex items-center px-4 text-sm text-fg-secondary dark:text-gray-300">
-                  Page {page} of {pagination.totalPages}
+                <span className="flex items-center px-4 text-sm text-fg-secondary">
+                  {tp("discover.page.of", { page, total: pagination.totalPages })}
                 </span>
-                <Button
-                  variant="outline"
-                  disabled={page >= pagination.totalPages}
-                  onClick={() => { setPage(page + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                >
-                  Next →
+                <Button variant="outline" disabled={page >= pagination.totalPages} onClick={() => goToPage(page + 1)}>
+                  {tp("discover.page.next")}
+                  <ArrowRight className="ms-1 h-4 w-4 rtl:rotate-180" aria-hidden="true" />
                 </Button>
-              </div>
+              </nav>
             )}
           </>
         )}
       </div>
 
       {/* Newsletter/subscribe CTA */}
-      <div className="bg-emerald-700 dark:bg-emerald-900 mt-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-14 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
-            Never miss a weekly digest
-          </h2>
-          <p className="text-emerald-200 mb-6 max-w-lg mx-auto">
-            Every Monday, get the latest remote hiring trends, in-demand skills, and Africa-specific
-            job market insights — delivered automatically.
-          </p>
-          <Link href="/register">
-            <Button className="bg-surface text-emerald-700 hover:bg-emerald-50 font-semibold px-8 py-3 text-base">
-              Join AfriTalent free →
+      <div className="mt-16 bg-emerald-800">
+        <div className="mx-auto max-w-4xl px-4 py-14 text-center sm:px-6 lg:px-8">
+          <h2 className="mb-3 text-2xl font-bold text-white md:text-3xl">{tp("guides.blog.ctaTitle")}</h2>
+          <p className="mx-auto mb-6 max-w-lg text-emerald-100">{tp("guides.blog.ctaBody")}</p>
+          <Link href={localizePath("/register", locale)}>
+            <Button className="bg-white px-8 py-3 text-base font-semibold text-emerald-800 hover:bg-emerald-50 dark:bg-white dark:text-emerald-800 dark:hover:bg-emerald-50">
+              {tp("guides.blog.ctaButton")}
             </Button>
           </Link>
         </div>

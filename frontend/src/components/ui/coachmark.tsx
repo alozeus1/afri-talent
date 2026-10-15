@@ -10,56 +10,55 @@ interface CoachmarkProps {
   children: React.ReactNode;
 }
 
+/**
+ * Hover hint for a badge. It is decorative (the badge text already carries
+ * the meaning), so it is hidden from assistive tech and adds no extra click
+ * target inside the job-card link.
+ */
 export function Coachmark({ title, description, position = "top", children }: CoachmarkProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div 
-      className="relative inline-flex"
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-      onClick={(e) => {
-        // Prevent click from propagating up to the link if it wraps this
-        e.preventDefault();
-        e.stopPropagation();
-      }}
-    >
-      {/* Target Element */}
-      <div className="relative">
+    <span className="relative inline-flex" onMouseEnter={() => setIsOpen(true)} onMouseLeave={() => setIsOpen(false)}>
+      {/* Target element */}
+      <span className="relative">
         {children}
-        
-        {/* Pulsing indicator */}
-        <span className="absolute -top-1 -right-1 flex h-3 w-3">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500 border-2 border-white dark:border-zinc-950"></span>
-        </span>
-      </div>
 
-      {/* Tooltip Card */}
+        {/* Pulsing indicator */}
+        <span className="absolute -top-1 -end-1 flex h-3 w-3" aria-hidden="true">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75 motion-reduce:animate-none"></span>
+          <span className="relative inline-flex h-3 w-3 rounded-full border-2 border-surface bg-amber-500"></span>
+        </span>
+      </span>
+
+      {/* Tooltip card */}
       {isOpen && (
-        <div 
-          className={`absolute z-[100] w-64 p-4 rounded-xl border border-line bg-surface shadow-xl dark:border-zinc-800 dark:bg-zinc-900 transition-all duration-200 animate-in fade-in zoom-in-95
-            ${position === 'top' ? 'bottom-full left-1/2 -translate-x-1/2 mb-3' : ''}
-            ${position === 'bottom' ? 'top-full left-1/2 -translate-x-1/2 mt-3' : ''}
+        <span
+          aria-hidden="true"
+          className={`absolute z-[100] w-64 rounded-xl border border-line bg-surface-raised p-4 shadow-overlay transition-all duration-200 animate-in fade-in zoom-in-95
+            ${position === "top" ? "bottom-full left-1/2 mb-3 -translate-x-1/2" : ""}
+            ${position === "bottom" ? "top-full left-1/2 mt-3 -translate-x-1/2" : ""}
           `}
         >
-          <div className="flex items-start gap-3">
-            <div className="shrink-0 p-2 bg-emerald-50 text-primary-text rounded-lg dark:bg-emerald-900/30 dark:text-emerald-400">
-              <Info className="w-4 h-4" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-fg dark:text-zinc-100">{title}</h4>
-              <p className="mt-1 text-xs text-fg-secondary dark:text-zinc-400 leading-relaxed">{description}</p>
-            </div>
-          </div>
-          
+          <span className="flex items-start gap-3">
+            <span className="shrink-0 rounded-lg bg-success-soft p-2 text-primary-text">
+              <Info className="h-4 w-4" />
+            </span>
+            <span className="block">
+              <span className="block text-sm font-bold text-fg">{title}</span>
+              <span className="mt-1 block text-xs leading-relaxed text-fg-secondary">{description}</span>
+            </span>
+          </span>
+
           {/* Arrow */}
-          <div className={`absolute w-3 h-3 bg-surface border border-line dark:bg-zinc-900 dark:border-zinc-800 rotate-45
-            ${position === 'top' ? '-bottom-1.5 left-1/2 -translate-x-1/2 border-t-0 border-l-0' : ''}
-            ${position === 'bottom' ? '-top-1.5 left-1/2 -translate-x-1/2 border-b-0 border-r-0' : ''}
-          `} />
-        </div>
+          <span
+            className={`absolute h-3 w-3 rotate-45 border border-line bg-surface-raised
+            ${position === "top" ? "-bottom-1.5 left-1/2 -translate-x-1/2 border-l-0 border-t-0" : ""}
+            ${position === "bottom" ? "-top-1.5 left-1/2 -translate-x-1/2 border-b-0 border-r-0" : ""}
+          `}
+          />
+        </span>
       )}
-    </div>
+    </span>
   );
 }

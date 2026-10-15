@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import Link from "next/link";
+import { ChevronDown, Lightbulb, PenLine, ThumbsUp, X } from "lucide-react";
 import {
   interviewExperiences,
   InterviewListResponse,
@@ -13,10 +15,11 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CardGridSkeleton } from "@/components/ui/skeleton";
 import { trackEvent } from "@/lib/analytics";
-import { useT } from "@/lib/i18n/client";
+import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { usePublicT, type PublicMessageKey, type PublicT } from "@/lib/i18n/public-messages";
 
-const DIFFICULTY_OPTIONS = ["EASY", "MEDIUM", "HARD"];
-const OUTCOME_OPTIONS = ["OFFERED", "REJECTED", "NO_RESPONSE", "IN_PROGRESS"];
+const DIFFICULTY_OPTIONS = ["EASY", "MEDIUM", "HARD"] as const;
+const OUTCOME_OPTIONS = ["OFFERED", "REJECTED", "NO_RESPONSE", "IN_PROGRESS"] as const;
 const INTERVIEW_TYPES = [
   "PHONE_SCREEN",
   "TECHNICAL",
@@ -26,118 +29,94 @@ const INTERVIEW_TYPES = [
   "PANEL",
   "ON_SITE",
   "OTHER",
-];
+] as const;
 const HELPFUL_STORAGE_KEY = "afritalent_interview_helpful_votes";
 
-const MOCK_EXPERIENCES: InterviewExperienceItem[] = [
-  {
-    id: "sample-aws-cloud-engineer",
-    company: { id: "sample-company-type-cloud", name: "Sample scenario: global cloud consulting team" },
-    jobTitle: "AWS Cloud Engineer",
-    difficulty: "MEDIUM",
-    outcome: "IN_PROGRESS",
-    interviewType: "TECHNICAL",
-    process: "Practice scenario, not a real user-submitted interview. A typical flow could include a recruiter screen, AWS fundamentals round, troubleshooting exercise, and a short architecture discussion.",
-    questions: ["How would you troubleshoot an EC2 instance that cannot be reached over SSH?", "Explain public vs private subnets in a VPC.", "How would you monitor a small production API?"],
-    tips: "Prepare to explain IAM, VPC routing, security groups, CloudWatch, and one reliability story from your own experience.",
-    duration: "Practice flow: 3 to 4 rounds",
-    helpfulCount: 42,
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-  {
-    id: "sample-devops-engineer",
-    company: { id: "sample-company-type-saas", name: "Sample scenario: remote SaaS platform team" },
-    jobTitle: "DevOps Engineer",
-    difficulty: "HARD",
-    outcome: "IN_PROGRESS",
-    interviewType: "SYSTEM_DESIGN",
-    process: "Practice scenario, not a real user-submitted interview. The candidate is asked to design a deployment pipeline, debug a failed release, and explain rollback and observability choices.",
-    questions: ["Design a CI/CD pipeline from commit to production.", "A deployment passes tests but health checks fail. What do you do first?", "How do you manage secrets in CI/CD?"],
-    tips: "Use a structured answer: quality gates, deployment strategy, monitoring, rollback, and communication.",
-    duration: "Practice flow: 2 to 3 rounds",
-    helpfulCount: 15,
-    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-  },
-  {
-    id: "sample-cybersecurity-analyst",
-    company: { id: "sample-company-type-fintech", name: "Sample scenario: regulated fintech security team" },
-    jobTitle: "Cybersecurity Analyst",
-    difficulty: "HARD",
-    outcome: "IN_PROGRESS",
-    interviewType: "TECHNICAL",
-    process: "Practice scenario, not a real user-submitted interview. The flow includes a security fundamentals screen, phishing/risk discussion, and an incident response case.",
-    questions: ["How would you prioritize vulnerabilities when fixes exceed team capacity?", "What phishing indicators would you teach non-technical users?", "How would you document an incident escalation?"],
-    tips: "Think in evidence, impact, urgency, and practical risk reduction. Avoid guessing when facts are missing.",
-    duration: "Practice flow: 2 to 4 rounds",
-    helpfulCount: 89,
-    createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
-  },
-  {
-    id: "sample-backend-developer",
-    company: { id: "sample-company-type-marketplace", name: "Sample scenario: global marketplace engineering team" },
-    jobTitle: "Backend Developer",
-    difficulty: "MEDIUM",
-    outcome: "IN_PROGRESS",
-    interviewType: "TECHNICAL",
-    process: "Practice scenario, not a real user-submitted interview. The candidate discusses API design, duplicate handling, data validation, and production debugging.",
-    questions: ["Design an API for saving and tracking job applications.", "How would you prevent duplicate jobs from multiple providers?", "A production endpoint is timing out. What is your debugging sequence?"],
-    tips: "Explain data models, status transitions, authorization, logs, metrics, and a safe mitigation path.",
-    duration: "Practice flow: 3 rounds",
-    helpfulCount: 23,
-    createdAt: new Date(Date.now() - 86400000 * 18).toISOString(),
-  },
-  {
-    id: "sample-product-manager",
-    company: { id: "sample-company-type-startup", name: "Sample scenario: early-stage product team" },
-    jobTitle: "Product Manager",
-    difficulty: "MEDIUM",
-    outcome: "IN_PROGRESS",
-    interviewType: "BEHAVIORAL",
-    process: "Practice scenario, not a real user-submitted interview. The flow evaluates product judgment, prioritization, early-user feedback, and safety metrics.",
-    questions: ["How would you prioritize improvements for a pre-launch job platform?", "Tell me about a time you changed direction after user feedback.", "What metrics would you track for an application assistant feature?"],
-    tips: "Anchor answers in user value, risk, learning speed, and measurable product quality signals.",
-    duration: "Practice flow: 2 to 3 rounds",
-    helpfulCount: 7,
-    createdAt: new Date(Date.now() - 86400000 * 25).toISOString(),
-  }
-];
+const DIFFICULTY_LABELS: Record<string, PublicMessageKey> = {
+  EASY: "guides.iv.difficulty.easy",
+  MEDIUM: "guides.iv.difficulty.medium",
+  HARD: "guides.iv.difficulty.hard",
+};
+const OUTCOME_LABELS: Record<string, PublicMessageKey> = {
+  OFFERED: "guides.iv.outcome.offered",
+  REJECTED: "guides.iv.outcome.rejected",
+  NO_RESPONSE: "guides.iv.outcome.noResponse",
+  IN_PROGRESS: "guides.iv.outcome.inProgress",
+};
+const TYPE_LABELS: Record<string, PublicMessageKey> = {
+  PHONE_SCREEN: "guides.iv.type.phone",
+  TECHNICAL: "guides.iv.type.technical",
+  BEHAVIORAL: "guides.iv.type.behavioral",
+  SYSTEM_DESIGN: "guides.iv.type.systemDesign",
+  TAKE_HOME: "guides.iv.type.takeHome",
+  PANEL: "guides.iv.type.panel",
+  ON_SITE: "guides.iv.type.onSite",
+  OTHER: "guides.iv.type.other",
+};
 
-function difficultyBadge(difficulty: string) {
-  switch (difficulty.toUpperCase()) {
-    case "EASY":
-      return <Badge variant="success">Easy</Badge>;
-    case "MEDIUM":
-      return <Badge variant="warning">Medium</Badge>;
-    case "HARD":
-      return <Badge variant="danger">Hard</Badge>;
-    default:
-      return <Badge>{difficulty}</Badge>;
-  }
+const label = (map: Record<string, PublicMessageKey>, value: string, tp: PublicT) =>
+  map[value.toUpperCase()] ? tp(map[value.toUpperCase()]) : value;
+
+// Clearly labelled practice scenarios shown until real community entries exist.
+const SAMPLE_SCENARIOS = [
+  { id: "aws", jobTitle: "AWS Cloud Engineer", difficulty: "MEDIUM", interviewType: "TECHNICAL", helpfulCount: 42, ageDays: 2 },
+  { id: "devops", jobTitle: "DevOps Engineer", difficulty: "HARD", interviewType: "SYSTEM_DESIGN", helpfulCount: 15, ageDays: 5 },
+  { id: "security", jobTitle: "Cybersecurity Analyst", difficulty: "HARD", interviewType: "TECHNICAL", helpfulCount: 89, ageDays: 12 },
+  { id: "backend", jobTitle: "Backend Developer", difficulty: "MEDIUM", interviewType: "TECHNICAL", helpfulCount: 23, ageDays: 18 },
+  { id: "product", jobTitle: "Product Manager", difficulty: "MEDIUM", interviewType: "BEHAVIORAL", helpfulCount: 7, ageDays: 25 },
+] as const;
+
+function buildSampleExperiences(tp: PublicT): InterviewExperienceItem[] {
+  return SAMPLE_SCENARIOS.map((sample) => {
+    const key = (field: string) => `guides.iv.sample.${sample.id}.${field}` as PublicMessageKey;
+    return {
+      id: `sample-${sample.id}`,
+      company: { id: `sample-company-${sample.id}`, name: tp(key("company")) },
+      jobTitle: sample.jobTitle,
+      difficulty: sample.difficulty,
+      outcome: "IN_PROGRESS",
+      interviewType: sample.interviewType,
+      process: tp(key("process")),
+      questions: [tp(key("q1")), tp(key("q2")), tp(key("q3"))],
+      tips: tp(key("tips")),
+      duration: tp(key("duration")),
+      helpfulCount: sample.helpfulCount,
+      createdAt: new Date(Date.now() - 86400000 * sample.ageDays).toISOString(),
+    };
+  });
 }
 
-function outcomeBadge(outcome: string) {
-  switch (outcome.toUpperCase()) {
-    case "OFFERED":
-      return <Badge variant="success">Offered</Badge>;
-    case "REJECTED":
-      return <Badge variant="danger">Rejected</Badge>;
-    case "NO_RESPONSE":
-      return <Badge variant="warning">No Response</Badge>;
-    case "IN_PROGRESS":
-      return <Badge variant="info">In Progress</Badge>;
-    default:
-      return <Badge>{outcome}</Badge>;
-  }
-}
+const FIELD_CLASS =
+  "w-full rounded-xl border border-line-strong bg-surface-raised px-4 py-3 text-fg placeholder:text-fg-muted shadow-xs focus:outline-none focus:ring-2 focus:ring-focus";
+const chipClass = (active: boolean) =>
+  `rounded-full px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+    active ? "bg-primary text-primary-fg" : "bg-surface-muted text-fg-secondary hover:text-fg"
+  }`;
+
+const EMPTY_FORM = {
+  companyId: "",
+  companySearch: "",
+  jobTitle: "",
+  difficulty: "MEDIUM",
+  outcome: "OFFERED",
+  interviewType: "TECHNICAL",
+  process: "",
+  questions: [""],
+  tips: "",
+  duration: "",
+};
 
 export default function InterviewsPage() {
   const t = useT();
+  const tp = usePublicT();
+  const locale = useLocale();
   const { user } = useAuth();
+  const sampleExperiences = useMemo(() => buildSampleExperiences(tp), [tp]);
 
   // List state
   const [data, setData] = useState<InterviewListResponse | null>(null);
+  const [usingSamples, setUsingSamples] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Filters
   const [searchText, setSearchText] = useState("");
@@ -150,21 +129,11 @@ export default function InterviewsPage() {
 
   // Submit modal
   const [showSubmitForm, setShowSubmitForm] = useState(false);
+  const [loginPrompt, setLoginPrompt] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    companyId: "",
-    companySearch: "",
-    jobTitle: "",
-    difficulty: "MEDIUM",
-    outcome: "OFFERED",
-    interviewType: "TECHNICAL",
-    process: "",
-    questions: [""],
-    tips: "",
-    duration: "",
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
   // Helpful tracking
   const [helpfulSet, setHelpfulSet] = useState<Set<string>>(new Set());
@@ -182,7 +151,6 @@ export default function InterviewsPage() {
 
   const fetchExperiences = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const response = await interviewExperiences.list({
         jobTitle: searchText || undefined,
@@ -191,17 +159,12 @@ export default function InterviewsPage() {
       });
       if (response && response.experiences.length > 0) {
         setData(response);
+        setUsingSamples(false);
       } else {
-        setData({
-          experiences: MOCK_EXPERIENCES,
-          pagination: { page: 1, limit: 10, total: MOCK_EXPERIENCES.length, totalPages: 1 }
-        });
+        setUsingSamples(true);
       }
     } catch {
-      setData({
-        experiences: MOCK_EXPERIENCES,
-        pagination: { page: 1, limit: 10, total: MOCK_EXPERIENCES.length, totalPages: 1 }
-      });
+      setUsingSamples(true);
     } finally {
       setLoading(false);
     }
@@ -214,6 +177,26 @@ export default function InterviewsPage() {
     return () => clearTimeout(debounce);
   }, [fetchExperiences]);
 
+  // Samples are rebuilt per locale, so they are derived rather than stored.
+  const listData: InterviewListResponse | null = usingSamples
+    ? {
+        experiences: sampleExperiences.map((exp) =>
+          helpfulSet.has(exp.id) ? { ...exp, helpfulCount: exp.helpfulCount + 1 } : exp,
+        ),
+        pagination: { page: 1, limit: 10, total: sampleExperiences.length, totalPages: 1 },
+      }
+    : data;
+
+  // Escape closes the share dialog.
+  useEffect(() => {
+    if (!showSubmitForm) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowSubmitForm(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showSubmitForm]);
+
   const handleHelpful = async (id: string) => {
     if (helpfulSet.has(id)) return;
     const isDemoExperience = id.startsWith("exp-") || id.startsWith("sample-");
@@ -224,16 +207,20 @@ export default function InterviewsPage() {
     setHelpfulError(null);
     setHelpfulLoadingId(id);
     setHelpfulSet(nextHelpfulSet);
-    window.localStorage.setItem(HELPFUL_STORAGE_KEY, JSON.stringify([...nextHelpfulSet]));
-    setData((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        experiences: prev.experiences.map((exp) =>
-          exp.id === id ? { ...exp, helpfulCount: exp.helpfulCount + 1 } : exp
-        ),
-      };
-    });
+    try {
+      window.localStorage.setItem(HELPFUL_STORAGE_KEY, JSON.stringify([...nextHelpfulSet]));
+    } catch {
+      // Storage unavailable: the vote still counts for this session.
+    }
+    if (!isDemoExperience) {
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          experiences: prev.experiences.map((exp) => (exp.id === id ? { ...exp, helpfulCount: exp.helpfulCount + 1 } : exp)),
+        };
+      });
+    }
     trackEvent("interview_experience_helpful_clicked", { experience_id: id, demo: isDemoExperience });
 
     try {
@@ -243,32 +230,27 @@ export default function InterviewsPage() {
     } catch {
       setData(previousData);
       setHelpfulSet(previousHelpfulSet);
-      window.localStorage.setItem(HELPFUL_STORAGE_KEY, JSON.stringify([...previousHelpfulSet]));
-      setHelpfulError("Could not save your helpful vote. Please try again.");
+      try {
+        window.localStorage.setItem(HELPFUL_STORAGE_KEY, JSON.stringify([...previousHelpfulSet]));
+      } catch {
+        // ignore
+      }
+      setHelpfulError(tp("guides.iv.helpfulError"));
     } finally {
       setHelpfulLoadingId(null);
     }
   };
 
   const addQuestion = () => {
-    setFormData((prev) => ({
-      ...prev,
-      questions: [...prev.questions, ""],
-    }));
+    setFormData((prev) => ({ ...prev, questions: [...prev.questions, ""] }));
   };
 
   const removeQuestion = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      questions: prev.questions.filter((_, i) => i !== index),
-    }));
+    setFormData((prev) => ({ ...prev, questions: prev.questions.filter((_, i) => i !== index) }));
   };
 
   const updateQuestion = (index: number, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      questions: prev.questions.map((q, i) => (i === index ? value : q)),
-    }));
+    setFormData((prev) => ({ ...prev, questions: prev.questions.map((q, i) => (i === index ? value : q)) }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -289,18 +271,7 @@ export default function InterviewsPage() {
         duration: formData.duration || undefined,
       });
       setSubmitSuccess(true);
-      setFormData({
-        companyId: "",
-        companySearch: "",
-        jobTitle: "",
-        difficulty: "MEDIUM",
-        outcome: "OFFERED",
-        interviewType: "TECHNICAL",
-        process: "",
-        questions: [""],
-        tips: "",
-        duration: "",
-      });
+      setFormData(EMPTY_FORM);
       // Refresh list
       fetchExperiences();
       setTimeout(() => {
@@ -308,92 +279,92 @@ export default function InterviewsPage() {
         setSubmitSuccess(false);
       }, 2000);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to submit experience");
+      setSubmitError(err instanceof Error ? err.message : tp("guides.iv.submitError"));
     } finally {
       setSubmitLoading(false);
     }
   };
 
   // Filter experiences client-side for outcome (API may not support it)
-  const filteredExperiences = data?.experiences.filter((exp) => {
+  const filteredExperiences = listData?.experiences.filter((exp) => {
     if (filterOutcome && exp.outcome.toUpperCase() !== filterOutcome) return false;
     return true;
   });
 
+  const closeForm = () => {
+    setShowSubmitForm(false);
+    setSubmitError(null);
+    setSubmitSuccess(false);
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="mx-auto max-w-7xl px-4 py-12 pb-28 sm:px-6 lg:px-8">
       {/* Hero */}
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-fg mb-4">{t("interviews.title")}</h1>
-        <p className="text-lg text-fg-secondary max-w-2xl mx-auto">
-          {t("interviews.practiceSubtitle")}
-        </p>
+      <div className="mb-12 text-center">
+        <h1 className="font-display mb-4 text-4xl font-bold tracking-tight text-fg">{t("interviews.title")}</h1>
+        <p className="mx-auto max-w-2xl text-lg text-fg-secondary">{t("interviews.practiceSubtitle")}</p>
       </div>
 
-      {/* Search and Filters */}
+      {/* Search and filters */}
       <Card className="mb-8">
         <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
-            <div className="flex-1">
-              <Input
-                placeholder={t("interviews.searchPlaceholder")}
-                value={searchText}
-                onChange={(e) => {
-                  setSearchText(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
+          <div className="mb-4">
+            <Input
+              type="search"
+              aria-label={t("interviews.searchPlaceholder")}
+              placeholder={t("interviews.searchPlaceholder")}
+              value={searchText}
+              onChange={(e) => {
+                setSearchText(e.target.value);
+                setPage(1);
+              }}
+            />
           </div>
 
-          {/* Filter Chips */}
-          <div className="flex flex-wrap gap-2">
-            <span className="text-sm text-fg-muted self-center mr-2">{t("common.difficulty")}:</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="me-2 text-sm text-fg-muted">{t("common.difficulty")}:</span>
             {DIFFICULTY_OPTIONS.map((d) => (
               <button
+                type="button"
                 key={d}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  filterDifficulty === d
-                    ? "bg-emerald-600 text-white"
-                    : "bg-surface-muted text-fg-secondary hover:bg-gray-200"
-                }`}
+                aria-pressed={filterDifficulty === d}
+                className={chipClass(filterDifficulty === d)}
                 onClick={() => {
                   setFilterDifficulty(filterDifficulty === d ? "" : d);
                   setPage(1);
                 }}
               >
-                {d.charAt(0) + d.slice(1).toLowerCase()}
+                {tp(DIFFICULTY_LABELS[d])}
               </button>
             ))}
 
-            <span className="text-sm text-fg-muted self-center ml-4 mr-2">{t("common.outcome")}:</span>
-            {["OFFERED", "REJECTED"].map((o) => (
+            <span className="me-2 ms-4 text-sm text-fg-muted">{t("common.outcome")}:</span>
+            {(["OFFERED", "REJECTED"] as const).map((o) => (
               <button
+                type="button"
                 key={o}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  filterOutcome === o
-                    ? "bg-emerald-600 text-white"
-                    : "bg-surface-muted text-fg-secondary hover:bg-gray-200"
-                }`}
+                aria-pressed={filterOutcome === o}
+                className={chipClass(filterOutcome === o)}
                 onClick={() => {
                   setFilterOutcome(filterOutcome === o ? "" : o);
                   setPage(1);
                 }}
               >
-                {o.charAt(0) + o.slice(1).toLowerCase()}
+                {tp(OUTCOME_LABELS[o])}
               </button>
             ))}
 
             {(filterDifficulty || filterOutcome) && (
               <button
-                className="px-3 py-1 rounded-full text-sm font-medium text-red-600 hover:bg-red-50"
+                type="button"
+                className="rounded-full px-3 py-1 text-sm font-medium text-danger hover:bg-danger-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 onClick={() => {
                   setFilterDifficulty("");
                   setFilterOutcome("");
                   setPage(1);
                 }}
               >
-                Clear filters
+                {t("interviews.clearFilters")}
               </button>
             )}
           </div>
@@ -401,40 +372,30 @@ export default function InterviewsPage() {
       </Card>
 
       {/* Loading */}
-      {loading && (
-        <CardGridSkeleton count={3} />
-      )}
+      {loading && <CardGridSkeleton count={3} />}
 
-      {/* Error */}
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-8">{error}</div>
-      )}
       {helpfulError && (
-        <div className="bg-amber-50 text-amber-800 border border-amber-200 p-4 rounded-lg mb-8 text-sm">
+        <div role="alert" className="mb-8 rounded-lg border border-warning-line bg-warning-soft p-4 text-sm text-fg">
           {helpfulError}
         </div>
       )}
 
-      {/* Interview Cards */}
+      {/* Interview cards */}
       {!loading && filteredExperiences && (
         <>
           {filteredExperiences.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken p-10 text-center">
-              <p className="text-lg font-semibold text-fg mb-2">{t("interviews.noMatch")}</p>
-              <p className="mx-auto max-w-xl text-sm leading-6 text-fg-muted">
-                {t("interviews.noMatchDesc")}
-              </p>
+              <p className="mb-2 text-lg font-semibold text-fg">{t("interviews.noMatch")}</p>
+              <p className="mx-auto max-w-xl text-sm leading-6 text-fg-muted">{t("interviews.noMatchDesc")}</p>
             </div>
           ) : (
-            <div className="space-y-4 mb-8">
+            <div className="mb-8 space-y-4">
               {filteredExperiences.map((exp) => (
                 <InterviewCard
                   key={exp.id}
                   experience={exp}
                   isExpanded={expandedId === exp.id}
-                  onToggle={() =>
-                    setExpandedId(expandedId === exp.id ? null : exp.id)
-                  }
+                  onToggle={() => setExpandedId(expandedId === exp.id ? null : exp.id)}
                   onHelpful={() => handleHelpful(exp.id)}
                   isHelpfulMarked={helpfulSet.has(exp.id)}
                   isHelpfulLoading={helpfulLoadingId === exp.id}
@@ -444,23 +405,15 @@ export default function InterviewsPage() {
           )}
 
           {/* Pagination */}
-          {data && data.pagination.totalPages > 1 && (
-            <div className="flex justify-center gap-2 mb-8">
-              <Button
-                variant="outline"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
+          {listData && listData.pagination.totalPages > 1 && (
+            <div className="mb-8 flex justify-center gap-2">
+              <Button variant="outline" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
                 {t("common.previous")}
               </Button>
               <span className="flex items-center px-4 text-fg-secondary">
-                Page {page} of {data.pagination.totalPages}
+                {tp("discover.page.of", { page, total: listData.pagination.totalPages })}
               </span>
-              <Button
-                variant="outline"
-                disabled={page === data.pagination.totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
+              <Button variant="outline" disabled={page === listData.pagination.totalPages} onClick={() => setPage((p) => p + 1)}>
                 {t("common.next")}
               </Button>
             </div>
@@ -468,53 +421,64 @@ export default function InterviewsPage() {
         </>
       )}
 
-      {/* Floating Share Button */}
-      <div className="fixed bottom-8 right-8 z-50">
+      {/* Floating share button */}
+      <div className="fixed bottom-6 end-6 z-40 flex max-w-xs flex-col items-end gap-2">
+        {loginPrompt && !user && (
+          <div role="status" className="rounded-xl border border-line bg-surface-raised p-3 text-sm text-fg-secondary shadow-overlay">
+            {tp("guides.iv.loginPrompt")}{" "}
+            <Link
+              href={`${localizePath("/login", locale)}?redirect=${encodeURIComponent(localizePath("/interviews", locale))}`}
+              className="font-medium text-primary-text hover:underline"
+            >
+              {t("auth.signIn")}
+            </Link>
+          </div>
+        )}
         <Button
           size="lg"
-          className="shadow-lg"
+          className="shadow-raised"
           onClick={() => {
             if (!user) {
-              alert("Please log in to share your interview experience.");
+              setLoginPrompt(true);
               return;
             }
             setShowSubmitForm(true);
           }}
         >
-          ✍️ {t("interviews.shareExperience")}
+          <PenLine className="me-2 h-4 w-4" aria-hidden="true" />
+          {t("interviews.shareExperience")}
         </Button>
       </div>
 
-      {/* Submit Modal */}
+      {/* Share dialog */}
       {showSubmitForm && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-10 px-4 overflow-y-auto">
-          <Card className="w-full max-w-2xl mb-10">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 pt-10">
+          <button type="button" tabIndex={-1} aria-label={tp("site.trust.close")} className="fixed inset-0 cursor-default bg-black/50" onClick={closeForm} />
+          <Card className="relative mb-10 w-full max-w-2xl" role="dialog" aria-modal="true" aria-labelledby="share-interview-title">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-fg">
+                <h2 id="share-interview-title" className="text-xl font-bold text-fg">
                   {t("interviews.shareExperience")}
                 </h2>
                 <button
-                  className="text-gray-400 hover:text-fg-secondary text-2xl"
-                  onClick={() => {
-                    setShowSubmitForm(false);
-                    setSubmitError(null);
-                    setSubmitSuccess(false);
-                  }}
+                  type="button"
+                  aria-label={tp("site.trust.close")}
+                  className="rounded p-1 text-fg-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  onClick={closeForm}
                 >
-                  ×
+                  <X className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
             </CardHeader>
             <CardContent>
               {submitSuccess && (
-                <div className="bg-emerald-50 text-emerald-700 p-4 rounded-lg mb-4">
-                  ✅ {t("interviews.shareSuccess")}
+                <div role="status" className="mb-4 rounded-lg border border-success-line bg-success-soft p-4 text-success">
+                  {t("interviews.shareSuccess")}
                 </div>
               )}
 
               {submitError && (
-                <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
+                <div role="alert" className="mb-4 rounded-lg border border-danger-line bg-danger-soft p-4 text-danger">
                   {submitError}
                 </div>
               )}
@@ -523,92 +487,68 @@ export default function InterviewsPage() {
                 <Input
                   label={t("interviews.companyId")}
                   id="interview-companyId"
-                  placeholder="Enter company ID"
+                  placeholder={tp("guides.iv.companyIdPlaceholder")}
                   value={formData.companyId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, companyId: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, companyId: e.target.value })}
                   required
                 />
                 <Input
                   label={t("interviews.jobTitle")}
                   id="interview-jobTitle"
-                  placeholder="e.g. Senior Frontend Developer"
+                  placeholder={tp("guides.iv.jobTitlePlaceholder")}
                   value={formData.jobTitle}
-                  onChange={(e) =>
-                    setFormData({ ...formData, jobTitle: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, jobTitle: e.target.value })}
                   required
                 />
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div className="w-full">
-                    <label
-                      htmlFor="interview-difficulty"
-                      className="block text-sm font-medium text-fg-secondary mb-1"
-                    >
-                      Difficulty
+                    <label htmlFor="interview-difficulty" className="mb-1 block text-sm font-medium text-fg-secondary">
+                      {t("common.difficulty")}
                     </label>
                     <select
                       id="interview-difficulty"
-                      className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className={FIELD_CLASS}
                       value={formData.difficulty}
-                      onChange={(e) =>
-                        setFormData({ ...formData, difficulty: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
                     >
                       {DIFFICULTY_OPTIONS.map((d) => (
                         <option key={d} value={d}>
-                          {d.charAt(0) + d.slice(1).toLowerCase()}
+                          {tp(DIFFICULTY_LABELS[d])}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div className="w-full">
-                    <label
-                      htmlFor="interview-outcome"
-                      className="block text-sm font-medium text-fg-secondary mb-1"
-                    >
-                      Outcome
+                    <label htmlFor="interview-outcome" className="mb-1 block text-sm font-medium text-fg-secondary">
+                      {t("common.outcome")}
                     </label>
                     <select
                       id="interview-outcome"
-                      className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className={FIELD_CLASS}
                       value={formData.outcome}
-                      onChange={(e) =>
-                        setFormData({ ...formData, outcome: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
                     >
                       {OUTCOME_OPTIONS.map((o) => (
                         <option key={o} value={o}>
-                          {o.replace("_", " ").charAt(0) +
-                            o.replace("_", " ").slice(1).toLowerCase()}
+                          {tp(OUTCOME_LABELS[o])}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div className="w-full">
-                    <label
-                      htmlFor="interview-type"
-                      className="block text-sm font-medium text-fg-secondary mb-1"
-                    >
-                      Interview Type
+                    <label htmlFor="interview-type" className="mb-1 block text-sm font-medium text-fg-secondary">
+                      {tp("guides.iv.interviewType")}
                     </label>
                     <select
                       id="interview-type"
-                      className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className={FIELD_CLASS}
                       value={formData.interviewType}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          interviewType: e.target.value,
-                        })
-                      }
+                      onChange={(e) => setFormData({ ...formData, interviewType: e.target.value })}
                     >
-                      {INTERVIEW_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {t.replace(/_/g, " ").charAt(0) +
-                            t.replace(/_/g, " ").slice(1).toLowerCase()}
+                      {INTERVIEW_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {tp(TYPE_LABELS[type])}
                         </option>
                       ))}
                     </select>
@@ -616,33 +556,27 @@ export default function InterviewsPage() {
                 </div>
 
                 <div className="w-full">
-                  <label
-                    htmlFor="interview-process"
-                    className="block text-sm font-medium text-fg-secondary mb-1"
-                  >
+                  <label htmlFor="interview-process" className="mb-1 block text-sm font-medium text-fg-secondary">
                     {t("interviews.interviewProcess")}
                   </label>
                   <textarea
                     id="interview-process"
-                    className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[100px]"
-                    placeholder="Describe the interview process step by step..."
+                    className={`${FIELD_CLASS} min-h-[100px]`}
+                    placeholder={tp("guides.iv.processPlaceholder")}
                     value={formData.process}
-                    onChange={(e) =>
-                      setFormData({ ...formData, process: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, process: e.target.value })}
                     required
                   />
                 </div>
 
                 {/* Questions */}
-                <div className="w-full">
-                  <label className="block text-sm font-medium text-fg-secondary mb-1">
-                    {t("interviews.interviewQuestions")}
-                  </label>
+                <fieldset className="w-full">
+                  <legend className="mb-1 block text-sm font-medium text-fg-secondary">{t("interviews.interviewQuestions")}</legend>
                   {formData.questions.map((q, i) => (
-                    <div key={i} className="flex gap-2 mb-2">
+                    <div key={i} className="mb-2 flex gap-2">
                       <Input
-                        placeholder={`Question ${i + 1}`}
+                        aria-label={tp("guides.iv.questionN", { n: i + 1 })}
+                        placeholder={tp("guides.iv.questionN", { n: i + 1 })}
                         value={q}
                         onChange={(e) => updateQuestion(i, e.target.value)}
                       />
@@ -651,62 +585,44 @@ export default function InterviewsPage() {
                           type="button"
                           variant="ghost"
                           size="sm"
+                          aria-label={tp("guides.iv.removeQuestion", { n: i + 1 })}
                           onClick={() => removeQuestion(i)}
                         >
-                          ✕
+                          <X className="h-4 w-4" aria-hidden="true" />
                         </Button>
                       )}
                     </div>
                   ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addQuestion}
-                  >
+                  <Button type="button" variant="outline" size="sm" onClick={addQuestion}>
                     {t("interviews.addQuestion")}
                   </Button>
-                </div>
+                </fieldset>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="w-full">
-                    <label
-                      htmlFor="interview-tips"
-                      className="block text-sm font-medium text-fg-secondary mb-1"
-                    >
+                    <label htmlFor="interview-tips" className="mb-1 block text-sm font-medium text-fg-secondary">
                       {t("interviews.tipsForOthers")}
                     </label>
                     <textarea
                       id="interview-tips"
-                      className="w-full px-4 py-2 border border-line-strong rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px]"
-                      placeholder="Any tips for future candidates?"
+                      className={`${FIELD_CLASS} min-h-[80px]`}
+                      placeholder={tp("guides.iv.tipsPlaceholder")}
                       value={formData.tips}
-                      onChange={(e) =>
-                        setFormData({ ...formData, tips: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, tips: e.target.value })}
                     />
                   </div>
                   <Input
-                    label="Duration"
+                    label={t("interviews.duration")}
                     id="interview-duration"
-                    placeholder="e.g. 2 weeks, 3 rounds"
+                    placeholder={tp("guides.iv.durationPlaceholder")}
                     value={formData.duration}
-                    onChange={(e) =>
-                      setFormData({ ...formData, duration: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
                   />
                 </div>
 
                 <div className="flex justify-end gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowSubmitForm(false);
-                      setSubmitError(null);
-                    }}
-                  >
-                    Cancel
+                  <Button type="button" variant="outline" onClick={closeForm}>
+                    {t("common.cancel")}
                   </Button>
                   <Button type="submit" disabled={submitLoading}>
                     {submitLoading ? t("common.submitting") : t("interviews.shareButton")}
@@ -737,74 +653,69 @@ function InterviewCard({
   isHelpfulLoading: boolean;
 }) {
   const t = useT();
+  const tp = usePublicT();
+  const locale = useLocale();
   const isSampleScenario = experience.id.startsWith("sample-") || experience.id.startsWith("exp-");
+  const detailsId = `interview-details-${experience.id}`;
+  const difficultyVariant = experience.difficulty.toUpperCase() === "EASY" ? "success" : experience.difficulty.toUpperCase() === "HARD" ? "danger" : "warning";
+  const outcomeVariant =
+    experience.outcome.toUpperCase() === "OFFERED"
+      ? "success"
+      : experience.outcome.toUpperCase() === "REJECTED"
+        ? "danger"
+        : experience.outcome.toUpperCase() === "NO_RESPONSE"
+          ? "warning"
+          : "info";
 
   return (
-    <Card
-      className="interactive-card cursor-pointer hover:shadow-md transition-shadow"
-      onClick={onToggle}
-    >
+    <Card className="transition-shadow hover:shadow-raised">
       <CardContent className="p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
+        <div className="mb-3 flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div>
-            <h3 className="text-lg font-semibold text-fg">
-              {experience.company?.name || "Unknown Company"}
-            </h3>
+            <h3 className="text-lg font-semibold text-fg">{experience.company?.name || tp("guides.iv.unknownCompany")}</h3>
             <p className="text-sm text-fg-secondary">{experience.jobTitle}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {isSampleScenario && <Badge variant="warning">{t("interviews.sampleScenario")}</Badge>}
-            {difficultyBadge(experience.difficulty)}
-            {outcomeBadge(experience.outcome)}
-            <Badge variant="info">
-              {experience.interviewType.replace(/_/g, " ")}
-            </Badge>
+            <Badge variant={difficultyVariant}>{label(DIFFICULTY_LABELS, experience.difficulty, tp)}</Badge>
+            <Badge variant={outcomeVariant}>{label(OUTCOME_LABELS, experience.outcome, tp)}</Badge>
+            <Badge variant="info">{label(TYPE_LABELS, experience.interviewType, tp)}</Badge>
             <button
               type="button"
-              className="rounded-full border border-line px-3 py-1 text-xs font-semibold text-fg-secondary hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+              className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1 text-xs font-semibold text-fg-secondary hover:border-primary hover:text-primary-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               aria-expanded={isExpanded}
-              onClick={(event) => {
-                event.stopPropagation();
-                onToggle();
-              }}
+              aria-controls={detailsId}
+              onClick={onToggle}
             >
               {isExpanded ? t("interviews.hideDetails") : t("interviews.viewDetails")}
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} aria-hidden="true" />
             </button>
           </div>
         </div>
 
-        <p className="text-fg-secondary text-sm mb-3 line-clamp-2">
-          {experience.process}
-        </p>
+        <p className="mb-3 line-clamp-2 text-sm text-fg-secondary">{experience.process}</p>
 
         {experience.questions.length > 0 && !isExpanded && (
-          <p className="text-sm text-gray-400 mb-3">
-            💡 {experience.questions.length} question
-            {experience.questions.length !== 1 ? "s" : ""} shared
+          <p className="mb-3 inline-flex items-center gap-1.5 text-sm text-fg-muted">
+            <Lightbulb className="h-4 w-4" aria-hidden="true" />
+            {tp(experience.questions.length === 1 ? "guides.iv.questionsSharedOne" : "guides.iv.questionsShared", {
+              count: experience.questions.length,
+            })}
           </p>
         )}
 
-        {/* Expanded Detail */}
+        {/* Expanded detail */}
         {isExpanded && (
-          <div
-            className="mt-4 pt-4 border-t border-line space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div id={detailsId} className="mt-4 space-y-4 border-t border-line pt-4">
             <div>
-              <h4 className="text-sm font-semibold text-fg mb-2">
-                {t("interviews.fullProcess")}
-              </h4>
-              <p className="text-sm text-fg-secondary whitespace-pre-wrap">
-                {experience.process}
-              </p>
+              <h4 className="mb-2 text-sm font-semibold text-fg">{t("interviews.fullProcess")}</h4>
+              <p className="whitespace-pre-wrap text-sm text-fg-secondary">{experience.process}</p>
             </div>
 
             {experience.questions.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold text-fg mb-2">
-                  {t("interviews.questionsLabel")}
-                </h4>
-                <ul className="list-disc list-inside space-y-1">
+                <h4 className="mb-2 text-sm font-semibold text-fg">{t("interviews.questionsLabel")}</h4>
+                <ul className="list-inside list-disc space-y-1">
                   {experience.questions.map((q, i) => (
                     <li key={i} className="text-sm text-fg-secondary">
                       {q}
@@ -816,46 +727,38 @@ function InterviewCard({
 
             {experience.tips && (
               <div>
-                <h4 className="text-sm font-semibold text-fg mb-2">
-                  {t("interviews.tipsLabel")}
-                </h4>
+                <h4 className="mb-2 text-sm font-semibold text-fg">{t("interviews.tipsLabel")}</h4>
                 <p className="text-sm text-fg-secondary">{experience.tips}</p>
               </div>
             )}
 
             {experience.duration && (
-              <p className="text-sm text-gray-400">
-                Duration: {experience.duration}
+              <p className="text-sm text-fg-muted">
+                {t("interviews.durationLabel")}: {experience.duration}
               </p>
             )}
           </div>
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-line">
-          <span className="text-xs text-gray-400">
-            {new Date(experience.createdAt).toLocaleDateString()}
-          </span>
+        <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
+          <span className="text-xs text-fg-muted">{new Date(experience.createdAt).toLocaleDateString(locale)}</span>
           <button
             type="button"
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed ${
-              isHelpfulMarked
-                ? "text-primary-text font-medium"
-                : "text-gray-400 hover:text-primary-text"
+            className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed ${
+              isHelpfulMarked ? "font-medium text-primary-text" : "text-fg-muted hover:text-primary-text"
             }`}
             disabled={isHelpfulMarked || isHelpfulLoading}
             aria-pressed={isHelpfulMarked}
             aria-label={
               isHelpfulMarked
-                ? `Marked helpful with ${experience.helpfulCount} helpful votes`
-                : `Mark ${experience.company?.name || "this"} interview experience as helpful`
+                ? tp("guides.iv.helpfulMarked", { count: experience.helpfulCount })
+                : tp("guides.iv.helpfulMark", { company: experience.company?.name || tp("guides.iv.unknownCompany") })
             }
-            onClick={(e) => {
-              e.stopPropagation();
-              onHelpful();
-            }}
+            onClick={onHelpful}
           >
-            {isHelpfulLoading ? "..." : t("common.helpfulLabel")} ({experience.helpfulCount})
+            <ThumbsUp className="h-4 w-4" aria-hidden="true" />
+            {isHelpfulLoading ? "…" : t("common.helpfulLabel")} ({experience.helpfulCount})
           </button>
         </div>
       </CardContent>

@@ -253,7 +253,7 @@ export default function ContactPage() {
 
                 {/* Honeypot: hidden from people and assistive tech; bots fill it. */}
                 <div aria-hidden="true" className="absolute -left-[10000px] h-px w-px overflow-hidden">
-                  <label htmlFor="contact-website">Website</label>
+                  <label htmlFor="contact-website">{"Website" /* bot-facing honeypot, never shown to people */}</label>
                   <input
                     id="contact-website"
                     name="website"

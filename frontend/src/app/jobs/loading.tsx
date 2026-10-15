@@ -19,14 +19,14 @@ export default function JobsLoading() {
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-12 animate-pulse rounded-2xl bg-surface-muted dark:bg-gray-800" />
+            <div key={index} className="h-12 animate-pulse rounded-2xl bg-surface-muted" />
           ))}
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
           {Array.from({ length: 3 }).map((_, index) => (
             <div
               key={index}
-              className="h-10 w-32 animate-pulse rounded-full bg-surface-muted dark:bg-gray-800"
+              className="h-10 w-32 animate-pulse rounded-full bg-surface-muted"
             />
           ))}
         </div>
