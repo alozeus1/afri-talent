@@ -13,6 +13,7 @@ import {
   ReviewStatus,
   ReviewTargetType,
   Role,
+  SupportTicketStatus,
   VerificationArtifactStatus,
 } from "@prisma/client";
 import prisma from "../lib/prisma.js";
@@ -122,13 +123,15 @@ router.get(
       openAbuseReports,
       unverifiedEmployers,
       applicationRows,
+      supportTicketsOpen,
     ] = await Promise.all([
       prisma.user.groupBy({ by: ["role"], where: { deletedAt: null }, _count: { _all: true } }),
       prisma.user.groupBy({ by: ["accountRestrictionStatus"], where: { deletedAt: null }, _count: { _all: true } }),
       prisma.job.groupBy({ by: ["status"], _count: { _all: true } }),
       prisma.user.count({ where: { createdAt: { gte: since7d }, deletedAt: null } }),
       prisma.job.count({ where: { isFeatured: true, status: JobStatus.PUBLISHED } }),
-      prisma.companyReview.count({ where: { isApproved: false } }),
+      // Pending = not approved and not rejected (see CompanyReview moderation trail).
+      prisma.companyReview.count({ where: { isApproved: false, rejectedAt: null } }),
       prisma.verificationArtifact.count({
         where: { status: { in: [VerificationArtifactStatus.PENDING, VerificationArtifactStatus.NEEDS_MORE_INFO] } },
       }),
@@ -144,6 +147,8 @@ router.get(
         WHERE "createdAt" >= ${since14d}
         GROUP BY 1
         ORDER BY 1`,
+      // OPEN = awaiting a first staff response (PENDING waits on the customer).
+      prisma.supportTicket.count({ where: { status: SupportTicketStatus.OPEN } }),
     ]);
 
     const countBy = <K extends string>(rows: Array<Record<string, unknown> & { _count: { _all: number } }>, key: string) =>
@@ -188,8 +193,7 @@ router.get(
         verificationBacklog,
         openAbuseReports,
         unverifiedEmployers,
-        // No support-ticket store exists yet; null renders as "not connected".
-        supportTicketsOpen: null as number | null,
+        supportTicketsOpen: supportTicketsOpen as number | null,
       },
       emailDeliveryConfigured: isEmailDeliveryConfigured(),
       generatedAt: new Date().toISOString(),

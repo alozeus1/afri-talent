@@ -144,7 +144,7 @@ export default function AdminOverviewPage() {
     { key: "overview.verificationBacklog", value: overview.queues.verificationBacklog, href: "/admin/trust", tone: "info" },
     { key: "overview.unverifiedEmployers", value: overview.queues.unverifiedEmployers, href: "/admin/companies?verificationLevel=UNVERIFIED", tone: "info" },
     { key: "overview.reviewsPending", value: overview.queues.reviewsPending, href: "/admin/reviews", tone: "warning" },
-    { key: "overview.supportTickets", value: overview.queues.supportTicketsOpen, href: "/admin/messages", tone: "info" },
+    { key: "overview.supportTickets", value: overview.queues.supportTicketsOpen, href: "/admin/support", tone: "info" },
   ];
 
   return (

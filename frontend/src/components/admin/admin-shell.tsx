@@ -18,6 +18,7 @@ const MANAGE: NavItem[] = [
   { href: "/admin/jobs", key: "nav.jobs", icon: "M4 7h16v12H4zM9 7V5h6v2" },
   { href: "/admin/messages", key: "nav.messages", icon: "M4 5h16v11H7l-3 3z" },
   { href: "/admin/trust", key: "nav.trust", icon: "M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" },
+  { href: "/admin/support", key: "nav.support", icon: "M4 5h16v11H9l-5 4zM9 9h6M9 12h4" },
   { href: "/admin/reviews", key: "nav.reviews", icon: "M12 4l2.5 5 5.5.8-4 3.9.9 5.5L12 16.6 7.1 19.2l.9-5.5-4-3.9 5.5-.8z" },
   { href: "/admin/audit-logs", key: "nav.auditLogs", icon: "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" },
 ];
