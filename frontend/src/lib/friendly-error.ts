@@ -59,6 +59,21 @@ const KNOWN_CODES: Record<string, FriendlyError> = {
     description: "You have already submitted an application to this role.",
     tone: "info",
   },
+  ACCOUNT_SUSPENDED: {
+    title: "Account suspended",
+    description: "Your account is temporarily suspended. Contact support if you need help.",
+    tone: "error",
+  },
+  ACCOUNT_BANNED: {
+    title: "Account deactivated",
+    description: "This account has been deactivated. Contact support if you believe this is a mistake.",
+    tone: "error",
+  },
+  SESSION_REVOKED: {
+    title: "Session ended",
+    description: "For your security, please sign in again.",
+    tone: "warning",
+  },
 };
 
 /**
