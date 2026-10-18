@@ -43,6 +43,11 @@ describe("isEvergreenPosting", () => {
     "Spontaneous application (m/f/d)",
     "Join our Talent Pool",
     "Talent Community – Lagos",
+    "Initiativbewerbung",
+    "Initiativbewerbung (m/w/d)",
+    "Candidature spontanée",
+    "Candidatura espontánea",
+    "Candidatura espontânea",
   ])("flags %s", (title) => {
     expect(isEvergreenPosting(title)).toBe(true);
   });

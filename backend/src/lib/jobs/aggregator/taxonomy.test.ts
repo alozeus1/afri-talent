@@ -70,6 +70,9 @@ describe("classifyJobField", () => {
     expect(classifyJobField({ title: "Business Development Manager" })).toBe("Sales");
     expect(classifyJobField({ title: "Talent Acquisition Specialist" })).toBe("Human Resources");
     expect(classifyJobField({ title: "Mechanical Engineer" })).toBe("Engineering Non-Software");
+    expect(
+      classifyJobField({ title: "CAD Expert, Remote", description: "Support our customer success team." }),
+    ).toBe("Engineering Non-Software");
     expect(classifyJobField({ title: "Supply Chain Manager", description: "Procurement and logistics" })).toBe("Logistics");
     expect(classifyJobField({ title: "Sr. Instructional Designer, Learning Operations" })).toBe("Education");
   });

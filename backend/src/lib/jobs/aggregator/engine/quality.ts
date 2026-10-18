@@ -17,6 +17,10 @@ const EVERGREEN_TITLE_PATTERNS: RegExp[] = [
   /\btalent (?:pool|community|network)\b/,
   /\bexpression of interest\b/,
   /\bfuture (?:opportunities|openings|roles)\b/,
+  // Non-English boards (DE/FR/ES/PT) use their own catch-all wording.
+  /\b(?:initiativ|blind)bewerbung\b/,
+  /\bcandidature (?:spontanee|libre)\b/,
+  /\bcandidatura (?:espontanea|libre)\b/,
 ];
 
 function normalizeTitle(title: string): string {

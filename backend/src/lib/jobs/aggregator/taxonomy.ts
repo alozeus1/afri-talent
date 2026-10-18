@@ -53,6 +53,8 @@ const FIELD_PATTERNS: Array<{ field: JobField; patterns: RegExp[] }> = [
       /\bmanufacturing engineer/i,
       /\bstructural engineer/i,
       /\bpetroleum engineer/i,
+      /\bcad\b/i,
+      /\bdrafts(?:man|person)\b/i,
     ],
   },
   {
