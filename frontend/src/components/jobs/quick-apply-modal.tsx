@@ -2,10 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { applications, Job, quickApply, QuickApplyEligibility } from "@/lib/api";
+import { ApiError, applications, Job, quickApply, QuickApplyEligibility, QuickApplyPreview } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { usePublicT } from "@/lib/i18n/public-messages";
+import { usePublicLabel } from "@/lib/i18n/public-labels";
+import { richText } from "@/lib/i18n/rich-text";
+
+const COVER_LETTER_MAX = 5000;
+
+const TONE_CLASSES: Record<string, string> = {
+  error: "bg-danger-soft border-danger-line text-fg",
+  warning: "bg-warning-soft border-warning-line text-fg",
+  info: "bg-info-soft border-info-line text-fg",
+};
+
+function isAlreadyApplied(err: unknown): boolean {
+  if (err instanceof ApiError && (err.status === 409 || err.code === "ALREADY_APPLIED")) return true;
+  return err instanceof Error && err.message.toLowerCase().includes("already applied");
+}
 
 interface QuickApplyModalProps {
   job: Job;
@@ -21,6 +38,12 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
   const [error, setError] = useState<FriendlyError | null>(null);
   const [success, setSuccess] = useState(false);
   const [consented, setConsented] = useState(false);
+  const [preview, setPreview] = useState<QuickApplyPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [coverLetter, setCoverLetter] = useState("");
+  const locale = useLocale();
+  const tp = usePublicT();
+  const label = usePublicLabel();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
@@ -42,19 +65,48 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
       setSuccess(false);
       setEligibility(null);
       setConsented(false);
+      setPreview(null);
+      setCoverLetter("");
 
+      let cancelled = false;
       quickApply
         .checkEligibility(job.id)
-        .then((data) => {
+        .then(async (data) => {
+          if (cancelled) return;
           setEligibility(data);
+          if (!data.eligible) return;
+          // Draft the letter up front so the candidate reviews exactly what
+          // the employer will receive before consenting.
+          setPreviewLoading(true);
+          try {
+            const drafted = await quickApply.preview(job.id);
+            if (cancelled) return;
+            setPreview(drafted);
+            setCoverLetter(drafted.coverLetter);
+          } catch (err) {
+            if (cancelled) return;
+            if (isAlreadyApplied(err)) {
+              onSuccess();
+              return;
+            }
+            setError(toFriendlyError(err));
+          } finally {
+            if (!cancelled) setPreviewLoading(false);
+          }
         })
         .catch((err) => {
-          setError(toFriendlyError(err));
+          if (!cancelled) setError(toFriendlyError(err));
         })
         .finally(() => {
-          setLoading(false);
+          if (!cancelled) setLoading(false);
         });
+      return () => {
+        cancelled = true;
+      };
     }
+    // onSuccess is intentionally excluded: callers pass an inline closure and
+    // re-running the draft on every parent render would refetch the letter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isOnPlatformApply, job.id]);
 
   useEffect(() => {
@@ -80,9 +132,17 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
   const handleApply = async () => {
     if (!consented) {
       setError({
-        title: "Please confirm before submitting",
-        description:
-          "Tick the consent box so we know you have reviewed this application.",
+        title: tp("discover.quick.confirmTitle"),
+        description: tp("discover.quick.confirmBody"),
+        tone: "info",
+      });
+      return;
+    }
+    const reviewedLetter = coverLetter.trim();
+    if (!reviewedLetter) {
+      setError({
+        title: tp("discover.quick.letterTitle"),
+        description: tp("discover.quick.letterBody"),
         tone: "info",
       });
       return;
@@ -91,12 +151,16 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
     setError(null);
 
     try {
-      await quickApply.apply(job.id, { confirm: true });
+      await quickApply.apply(job.id, { confirm: true, coverLetter: reviewedLetter });
       setSuccess(true);
       setTimeout(() => {
         onSuccess();
       }, 1500);
     } catch (err) {
+      if (isAlreadyApplied(err)) {
+        onSuccess();
+        return;
+      }
       setError(toFriendlyError(err));
     } finally {
       setApplying(false);
@@ -132,20 +196,20 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
       className="fixed inset-0 z-50 flex items-center justify-center"
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <button type="button" tabIndex={-1} aria-label={tp("discover.quick.close")} className="absolute inset-0 cursor-default bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md mx-4">
-        <h2 id="quick-apply-title" className="sr-only">Quick Apply to {job.title}</h2>
+      <div className="relative w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+        <h2 id="quick-apply-title" className="sr-only">{tp("discover.quick.titleFor", { title: job.title })}</h2>
         <Card className="shadow-xl">
           <CardContent className="p-6">
             {/* Close button */}
             <button
               ref={closeButtonRef}
               type="button"
-              aria-label="Close Quick Apply"
+              aria-label={tp("discover.quick.close")}
               onClick={onClose}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+              className="absolute top-4 end-4 rounded-md text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -155,28 +219,28 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
             {/* Loading */}
             {isOnPlatformApply && loading && (
               <div className="flex flex-col items-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mb-4"></div>
-                <p className="text-gray-600">Checking eligibility...</p>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+                <p role="status" className="text-fg-secondary">{tp("discover.quick.checking")}</p>
               </div>
             )}
 
             {!isOnPlatformApply && (
               <div>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="h-10 w-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="h-10 w-10 bg-info-soft rounded-lg flex items-center justify-center">
+                    <svg aria-hidden="true" className="w-5 h-5 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h4m0 0v4m0-4L10 14m-4 6h12a2 2 0 002-2V9a2 2 0 00-2-2h-3m-4 0H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">External Application</h3>
-                    <p className="text-sm text-gray-600">{job.title}</p>
+                    <h3 className="text-lg font-semibold text-fg">{tp("discover.quick.externalTitle")}</h3>
+                    <p className="text-sm text-fg-secondary">{job.title}</p>
                   </div>
                 </div>
 
-                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-indigo-900">
-                    This role uses a verified external employer or ATS application path. AfriTalent will not pretend the application was delivered from inside the platform.
+                <div className="bg-info-soft border border-info-line rounded-lg p-4 mb-4">
+                  <p className="text-sm text-fg-secondary">
+                    {tp("discover.quick.externalBody")}
                   </p>
                 </div>
 
@@ -187,16 +251,16 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                     onClick={() => void handleExternalApply()}
                     disabled={!externalApplyUrl || applying}
                   >
-                    {applying ? "Opening..." : "Continue to Employer Site"}
+                    {applying ? tp("discover.quick.opening") : tp("discover.apply.continueExternal")}
                   </Button>
                   {error && (
-                    <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-                      <p className="font-medium">{error.title}</p>
-                      <p className="mt-0.5">{error.description}</p>
+                    <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-fg">
+                      <p className="font-medium">{label(error.title)}</p>
+                      <p className="mt-0.5">{label(error.description)}</p>
                     </div>
                   )}
                   <Button variant="outline" className="w-full" onClick={onClose}>
-                    Close
+                    {tp("discover.quick.closeButton")}
                   </Button>
                 </div>
               </div>
@@ -210,18 +274,14 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                   aria-live="assertive"
                   data-testid="quick-apply-error"
                   className={`p-4 rounded-lg mb-4 border text-sm ${
-                    error.tone === "error"
-                      ? "bg-red-50 border-red-200 text-red-800"
-                      : error.tone === "warning"
-                        ? "bg-amber-50 border-amber-200 text-amber-900"
-                        : "bg-blue-50 border-blue-200 text-blue-900"
+                    TONE_CLASSES[error.tone ?? "error"]
                   }`}
                 >
-                  <p className="font-medium">{error.title}</p>
-                  <p className="mt-0.5">{error.description}</p>
+                  <p className="font-medium">{label(error.title)}</p>
+                  <p className="mt-0.5">{label(error.description)}</p>
                 </div>
                 <Button variant="outline" className="w-full" onClick={onClose}>
-                  Close
+                  {tp("discover.quick.closeButton")}
                 </Button>
               </div>
             )}
@@ -229,14 +289,16 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
             {/* Success */}
             {success && (
               <div className="flex flex-col items-center py-8">
-                <div className="h-16 w-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
-                  <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="h-16 w-16 bg-success-soft rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-primary-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">Application Sent!</h3>
-                <p className="text-sm text-gray-600 text-center">
-                  Your profile and resume have been sent to the employer.
+                <h3 className="text-lg font-semibold text-fg mb-1">{tp("discover.quick.sentTitle")}</h3>
+                <p className="text-sm text-fg-secondary text-center">
+                  {preview?.resume
+                    ? tp("discover.quick.sentWithResume")
+                    : tp("discover.quick.sentNoResume")}
                 </p>
               </div>
             )}
@@ -245,24 +307,24 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
             {isOnPlatformApply && !loading && !success && eligibility?.eligible && (
               <div>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="h-10 w-10 bg-success-soft rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-primary-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Quick Apply</h3>
-                    <p className="text-sm text-gray-600">{job.title}</p>
+                    <h3 className="text-lg font-semibold text-fg">{tp("discover.quick.title")}</h3>
+                    <p className="text-sm text-fg-secondary">{job.title}</p>
                   </div>
                 </div>
 
                 {/* Profile completeness */}
                 <div className="mb-4">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Profile completeness</span>
-                    <span className="font-medium text-gray-900">{eligibility.profileCompleteness}%</span>
+                    <span className="text-fg-secondary">{tp("discover.quick.completeness")}</span>
+                    <span className="font-medium text-fg">{eligibility.profileCompleteness}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-surface-muted rounded-full h-2">
                     <div
                       className="bg-emerald-600 h-2 rounded-full transition-all"
                       style={{ width: `${eligibility.profileCompleteness}%` }}
@@ -270,11 +332,71 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                   </div>
                 </div>
 
-                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-emerald-800">
-                    Your profile and active resume will be sent to the employer.
-                  </p>
-                </div>
+                {previewLoading && (
+                  <div className="flex items-center gap-3 rounded-lg border border-line p-4 mb-4" data-testid="quick-apply-preview-loading">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                    <p role="status" className="text-sm text-fg-secondary">{tp("discover.quick.drafting")}</p>
+                  </div>
+                )}
+
+                {!previewLoading && preview && (
+                  <>
+                    {preview.resume ? (
+                      <div className="flex items-center justify-between gap-3 bg-success-soft border border-success-line rounded-lg p-3 mb-4" data-testid="quick-apply-resume">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium uppercase tracking-wide text-success">{tp("discover.quick.resumeAttached")}</p>
+                          <p className="truncate text-sm font-medium text-fg">{preview.resume.name}</p>
+                        </div>
+                        <Link
+                          href={localizePath("/candidate/resumes", locale)}
+                          className="shrink-0 text-xs font-medium text-primary-text underline-offset-2 hover:underline"
+                        >
+                          {tp("discover.quick.change")}
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="bg-warning-soft border border-warning-line rounded-lg p-3 mb-4 text-sm text-fg" data-testid="quick-apply-no-resume">
+                        <p className="font-medium">{tp("discover.quick.noResume")}</p>
+                        <p className="mt-0.5 text-fg-secondary">
+                          {richText(tp("discover.quick.noResumeBody"), {
+                            upload: (chunk) => (
+                              <Link href={localizePath("/candidate/resumes", locale)} className="font-medium text-fg underline">
+                                {chunk}
+                              </Link>
+                            ),
+                            build: (chunk) => (
+                              <Link href={localizePath("/candidate/resume-builder", locale)} className="font-medium text-fg underline">
+                                {chunk}
+                              </Link>
+                            ),
+                          })}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="mb-4">
+                      <div className="mb-1 flex items-baseline justify-between">
+                        <label htmlFor="quick-apply-cover-letter" className="text-sm font-medium text-fg">
+                          {tp("discover.quick.coverLetter")}
+                        </label>
+                        <span className="text-xs text-fg-muted">
+                          {coverLetter.length}/{COVER_LETTER_MAX}
+                        </span>
+                      </div>
+                      <p className="mb-2 text-xs text-fg-muted">
+                        {tp("discover.quick.coverHelp")}
+                      </p>
+                      <textarea
+                        id="quick-apply-cover-letter"
+                        data-testid="quick-apply-cover-letter"
+                        className="w-full min-h-[200px] rounded-lg border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-focus"
+                        value={coverLetter}
+                        maxLength={COVER_LETTER_MAX}
+                        onChange={(e) => setCoverLetter(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
 
                 {error && (
                   <div
@@ -282,21 +404,17 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                     aria-live="assertive"
                     data-testid="quick-apply-inline-error"
                     className={`p-3 rounded-lg mb-4 border text-sm ${
-                      error.tone === "error"
-                        ? "bg-red-50 border-red-200 text-red-800"
-                        : error.tone === "warning"
-                          ? "bg-amber-50 border-amber-200 text-amber-900"
-                          : "bg-blue-50 border-blue-200 text-blue-900"
+                      TONE_CLASSES[error.tone ?? "error"]
                     }`}
                   >
-                    <p className="font-medium">{error.title}</p>
-                    <p className="mt-0.5">{error.description}</p>
+                    <p className="font-medium">{label(error.title)}</p>
+                    <p className="mt-0.5">{label(error.description)}</p>
                   </div>
                 )}
 
                 <label
                   htmlFor="quick-apply-consent"
-                  className="flex items-start gap-3 p-3 mb-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  className="flex items-start gap-3 p-3 mb-4 border border-line rounded-lg cursor-pointer hover:bg-surface-sunken transition-colors"
                 >
                   <input
                     id="quick-apply-consent"
@@ -304,10 +422,10 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                     data-testid="quick-apply-consent-checkbox"
                     checked={consented}
                     onChange={(e) => setConsented(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                    className="mt-0.5 h-4 w-4 rounded border-line-strong text-primary-text accent-emerald-700 focus:ring-focus"
                   />
-                  <span className="text-sm text-gray-700">
-                    I confirm I&apos;ve reviewed this application and want AfriTalent to submit it on my behalf.
+                  <span className="text-sm text-fg-secondary">
+                    {preview?.resume ? tp("discover.quick.consentWithResume") : tp("discover.quick.consent")}
                   </span>
                 </label>
 
@@ -315,10 +433,10 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                   className="w-full"
                   size="lg"
                   onClick={handleApply}
-                  disabled={applying || !consented}
+                  disabled={applying || !consented || previewLoading || !preview || !coverLetter.trim()}
                   data-testid="quick-apply-submit"
                 >
-                  {applying ? "Submitting..." : "Apply Now"}
+                  {applying ? tp("discover.quick.submitting") : tp("discover.quick.submit")}
                 </Button>
               </div>
             )}
@@ -327,30 +445,30 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
             {isOnPlatformApply && !loading && !success && eligibility && !eligibility.eligible && (
               <div>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="h-10 w-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="h-10 w-10 bg-warning-soft rounded-lg flex items-center justify-center">
+                    <svg aria-hidden="true" className="w-5 h-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Not Eligible Yet</h3>
-                    <p className="text-sm text-gray-600">{job.title}</p>
+                    <h3 className="text-lg font-semibold text-fg">{tp("discover.quick.notEligible")}</h3>
+                    <p className="text-sm text-fg-secondary">{job.title}</p>
                   </div>
                 </div>
 
                 {eligibility.reason && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-                    <p className="text-sm text-amber-800">{eligibility.reason}</p>
+                  <div className="bg-warning-soft border border-warning-line rounded-lg p-4 mb-4">
+                    <p className="text-sm text-fg">{eligibility.reason}</p>
                   </div>
                 )}
 
                 {/* Profile completeness */}
                 <div className="mb-4">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">Profile completeness</span>
-                    <span className="font-medium text-gray-900">{eligibility.profileCompleteness}%</span>
+                    <span className="text-fg-secondary">{tp("discover.quick.completeness")}</span>
+                    <span className="font-medium text-fg">{eligibility.profileCompleteness}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-surface-muted rounded-full h-2">
                     <div
                       className={`h-2 rounded-full transition-all ${
                         eligibility.profileCompleteness >= 80 ? "bg-emerald-600" : "bg-amber-500"
@@ -363,38 +481,38 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                 <div className="space-y-3 mb-4">
                   {eligibility.profileCompleteness < 80 && (
                     <Link
-                      href="/candidate/profile"
-                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      href={localizePath("/candidate/profile", locale)}
+                      className="flex items-center gap-3 p-3 bg-surface-sunken rounded-lg hover:bg-surface-muted transition-colors"
                     >
-                      <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className="h-8 w-8 bg-info-soft rounded-full flex items-center justify-center">
+                        <svg aria-hidden="true" className="w-4 h-4 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">Complete your profile</p>
-                        <p className="text-xs text-gray-500">Add missing details to your profile</p>
+                        <p className="text-sm font-medium text-fg">{tp("discover.quick.completeProfile")}</p>
+                        <p className="text-xs text-fg-muted">{tp("discover.quick.completeProfileBody")}</p>
                       </div>
-                      <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg aria-hidden="true" className="w-4 h-4 text-fg-muted ms-auto rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </Link>
                   )}
                   {!eligibility.hasActiveResume && (
                     <Link
-                      href="/candidate/resumes"
-                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      href={localizePath("/candidate/resumes", locale)}
+                      className="flex items-center gap-3 p-3 bg-surface-sunken rounded-lg hover:bg-surface-muted transition-colors"
                     >
-                      <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
-                        <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className="h-8 w-8 bg-surface-muted rounded-full flex items-center justify-center">
+                        <svg aria-hidden="true" className="w-4 h-4 text-fg-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">Upload a resume</p>
-                        <p className="text-xs text-gray-500">Add an active resume for Quick Apply</p>
+                        <p className="text-sm font-medium text-fg">{tp("discover.quick.uploadResume")}</p>
+                        <p className="text-xs text-fg-muted">{tp("discover.quick.uploadResumeBody")}</p>
                       </div>
-                      <svg className="w-4 h-4 text-gray-400 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg aria-hidden="true" className="w-4 h-4 text-fg-muted ms-auto rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </Link>
@@ -402,7 +520,7 @@ export function QuickApplyModal({ job, isOpen, onClose, onSuccess }: QuickApplyM
                 </div>
 
                 <Button variant="outline" className="w-full" onClick={onClose}>
-                  Close
+                  {tp("discover.quick.closeButton")}
                 </Button>
               </div>
             )}

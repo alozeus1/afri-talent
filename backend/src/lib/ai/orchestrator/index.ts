@@ -49,7 +49,14 @@ import type {
 
 // ── Mock AI mode ─────────────────────────────────────────────────────────────
 
-const MOCK_AI = process.env.MOCK_AI === "1";
+// Mock when explicitly requested, or when no API key is configured outside
+// production (local Docker / dev without a key). Production without a key
+// still fails loudly (503 "AI service is not configured") rather than serving
+// stub data. Evaluated per call so env changes in tests take effect.
+function useMockAi(): boolean {
+  if (process.env.MOCK_AI === "1") return true;
+  return !process.env.ANTHROPIC_API_KEY && process.env.NODE_ENV !== "production";
+}
 
 const MOCK_RESUME_JSON = {
   name: "Test User",
@@ -302,7 +309,7 @@ export async function runOrchestratorCore(input: OrchestratorInput): Promise<Orc
   const run_id = input.run_id ?? randomUUID();
 
   // ── MOCK MODE — returns deterministic output without calling Claude API ────
-  if (MOCK_AI) {
+  if (useMockAi()) {
     logger.debug({ run_id, user_id, run_type }, "[orchestrator] MOCK_AI mode — skipping real API calls");
 
     const inputJobs = (jobs ?? []).slice(0, 3).map((j) => ({

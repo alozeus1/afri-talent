@@ -1,6 +1,7 @@
 "use client";
 
 import { useTheme } from "@/lib/theme-context";
+import { usePublicT } from "@/lib/i18n/public-messages";
 
 interface ThemeToggleProps {
   className?: string;
@@ -8,14 +9,15 @@ interface ThemeToggleProps {
 
 export function ThemeToggle({ className = "" }: ThemeToggleProps) {
   const { toggleTheme } = useTheme();
+  const tp = usePublicT();
 
   return (
     <button
       type="button"
       onClick={toggleTheme}
-      className={`inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 ${className}`}
-      aria-label="Toggle color theme"
-      title="Toggle color theme"
+      className={`inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-surface text-fg-secondary transition-colors hover:bg-surface-sunken focus:outline-none focus-visible:ring-2 focus-visible:ring-focus ${className}`}
+      aria-label={tp("site.theme.toggle")}
+      title={tp("site.theme.toggle")}
       suppressHydrationWarning
     >
       <svg className="h-5 w-5 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">

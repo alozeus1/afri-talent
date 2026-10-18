@@ -2,101 +2,154 @@
 
 // Saved jobs — candidate bookmarks list (roadmap Phase 2/D).
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { Bookmark, MapPin } from "lucide-react";
 import { savedJobs, SavedJobItem, Job } from "@/lib/api";
 import { africaPill } from "@/lib/job-trust-labels";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { JobListSkeleton } from "@/components/ui/skeleton";
+import {
+  CandidateBackLink,
+  CandidateLoadError,
+  CandidateNotice,
+  CandidatePageHeader,
+} from "@/components/candidate/candidate-ui";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { enumLabel, useCandidateFormatters, useCandidateT } from "@/lib/i18n/candidate-messages";
+import { useLocationLabel } from "@/lib/i18n/public-labels";
 
 export default function SavedJobsPage() {
+  const locale = useLocale();
+  const locationLabel = useLocationLabel();
+  const t = useCandidateT();
+  const fmt = useCandidateFormatters();
   const [items, setItems] = useState<SavedJobItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [removeFailed, setRemoveFailed] = useState(false);
 
-  useEffect(() => {
+  const href = (path: string) => localizePath(path, locale);
+
+  const load = useCallback(() => {
     savedJobs
       .list()
       .then((data) => setItems(data.saved))
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load saved jobs"))
+      .catch((err) => setError(err))
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
   const unsave = async (jobId: string) => {
+    setRemoveFailed(false);
     setItems((prev) => prev.filter((i) => i.job.id !== jobId));
     try {
       await savedJobs.unsave(jobId);
     } catch {
+      setRemoveFailed(true);
       // refetch to restore accurate state on failure
-      savedJobs.list().then((data) => setItems(data.saved)).catch(() => {});
+      savedJobs
+        .list()
+        .then((data) => setItems(data.saved))
+        .catch(() => {});
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 dark:bg-gray-950">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Saved jobs</h1>
-        <p className="mt-1 mb-6 text-sm text-gray-500 dark:text-gray-400">
-          Roles you bookmarked to compare, track, and apply to when ready.
-        </p>
+    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:py-12">
+      <CandidateBackLink href={href("/candidate")}>{t("nav.backToDashboard")}</CandidateBackLink>
+      <CandidatePageHeader
+        title={t("savedJobs.title")}
+        description={t("savedJobs.subtitle")}
+        actions={
+          !loading && !error && items.length > 0 ? (
+            <Badge variant="default">{t("savedJobs.count", { count: fmt.number(items.length) })}</Badge>
+          ) : null
+        }
+      />
 
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
-          </div>
-        ) : error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">{error}</div>
-        ) : items.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="font-semibold text-gray-900 dark:text-gray-100">No saved jobs yet</p>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Tap “Save job” on any listing and it will appear here.
-              </p>
-              <Link href="/jobs" className="mt-4 inline-block">
-                <Button>Browse jobs</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {items.map((item) => (
-              <Card key={item.id} className={item.job.isExpired ? "opacity-60" : ""}>
-                <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div>
-                    <Link href={`/jobs/${item.job.slug}`} className="font-semibold text-gray-900 hover:text-emerald-700 dark:text-gray-100 dark:hover:text-emerald-400">
-                      {item.job.title}
-                    </Link>
-                    <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                      {item.job.employer?.companyName ?? item.job.sourceName ?? "Company"}
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <span>{item.job.location}</span>
-                      <span>·</span>
-                      <span>{item.job.type}</span>
-                      {item.job.hiresFromAfrica && <Badge variant="success">Hires from Africa</Badge>}
-                      {(() => {
-                        const pill = africaPill(item.job as unknown as Job);
-                        return pill ? <Badge variant={pill.variant}>{pill.label}</Badge> : null;
-                      })()}
-                      {item.job.isExpired && <Badge variant="warning">Expired</Badge>}
+      {removeFailed ? (
+        <CandidateNotice className="mb-4">{t("savedJobs.removeFailed")}</CandidateNotice>
+      ) : null}
+
+      {loading ? (
+        <JobListSkeleton count={3} />
+      ) : error ? (
+        <CandidateLoadError
+          error={error}
+          subject={t("ui.subject.savedJobs")}
+          onRetry={() => {
+            setLoading(true);
+            setError(null);
+            load();
+          }}
+        />
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={<Bookmark className="h-6 w-6" />}
+          title={t("savedJobs.emptyTitle")}
+          description={t("savedJobs.emptyBody")}
+          primaryAction={{ label: t("dash.browseJobs"), href: href("/jobs") }}
+        />
+      ) : (
+        <ul className="space-y-3">
+          {items.map((item) => {
+            const pill = africaPill(item.job as unknown as Job);
+            return (
+              <li key={item.id}>
+                <Card className={item.job.isExpired ? "opacity-70" : "transition hover:border-line-strong hover:shadow-card"}>
+                  <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <Link
+                        href={href(`/jobs/${item.job.slug}`)}
+                        className="font-semibold text-fg hover:text-primary-text"
+                      >
+                        {item.job.title}
+                      </Link>
+                      <p className="text-sm font-medium text-primary-text">
+                        {item.job.employer?.companyName ?? item.job.sourceName ?? t("savedJobs.company")}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-fg-muted">
+                        {item.job.location ? (
+                          <span className="inline-flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                            {locationLabel(item.job.location)}
+                          </span>
+                        ) : null}
+                        {item.job.type ? <span>{enumLabel(t, "jobType", item.job.type)}</span> : null}
+                        {item.job.hiresFromAfrica && <Badge variant="success">{t("savedJobs.hiresFromAfrica")}</Badge>}
+                        {pill ? <Badge variant={pill.variant}>{pill.label}</Badge> : null}
+                        {item.job.isExpired && <Badge variant="warning">{t("savedJobs.expired")}</Badge>}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Link href={`/jobs/${item.job.slug}`}>
-                      <Button size="sm" variant="outline">View</Button>
-                    </Link>
-                    <Button size="sm" variant="ghost" onClick={() => unsave(item.job.id)} aria-label={`Remove ${item.job.title} from saved jobs`}>
-                      Remove
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Link href={href(`/jobs/${item.job.slug}`)}>
+                        <Button size="sm" variant="outline">
+                          {t("savedJobs.view")}
+                        </Button>
+                      </Link>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => unsave(item.job.id)}
+                        aria-label={t("savedJobs.removeLabel", { title: item.job.title })}
+                      >
+                        {t("savedJobs.remove")}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { isSupportedLocale } from "@/lib/i18n/config";
+import { HtmlLangSync } from "@/components/layout/html-lang-sync";
 
 type LocaleLayoutProps = {
   children: ReactNode;
@@ -13,5 +14,10 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
     notFound();
   }
 
-  return children;
+  return (
+    <>
+      <HtmlLangSync locale={locale} />
+      {children}
+    </>
+  );
 }

@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
+  CreateJobData,
   EmployerJobPreview,
   EmployerTrustDashboard,
   employerAnalytics,
@@ -13,22 +13,45 @@ import {
 } from "@/lib/api";
 import { employerOnboardingEvents } from "@/lib/analytics";
 import { EmployerJobPostingPreview } from "@/components/employer/job-posting-preview";
+import {
+  BackLink,
+  Eyebrow,
+  Notice,
+  Spinner,
+  controlClass,
+  labelClass,
+} from "@/components/employer/employer-ui";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TrustBadge } from "@/components/trust/trust-badge";
 import { localizePath, useLocale } from "@/lib/i18n/client";
+import { EXAMPLE } from "@/components/employer/locale-neutral";
+import { useEmployerI18n } from "@/lib/i18n/employer-messages";
+import {
+  EMPTY_JOB_MOBILITY,
+  JobMobilityFields,
+  type JobMobilityValues,
+} from "@/components/employer/job-mobility-fields";
+import {
+  CURRENCIES,
+  JOB_TYPES,
+  SALARY_PERIOD_KEYS,
+  SALARY_PERIODS,
+  SENIORITY_LEVELS,
+  type SalaryPeriodOption,
+} from "@/components/employer/job-form-options";
+import { parseCountryList } from "@/lib/job-options";
 
-const jobTypes = ["Full-time", "Part-time", "Contract", "Freelance", "Internship"];
-const seniorityLevels = ["Junior", "Mid-level", "Senior", "Lead", "Executive"];
+type Step = 1 | 2 | 3;
 
 export default function NewJobPage() {
   const locale = useLocale();
-  const router = useRouter();
   const { user } = useAuth();
+  const { t, tv, ts } = useEmployerI18n();
   const [trustDashboard, setTrustDashboard] = useState<EmployerTrustDashboard | null>(null);
   const [loadingTrust, setLoadingTrust] = useState(true);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<Step>(1);
   const [preview, setPreview] = useState<EmployerJobPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
@@ -41,9 +64,11 @@ export default function NewJobPage() {
     salaryMin: "",
     salaryMax: "",
     currency: "USD",
+    salaryPeriod: "YEARLY",
     tags: "",
     applicationUrl: "",
   });
+  const [mobility, setMobility] = useState<JobMobilityValues>(EMPTY_JOB_MOBILITY);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState<{ jobId: string; pending: boolean; pendingReason: string | null } | null>(null);
@@ -112,7 +137,7 @@ export default function NewJobPage() {
     setError(null);
 
     if (trustDashboard && !trustDashboard.trust.postingEligibility) {
-      setError("Complete the required employer trust checks before posting publicly.");
+      setError(t("jobs.errTrustBeforePosting"));
       return;
     }
 
@@ -128,8 +153,14 @@ export default function NewJobPage() {
         salaryMin: formData.salaryMin ? parseInt(formData.salaryMin, 10) : undefined,
         salaryMax: formData.salaryMax ? parseInt(formData.salaryMax, 10) : undefined,
         currency: formData.currency || undefined,
-        tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
+        salaryPeriod: formData.salaryPeriod as SalaryPeriodOption,
+        tags: formData.tags ? formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : undefined,
         applicationUrl: formData.applicationUrl || undefined,
+        workplaceType: mobility.workplaceType || undefined,
+        jobField: mobility.jobField || undefined,
+        visaSponsorship: mobility.visaSponsorship as CreateJobData["visaSponsorship"],
+        relocationAssistance: mobility.relocationAssistance,
+        eligibleCountries: parseCountryList(mobility.eligibleCountries),
       });
       setSubmitted({
         jobId: result.id,
@@ -137,7 +168,7 @@ export default function NewJobPage() {
         pendingReason: result.pendingReason,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create job");
+      setError(err instanceof Error && err.message ? err.message : t("jobs.errCreate"));
     } finally {
       setLoading(false);
     }
@@ -147,34 +178,38 @@ export default function NewJobPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const updateMobility = <K extends keyof JobMobilityValues>(field: K, value: JobMobilityValues[K]) => {
+    setMobility((prev) => ({ ...prev, [field]: value }));
+  };
+
   const nextStep = () => {
     if (step === 1 && (!formData.title || !formData.description || !formData.location)) {
-      setError("Please complete title, description, and location before continuing.");
+      setError(t("jobs.errBasics"));
       return;
     }
     if (trustDashboard && !trustDashboard.trust.postingEligibility) {
-      setError("Finish employer verification before continuing to publish.");
+      setError(t("jobs.errVerifyFirst"));
       return;
     }
     if (step === 2 && (!formData.type || !formData.seniority)) {
-      setError("Please complete role details before continuing.");
+      setError(t("jobs.errDetails"));
       return;
     }
     setError(null);
-    setStep((prev) => (prev < 3 ? ((prev + 1) as 1 | 2 | 3) : prev));
+    setStep((prev) => (prev < 3 ? ((prev + 1) as Step) : prev));
   };
 
   const prevStep = () => {
     setError(null);
-    setStep((prev) => (prev > 1 ? ((prev - 1) as 1 | 2 | 3) : prev));
+    setStep((prev) => (prev > 1 ? ((prev - 1) as Step) : prev));
   };
 
   if (!user || user.role !== "EMPLOYER") {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-12 text-center">
-        <p className="mb-4 text-gray-600">You must be logged in as an employer to post jobs.</p>
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+        <p className="mb-4 text-fg-secondary">{t("jobs.mustBeEmployer")}</p>
         <Link href={localizePath("/login", locale)}>
-          <Button>Login</Button>
+          <Button>{t("common.login")}</Button>
         </Link>
       </div>
     );
@@ -182,33 +217,33 @@ export default function NewJobPage() {
 
   if (submitted) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
-        <div className={`w-16 h-16 mx-auto mb-6 rounded-full flex items-center justify-center ${submitted.pending ? "bg-amber-100" : "bg-emerald-100"}`}>
-          {submitted.pending ? (
-            <svg className="w-8 h-8 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center" role="status">
+        <div
+          className={`mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border ${
+            submitted.pending ? "border-warning-line bg-warning-soft text-warning" : "border-success-line bg-success-soft text-success"
+          }`}
+        >
+          <svg aria-hidden="true" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            {submitted.pending ? (
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          ) : (
-            <svg className="w-8 h-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            ) : (
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          )}
+            )}
+          </svg>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-3">
-          {submitted.pending ? "Job submitted for review" : "Job published!"}
+        <h1 className="mb-3 text-2xl font-bold text-fg">
+          {submitted.pending ? t("jobs.submittedTitle") : t("jobs.publishedTitle")}
         </h1>
-        <p className="text-gray-600 mb-8">
-          {submitted.pending
-            ? submitted.pendingReason
-            : "Your job is live and visible to candidates now."}
+        <p className="mb-8 text-fg-secondary">
+          {submitted.pending ? ts(submitted.pendingReason) || t("jobs.submittedBody") : t("jobs.publishedBody")}
         </p>
-        <div className="flex justify-center gap-4">
+        <div className="flex flex-wrap justify-center gap-3">
           <Link href={localizePath("/employer", locale)}>
-            <Button>Go to dashboard</Button>
+            <Button>{t("common.goToDashboard")}</Button>
           </Link>
           {submitted.pending && (
             <Link href={localizePath("/employer/trust", locale)}>
-              <Button variant="outline">Complete verification</Button>
+              <Button variant="outline">{t("common.completeVerification")}</Button>
             </Link>
           )}
         </div>
@@ -216,107 +251,138 @@ export default function NewJobPage() {
     );
   }
 
-  return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      <Link href={localizePath("/employer", locale)} className="mb-6 inline-flex items-center text-emerald-600 hover:text-emerald-700">
-        <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to dashboard
-      </Link>
+  const steps: Array<{ n: Step; label: string }> = [
+    { n: 1, label: t("jobs.stepBasics") },
+    { n: 2, label: t("jobs.stepDetails") },
+    { n: 3, label: t("jobs.stepPublish") },
+  ];
+  const workplaceLabel = mobility.workplaceType ? tv("opt.workplace", mobility.workplaceType) : t("common.notSpecified");
+  const reviewRows: Array<[string, string]> = [
+    [t("jobs.fieldTitle"), formData.title],
+    [t("jobs.fieldLocation"), formData.location],
+    [t("jobs.fieldType"), tv("opt.jobType", formData.type)],
+    [t("jobs.fieldSeniority"), tv("opt.seniority", formData.seniority)],
+    [
+      t("jobs.reviewSalary"),
+      formData.salaryMin || formData.salaryMax
+        ? `${formData.salaryMin || "–"} – ${formData.salaryMax || "–"} ${formData.currency} · ${t(SALARY_PERIOD_KEYS[formData.salaryPeriod as SalaryPeriodOption])}`
+        : t("common.notSpecified"),
+    ],
+    [t("jobs.reviewWorkplace"), [workplaceLabel, mobility.jobField ? tv("opt.field", mobility.jobField) : ""].filter(Boolean).join(" · ")],
+    [
+      t("mobility.visa"),
+      [tv("opt.visa", mobility.visaSponsorship), mobility.relocationAssistance ? t("jobs.reviewRelocation") : ""]
+        .filter(Boolean)
+        .join(" · "),
+    ],
+    ...(mobility.eligibleCountries.trim()
+      ? [[t("jobs.reviewCountries"), parseCountryList(mobility.eligibleCountries).join(", ")] as [string, string]]
+      : []),
+    [t("jobs.reviewTags"), formData.tags || t("jobs.reviewNoTags")],
+    [t("jobs.reviewApplyPath"), formData.applicationUrl ? t("jobs.reviewApplyBoth") : t("jobs.reviewApplyDirect")],
+  ];
 
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <BackLink href={localizePath("/employer", locale)}>{t("common.backToDashboard")}</BackLink>
+
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card>
           <CardHeader>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
-              Guided job launch
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold text-gray-900">Post a credible job that can get to shortlist fast</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Trusted employers publish faster. Inline moderation guidance helps you fix risky or low-signal drafts before candidates ever see them.
-            </p>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              {[
-                { n: 1, label: "Basics" },
-                { n: 2, label: "Role details" },
-                { n: 3, label: "Publish" },
-              ].map((item) => (
-                <div
-                  key={item.n}
-                  className={`rounded-2xl px-3 py-3 text-center text-xs font-medium ${
-                    step >= item.n ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  {item.n}. {item.label}
-                </div>
-              ))}
-            </div>
+            <Eyebrow>{t("jobs.newEyebrow")}</Eyebrow>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-fg">{t("jobs.newTitle")}</h1>
+            <p className="mt-2 text-sm text-fg-secondary">{t("jobs.newSubtitle")}</p>
+            <ol className="mt-5 grid grid-cols-3 gap-2" aria-label={t("jobs.progressLabel")}>
+              {steps.map((item) => {
+                const state = step === item.n ? "current" : step > item.n ? "done" : "todo";
+                return (
+                  <li
+                    key={item.n}
+                    aria-current={state === "current" ? "step" : undefined}
+                    className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-center text-xs font-medium transition-colors sm:text-sm ${
+                      state === "current"
+                        ? "border-transparent bg-primary text-primary-fg shadow-xs"
+                        : state === "done"
+                          ? "border-success-line bg-primary-soft text-primary-text"
+                          : "border-line bg-surface-sunken text-fg-muted"
+                    }`}
+                  >
+                    <span aria-hidden="true">{state === "done" ? "✓" : item.n}</span>
+                    {item.label}
+                  </li>
+                );
+              })}
+            </ol>
           </CardHeader>
           <CardContent>
             {loadingTrust ? (
               <div className="mb-6 flex justify-center py-3">
-                <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-emerald-600" />
+                <Spinner />
               </div>
             ) : trustDashboard ? (
-              <div className={`mb-6 rounded-3xl border px-4 py-4 ${trustDashboard.trust.postingEligibility ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+              <div
+                className={`mb-6 rounded-2xl border px-4 py-4 ${
+                  trustDashboard.trust.postingEligibility ? "border-success-line bg-success-soft" : "border-warning-line bg-warning-soft"
+                }`}
+              >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <div className="flex flex-wrap gap-2">
                       <TrustBadge
-                        label={trustDashboard.trust.badge}
+                        label={ts(trustDashboard.trust.badge)}
                         riskLevel={trustDashboard.trust.riskLevel}
                         variant="success"
                       />
                       {trustDashboard.trust.verifiedDomain && (
-                        <TrustBadge label={`Domain matched: ${trustDashboard.trust.verifiedDomain}`} variant="info" />
+                        <TrustBadge label={t("jobs.domainMatched", { domain: trustDashboard.trust.verifiedDomain })} variant="info" />
                       )}
                     </div>
-                    <p className="mt-3 text-sm text-gray-700">
-                      {trustDashboard.trust.postingEligibility
-                        ? "Your account meets the current minimum threshold for public posting."
-                        : "Public posting is blocked until the minimum employer trust threshold is met."}
+                    <p className="mt-3 text-sm text-fg-secondary">
+                      {trustDashboard.trust.postingEligibility ? t("jobs.eligible") : t("jobs.notEligible")}
                     </p>
                     {trustDashboard.trust.warnings.length > 0 && (
-                      <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                      <ul className="mt-2 list-disc space-y-1 ps-5 text-sm text-fg-secondary">
                         {trustDashboard.trust.warnings.map((warning) => (
-                          <li key={warning}>• {warning}</li>
+                          <li key={warning}>{ts(warning)}</li>
                         ))}
                       </ul>
                     )}
                   </div>
-                  <Link href={localizePath("/employer/trust", locale)}>
+                  <Link href={localizePath("/employer/trust", locale)} className="shrink-0">
                     <Button variant={trustDashboard.trust.postingEligibility ? "outline" : "primary"}>
-                      {trustDashboard.trust.postingEligibility ? "Review trust profile" : "Complete verification"}
+                      {trustDashboard.trust.postingEligibility ? t("jobs.reviewTrust") : t("common.completeVerification")}
                     </Button>
                   </Link>
                 </div>
               </div>
             ) : null}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6" noValidate>
               {error && (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>
+                <Notice tone="danger" role="alert">
+                  {error}
+                </Notice>
               )}
 
               {step === 1 && (
                 <>
                   <Input
                     id="title"
-                    label="Job title"
-                    placeholder="Senior Full-Stack Engineer"
+                    label={t("jobs.fieldTitle")}
+                    placeholder={t("jobs.titlePlaceholder")}
                     value={formData.title}
                     onChange={(e) => updateField("title", e.target.value)}
                     required
                   />
 
                   <div>
-                    <label htmlFor="description" className="mb-1 block text-sm font-medium text-gray-700">
-                      Job description
+                    <label htmlFor="description" className={labelClass}>
+                      {t("jobs.fieldDescription")}
                     </label>
                     <textarea
                       id="description"
-                      className="min-h-[220px] w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      placeholder="Describe the mission, responsibilities, outcomes, requirements, and candidate fit."
+                      className={`${controlClass} min-h-[220px]`}
+                      placeholder={t("jobs.descriptionPlaceholder")}
                       value={formData.description}
                       onChange={(e) => updateField("description", e.target.value)}
                       required
@@ -325,8 +391,8 @@ export default function NewJobPage() {
 
                   <Input
                     id="location"
-                    label="Location"
-                    placeholder="Remote, Lagos, Nigeria, or Europe timezone"
+                    label={t("jobs.fieldLocation")}
+                    placeholder={t("jobs.locationPlaceholder")}
                     value={formData.location}
                     onChange={(e) => updateField("location", e.target.value)}
                     required
@@ -336,44 +402,46 @@ export default function NewJobPage() {
 
               {step === 2 && (
                 <>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label htmlFor="type" className="mb-1 block text-sm font-medium text-gray-700">
-                        Job type
+                      <label htmlFor="type" className={labelClass}>
+                        {t("jobs.fieldType")}
                       </label>
                       <select
                         id="type"
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className={controlClass}
                         value={formData.type}
                         onChange={(e) => updateField("type", e.target.value)}
                       >
-                        {jobTypes.map((t) => (
-                          <option key={t} value={t}>{t}</option>
+                        {JOB_TYPES.map((value) => (
+                          <option key={value} value={value}>{tv("opt.jobType", value)}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label htmlFor="seniority" className="mb-1 block text-sm font-medium text-gray-700">
-                        Seniority level
+                      <label htmlFor="seniority" className={labelClass}>
+                        {t("jobs.fieldSeniority")}
                       </label>
                       <select
                         id="seniority"
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className={controlClass}
                         value={formData.seniority}
                         onChange={(e) => updateField("seniority", e.target.value)}
                       >
-                        {seniorityLevels.map((s) => (
-                          <option key={s} value={s}>{s}</option>
+                        {SENIORITY_LEVELS.map((value) => (
+                          <option key={value} value={value}>{tv("opt.seniority", value)}</option>
                         ))}
                       </select>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Input
                       id="salaryMin"
                       type="number"
-                      label="Min salary"
+                      inputMode="numeric"
+                      min={0}
+                      label={t("jobs.fieldSalaryMin")}
                       placeholder="60000"
                       value={formData.salaryMin}
                       onChange={(e) => updateField("salaryMin", e.target.value)}
@@ -381,119 +449,137 @@ export default function NewJobPage() {
                     <Input
                       id="salaryMax"
                       type="number"
-                      label="Max salary"
+                      inputMode="numeric"
+                      min={0}
+                      label={t("jobs.fieldSalaryMax")}
                       placeholder="90000"
                       value={formData.salaryMax}
                       onChange={(e) => updateField("salaryMax", e.target.value)}
                     />
                     <div>
-                      <label htmlFor="currency" className="mb-1 block text-sm font-medium text-gray-700">
-                        Currency
+                      <label htmlFor="currency" className={labelClass}>
+                        {t("jobs.fieldCurrency")}
                       </label>
                       <select
                         id="currency"
-                        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className={controlClass}
                         value={formData.currency}
                         onChange={(e) => updateField("currency", e.target.value)}
                       >
-                        <option value="USD">USD</option>
-                        <option value="EUR">EUR</option>
-                        <option value="GBP">GBP</option>
-                        <option value="NGN">NGN</option>
-                        <option value="KES">KES</option>
-                        <option value="ZAR">ZAR</option>
+                        {CURRENCIES.map((code) => (
+                          <option key={code} value={code}>{code}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="salaryPeriod" className={labelClass}>
+                        {t("jobs.fieldSalaryPeriod")}
+                      </label>
+                      <select
+                        id="salaryPeriod"
+                        className={controlClass}
+                        value={formData.salaryPeriod}
+                        onChange={(e) => updateField("salaryPeriod", e.target.value)}
+                      >
+                        {SALARY_PERIODS.map((value) => (
+                          <option key={value} value={value}>{t(SALARY_PERIOD_KEYS[value])}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
 
+                  <JobMobilityFields values={mobility} onChange={updateMobility} />
+
                   <Input
                     id="tags"
-                    label="Skills or tags"
-                    placeholder="React, Node.js, PostgreSQL"
+                    label={t("jobs.fieldTags")}
+                    placeholder={t("jobs.tagsPlaceholder")}
                     value={formData.tags}
                     onChange={(e) => updateField("tags", e.target.value)}
                   />
-                  <Input
-                    id="applicationUrl"
-                    label="Optional employer application link"
-                    placeholder="https://company.com/careers/job-id"
-                    value={formData.applicationUrl}
-                    onChange={(e) => updateField("applicationUrl", e.target.value)}
-                  />
-                  <p className="-mt-2 text-sm text-gray-500">
-                    Leave this blank to receive applications directly on AfriTalent. Add it when candidates should also be able to continue on your company careers site.
-                  </p>
+                  <div>
+                    <Input
+                      id="applicationUrl"
+                      type="url"
+                      label={t("jobs.fieldApplicationUrl")}
+                      placeholder={EXAMPLE.careersUrl}
+                      aria-describedby="applicationUrl-hint"
+                      value={formData.applicationUrl}
+                      onChange={(e) => updateField("applicationUrl", e.target.value)}
+                    />
+                    <p id="applicationUrl-hint" className="mt-2 text-sm text-fg-muted">
+                      {t("jobs.applicationUrlHint")}
+                    </p>
+                  </div>
                 </>
               )}
 
               {step === 3 && (
-                <div className="space-y-5">
-                  <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-                    <p className="mb-2 font-semibold">Publish review</p>
-                    <p><strong>Title:</strong> {formData.title}</p>
-                    <p><strong>Location:</strong> {formData.location}</p>
-                    <p><strong>Type:</strong> {formData.type}</p>
-                    <p><strong>Seniority:</strong> {formData.seniority}</p>
-                    <p>
-                      <strong>Salary:</strong> {formData.salaryMin || "-"} - {formData.salaryMax || "-"} {formData.currency}
-                    </p>
-                    <p><strong>Tags:</strong> {formData.tags || "None added yet"}</p>
-                    <p><strong>Application path:</strong> {formData.applicationUrl ? "AfriTalent and employer site" : "AfriTalent direct apply"}</p>
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-line bg-surface-sunken p-5">
+                    <p className="mb-3 font-semibold text-fg">{t("jobs.reviewTitle")}</p>
+                    <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                      {reviewRows.map(([label, value]) => (
+                        <div key={label} className="min-w-0">
+                          <dt className="text-fg-muted">{label}</dt>
+                          <dd className="mt-0.5 break-words font-medium text-fg">{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
                   </div>
-                  <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-950">
-                    Keep communication on-platform, avoid vague salary bait, and make location plus visa expectations explicit. These patterns most strongly improve trust and reduce moderation holds.
-                  </div>
-                  {preview?.moderationRequired && (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
-                      This draft is likely to trigger moderation review. Fix the highlighted credibility gaps first if you want a smoother publish path.
-                    </div>
-                  )}
+                  <Notice tone="info">{t("jobs.reviewAdvice")}</Notice>
+                  {preview?.moderationRequired && <Notice tone="warning">{t("jobs.reviewModeration")}</Notice>}
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-wrap gap-3 border-t border-line pt-6">
                 {step > 1 && (
                   <Button type="button" variant="outline" onClick={prevStep}>
-                    Back
+                    {t("common.back")}
                   </Button>
                 )}
+                {/* Distinct keys: without them React reuses the same <button>
+                    and flips type="button" -> "submit" during the click, so the
+                    browser submits the form and skips the step-3 review. */}
                 {step < 3 ? (
-                  <Button type="button" className="flex-1" onClick={nextStep}>
-                    Continue
+                  <Button key="continue" type="button" className="flex-1" onClick={nextStep}>
+                    {t("common.continue")}
                   </Button>
                 ) : (
-                  <Button type="submit" className="flex-1" disabled={loading}>
-                    {loading ? "Creating..." : "Post job"}
+                  <Button key="submit" type="submit" className="flex-1" isLoading={loading} disabled={loading}>
+                    {loading ? t("jobs.creating") : t("jobs.postJob")}
                   </Button>
                 )}
                 <Link href={localizePath("/employer", locale)}>
-                  <Button type="button" variant="outline">Cancel</Button>
+                  <Button type="button" variant="ghost">
+                    {t("common.cancel")}
+                  </Button>
                 </Link>
               </div>
             </form>
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
-          <EmployerJobPostingPreview preview={preview} loading={previewLoading} />
+        <aside className="space-y-6">
+          <div className="xl:sticky xl:top-24 xl:space-y-6">
+            <EmployerJobPostingPreview preview={preview} loading={previewLoading} />
 
-          <Card className="border-gray-200 bg-gray-50">
-            <CardHeader>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-gray-500">
-                Moderation rules
-              </p>
-              <h2 className="mt-2 text-lg font-semibold text-gray-900">Inline trust guidance</h2>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm text-gray-700">
-                <li>• Add compensation ranges where possible to improve credibility.</li>
-                <li>• Clarify remote, onsite, or hybrid expectations and eligible countries.</li>
-                <li>• Avoid off-platform contact instructions in the description.</li>
-                <li>• Finish employer verification before scaling posting volume.</li>
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
+            <Card className="mt-6 border-line bg-surface-sunken xl:mt-0">
+              <CardHeader>
+                <Eyebrow>{t("jobs.rulesEyebrow")}</Eyebrow>
+                <h2 className="mt-2 text-lg font-semibold text-fg">{t("jobs.rulesTitle")}</h2>
+              </CardHeader>
+              <CardContent>
+                <ul className="list-disc space-y-2 ps-5 text-sm text-fg-secondary">
+                  <li>{t("jobs.rule1")}</li>
+                  <li>{t("jobs.rule2")}</li>
+                  <li>{t("jobs.rule3")}</li>
+                  <li>{t("jobs.rule4")}</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+        </aside>
       </div>
     </div>
   );

@@ -1,0 +1,25 @@
+import type en from "./en";
+
+export default {
+  "salaries.title": "اعرف قيمتك",
+  "salaries.subtitle": "استكشف بيانات الرواتب المجهولة من المهنيين الأفارقة العاملين عالميًا.",
+  "salaries.practicalSubtitle": "استكشف بيانات الرواتب المجهولة المتاحة، بالإضافة إلى توجيهات السوق الموصوفة بوضوح للأدوار العالمية.",
+  "salaries.searchSalaries": "البحث عن الرواتب",
+  "salaries.compareCountries": "المقارنة بين الدول",
+  "salaries.compareDesc": "حدد مسمى وظيفياً لرؤية متوسط الرواتب في مختلف الدول",
+  "salaries.distributionByLevel": "توزيع الرواتب حسب المستوى",
+  "salaries.distributionDesc": "نطاقات تعويضات نموذجية للأغراض التعليمية فقط.",
+  "salaries.topPayingRoles": "الأدوار الأعلى أجراً",
+  "salaries.topPayingDesc": "تقارير رواتب المجتمع المباشرة عند توفرها.",
+  "salaries.submitSalary": "إرسال راتبك",
+  "salaries.submitButton": "إرسال الراتب",
+  "salaries.searchButton": "بحث",
+  "salaries.compareButton": "قارن",
+  "salaries.allCountries": "جميع الدول",
+  "salaries.noReportsFound": "لم يتم العثور على تقارير رواتب لهذا البحث. كن أول من يساهم!",
+  "salaries.noCompareData": "لا توجد بيانات مقارنة متاحة لهذا المسمى الوظيفي.",
+  "salaries.noVerifiedReports": "لا توجد تقارير رواتب موثّقة من المجتمع بعد",
+  "salaries.noVerifiedDesc": "ستعرض AfriTalent الأدوار الأعلى أجراً بعد وجود عدد كافٍ من تقديمات الرواتب الحقيقية.",
+  "salaries.jobTitlePlaceholder": "المسمى الوظيفي (مثال: مهندس برمجيات)",
+  "salaries.compareJobTitle": "المسمى الوظيفي (مثال: عالم بيانات)",
+} satisfies Record<keyof typeof en, string>;

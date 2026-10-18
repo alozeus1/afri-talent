@@ -1,56 +1,100 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
+import { FormEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import {
   AdminAbuseReport,
   AdminTrustCase,
+  AdminTrustCaseAction,
   AdminTrustDashboard,
   AdminVerificationQueueItem,
   adminTrust,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { TrustBadge } from "@/components/trust/trust-badge";
-import { humanizeTrustValue } from "@/lib/trust-labels";
-import { localizePath, useLocale } from "@/lib/i18n/client";
+import { useAdminEnum, useAdminFormatters, useAdminT } from "@/lib/i18n/admin-messages";
+import {
+  EmptyState,
+  ErrorState,
+  Field,
+  FilterChips,
+  Notice,
+  PageHeader,
+  Pill,
+  SkeletonList,
+  StatCard,
+  fieldClass,
+  labelClass,
+  linkClass,
+  muted,
+  statusTone,
+  strong,
+} from "@/components/admin/console-ui";
 
-type ArtifactFormState = Record<
-  string,
-  {
-    reasonCode: string;
-    reviewerNotes: string;
-  }
->;
+const ACTION_TYPES = ["NOTE", "APPROVE", "REJECT", "HOLD", "LIMIT", "SUSPEND", "REINSTATE", "ESCALATE"] as const;
+type ActionType = (typeof ACTION_TYPES)[number];
+const CASE_STATUSES = ["OPEN", "IN_REVIEW", "ACTIONED", "DISMISSED"] as const;
+const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
+const REPORT_STATUSES = ["TRIAGED", "RESOLVED", "DISMISSED"] as const;
 
-type CaseFormState = Record<
-  string,
-  {
-    actionType: "NOTE" | "APPROVE" | "REJECT" | "HOLD" | "LIMIT" | "SUSPEND" | "REINSTATE" | "ESCALATE";
-    reasonCode: string;
-    notes: string;
-    status: "OPEN" | "IN_REVIEW" | "ACTIONED" | "DISMISSED";
-    priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  }
->;
+type ArtifactForm = { reasonCode: string; reviewerNotes: string };
+type CaseForm = {
+  actionType: ActionType;
+  reasonCode: string;
+  notes: string;
+  status: (typeof CASE_STATUSES)[number];
+  priority: (typeof PRIORITIES)[number];
+};
+type ReportForm = { status: (typeof REPORT_STATUSES)[number]; reasonCode: string; notes: string; actionType: "" | ActionType };
 
-type ReportFormState = Record<
-  string,
-  {
-    status: "TRIAGED" | "RESOLVED" | "DISMISSED";
-    reasonCode: string;
-    notes: string;
-    actionType: "" | "NOTE" | "APPROVE" | "REJECT" | "HOLD" | "LIMIT" | "SUSPEND" | "REINSTATE" | "ESCALATE";
-  }
->;
+type VerificationStatusFilter = "ALL" | "PENDING" | "APPROVED" | "REJECTED" | "NEEDS_MORE_INFO";
+type SubjectFilter = "ALL" | "EMPLOYER" | "CANDIDATE";
+type RiskFilter = "ALL" | "ACTIVE";
+type ReportFilter = "ALL" | "ACTIVE" | "OPEN" | "TRIAGED" | "RESOLVED" | "DISMISSED";
+type Queue = "verification" | "risk" | "reports";
+
+const DEFAULT_ARTIFACT: ArtifactForm = { reasonCode: "verification_review", reviewerNotes: "" };
+const DEFAULT_CASE: CaseForm = { actionType: "NOTE", reasonCode: "trust_review", notes: "", status: "IN_REVIEW", priority: "MEDIUM" };
+const DEFAULT_REPORT: ReportForm = { status: "TRIAGED", reasonCode: "report_triaged", notes: "", actionType: "" };
+
+function ActionHistory({ actions, emptyText }: { actions: AdminTrustCaseAction[] | undefined; emptyText: string }) {
+  const t = useAdminT();
+  const label = useAdminEnum();
+  const fmt = useAdminFormatters();
+  if (!actions?.length) return <p className={`text-sm ${muted}`}>{emptyText}</p>;
+  return (
+    <ol className="relative space-y-3 border-s border-line ps-4">
+      {actions.map((action) => (
+        <li key={action.id} className="relative text-sm">
+          <span className="absolute -start-[1.4rem] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-primary" aria-hidden />
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill tone="blue">{label("modAction", action.actionType)}</Pill>
+            {action.reasonCode && <code className={`text-xs ${muted}`}>{action.reasonCode}</code>}
+          </div>
+          <p className="mt-1 text-fg-secondary">{action.notes || t("common.noNotes")}</p>
+          <p className={`mt-1 text-xs ${muted}`}>
+            {action.actor?.name || t("detail.system")} · {fmt.dateTime(action.createdAt)}
+          </p>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function QueueCard({ header, aside, children }: { header: ReactNode; aside?: ReactNode; children: ReactNode }) {
+  return (
+    <li className="surface-panel space-y-4 rounded-2xl p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">{header}</div>
+        {aside && <div className="shrink-0 rounded-xl border border-line bg-surface-sunken px-4 py-2 text-sm">{aside}</div>}
+      </div>
+      {children}
+    </li>
+  );
+}
 
 export default function AdminTrustPage() {
-  const locale = useLocale();
-  const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const t = useAdminT();
+  const label = useAdminEnum();
+  const fmt = useAdminFormatters();
 
   const [dashboard, setDashboard] = useState<AdminTrustDashboard | null>(null);
   const [verificationQueue, setVerificationQueue] = useState<AdminVerificationQueueItem[]>([]);
@@ -58,44 +102,25 @@ export default function AdminTrustPage() {
   const [reports, setReports] = useState<AdminAbuseReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [artifactForms, setArtifactForms] = useState<ArtifactFormState>({});
-  const [caseForms, setCaseForms] = useState<CaseFormState>({});
-  const [reportForms, setReportForms] = useState<ReportFormState>({});
+  const [artifactForms, setArtifactForms] = useState<Record<string, ArtifactForm>>({});
+  const [caseForms, setCaseForms] = useState<Record<string, CaseForm>>({});
+  const [reportForms, setReportForms] = useState<Record<string, ReportForm>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [verificationStatusFilter, setVerificationStatusFilter] = useState<"ALL" | "PENDING" | "APPROVED" | "REJECTED" | "NEEDS_MORE_INFO">("PENDING");
-  const [verificationSubjectFilter, setVerificationSubjectFilter] = useState<"ALL" | "EMPLOYER" | "CANDIDATE">("ALL");
-  const [riskStatusFilter, setRiskStatusFilter] = useState<"ALL" | "ACTIVE">("ACTIVE");
-  const [reportStatusFilter, setReportStatusFilter] = useState<"ALL" | "ACTIVE" | "OPEN" | "TRIAGED" | "RESOLVED" | "DISMISSED">("ACTIVE");
+  const [queue, setQueue] = useState<Queue>("verification");
+  const [verificationStatusFilter, setVerificationStatusFilter] = useState<VerificationStatusFilter>("PENDING");
+  const [verificationSubjectFilter, setVerificationSubjectFilter] = useState<SubjectFilter>("ALL");
+  const [riskStatusFilter, setRiskStatusFilter] = useState<RiskFilter>("ACTIVE");
+  const [reportStatusFilter, setReportStatusFilter] = useState<ReportFilter>("ACTIVE");
 
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "ADMIN")) {
-      router.push(localizePath("/login", locale));
-    }
-  }, [isLoading, locale, router, user]);
-
-  useEffect(() => {
-    if (user?.role === "ADMIN") {
-      loadAll();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, verificationStatusFilter, verificationSubjectFilter, riskStatusFilter, reportStatusFilter]);
-
-  const actionHistoryPreview = useMemo(
-    () => riskQueue.slice(0, 3).reduce((count, current) => count + current.actions.length, 0),
-    [riskQueue],
-  );
-
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [dashboardData, verificationData, riskData, reportsData] = await Promise.all([
         adminTrust.dashboard(),
-        adminTrust.verificationQueue({
-          status: verificationStatusFilter,
-          subject: verificationSubjectFilter,
-        }),
+        adminTrust.verificationQueue({ status: verificationStatusFilter, subject: verificationSubjectFilter }),
         adminTrust.riskQueue({ status: riskStatusFilter }),
         adminTrust.reports({ status: reportStatusFilter }),
       ]);
@@ -103,675 +128,385 @@ export default function AdminTrustPage() {
       setVerificationQueue(verificationData.queue);
       setRiskQueue(riskData.queue);
       setReports(reportsData.reports);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load trust operations data.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
-  };
+  }, [verificationStatusFilter, verificationSubjectFilter, riskStatusFilter, reportStatusFilter, t]);
 
-  const getArtifactForm = (artifactId: string) =>
-    artifactForms[artifactId] || {
-      reasonCode: "verification_review",
-      reviewerNotes: "",
-    };
+  useEffect(() => {
+    void loadAll();
+  }, [loadAll]);
 
-  const getCaseForm = (caseId: string) =>
-    caseForms[caseId] || {
-      actionType: "NOTE",
-      reasonCode: "trust_review",
-      notes: "",
-      status: "IN_REVIEW",
-      priority: "MEDIUM",
-    };
+  const artifactForm = (id: string) => artifactForms[id] ?? DEFAULT_ARTIFACT;
+  const caseForm = (id: string) => caseForms[id] ?? DEFAULT_CASE;
+  const reportForm = (id: string) => reportForms[id] ?? DEFAULT_REPORT;
+  const patchArtifact = (id: string, p: Partial<ArtifactForm>) => setArtifactForms((c) => ({ ...c, [id]: { ...artifactForm(id), ...p } }));
+  const patchCase = (id: string, p: Partial<CaseForm>) => setCaseForms((c) => ({ ...c, [id]: { ...caseForm(id), ...p } }));
+  const patchReport = (id: string, p: Partial<ReportForm>) => setReportForms((c) => ({ ...c, [id]: { ...reportForm(id), ...p } }));
 
-  const getReportForm = (reportId: string) =>
-    reportForms[reportId] || {
-      status: "TRIAGED",
-      reasonCode: "report_triaged",
-      notes: "",
-      actionType: "",
-    };
-
-  const updateArtifactForm = (artifactId: string, updates: Partial<ArtifactFormState[string]>) => {
-    setArtifactForms((current) => ({
-      ...current,
-      [artifactId]: {
-        ...getArtifactForm(artifactId),
-        ...updates,
-      },
-    }));
-  };
-
-  const updateCaseForm = (caseId: string, updates: Partial<CaseFormState[string]>) => {
-    setCaseForms((current) => ({
-      ...current,
-      [caseId]: {
-        ...getCaseForm(caseId),
-        ...updates,
-      },
-    }));
-  };
-
-  const updateReportForm = (reportId: string, updates: Partial<ReportFormState[string]>) => {
-    setReportForms((current) => ({
-      ...current,
-      [reportId]: {
-        ...getReportForm(reportId),
-        ...updates,
-      },
-    }));
-  };
-
-  const handleArtifactAction = async (
-    artifactId: string,
-    status: "APPROVED" | "REJECTED" | "NEEDS_MORE_INFO",
-  ) => {
-    const form = getArtifactForm(artifactId);
-    setBusyId(artifactId);
-    setError(null);
+  const run = async (id: string, action: () => Promise<unknown>, successText: string) => {
+    setBusyId(id);
+    setActionError(null);
     setSuccess(null);
-
     try {
-      await adminTrust.reviewArtifact(artifactId, {
-        status,
-        reasonCode: form.reasonCode,
-        reviewerNotes: form.reviewerNotes || undefined,
-      });
+      await action();
       await loadAll();
-      setSuccess(`Artifact ${artifactId.slice(0, 8)} reviewed.`);
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Failed to review verification artifact.");
+      setSuccess(successText);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setBusyId(null);
     }
   };
 
-  const handleCaseAction = async (event: FormEvent, trustCase: AdminTrustCase) => {
-    event.preventDefault();
-    const form = getCaseForm(trustCase.id);
-    setBusyId(trustCase.id);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      await adminTrust.caseAction(trustCase.id, {
-        actionType: form.actionType,
-        reasonCode: form.reasonCode,
-        notes: form.notes || undefined,
-        status: form.status,
-        priority: form.priority,
-      });
-      await loadAll();
-      setSuccess(`Trust case ${trustCase.id.slice(0, 8)} updated.`);
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Failed to update trust case.");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleReportAction = async (event: FormEvent, report: AdminAbuseReport) => {
-    event.preventDefault();
-    const form = getReportForm(report.id);
-    setBusyId(report.id);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      await adminTrust.reportAction(report.id, {
-        status: form.status,
-        reasonCode: form.reasonCode,
-        notes: form.notes || undefined,
-        actionType: form.actionType || undefined,
-      });
-      await loadAll();
-      setSuccess(`Report ${report.id.slice(0, 8)} updated.`);
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Failed to update report.");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-      </div>
+  const reviewArtifact = (artifactId: string, status: "APPROVED" | "REJECTED" | "NEEDS_MORE_INFO") => {
+    const form = artifactForm(artifactId);
+    void run(
+      artifactId,
+      () => adminTrust.reviewArtifact(artifactId, { status, reasonCode: form.reasonCode, reviewerNotes: form.reviewerNotes || undefined }),
+      t("trust.artifactReviewed", { id: artifactId.slice(0, 8) }),
     );
-  }
+  };
 
-  if (loading) {
+  const submitCase = (event: FormEvent, trustCase: AdminTrustCase) => {
+    event.preventDefault();
+    const form = caseForm(trustCase.id);
+    void run(
+      trustCase.id,
+      () =>
+        adminTrust.caseAction(trustCase.id, {
+          actionType: form.actionType,
+          reasonCode: form.reasonCode,
+          notes: form.notes || undefined,
+          status: form.status,
+          priority: form.priority,
+        }),
+      t("trust.caseUpdated", { id: trustCase.id.slice(0, 8) }),
+    );
+  };
+
+  const submitReport = (event: FormEvent, report: AdminAbuseReport) => {
+    event.preventDefault();
+    const form = reportForm(report.id);
+    void run(
+      report.id,
+      () =>
+        adminTrust.reportAction(report.id, {
+          status: form.status,
+          reasonCode: form.reasonCode,
+          notes: form.notes || undefined,
+          actionType: form.actionType || undefined,
+        }),
+      t("trust.reportUpdated", { id: report.id.slice(0, 8) }),
+    );
+  };
+
+  if (loading && !dashboard) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex justify-center py-24">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-        </div>
+      <div>
+        <PageHeader title={t("trust.title")} subtitle={t("trust.subtitle")} />
+        <SkeletonList rows={4} />
       </div>
     );
   }
 
   if (!dashboard) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <p className="font-semibold">We couldn&apos;t load trust operations</p>
-          <p className="mt-1">{error ?? "Try again in a moment."}</p>
-          <Button size="sm" className="mt-4" onClick={loadAll}>Retry</Button>
-        </div>
+      <div>
+        <PageHeader title={t("trust.title")} subtitle={t("trust.subtitle")} />
+        <ErrorState message={error} onRetry={() => void loadAll()} />
       </div>
     );
   }
 
+  const queues: Array<{ value: Queue; label: string; count: number }> = [
+    { value: "verification", label: t("trust.queueVerification"), count: verificationQueue.length },
+    { value: "risk", label: t("trust.queueRisk"), count: riskQueue.length },
+    { value: "reports", label: t("trust.queueReports"), count: reports.length },
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
-      <section className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-100 via-white to-red-50 p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700 mb-3">
-          Admin Trust Operations
-        </p>
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Verification, fraud risk, and abuse moderation</h1>
-        <p className="max-w-3xl text-lg text-gray-600">
-          Review identity evidence, manage scam and impersonation cases, and keep a complete action history with reason codes for every moderation decision.
-        </p>
-      </section>
+    <div>
+      <PageHeader title={t("trust.title")} subtitle={t("trust.subtitle")} />
 
-      {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <Notice tone="error" onDismiss={() => setError(null)}>{error}</Notice>}
+      {actionError && <Notice tone="error" onDismiss={() => setActionError(null)}>{actionError}</Notice>}
+      {success && <Notice tone="success" onDismiss={() => setSuccess(null)}>{success}</Notice>}
 
-      {success && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {success}
-        </div>
-      )}
-
-      <div className="grid gap-6 md:grid-cols-3 xl:grid-cols-6">
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Pending artifacts</p>
-            <p className="mt-3 text-3xl font-bold text-gray-900">{dashboard.pendingVerificationArtifacts}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Open cases</p>
-            <p className="mt-3 text-3xl font-bold text-gray-900">{dashboard.openRiskCases}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Open reports</p>
-            <p className="mt-3 text-3xl font-bold text-gray-900">{dashboard.openReports}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Limited accounts</p>
-            <p className="mt-3 text-3xl font-bold text-amber-700">{dashboard.limitedAccounts}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Suspended accounts</p>
-            <p className="mt-3 text-3xl font-bold text-red-700">{dashboard.suspendedAccounts}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Held jobs</p>
-            <p className="mt-3 text-3xl font-bold text-blue-700">{dashboard.heldJobs}</p>
-          </CardContent>
-        </Card>
+      <div className="mb-6 grid gap-4 sm:grid-cols-3 xl:grid-cols-6">
+        <StatCard label={t("trust.statArtifacts")} value={fmt.number(dashboard.pendingVerificationArtifacts)} tone="info" />
+        <StatCard label={t("trust.statCases")} value={fmt.number(dashboard.openRiskCases)} tone="warning" />
+        <StatCard label={t("trust.statReports")} value={fmt.number(dashboard.openReports)} tone="warning" />
+        <StatCard label={t("trust.statLimited")} value={fmt.number(dashboard.limitedAccounts)} tone="neutral" />
+        <StatCard label={t("trust.statSuspended")} value={fmt.number(dashboard.suspendedAccounts)} tone="danger" />
+        <StatCard label={t("trust.statHeldJobs")} value={fmt.number(dashboard.heldJobs)} tone="brand" />
       </div>
 
-      <Card className="border-slate-200">
-        <CardContent className="p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Trust operations summary</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              {verificationQueue.length} artifact review item(s), {riskQueue.length} risk case(s), {reports.length} abuse report(s), and {actionHistoryPreview} recent action log entries in view.
-            </p>
+      <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <FilterChips label={t("trust.queueLabel")} options={queues} value={queue} onChange={setQueue} />
+
+        {queue === "verification" && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={t("common.status")}>
+              {(id) => (
+                <select id={id} className={fieldClass} value={verificationStatusFilter}
+                  onChange={(e) => setVerificationStatusFilter(e.target.value as VerificationStatusFilter)}>
+                  {(["PENDING", "ALL", "APPROVED", "REJECTED", "NEEDS_MORE_INFO"] as const).map((s) => (
+                    <option key={s} value={s}>{s === "ALL" ? t("common.all") : label("artifactStatus", s)}</option>
+                  ))}
+                </select>
+              )}
+            </Field>
+            <Field label={t("trust.subject")}>
+              {(id) => (
+                <select id={id} className={fieldClass} value={verificationSubjectFilter}
+                  onChange={(e) => setVerificationSubjectFilter(e.target.value as SubjectFilter)}>
+                  <option value="ALL">{t("common.all")}</option>
+                  <option value="EMPLOYER">{t("role.EMPLOYER")}</option>
+                  <option value="CANDIDATE">{t("role.CANDIDATE")}</option>
+                </select>
+              )}
+            </Field>
           </div>
-          <Link href={localizePath("/admin", locale)}>
-            <Button variant="outline">Back to admin dashboard</Button>
-          </Link>
-        </CardContent>
-      </Card>
-
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">Verification review queue</h2>
-                <p className="text-sm text-gray-600">Review employer and candidate evidence before granting badges or trust upgrades.</p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="verificationStatusFilter" className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-1">
-                    Status
-                  </label>
-                  <select
-                    id="verificationStatusFilter"
-                    value={verificationStatusFilter}
-                    onChange={(event) => setVerificationStatusFilter(event.target.value as typeof verificationStatusFilter)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
-                  >
-                    {["PENDING", "ALL", "APPROVED", "REJECTED", "NEEDS_MORE_INFO"].map((status) => (
-                      <option key={status} value={status}>{humanizeTrustValue(status)}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="verificationSubjectFilter" className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-1">
-                    Subject
-                  </label>
-                  <select
-                    id="verificationSubjectFilter"
-                    value={verificationSubjectFilter}
-                    onChange={(event) => setVerificationSubjectFilter(event.target.value as typeof verificationSubjectFilter)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
-                  >
-                    {["ALL", "EMPLOYER", "CANDIDATE"].map((subject) => (
-                      <option key={subject} value={subject}>{humanizeTrustValue(subject)}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {verificationQueue.length === 0 ? (
-              <p className="text-sm text-gray-600">No verification items match the current filters.</p>
-            ) : (
-              verificationQueue.map((artifact) => {
-                const form = getArtifactForm(artifact.id);
-                return (
-                  <div key={artifact.id} className="rounded-3xl border border-gray-200 bg-gray-50 p-5 space-y-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-lg font-semibold text-gray-900">{humanizeTrustValue(artifact.type)}</p>
-                          <TrustBadge label={humanizeTrustValue(artifact.status)} variant={artifact.status === "APPROVED" ? "success" : artifact.status === "REJECTED" ? "danger" : "warning"} />
-                        </div>
-                        <p className="mt-2 text-sm text-gray-600">
-                          {artifact.employer?.companyName || artifact.user?.name || "Unknown subject"} • submitted {new Date(artifact.submittedAt).toLocaleDateString()}
-                        </p>
-                        {artifact.fileName && (
-                          <p className="mt-2 text-sm text-gray-500">File: {artifact.fileName}</p>
-                        )}
-                        {artifact.externalUrl && (
-                          <a href={artifact.externalUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex text-sm text-emerald-700 hover:text-emerald-800">
-                            Open supporting URL
-                          </a>
-                        )}
-                      </div>
-                      <div className="rounded-2xl border border-white bg-white px-4 py-3 text-sm text-gray-600">
-                        <p className="font-semibold text-gray-900">Current reviewer</p>
-                        <p className="mt-1">{artifact.reviewer?.name || "Unassigned"}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-                      <div className="space-y-3">
-                        <Input
-                          label="Reason code"
-                          value={form.reasonCode}
-                          onChange={(event) => updateArtifactForm(artifact.id, { reasonCode: event.target.value })}
-                        />
-                        <div>
-                          <label htmlFor={`artifact-notes-${artifact.id}`} className="block text-sm font-medium text-gray-700 mb-1">
-                            Reviewer notes
-                          </label>
-                          <textarea
-                            id={`artifact-notes-${artifact.id}`}
-                            value={form.reviewerNotes}
-                            onChange={(event) => updateArtifactForm(artifact.id, { reviewerNotes: event.target.value })}
-                            rows={4}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900"
-                          />
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button type="button" size="sm" disabled={busyId === artifact.id} onClick={() => handleArtifactAction(artifact.id, "APPROVED")}>
-                            Approve
-                          </Button>
-                          <Button type="button" size="sm" variant="outline" disabled={busyId === artifact.id} onClick={() => handleArtifactAction(artifact.id, "NEEDS_MORE_INFO")}>
-                            Need more info
-                          </Button>
-                          <Button type="button" size="sm" variant="danger" disabled={busyId === artifact.id} onClick={() => handleArtifactAction(artifact.id, "REJECTED")}>
-                            Reject
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <p className="text-sm font-semibold text-gray-900">Action history</p>
-                        {artifact.trustCase?.actions.length ? (
-                          artifact.trustCase.actions.map((action) => (
-                            <div key={action.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <TrustBadge label={humanizeTrustValue(action.actionType)} variant="info" />
-                                {action.reasonCode && (
-                                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{action.reasonCode}</span>
-                                )}
-                              </div>
-                              <p className="mt-2">{action.notes || "No notes provided."}</p>
-                              <p className="mt-2 text-xs text-gray-400">
-                                {action.actor?.name || "System"} • {new Date(action.createdAt).toLocaleString()}
-                              </p>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-gray-500">No actions recorded yet.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
+        )}
+        {queue === "risk" && (
+          <Field label={t("trust.scope")}>
+            {(id) => (
+              <select id={id} className={fieldClass} value={riskStatusFilter} onChange={(e) => setRiskStatusFilter(e.target.value as RiskFilter)}>
+                <option value="ACTIVE">{t("trust.scopeActive")}</option>
+                <option value="ALL">{t("common.all")}</option>
+              </select>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">Fraud and risk queue</h2>
-                <p className="text-sm text-gray-600">Escalate, hold, limit, suspend, or reinstate accounts with full action history.</p>
-              </div>
-              <div>
-                <label htmlFor="riskStatusFilter" className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-1">
-                  Queue scope
-                </label>
-                <select
-                  id="riskStatusFilter"
-                  value={riskStatusFilter}
-                  onChange={(event) => setRiskStatusFilter(event.target.value as typeof riskStatusFilter)}
-                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
-                >
-                  {["ACTIVE", "ALL"].map((status) => (
-                    <option key={status} value={status}>{humanizeTrustValue(status)}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {riskQueue.length === 0 ? (
-              <p className="text-sm text-gray-600">No trust cases match the current filter.</p>
-            ) : (
-              riskQueue.map((trustCase) => {
-                const form = getCaseForm(trustCase.id);
-                const subject =
-                  trustCase.job?.title ||
-                  trustCase.employerTrustProfile?.employer.companyName ||
-                  trustCase.candidateTrustProfile?.user.name ||
-                  trustCase.report?.reason ||
-                  trustCase.title;
-
-                return (
-                  <div key={trustCase.id} className="rounded-3xl border border-gray-200 bg-gray-50 p-5 space-y-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-lg font-semibold text-gray-900">{trustCase.title}</p>
-                          <TrustBadge label={trustCase.priority} riskLevel={trustCase.priority} />
-                          <TrustBadge label={humanizeTrustValue(trustCase.status)} variant={trustCase.status === "DISMISSED" ? "default" : trustCase.status === "ACTIONED" ? "success" : "warning"} />
-                        </div>
-                        <p className="mt-2 text-sm text-gray-600">
-                          {humanizeTrustValue(trustCase.entityType)} • {subject}
-                        </p>
-                        {trustCase.summary && (
-                          <p className="mt-3 text-sm text-gray-500">{trustCase.summary}</p>
-                        )}
-                      </div>
-                      <div className="rounded-2xl border border-white bg-white px-4 py-3 text-sm text-gray-600">
-                        <p className="font-semibold text-gray-900">Assigned admin</p>
-                        <p className="mt-1">{trustCase.assignedAdmin?.name || "Unassigned"}</p>
-                      </div>
-                    </div>
-
-                    <form onSubmit={(event) => handleCaseAction(event, trustCase)} className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <label htmlFor={`case-action-${trustCase.id}`} className="block text-sm font-medium text-gray-700 mb-1">
-                            Action
-                          </label>
-                          <select
-                            id={`case-action-${trustCase.id}`}
-                            value={form.actionType}
-                            onChange={(event) => updateCaseForm(trustCase.id, { actionType: event.target.value as CaseFormState[string]["actionType"] })}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
-                          >
-                            {["NOTE", "APPROVE", "REJECT", "HOLD", "LIMIT", "SUSPEND", "REINSTATE", "ESCALATE"].map((actionType) => (
-                              <option key={actionType} value={actionType}>{humanizeTrustValue(actionType)}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label htmlFor={`case-status-${trustCase.id}`} className="block text-sm font-medium text-gray-700 mb-1">
-                            Case status
-                          </label>
-                          <select
-                            id={`case-status-${trustCase.id}`}
-                            value={form.status}
-                            onChange={(event) => updateCaseForm(trustCase.id, { status: event.target.value as CaseFormState[string]["status"] })}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
-                          >
-                            {["OPEN", "IN_REVIEW", "ACTIONED", "DISMISSED"].map((status) => (
-                              <option key={status} value={status}>{humanizeTrustValue(status)}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label htmlFor={`case-priority-${trustCase.id}`} className="block text-sm font-medium text-gray-700 mb-1">
-                            Priority
-                          </label>
-                          <select
-                            id={`case-priority-${trustCase.id}`}
-                            value={form.priority}
-                            onChange={(event) => updateCaseForm(trustCase.id, { priority: event.target.value as CaseFormState[string]["priority"] })}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
-                          >
-                            {["LOW", "MEDIUM", "HIGH", "CRITICAL"].map((priority) => (
-                              <option key={priority} value={priority}>{humanizeTrustValue(priority)}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <Input
-                          label="Reason code"
-                          value={form.reasonCode}
-                          onChange={(event) => updateCaseForm(trustCase.id, { reasonCode: event.target.value })}
-                        />
-                        <div className="sm:col-span-2">
-                          <label htmlFor={`case-notes-${trustCase.id}`} className="block text-sm font-medium text-gray-700 mb-1">
-                            Internal notes
-                          </label>
-                          <textarea
-                            id={`case-notes-${trustCase.id}`}
-                            value={form.notes}
-                            onChange={(event) => updateCaseForm(trustCase.id, { notes: event.target.value })}
-                            rows={4}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <Button type="submit" disabled={busyId === trustCase.id}>
-                            {busyId === trustCase.id ? "Applying..." : "Apply moderation action"}
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <p className="text-sm font-semibold text-gray-900">Action history</p>
-                        {trustCase.actions.length ? (
-                          trustCase.actions.map((action) => (
-                            <div key={action.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <TrustBadge label={humanizeTrustValue(action.actionType)} variant="info" />
-                                {action.reasonCode && (
-                                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{action.reasonCode}</span>
-                                )}
-                              </div>
-                              <p className="mt-2">{action.notes || "No notes provided."}</p>
-                              <p className="mt-2 text-xs text-gray-400">
-                                {action.actor?.name || "System"} • {new Date(action.createdAt).toLocaleString()}
-                              </p>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-gray-500">No moderation actions recorded yet.</p>
-                        )}
-                      </div>
-                    </form>
-                  </div>
-                );
-              })
+          </Field>
+        )}
+        {queue === "reports" && (
+          <Field label={t("trust.scope")}>
+            {(id) => (
+              <select id={id} className={fieldClass} value={reportStatusFilter} onChange={(e) => setReportStatusFilter(e.target.value as ReportFilter)}>
+                <option value="ACTIVE">{t("trust.scopeActive")}</option>
+                <option value="ALL">{t("common.all")}</option>
+                {(["OPEN", "TRIAGED", "RESOLVED", "DISMISSED"] as const).map((s) => (
+                  <option key={s} value={s}>{label("reportStatus", s)}</option>
+                ))}
+              </select>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">Abuse reports queue</h2>
-                <p className="text-sm text-gray-600">Triage user reports and link them to moderation actions when needed.</p>
-              </div>
-              <div>
-                <label htmlFor="reportStatusFilter" className="block text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-1">
-                  Report scope
-                </label>
-                <select
-                  id="reportStatusFilter"
-                  value={reportStatusFilter}
-                  onChange={(event) => setReportStatusFilter(event.target.value as typeof reportStatusFilter)}
-                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
-                >
-                  {["ACTIVE", "ALL", "OPEN", "TRIAGED", "RESOLVED", "DISMISSED"].map((status) => (
-                    <option key={status} value={status}>{humanizeTrustValue(status)}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {reports.length === 0 ? (
-              <p className="text-sm text-gray-600">No abuse reports match the current filter.</p>
-            ) : (
-              reports.map((report) => {
-                const form = getReportForm(report.id);
-                return (
-                  <div key={report.id} className="rounded-3xl border border-gray-200 bg-gray-50 p-5 space-y-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-lg font-semibold text-gray-900">{humanizeTrustValue(report.reason)}</p>
-                          <TrustBadge label={humanizeTrustValue(report.status)} variant={report.status === "RESOLVED" ? "success" : report.status === "DISMISSED" ? "default" : "warning"} />
-                        </div>
-                        <p className="mt-2 text-sm text-gray-600">
-                          Reporter: {report.reporter.name} • Reported user: {report.reportedUser?.name || report.employer?.companyName || "Unknown"}
-                        </p>
-                        {report.details && (
-                          <p className="mt-3 text-sm text-gray-500">{report.details}</p>
-                        )}
-                      </div>
-                      <div className="rounded-2xl border border-white bg-white px-4 py-3 text-sm text-gray-600">
-                        <p className="font-semibold text-gray-900">Assigned admin</p>
-                        <p className="mt-1">{report.assignedAdmin?.name || "Unassigned"}</p>
-                      </div>
-                    </div>
-
-                    <form onSubmit={(event) => handleReportAction(event, report)} className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <label htmlFor={`report-status-${report.id}`} className="block text-sm font-medium text-gray-700 mb-1">
-                            Report status
-                          </label>
-                          <select
-                            id={`report-status-${report.id}`}
-                            value={form.status}
-                            onChange={(event) => updateReportForm(report.id, { status: event.target.value as ReportFormState[string]["status"] })}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
-                          >
-                            {["TRIAGED", "RESOLVED", "DISMISSED"].map((status) => (
-                              <option key={status} value={status}>{humanizeTrustValue(status)}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label htmlFor={`report-action-${report.id}`} className="block text-sm font-medium text-gray-700 mb-1">
-                            Linked moderation action
-                          </label>
-                          <select
-                            id={`report-action-${report.id}`}
-                            value={form.actionType}
-                            onChange={(event) => updateReportForm(report.id, { actionType: event.target.value as ReportFormState[string]["actionType"] })}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm"
-                          >
-                            <option value="">No linked action</option>
-                            {["NOTE", "APPROVE", "REJECT", "HOLD", "LIMIT", "SUSPEND", "REINSTATE", "ESCALATE"].map((actionType) => (
-                              <option key={actionType} value={actionType}>{humanizeTrustValue(actionType)}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <Input
-                          label="Reason code"
-                          value={form.reasonCode}
-                          onChange={(event) => updateReportForm(report.id, { reasonCode: event.target.value })}
-                        />
-                        <div className="sm:col-span-2">
-                          <label htmlFor={`report-notes-${report.id}`} className="block text-sm font-medium text-gray-700 mb-1">
-                            Resolution notes
-                          </label>
-                          <textarea
-                            id={`report-notes-${report.id}`}
-                            value={form.notes}
-                            onChange={(event) => updateReportForm(report.id, { notes: event.target.value })}
-                            rows={4}
-                            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <Button type="submit" disabled={busyId === report.id}>
-                            {busyId === report.id ? "Saving..." : "Update report"}
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <p className="text-sm font-semibold text-gray-900">Connected case history</p>
-                        {report.trustCase?.actions.length ? (
-                          report.trustCase.actions.map((action) => (
-                            <div key={action.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <TrustBadge label={humanizeTrustValue(action.actionType)} variant="info" />
-                                {action.reasonCode && (
-                                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">{action.reasonCode}</span>
-                                )}
-                              </div>
-                              <p className="mt-2">{action.notes || "No notes provided."}</p>
-                              <p className="mt-2 text-xs text-gray-400">
-                                {action.actor?.name || "System"} • {new Date(action.createdAt).toLocaleString()}
-                              </p>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-gray-500">No linked case history yet.</p>
-                        )}
-                      </div>
-                    </form>
-                  </div>
-                );
-              })
-            )}
-          </CardContent>
-        </Card>
+          </Field>
+        )}
       </div>
+
+      <p className={`mb-4 text-sm ${muted}`}>{t(`trust.help.${queue}`)}</p>
+
+      {loading ? (
+        <SkeletonList rows={3} />
+      ) : queue === "verification" ? (
+        verificationQueue.length === 0 ? (
+          <EmptyState title={t("trust.emptyVerification")} />
+        ) : (
+          <ul className="space-y-4">
+            {verificationQueue.map((artifact) => {
+              const form = artifactForm(artifact.id);
+              const busy = busyId === artifact.id;
+              return (
+                <QueueCard
+                  key={artifact.id}
+                  header={
+                    <>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className={`text-base font-semibold ${strong}`}>{label("artifactType", artifact.type)}</h2>
+                        <Pill tone={statusTone(artifact.status)}>{label("artifactStatus", artifact.status)}</Pill>
+                      </div>
+                      <p className={`mt-1 text-sm ${muted}`}>
+                        {t("trust.submitted", {
+                          subject: artifact.employer?.companyName || artifact.user?.name || t("common.unknown"),
+                          date: fmt.date(artifact.submittedAt),
+                        })}
+                      </p>
+                      {artifact.fileName && <p className={`mt-1 text-sm ${muted}`}>{t("trust.file", { name: artifact.fileName })}</p>}
+                      {artifact.externalUrl && (
+                        <a href={artifact.externalUrl} target="_blank" rel="noopener noreferrer" className={`mt-1 inline-block text-sm ${linkClass}`}>
+                          {t("trust.openUrl")}
+                        </a>
+                      )}
+                    </>
+                  }
+                  aside={
+                    <>
+                      <p className={labelClass}>{t("trust.reviewer")}</p>
+                      <p className={strong}>{artifact.reviewer?.name || t("common.unassigned")}</p>
+                    </>
+                  }
+                >
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                    <div className="space-y-3">
+                      <Field label={t("common.reasonCode")}>
+                        {(id) => <input id={id} className={`${fieldClass} font-mono`} value={form.reasonCode} onChange={(e) => patchArtifact(artifact.id, { reasonCode: e.target.value })} />}
+                      </Field>
+                      <Field label={t("trust.reviewerNotes")}>
+                        {(id) => <textarea id={id} rows={3} className={fieldClass} value={form.reviewerNotes} onChange={(e) => patchArtifact(artifact.id, { reviewerNotes: e.target.value })} />}
+                      </Field>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" isLoading={busy} onClick={() => reviewArtifact(artifact.id, "APPROVED")}>{t("common.approve")}</Button>
+                        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => reviewArtifact(artifact.id, "NEEDS_MORE_INFO")}>{t("trust.needMoreInfo")}</Button>
+                        <Button type="button" size="sm" variant="danger" disabled={busy} onClick={() => reviewArtifact(artifact.id, "REJECTED")}>{t("common.reject")}</Button>
+                      </div>
+                    </div>
+                    <div>
+                      <p className={labelClass}>{t("common.actionHistory")}</p>
+                      <ActionHistory actions={artifact.trustCase?.actions} emptyText={t("common.noActions")} />
+                    </div>
+                  </div>
+                </QueueCard>
+              );
+            })}
+          </ul>
+        )
+      ) : queue === "risk" ? (
+        riskQueue.length === 0 ? (
+          <EmptyState title={t("trust.emptyRisk")} />
+        ) : (
+          <ul className="space-y-4">
+            {riskQueue.map((trustCase) => {
+              const form = caseForm(trustCase.id);
+              const subject =
+                trustCase.job?.title ||
+                trustCase.employerTrustProfile?.employer.companyName ||
+                trustCase.candidateTrustProfile?.user.name ||
+                (trustCase.report?.reason ? label("reportReason", trustCase.report.reason) : null) ||
+                trustCase.title;
+              return (
+                <QueueCard
+                  key={trustCase.id}
+                  header={
+                    <>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className={`text-base font-semibold ${strong}`}>{trustCase.title}</h2>
+                        <Pill tone={statusTone(trustCase.priority)}>{label("risk", trustCase.priority)}</Pill>
+                        <Pill tone={statusTone(trustCase.status)}>{label("caseStatus", trustCase.status)}</Pill>
+                      </div>
+                      <p className={`mt-1 text-sm ${muted}`}>{label("entityType", trustCase.entityType)} · {subject}</p>
+                      {trustCase.summary && <p className="mt-2 text-sm text-fg-secondary">{trustCase.summary}</p>}
+                    </>
+                  }
+                  aside={
+                    <>
+                      <p className={labelClass}>{t("trust.assignedAdmin")}</p>
+                      <p className={strong}>{trustCase.assignedAdmin?.name || t("common.unassigned")}</p>
+                    </>
+                  }
+                >
+                  <form onSubmit={(e) => submitCase(e, trustCase)} className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label={t("trust.action")}>
+                        {(id) => (
+                          <select id={id} className={fieldClass} value={form.actionType} onChange={(e) => patchCase(trustCase.id, { actionType: e.target.value as ActionType })}>
+                            {ACTION_TYPES.map((a) => <option key={a} value={a}>{label("modAction", a)}</option>)}
+                          </select>
+                        )}
+                      </Field>
+                      <Field label={t("trust.caseStatus")}>
+                        {(id) => (
+                          <select id={id} className={fieldClass} value={form.status} onChange={(e) => patchCase(trustCase.id, { status: e.target.value as CaseForm["status"] })}>
+                            {CASE_STATUSES.map((s) => <option key={s} value={s}>{label("caseStatus", s)}</option>)}
+                          </select>
+                        )}
+                      </Field>
+                      <Field label={t("common.priority")}>
+                        {(id) => (
+                          <select id={id} className={fieldClass} value={form.priority} onChange={(e) => patchCase(trustCase.id, { priority: e.target.value as CaseForm["priority"] })}>
+                            {PRIORITIES.map((p) => <option key={p} value={p}>{label("risk", p)}</option>)}
+                          </select>
+                        )}
+                      </Field>
+                      <Field label={t("common.reasonCode")}>
+                        {(id) => <input id={id} className={`${fieldClass} font-mono`} value={form.reasonCode} onChange={(e) => patchCase(trustCase.id, { reasonCode: e.target.value })} />}
+                      </Field>
+                      <Field label={t("trust.internalNotes")} className="sm:col-span-2">
+                        {(id) => <textarea id={id} rows={3} className={fieldClass} value={form.notes} onChange={(e) => patchCase(trustCase.id, { notes: e.target.value })} />}
+                      </Field>
+                      <div className="sm:col-span-2">
+                        <Button type="submit" isLoading={busyId === trustCase.id}>{t("trust.applyAction")}</Button>
+                      </div>
+                    </div>
+                    <div>
+                      <p className={labelClass}>{t("common.actionHistory")}</p>
+                      <ActionHistory actions={trustCase.actions} emptyText={t("common.noActions")} />
+                    </div>
+                  </form>
+                </QueueCard>
+              );
+            })}
+          </ul>
+        )
+      ) : reports.length === 0 ? (
+        <EmptyState title={t("trust.emptyReports")} />
+      ) : (
+        <ul className="space-y-4">
+          {reports.map((report) => {
+            const form = reportForm(report.id);
+            return (
+              <QueueCard
+                key={report.id}
+                header={
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className={`text-base font-semibold ${strong}`}>{label("reportReason", report.reason)}</h2>
+                      <Pill tone={statusTone(report.status)}>{label("reportStatus", report.status)}</Pill>
+                    </div>
+                    <p className={`mt-1 text-sm ${muted}`}>
+                      {t("trust.reportParties", {
+                        reporter: report.reporter.name,
+                        reported: report.reportedUser?.name || report.employer?.companyName || t("common.unknown"),
+                      })}
+                    </p>
+                    {report.details && <p className="mt-2 text-sm text-fg-secondary">{report.details}</p>}
+                  </>
+                }
+                aside={
+                  <>
+                    <p className={labelClass}>{t("trust.assignedAdmin")}</p>
+                    <p className={strong}>{report.assignedAdmin?.name || t("common.unassigned")}</p>
+                  </>
+                }
+              >
+                <form onSubmit={(e) => submitReport(e, report)} className="grid gap-5 lg:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label={t("trust.reportStatus")}>
+                      {(id) => (
+                        <select id={id} className={fieldClass} value={form.status} onChange={(e) => patchReport(report.id, { status: e.target.value as ReportForm["status"] })}>
+                          {REPORT_STATUSES.map((s) => <option key={s} value={s}>{label("reportStatus", s)}</option>)}
+                        </select>
+                      )}
+                    </Field>
+                    <Field label={t("trust.linkedAction")}>
+                      {(id) => (
+                        <select id={id} className={fieldClass} value={form.actionType} onChange={(e) => patchReport(report.id, { actionType: e.target.value as ReportForm["actionType"] })}>
+                          <option value="">{t("trust.noLinkedAction")}</option>
+                          {ACTION_TYPES.map((a) => <option key={a} value={a}>{label("modAction", a)}</option>)}
+                        </select>
+                      )}
+                    </Field>
+                    <Field label={t("common.reasonCode")} className="sm:col-span-2">
+                      {(id) => <input id={id} className={`${fieldClass} font-mono`} value={form.reasonCode} onChange={(e) => patchReport(report.id, { reasonCode: e.target.value })} />}
+                    </Field>
+                    <Field label={t("trust.resolutionNotes")} className="sm:col-span-2">
+                      {(id) => <textarea id={id} rows={3} className={fieldClass} value={form.notes} onChange={(e) => patchReport(report.id, { notes: e.target.value })} />}
+                    </Field>
+                    <div className="sm:col-span-2">
+                      <Button type="submit" isLoading={busyId === report.id}>{t("trust.updateReport")}</Button>
+                    </div>
+                  </div>
+                  <div>
+                    <p className={labelClass}>{t("trust.caseHistory")}</p>
+                    <ActionHistory actions={report.trustCase?.actions} emptyText={t("trust.noCaseHistory")} />
+                  </div>
+                </form>
+              </QueueCard>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

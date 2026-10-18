@@ -1,28 +1,29 @@
 "use client";
 
 import { pricingEvents } from "@/lib/analytics";
+import { usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
 
 interface RegionSelectorProps {
   currentRegion: string;
   onChange: (region: string) => void;
 }
 
-const REGIONS = [
-  { key: "AFRICA", label: "Africa", emoji: "\uD83C\uDF0D", description: "Discounted pricing" },
-  { key: "EUROPE", label: "Europe", emoji: "\uD83C\uDF0D", description: "EUR / GBP pricing" },
-  { key: "ROW", label: "Rest of World", emoji: "\uD83C\uDF0E", description: "Standard pricing" },
+const REGIONS: Array<{ key: string; label: PublicMessageKey; short: PublicMessageKey; emoji: string }> = [
+  { key: "AFRICA", label: "discover.region.africa", short: "discover.region.africaShort", emoji: "\uD83C\uDF0D" },
+  { key: "EUROPE", label: "discover.region.europe", short: "discover.region.europeShort", emoji: "\uD83C\uDF0D" },
+  { key: "ROW", label: "discover.region.row", short: "discover.region.rowShort", emoji: "\uD83C\uDF0E" },
 ];
 
 export function RegionSelector({ currentRegion, onChange }: RegionSelectorProps) {
+  const tp = usePublicT();
+  const current = REGIONS.find((r) => r.key === currentRegion) ?? REGIONS[2];
   return (
     <div className="flex flex-col items-center gap-3" data-testid="region-selector">
-      <p className="text-sm text-gray-500">
-        Pricing shown for{" "}
-        <span className="font-medium text-gray-700">
-          {REGIONS.find((r) => r.key === currentRegion)?.label ?? "Rest of World"}
-        </span>
+      <p className="text-sm text-fg-muted">
+        {tp("discover.region.shownFor")}{" "}
+        <span className="font-medium text-fg-secondary">{tp(current.label)}</span>
       </p>
-      <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+      <div className="inline-flex rounded-lg border border-line bg-surface p-1 shadow-sm">
         {REGIONS.map((r) => (
           <button
             key={r.key}
@@ -34,15 +35,15 @@ export function RegionSelector({ currentRegion, onChange }: RegionSelectorProps)
             }}
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition whitespace-nowrap ${
               currentRegion === r.key
-                ? "bg-emerald-600 text-white shadow-sm"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                ? "bg-primary text-primary-fg shadow-sm"
+                : "text-fg-secondary hover:text-fg hover:bg-surface-sunken"
             }`}
             aria-pressed={currentRegion === r.key}
             data-testid={`region-${r.key}`}
           >
-            <span className="mr-1">{r.emoji}</span>
-            <span className="hidden sm:inline">{r.label}</span>
-            <span className="sm:hidden">{r.label.slice(0, 3)}</span>
+            <span className="me-1" aria-hidden="true">{r.emoji}</span>
+            <span className="hidden sm:inline">{tp(r.label)}</span>
+            <span className="sm:hidden">{tp(r.short)}</span>
           </button>
         ))}
       </div>

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "./anthropic-client.js";
 import type { AIProvider, ParsedResume, TailoredResume, ExtractedJobData } from "./types.js";
 
 const FAST_MODEL = process.env.AI_FAST_MODEL || "claude-haiku-4-5-20251001";
@@ -11,9 +12,7 @@ export class ClaudeProvider implements AIProvider {
   private client: Anthropic;
 
   constructor() {
-    this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    this.client = getAnthropicClient();
   }
 
   private async complete(model: string, maxTokens: number, prompt: string): Promise<string> {

@@ -9,6 +9,12 @@ export function billingIsRequiredForHealth(env: NodeJS.ProcessEnv = process.env)
     return false;
   }
 
+  // Free launch: no payment providers are expected, so missing billing
+  // config is not a degradation unless explicitly required above.
+  if (env.FREE_MODE === "true") {
+    return false;
+  }
+
   const appEnv = (env.APP_ENV || env.NODE_ENV || "").toLowerCase();
   return !["development", "test", "staging"].includes(appEnv);
 }

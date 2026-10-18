@@ -64,11 +64,15 @@ test("jobs page shows loading skeleton and job detail emits JobPosting schema", 
 
   await page.goto(`${APP_URL}/jobs?search=manager&remote=true`, { waitUntil: "domcontentloaded" });
   await expect(
-    page.getByRole("heading", {
-      name: /Find the roles where your credibility and readiness compound/i,
-    }),
+    page.getByRole("heading", { level: 1, name: /Find jobs open to African talent/i }),
   ).toBeVisible();
   await expect(page.getByText(/jobs found/i)).toBeVisible();
+  // The ranking explanation sits behind the "How ranking works" disclosure.
+  const rankingInfo = page.getByRole("button", { name: /How ranking works/i });
+  await expect(async () => {
+    if ((await rankingInfo.getAttribute("aria-expanded")) !== "true") await rankingInfo.click();
+    await expect(rankingInfo).toHaveAttribute("aria-expanded", "true", { timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
   await expect(
     page.getByText(/Search ranking prioritizes relevance, recent refreshes, verified employers/i),
   ).toBeVisible();
@@ -144,10 +148,20 @@ test("mobile navigation drawer is accessible and usable", async ({ page }, testI
 
   await page.goto(`${APP_URL}/`, { waitUntil: "domcontentloaded" });
 
-  const toggle = page.getByLabel("Toggle menu");
+  // Below the xl breakpoint the header collapses into a hamburger whose
+  // accessible name tracks its state ("Open menu" / "Close menu").
+  const toggle = page.locator('button[aria-controls="mobile-menu-panel"]');
   await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAccessibleName("Open menu");
   await expect(toggle).toHaveAttribute("aria-controls", "mobile-menu-panel");
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+  await expect(async () => {
+    if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true", { timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+  await expect(toggle).toHaveAccessibleName("Close menu");
+  await expect(page.locator("#mobile-menu-panel")).toBeVisible();
 });
 
 test("low-bandwidth resilience: homepage remains navigable under delayed asset delivery", async ({

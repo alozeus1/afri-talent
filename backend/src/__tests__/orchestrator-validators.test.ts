@@ -247,3 +247,79 @@ describe("GuardReportSchemaValidator", () => {
     expect(r.success).toBe(false);
   });
 });
+
+// ── Null shapes the agent prompts explicitly allow ────────────────────────────
+// ResumeParserAgent's prompt says "If a field is not present, use null" and
+// declares start_date/description/degree/field/graduation_year as string|null.
+// The validators must accept exactly those shapes, otherwise every real
+// (non-mock) orchestrator run on a sparse resume fails schema validation.
+
+describe("validators accept the null shapes the prompts specify", () => {
+  it("ResumeSchemaValidator accepts every documented nullable field as null", () => {
+    const result = ResumeSchemaValidator.safeParse({
+      name: null,
+      email: null,
+      phone: null,
+      location: null,
+      headline: null,
+      summary: null,
+      years_of_experience: null,
+      skills: [],
+      experience: [
+        {
+          company: "TechCo",
+          title: "Engineer",
+          start_date: null,
+          end_date: null,
+          description: null,
+          metrics: [],
+          technologies: [],
+        },
+      ],
+      education: [
+        {
+          institution: "University of Lagos",
+          degree: null,
+          field: null,
+          graduation_year: null,
+        },
+      ],
+      languages: [],
+      certifications: [],
+      work_auth_status: null,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.experience[0].start_date).toBeNull();
+      expect(result.data.experience[0].description).toBeNull();
+      expect(result.data.education[0].degree).toBeNull();
+      expect(result.data.education[0].field).toBeNull();
+      expect(result.data.education[0].graduation_year).toBeNull();
+    }
+  });
+
+  it("ResumeSchemaValidator still rejects a null required company", () => {
+    const result = ResumeSchemaValidator.safeParse({
+      experience: [{ company: null, title: "Engineer", metrics: [], technologies: [] }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("GuardReportSchemaValidator accepts original_value: null (nothing original)", () => {
+    const result = GuardReportSchemaValidator.safeParse({
+      verdict: "FAIL",
+      issues: [
+        {
+          type: "fabrication",
+          field: "skills",
+          original_value: null,
+          fabricated_value: "Kubernetes",
+          severity: "high",
+        },
+      ],
+      requires_user_confirmation: [],
+      confidence: 0.8,
+    });
+    expect(result.success).toBe(true);
+  });
+});

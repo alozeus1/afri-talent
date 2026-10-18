@@ -8,17 +8,21 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { trust, AbuseReportInput } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
 
-const REASONS: Array<{ value: AbuseReportInput["reason"]; label: string }> = [
-  { value: "SCAM", label: "Looks like a scam" },
-  { value: "FAKE_JOB", label: "Fake or misleading job" },
-  { value: "ADVANCE_FEE_REQUEST", label: "Asks for money / fees" },
-  { value: "MISLEADING_SALARY", label: "Misleading salary" },
-  { value: "OTHER", label: "Something else" },
+const REASONS: Array<{ value: AbuseReportInput["reason"]; label: PublicMessageKey }> = [
+  { value: "SCAM", label: "discover.report.scam" },
+  { value: "FAKE_JOB", label: "discover.report.fake" },
+  { value: "ADVANCE_FEE_REQUEST", label: "discover.report.fees" },
+  { value: "MISLEADING_SALARY", label: "discover.report.salary" },
+  { value: "OTHER", label: "discover.report.other" },
 ];
 
 export function ReportJobButton({ jobId }: { jobId: string }) {
   const router = useRouter();
+  const tp = usePublicT();
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<AbuseReportInput["reason"]>("SCAM");
   const [details, setDetails] = useState("");
@@ -32,7 +36,7 @@ export function ReportJobButton({ jobId }: { jobId: string }) {
     } catch (err) {
       const status = (err as { status?: number })?.status;
       if (status === 401) {
-        router.push("/login");
+        router.push(localizePath("/login", locale));
         return;
       }
       setState("error");
@@ -41,8 +45,8 @@ export function ReportJobButton({ jobId }: { jobId: string }) {
 
   if (state === "done") {
     return (
-      <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-        Thanks — our trust team will review this listing.
+      <p role="status" className="text-sm font-medium text-success">
+        {tp("discover.report.thanks")}
       </p>
     );
   }
@@ -52,45 +56,46 @@ export function ReportJobButton({ jobId }: { jobId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-sm font-medium text-red-600 hover:text-red-700 hover:underline"
+        className="text-sm font-medium text-danger hover:underline"
       >
-        Report suspicious job
+        {tp("discover.report.open")}
       </button>
     );
   }
 
   return (
-    <div className="mt-2 rounded-xl border border-red-200 bg-red-50/60 p-4 dark:border-red-900 dark:bg-red-950/20">
-      <p className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-        Report this job to the trust team
+    <div className="mt-2 rounded-xl border border-danger-line bg-danger-soft p-4">
+      <p className="mb-2 text-sm font-semibold text-fg">
+        {tp("discover.report.title")}
       </p>
       <select
         value={reason}
         onChange={(e) => setReason(e.target.value as AbuseReportInput["reason"])}
-        className="mb-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-gray-100"
-        aria-label="Report reason"
+        className="mb-2 w-full rounded-lg border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-focus"
+        aria-label={tp("discover.report.reason")}
       >
         {REASONS.map((r) => (
-          <option key={r.value} value={r.value}>{r.label}</option>
+          <option key={r.value} value={r.value}>{tp(r.label)}</option>
         ))}
       </select>
       <textarea
         value={details}
         onChange={(e) => setDetails(e.target.value)}
-        placeholder="Anything that helps us review (optional)"
+        placeholder={tp("discover.report.details")}
+        aria-label={tp("discover.report.details")}
         rows={2}
         maxLength={4000}
-        className="mb-3 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-gray-100"
+        className="mb-3 w-full rounded-lg border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-focus"
       />
       {state === "error" && (
-        <p className="mb-2 text-xs text-red-600">Could not submit the report — please try again.</p>
+        <p role="alert" className="mb-2 text-xs text-danger">{tp("discover.report.error")}</p>
       )}
       <div className="flex gap-2">
         <Button size="sm" variant="danger" onClick={submit} disabled={state === "sending"}>
-          {state === "sending" ? "Sending…" : "Submit report"}
+          {state === "sending" ? tp("discover.report.sending") : tp("discover.report.submit")}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
-          Cancel
+          {tp("site.common.cancel")}
         </Button>
       </div>
     </div>

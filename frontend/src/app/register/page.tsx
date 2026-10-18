@@ -12,10 +12,29 @@ import { getPasswordStrength } from "@/lib/password-strength";
 import { Skeleton } from "@/components/ui/skeleton";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 import { createBotShieldPayload } from "@/lib/bot-shield";
+import { usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
+
+// lib/password-strength returns English copy; map it onto translated keys.
+const STRENGTH_LEVEL_KEYS: Record<string, PublicMessageKey> = {
+  "Very weak": "site.auth.strength.veryWeak",
+  Weak: "site.auth.strength.weak",
+  Fair: "site.auth.strength.fair",
+  Strong: "site.auth.strength.strong",
+  "Very strong": "site.auth.strength.veryStrong",
+};
+const STRENGTH_TIP_KEYS: Record<string, PublicMessageKey> = {
+  "Use at least 12 characters.": "site.auth.strength.tipLength",
+  "Use at least 12 characters for better security.": "site.auth.strength.tipLength",
+  "Add an uppercase letter.": "site.auth.strength.tipUpper",
+  "Add a lowercase letter.": "site.auth.strength.tipLower",
+  "Add a number.": "site.auth.strength.tipNumber",
+  "Add a symbol (e.g. !@#$%).": "site.auth.strength.tipSymbol",
+};
 
 function RegisterForm() {
   const locale = useLocale();
   const t = useT();
+  const tp = usePublicT();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { register } = useAuth();
@@ -41,25 +60,30 @@ function RegisterForm() {
     const errors: Record<string, string> = {};
     
     if (!formData.name || formData.name.length < 2) {
-      errors.name = "Name must be at least 2 characters";
+      errors.name = tp("site.auth.nameMin");
     }
     
     if (!formData.email) {
-      errors.email = "Email is required";
+      errors.email = tp("site.auth.emailRequired");
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = "Please enter a valid email";
+      errors.email = tp("site.auth.emailInvalid");
     }
     
     if (!formData.password) {
-      errors.password = "Password is required";
+      errors["password"] = tp("site.auth.passwordRequired");
     } else if (formData.password.length < 8) {
-      errors.password = "Password must be at least 8 characters";
+      errors["password"] = tp("site.auth.passwordMin");
     } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      errors.password = "Password must contain an uppercase letter, a lowercase letter, and a number";
+      errors["password"] = tp("site.auth.passwordComplexity");
     }
     
-    if (formData.role === "EMPLOYER" && !formData.companyName) {
-      errors.companyName = "Company name is required";
+    if (formData.role === "EMPLOYER" && !formData.companyName.trim()) {
+      errors.companyName = tp("site.auth.companyRequired");
+    }
+
+    // Backend rejects employer sign-up without a location; flag it inline.
+    if (formData.role === "EMPLOYER" && !formData.location.trim()) {
+      errors.location = tp("site.auth.locationRequired");
     }
     
     setFieldErrors(errors);
@@ -80,7 +104,7 @@ function RegisterForm() {
       });
       router.push(localizePath(formData.role === "EMPLOYER" ? "/employer" : "/candidate", locale));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(err instanceof Error ? err.message : tp("site.auth.registerFailed"));
     } finally {
       setLoading(false);
     }
@@ -94,19 +118,19 @@ function RegisterForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create Your Account</h1>
-        <p className="text-gray-600 dark:text-gray-300">Join the AfriTalent community</p>
+        <h1 className="text-2xl font-bold text-fg">{tp("site.auth.registerTitle")}</h1>
+        <p className="text-fg-secondary">{tp("site.auth.registerSubtitle")}</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 p-3 rounded-lg text-sm">
+            <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger">
               {error}
             </div>
           )}
 
           <div className="sr-only" aria-hidden="true">
-            <label htmlFor="website">Website</label>
+            <label htmlFor="website">{tp("site.auth.honeypot")}</label>
             <input
               id="website"
               name="website"
@@ -117,41 +141,44 @@ function RegisterForm() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">I am a</label>
+          <fieldset>
+            <legend className="mb-2 block text-sm font-medium text-fg-secondary">{t("auth.iAm")}</legend>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 className={`p-3 rounded-lg border-2 text-center transition-colors ${
                   formData.role === "CANDIDATE"
-                    ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                }`}
+                    ? "border-primary bg-success-soft text-primary-text"
+                    : "border-line hover:border-line-strong"
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
+                aria-pressed={formData.role === "CANDIDATE"}
                 onClick={() => updateField("role", "CANDIDATE")}
               >
-                <span className="font-medium">Candidate</span>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Looking for jobs</p>
+                <span className="font-medium">{t("auth.candidate")}</span>
+                <p className="text-xs text-fg-muted mt-1">{t("auth.lookingForJobs")}</p>
               </button>
               <button
                 type="button"
                 className={`p-3 rounded-lg border-2 text-center transition-colors ${
                   formData.role === "EMPLOYER"
-                    ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300"
-                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                }`}
+                    ? "border-primary bg-success-soft text-primary-text"
+                    : "border-line hover:border-line-strong"
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus`}
+                aria-pressed={formData.role === "EMPLOYER"}
                 onClick={() => updateField("role", "EMPLOYER")}
               >
-                <span className="font-medium">Employer</span>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Hiring talent</p>
+                <span className="font-medium">{t("auth.employer")}</span>
+                <p className="text-xs text-fg-muted mt-1">{t("auth.hiringTalent")}</p>
               </button>
             </div>
-          </div>
+          </fieldset>
 
           <Input
             id="name"
             type="text"
-            label="Full Name"
-            placeholder="Your name"
+            label={t("auth.fullName")}
+            autoComplete="name"
+            placeholder={tp("site.auth.namePlaceholder")}
             value={formData.name}
             onChange={(e) => updateField("name", e.target.value)}
             error={fieldErrors.name}
@@ -160,8 +187,9 @@ function RegisterForm() {
           <Input
             id="email"
             type="email"
-            label="Email"
-            placeholder="you@example.com"
+            label={t("auth.email")}
+            autoComplete="email"
+            placeholder={tp("site.auth.emailPlaceholder")}
             value={formData.email}
             onChange={(e) => updateField("email", e.target.value)}
             error={fieldErrors.email}
@@ -170,19 +198,20 @@ function RegisterForm() {
           <Input
             id="password"
             type="password"
-            label="Password"
-            placeholder="At least 8 characters"
+            label={t("auth.password")}
+            autoComplete="new-password"
+            placeholder={tp("site.auth.newPasswordPlaceholder")}
             value={formData.password}
             onChange={(e) => updateField("password", e.target.value)}
             error={fieldErrors.password}
           />
           {formData.password && (
-            <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900">
+            <div className="rounded-lg border border-line p-3 bg-surface-sunken" aria-live="polite">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Password strength</span>
-                <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">{passwordStrength.level}</span>
+                <span className="text-xs font-medium text-fg-secondary">{tp("site.auth.strength.label")}</span>
+                <span className="text-xs font-semibold text-fg">{tp(STRENGTH_LEVEL_KEYS[passwordStrength.level] ?? "site.auth.strength.fair")}</span>
               </div>
-              <div className="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-800 mb-2 overflow-hidden">
+              <div className="h-2 w-full rounded-full bg-surface-muted mb-2 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${
                     passwordStrength.score <= 1
@@ -198,13 +227,16 @@ function RegisterForm() {
                   aria-valuenow={passwordStrength.percentage}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-label="Password strength"
+                  aria-label={tp("site.auth.strength.label")}
                 />
               </div>
-              <p className="text-xs text-gray-600 dark:text-gray-300">
+              <p className="text-xs text-fg-secondary">
                 {passwordStrength.score >= 3
-                  ? "Great password. You're in good shape."
-                  : passwordStrength.feedback.slice(0, 2).join(" ")}
+                  ? tp("site.auth.strength.great")
+                  : passwordStrength.feedback
+                      .slice(0, 2)
+                      .map((tip) => (STRENGTH_TIP_KEYS[tip] ? tp(STRENGTH_TIP_KEYS[tip]) : tip))
+                      .join(" ")}
               </p>
             </div>
           )}
@@ -214,8 +246,9 @@ function RegisterForm() {
               <Input
                 id="companyName"
                 type="text"
-                label="Company Name"
-                placeholder="Your company"
+                label={tp("site.auth.companyName")}
+                autoComplete="organization"
+                placeholder={tp("site.auth.companyPlaceholder")}
                 value={formData.companyName}
                 onChange={(e) => updateField("companyName", e.target.value)}
                 error={fieldErrors.companyName}
@@ -223,24 +256,25 @@ function RegisterForm() {
               <Input
                 id="location"
                 type="text"
-                label="Company Location"
-                placeholder="e.g., Remote, Lagos, Nigeria"
+                label={tp("site.auth.companyLocation")}
+                placeholder={tp("site.auth.locationPlaceholder")}
                 value={formData.location}
                 onChange={(e) => updateField("location", e.target.value)}
+                error={fieldErrors.location}
               />
             </>
           )}
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Creating account..." : t("auth.createAccount")}
+            {loading ? tp("site.auth.creatingAccount") : t("auth.createAccount")}
           </Button>
         </form>
 
         <OAuthButtons mode="register" onError={(oauthError) => setError(oauthError)} />
 
-        <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
+        <div className="mt-6 text-center text-sm text-fg-secondary">
           {t("auth.alreadyHaveAccount")}{" "}
-          <Link href={localizePath("/login", locale)} className="text-emerald-600 hover:text-emerald-700 font-medium">
+          <Link href={localizePath("/login", locale)} className="font-medium text-primary-text hover:underline">
             {t("auth.signIn")}
           </Link>
         </div>

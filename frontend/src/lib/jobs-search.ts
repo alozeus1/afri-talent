@@ -11,9 +11,19 @@ export interface JobSearchState extends Required<Pick<JobListParams, "page" | "l
   relocationAssistance: string;
   hiresFromAfrica: string;
   remote: string;
+  sortBy: JobSortOption;
 }
 
 export const DEFAULT_JOB_RESULTS_LIMIT = 12;
+
+export const JOB_SORT_OPTIONS = ["relevance", "newest", "salary"] as const;
+export type JobSortOption = (typeof JOB_SORT_OPTIONS)[number];
+export const DEFAULT_JOB_SORT: JobSortOption = "relevance";
+
+function readSortParam(value: string | string[] | undefined): JobSortOption {
+  const raw = readStringParam(value);
+  return (JOB_SORT_OPTIONS as readonly string[]).includes(raw) ? (raw as JobSortOption) : DEFAULT_JOB_SORT;
+}
 
 function readStringParam(value: string | string[] | undefined): string {
   if (Array.isArray(value)) {
@@ -33,6 +43,8 @@ function readPositiveInt(value: string | string[] | undefined, fallback: number)
 export function parseJobSearchState(
   searchParams: Record<string, string | string[] | undefined>,
 ): JobSearchState {
+  // Legacy `filter=remote|visa` alias (old landing-page chips, external links).
+  const legacyFilter = readStringParam(searchParams.filter).toLowerCase();
   return {
     // `query` is an accepted alias (salary-page role links, external deep links)
     search: readStringParam(searchParams.search) || readStringParam(searchParams.query),
@@ -41,10 +53,12 @@ export function parseJobSearchState(
     jobField: readStringParam(searchParams.jobField),
     workplaceType: readStringParam(searchParams.workplaceType),
     seniority: readStringParam(searchParams.seniority),
-    visaSponsorship: readStringParam(searchParams.visaSponsorship),
+    visaSponsorship:
+      readStringParam(searchParams.visaSponsorship) || (legacyFilter === "visa" ? "YES" : ""),
     relocationAssistance: readStringParam(searchParams.relocationAssistance),
     hiresFromAfrica: readStringParam(searchParams.hiresFromAfrica),
-    remote: readStringParam(searchParams.remote),
+    remote: readStringParam(searchParams.remote) || (legacyFilter === "remote" ? "true" : ""),
+    sortBy: readSortParam(searchParams.sortBy),
     page: readPositiveInt(searchParams.page, 1),
     limit: readPositiveInt(searchParams.limit, DEFAULT_JOB_RESULTS_LIMIT),
   };
@@ -77,6 +91,7 @@ export function toJobListParams(state: JobSearchState): JobListParams {
     relocationAssistance: state.relocationAssistance || undefined,
     hiresFromAfrica: state.hiresFromAfrica || undefined,
     remote: state.remote || undefined,
+    sortBy: state.sortBy && state.sortBy !== DEFAULT_JOB_SORT ? state.sortBy : undefined,
     page: state.page,
     limit: state.limit,
   };
@@ -96,6 +111,7 @@ export function buildJobsHref(nextState: Partial<JobSearchState>): string {
     ["relocationAssistance", nextState.relocationAssistance],
     ["hiresFromAfrica", nextState.hiresFromAfrica],
     ["remote", nextState.remote],
+    ["sortBy", nextState.sortBy === DEFAULT_JOB_SORT ? undefined : nextState.sortBy],
     ["page", nextState.page],
     ["limit", nextState.limit],
   ];

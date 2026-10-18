@@ -1,14 +1,23 @@
 "use client";
 
-import * as Tabs from "@radix-ui/react-tabs";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useCallback, useEffect, useState } from "react";
+import { fetchAPI } from "@/lib/api";
+import { adminReviews } from "@/lib/api/support";
 import { Button } from "@/components/ui/button";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { useAdminFormatters, useAdminT } from "@/lib/i18n/admin-messages";
+import type { Pagination } from "@/lib/admin-console-api";
+import {
+  EmptyState,
+  ErrorState,
+  FilterChips,
+  Notice,
+  PageHeader,
+  PaginationBar,
+  Pill,
+  SkeletonList,
+  muted,
+  strong,
+} from "@/components/admin/console-ui";
 
 interface CompanyReview {
   id: string;
@@ -19,262 +28,166 @@ interface CompanyReview {
   pros: string;
   cons: string;
   approved: boolean;
+  moderationStatus?: "PENDING" | "APPROVED" | "REJECTED";
   createdAt: string;
 }
 
-interface ReviewsResponse {
-  reviews: CompanyReview[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+type ReviewFilter = "ALL" | "PENDING" | "APPROVED" | "REJECTED";
+
+function Stars({ rating, label }: { rating: number; label: string }) {
+  return (
+    <span className="inline-flex gap-0.5" role="img" aria-label={label}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <span key={star} aria-hidden className={`text-sm ${star <= rating ? "text-accent-text" : "text-line-strong"}`}>
+          ★
+        </span>
+      ))}
+    </span>
+  );
 }
 
 export default function AdminReviewsPage() {
-  const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const t = useAdminT();
+  const fmt = useAdminFormatters();
   const [reviews, setReviews] = useState<CompanyReview[]>([]);
+  const [pagination, setPagination] = useState<Pagination | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [moderating, setModerating] = useState<string | null>(null);
-
-  // Filters
-  const [filter, setFilter] = useState<"ALL" | "PENDING" | "APPROVED">("ALL");
+  const [filter, setFilter] = useState<ReviewFilter>("PENDING");
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "ADMIN")) {
-      router.push("/login");
-    }
-  }, [user, isLoading, router]);
-
-  useEffect(() => {
-    if (user?.role === "ADMIN") {
-      loadReviews();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, filter, page]);
-
-  const loadReviews = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
-      if (filter === "PENDING") params.set("approved", "false");
-      if (filter === "APPROVED") params.set("approved", "true");
-      params.set("page", page.toString());
-      const query = params.toString();
-
-      const res = await fetch(`${API_URL}/api/admin/reviews${query ? `?${query}` : ""}`, {
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch reviews");
-      }
-
-      const data: ReviewsResponse = await res.json();
+      const params = new URLSearchParams({ page: String(page) });
+      if (filter !== "ALL") params.set("status", filter.toLowerCase());
+      const data = await fetchAPI<{ reviews: CompanyReview[]; pagination: Pagination }>(`/api/admin/reviews?${params}`);
       setReviews(data.reviews);
-      setTotalPages(data.pagination.totalPages);
+      setPagination(data.pagination);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load reviews");
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, page, t]);
 
-  const moderateReview = async (id: string, action: "approve" | "reject") => {
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const moderate = async (id: string, action: "approve" | "reject") => {
     setModerating(id);
+    setActionError(null);
     try {
-      const res = await fetch(`${API_URL}/api/admin/reviews/${id}/moderate`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ action }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Moderation failed");
-      }
-
-      // Refresh list
-      await loadReviews();
+      // Shared client attaches the CSRF token; approval also recomputes the
+      // company's ratings server-side.
+      await adminReviews.moderate(id, action);
+      await load();
     } catch (err) {
-      console.error("Failed to moderate review:", err);
+      setActionError(t("reviews.moderationFailed", { error: err instanceof Error ? err.message : t("common.error") }));
     } finally {
       setModerating(null);
     }
   };
 
-  const renderStars = (rating: number) => {
-    return (
-      <div className="flex gap-0.5">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <span
-            key={star}
-            className={`text-sm ${star <= rating ? "text-yellow-400" : "text-gray-300"}`}
-          >
-            ★
-          </span>
-        ))}
-      </div>
-    );
-  };
+  const filters: Array<{ value: ReviewFilter; label: string }> = [
+    { value: "PENDING", label: t("moderation.PENDING") },
+    { value: "APPROVED", label: t("moderation.APPROVED") },
+    { value: "REJECTED", label: t("moderation.REJECTED") },
+    { value: "ALL", label: t("common.all") },
+  ];
 
-  if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
-  }
+  const emptyKey = {
+    PENDING: "reviews.emptyPending",
+    APPROVED: "reviews.emptyApproved",
+    REJECTED: "reviews.emptyRejected",
+    ALL: "reviews.empty",
+  } as const;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Review Moderation</h1>
-        <p className="text-gray-600">Review and moderate company reviews</p>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="mb-6 flex">
-        <Tabs.Root
+    <div>
+      <PageHeader title={t("reviews.title")} subtitle={t("reviews.subtitle")} />
+      <div className="mb-4">
+        <FilterChips
+          label={t("reviews.filterLabel")}
+          options={filters}
           value={filter}
-          onValueChange={(val) => { setFilter(val as "ALL" | "PENDING" | "APPROVED"); setPage(1); }}
-        >
-          <Tabs.List
-            className="flex items-center gap-x-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm text-sm"
-            aria-label="Filter Reviews"
-          >
-            {(["ALL", "PENDING", "APPROVED"] as const).map((f) => (
-              <Tabs.Trigger
-                key={f}
-                value={f}
-                className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-gray-500 hover:text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-medium"
-              >
-                {f === "ALL" ? "All Reviews" : f === "PENDING" ? "Pending" : "Approved"}
-              </Tabs.Trigger>
-            ))}
-          </Tabs.List>
-        </Tabs.Root>
+          onChange={(value) => {
+            setFilter(value);
+            setPage(1);
+          }}
+        />
       </div>
 
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-          {error}
-        </div>
-      )}
+      {actionError && <Notice tone="error" onDismiss={() => setActionError(null)}>{actionError}</Notice>}
 
-      {/* Reviews List */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-        </div>
+        <SkeletonList />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => void load()} />
       ) : reviews.length === 0 ? (
-        <Card>
-          <CardContent className="p-12">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">✅</span>
-              </div>
-              <p className="text-gray-600">
-                {filter === "PENDING"
-                  ? "No pending reviews to moderate"
-                  : filter === "APPROVED"
-                  ? "No approved reviews yet"
-                  : "No reviews found"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <EmptyState title={t(emptyKey[filter])} />
       ) : (
-        <div className="space-y-4">
-          {reviews.map((review) => (
-            <Card key={review.id}>
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-semibold text-gray-900 text-lg">{review.companyName}</h3>
-                      <Badge variant={review.approved ? "success" : "warning"}>
-                        {review.approved ? "Approved" : "Pending"}
-                      </Badge>
+        <>
+          <ul className="space-y-3">
+            {reviews.map((review) => {
+              const status = review.approved ? "APPROVED" : review.moderationStatus === "REJECTED" ? "REJECTED" : "PENDING";
+              return (
+                <li key={review.id} className="surface-panel rounded-2xl p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className={`text-base font-semibold ${strong}`} data-user-content>{review.companyName}</h2>
+                        <Pill tone={status === "APPROVED" ? "green" : status === "REJECTED" ? "red" : "amber"}>
+                          {t(`moderation.${status}`)}
+                        </Pill>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <Stars rating={review.rating} label={t("reviews.ratingLabel", { rating: review.rating })} />
+                        <span className={`text-sm ${muted}`} data-user-content>{t("reviews.by", { name: review.reviewerName })}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mb-1">
-                      {renderStars(review.rating)}
-                      <span className="text-sm text-gray-500">by {review.reviewerName}</span>
+                    <span className={`text-xs ${muted}`}>{fmt.date(review.createdAt)}</span>
+                  </div>
+
+                  <h3 className={`mt-3 font-medium ${strong}`} data-user-content>{review.title}</h3>
+                  <div className="mt-3 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-success-line bg-success-soft p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-success">{t("reviews.pros")}</p>
+                      <p className="mt-1 text-sm text-fg-secondary" data-user-content>{review.pros}</p>
+                    </div>
+                    <div className="rounded-xl border border-danger-line bg-danger-soft p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-danger">{t("reviews.cons")}</p>
+                      <p className="mt-1 text-sm text-fg-secondary" data-user-content>{review.cons}</p>
                     </div>
                   </div>
-                  <span className="text-xs text-gray-400">
-                    {new Date(review.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
 
-                <h4 className="font-medium text-gray-800 mb-2">{review.title}</h4>
-
-                <div className="grid md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Pros</p>
-                    <p className="text-sm text-gray-600">{review.pros}</p>
+                  <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
+                    {!review.approved && (
+                      <Button size="sm" onClick={() => void moderate(review.id, "approve")} isLoading={moderating === review.id}>
+                        {t("common.approve")}
+                      </Button>
+                    )}
+                    {review.moderationStatus !== "REJECTED" && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => void moderate(review.id, "reject")}
+                        disabled={moderating === review.id}
+                      >
+                        {review.approved ? t("reviews.unpublish") : t("common.reject")}
+                      </Button>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">Cons</p>
-                    <p className="text-sm text-gray-600">{review.cons}</p>
-                  </div>
-                </div>
-
-                {!review.approved && (
-                  <div className="flex gap-3 pt-3 border-t border-gray-100">
-                    <Button
-                      size="sm"
-                      onClick={() => moderateReview(review.id, "approve")}
-                      disabled={moderating === review.id}
-                    >
-                      {moderating === review.id ? "Processing..." : "Approve"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => moderateReview(review.id, "reject")}
-                      disabled={moderating === review.id}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center gap-2 mt-6">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-              >
-                Previous
-              </Button>
-              <span className="flex items-center px-3 text-sm text-gray-600">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-              >
-                Next
-              </Button>
-            </div>
-          )}
-        </div>
+                </li>
+              );
+            })}
+          </ul>
+          {pagination && pagination.totalPages > 1 && <PaginationBar pagination={pagination} onPage={setPage} />}
+        </>
       )}
     </div>
   );

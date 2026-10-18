@@ -1,9 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   adminBilling,
   BillingStatus,
@@ -15,19 +12,48 @@ import {
   PlanEntitlements,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { useAdminEnum, useAdminFormatters, useAdminT } from "@/lib/i18n/admin-messages";
+import {
+  EmptyState,
+  ErrorState,
+  Field,
+  KeyValueList,
+  Notice,
+  PageHeader,
+  Panel,
+  Pill,
+  SkeletonList,
+  StatCard,
+  Td,
+  Th,
+  fieldClass,
+  labelClass,
+  muted,
+  statusTone,
+  strong,
+} from "@/components/admin/console-ui";
 
-const initialSupportForm = {
-  actionType: "NOTE" as const,
-  reasonCode: "support_note",
-  notes: "",
-  invoiceId: "",
-};
+type SupportActionType =
+  | "NOTE"
+  | "RESEND_RECEIPT"
+  | "REFUND_REVIEW"
+  | "CANCEL_SUBSCRIPTION"
+  | "UPGRADE_DOWNGRADE_CORRECTION"
+  | "GRANDFATHER_OVERRIDE";
+type Capability = "CANDIDATE_PREMIUM" | "CANDIDATE_AI" | "EMPLOYER_PREMIUM";
 
+const SUPPORT_ACTIONS: SupportActionType[] = [
+  "NOTE",
+  "RESEND_RECEIPT",
+  "REFUND_REVIEW",
+  "CANCEL_SUBSCRIPTION",
+  "UPGRADE_DOWNGRADE_CORRECTION",
+  "GRANDFATHER_OVERRIDE",
+];
+
+const initialSupportForm = { actionType: "NOTE" as SupportActionType, reasonCode: "support_note", notes: "", invoiceId: "" };
 const initialCapabilityForm = {
-  capability: "CANDIDATE_AI" as "CANDIDATE_PREMIUM" | "CANDIDATE_AI" | "EMPLOYER_PREMIUM",
+  capability: "CANDIDATE_AI" as Capability,
   action: "GRANT" as "GRANT" | "REVOKE",
   reasonCode: "admin_capability_access_update",
   notes: "",
@@ -36,10 +62,17 @@ const initialCapabilityForm = {
 const candidatePlanOptions: BillingStatus["plan"][] = ["FREE", "BASIC", "PROFESSIONAL"];
 const employerPlanOptions: BillingStatus["plan"][] = ["EMPLOYER_FREE", "EMPLOYER_BASIC", "EMPLOYER_PREMIUM"];
 const subscriptionStatusOptions: BillingStatus["status"][] = ["ACTIVE", "PAST_DUE", "INACTIVE", "CANCELLED"];
+const INVOICE_EXAMPLE = "in_…";
+
+function toDatetimeLocalValue(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
 
 function buildInitialSubscriptionAccessForm(customer: AdminBillingCustomerDetail | null) {
   const defaultPlan = customer?.role === "EMPLOYER" ? "EMPLOYER_FREE" : "FREE";
-
   return {
     plan: customer?.subscription?.plan ?? defaultPlan,
     status: customer?.subscription?.status ?? "INACTIVE",
@@ -49,87 +82,40 @@ function buildInitialSubscriptionAccessForm(customer: AdminBillingCustomerDetail
   };
 }
 
-function formatMinorAmount(amountMinor: number | null, currency: string | null) {
-  if (amountMinor == null) return "n/a";
-  const normalizedCurrency = currency?.toUpperCase() || "USD";
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: normalizedCurrency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(amountMinor / 100);
-  } catch {
-    return `${normalizedCurrency} ${(amountMinor / 100).toFixed(2)}`;
-  }
-}
-
-function toDatetimeLocalValue(value: string | null) {
-  if (!value) return "";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return offsetDate.toISOString().slice(0, 16);
-}
-
-function formatEntitlementLimit(value: number | null | boolean | undefined) {
-  if (value === null) return "Unlimited";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (value === undefined) return "n/a";
-  return value.toString();
-}
-
 export default function AdminBillingPage() {
-  const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const t = useAdminT();
+  const label = useAdminEnum();
+  const fmt = useAdminFormatters();
 
   const [dashboard, setDashboard] = useState<AdminBillingDashboard | null>(null);
   const [discrepancies, setDiscrepancies] = useState<AdminBillingDiscrepancy[]>([]);
   const [runs, setRuns] = useState<AdminBillingReconciliationRun[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<AdminBillingCustomerSearchResult[]>([]);
+  const [searched, setSearched] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<AdminBillingCustomerDetail | null>(null);
   const [selectedPlanEntitlements, setSelectedPlanEntitlements] = useState<PlanEntitlements[]>([]);
   const [supportForm, setSupportForm] = useState(initialSupportForm);
   const [capabilityForm, setCapabilityForm] = useState(initialCapabilityForm);
   const [subscriptionAccessForm, setSubscriptionAccessForm] = useState(buildInitialSubscriptionAccessForm(null));
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isLoading && (!user || user.role !== "ADMIN")) {
-      router.push(`/login?redirect=${encodeURIComponent("/admin/billing")}`);
-    }
-  }, [isLoading, router, user]);
+  const limit = (value: number | null | boolean | undefined) => {
+    if (value === null) return t("billing.unlimited");
+    if (typeof value === "boolean") return value ? t("common.yes") : t("common.no");
+    if (value === undefined) return t("common.notAvailable");
+    return fmt.number(value);
+  };
+  const na = (value: string | null | undefined) => value || t("common.notAvailable");
+  const planLabel = (plan: string | null | undefined) => label("plan", plan || "FREE");
+  const subStatusLabel = (status: string | null | undefined) => label("subStatus", status || "INACTIVE");
 
-  useEffect(() => {
-    if (user?.role === "ADMIN") {
-      void loadOverview();
-    }
-  }, [user]);
-
-  useEffect(() => {
-    setSubscriptionAccessForm(buildInitialSubscriptionAccessForm(selectedCustomer));
-    setCapabilityForm((current) => ({
-      ...current,
-      capability: selectedCustomer?.role === "EMPLOYER" ? "EMPLOYER_PREMIUM" : "CANDIDATE_AI",
-    }));
-  }, [selectedCustomer]);
-
-  const openDiscrepancies = useMemo(
-    () => discrepancies.filter((item) => item.status !== "RESOLVED"),
-    [discrepancies],
-  );
-
-  const effectiveEntitlements = selectedCustomer?.billingEntitlementState?.entitlements ?? null;
-
-  async function loadOverview() {
-    setLoading(true);
-    setError(null);
+  const loadOverview = useCallback(async () => {
+    setLoadError(null);
     try {
       const [dashboardData, discrepanciesData, runsData] = await Promise.all([
         adminBilling.dashboard(),
@@ -139,808 +125,586 @@ export default function AdminBillingPage() {
       setDashboard(dashboardData);
       setDiscrepancies(discrepanciesData.discrepancies);
       setRuns(runsData.runs);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load billing operations data.");
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setLoading(false);
     }
-  }
+  }, [t]);
 
-  async function loadCustomer(userId: string) {
+  useEffect(() => {
+    void loadOverview();
+  }, [loadOverview]);
+
+  useEffect(() => {
+    setSubscriptionAccessForm(buildInitialSubscriptionAccessForm(selectedCustomer));
+    setCapabilityForm((current) => ({
+      ...current,
+      capability: selectedCustomer?.role === "EMPLOYER" ? "EMPLOYER_PREMIUM" : "CANDIDATE_AI",
+    }));
+  }, [selectedCustomer]);
+
+  const openDiscrepancies = useMemo(() => discrepancies.filter((item) => item.status !== "RESOLVED"), [discrepancies]);
+  const effectiveEntitlements = selectedCustomer?.billingEntitlementState?.entitlements ?? null;
+
+  const loadCustomer = async (userId: string) => {
     setBusy(`customer:${userId}`);
     setError(null);
     try {
       const response = await adminBilling.customer(userId);
       setSelectedCustomer(response.customer);
       setSelectedPlanEntitlements(response.planEntitlements);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load customer billing details.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setBusy(null);
     }
-  }
+  };
 
-  async function handleSearch(event: FormEvent) {
+  const runAction = async (key: string, action: () => Promise<string>) => {
+    setBusy(key);
+    setError(null);
+    setSuccess(null);
+    try {
+      setSuccess(await action());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const refreshCustomer = async () => {
+    if (!selectedCustomer) return;
+    await Promise.all([loadOverview(), loadCustomer(selectedCustomer.id)]);
+  };
+
+  const handleSearch = async (event: FormEvent) => {
     event.preventDefault();
-    if (!searchQuery.trim()) {
+    const query = searchQuery.trim();
+    if (!query) {
       setSearchResults([]);
+      setSearched(false);
       return;
     }
     setBusy("search");
     setError(null);
     try {
-      const response = await adminBilling.searchCustomers(searchQuery.trim());
+      const response = await adminBilling.searchCustomers(query);
       setSearchResults(response.customers);
-      if (response.customers.length === 1) {
-        await loadCustomer(response.customers[0].id);
-      }
-    } catch (searchError) {
-      setError(searchError instanceof Error ? searchError.message : "Customer search failed.");
+      setSearched(true);
+      if (response.customers.length === 1) await loadCustomer(response.customers[0].id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setBusy(null);
     }
-  }
+  };
 
-  async function handleTriggerReconciliation() {
-    setBusy("reconcile");
-    setError(null);
-    setSuccess(null);
-    try {
+  const handleTriggerReconciliation = () =>
+    void runAction("reconcile", async () => {
       await adminBilling.triggerReconciliation();
       await loadOverview();
-      setSuccess("Manual billing reconciliation completed.");
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Failed to run reconciliation.");
-    } finally {
-      setBusy(null);
-    }
-  }
+      return t("billing.reconciled");
+    });
 
-  async function handleResyncEntitlements() {
-    if (!selectedCustomer) return;
-    setBusy("resync");
-    setError(null);
-    setSuccess(null);
-    try {
+  const handleResyncEntitlements = () =>
+    void runAction("resync", async () => {
+      if (!selectedCustomer) return "";
       await adminBilling.resyncEntitlements(selectedCustomer.id);
-      await Promise.all([loadOverview(), loadCustomer(selectedCustomer.id)]);
-      setSuccess("Entitlements were re-synced and stale state was cleared.");
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Failed to re-sync entitlements.");
-    } finally {
-      setBusy(null);
-    }
-  }
+      await refreshCustomer();
+      return t("billing.resynced");
+    });
 
-  async function handleSubscriptionAccess(event: FormEvent) {
+  const handleSubscriptionAccess = (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedCustomer) return;
-    setBusy("subscription-access");
-    setError(null);
-    setSuccess(null);
-
-    try {
+    void runAction("subscription-access", async () => {
+      if (!selectedCustomer) return "";
       const response = await adminBilling.updateSubscriptionAccess(selectedCustomer.id, {
         plan: subscriptionAccessForm.plan,
         status: subscriptionAccessForm.status,
-        currentPeriodEnd: subscriptionAccessForm.currentPeriodEnd
-          ? new Date(subscriptionAccessForm.currentPeriodEnd).toISOString()
-          : null,
+        currentPeriodEnd: subscriptionAccessForm.currentPeriodEnd ? new Date(subscriptionAccessForm.currentPeriodEnd).toISOString() : null,
         reasonCode: subscriptionAccessForm.reasonCode,
         notes: subscriptionAccessForm.notes || undefined,
       });
-      await Promise.all([loadOverview(), loadCustomer(selectedCustomer.id)]);
-      setSuccess(
-        response.warnings[0]
-          ? `Subscription access updated. Effective plan is ${response.state.effectivePlan} and status is ${response.state.effectiveStatus}. Warning: ${response.warnings[0]}`
-          : `Subscription access updated. Effective plan is ${response.state.effectivePlan} and status is ${response.state.effectiveStatus}.`,
-      );
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Failed to update subscription access.");
-    } finally {
-      setBusy(null);
-    }
-  }
+      await refreshCustomer();
+      const base = t("billing.subscriptionUpdated", {
+        plan: response.state.effectivePlan,
+        status: subStatusLabel(response.state.effectiveStatus),
+      });
+      return response.warnings[0] ? `${base} ${t("billing.warning", { warning: response.warnings[0] })}` : base;
+    });
+  };
 
-  async function handleCapabilityAccess(event: FormEvent) {
+  const handleCapabilityAccess = (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedCustomer) return;
-    setBusy("capability-access");
-    setError(null);
-    setSuccess(null);
-
-    try {
+    void runAction("capability-access", async () => {
+      if (!selectedCustomer) return "";
       const response = await adminBilling.updateCapabilityAccess(selectedCustomer.id, {
         capability: capabilityForm.capability,
         action: capabilityForm.action,
         reasonCode: capabilityForm.reasonCode,
         notes: capabilityForm.notes || undefined,
       });
-      await Promise.all([loadOverview(), loadCustomer(selectedCustomer.id)]);
+      await refreshCustomer();
       setCapabilityForm((current) => ({ ...current, notes: "" }));
-      setSuccess(
-        response.warnings[0]
-          ? `Capability access updated. Effective plan is ${response.state.effectivePlan}. Warning: ${response.warnings[0]}`
-          : `Capability access updated. Effective plan is ${response.state.effectivePlan}.`,
-      );
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Failed to update capability access.");
-    } finally {
-      setBusy(null);
-    }
-  }
+      const base = t("billing.capabilityUpdated", { plan: response.state.effectivePlan });
+      return response.warnings[0] ? `${base} ${t("billing.warning", { warning: response.warnings[0] })}` : base;
+    });
+  };
 
-  async function handleSupportAction(event: FormEvent) {
+  const handleSupportAction = (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedCustomer) return;
-    setBusy("support");
-    setError(null);
-    setSuccess(null);
-
-    try {
+    void runAction("support", async () => {
+      if (!selectedCustomer) return "";
       const response = await adminBilling.supportAction(selectedCustomer.id, {
         actionType: supportForm.actionType,
         reasonCode: supportForm.reasonCode,
         notes: supportForm.notes || undefined,
         invoiceId: supportForm.invoiceId || undefined,
       });
-      await Promise.all([loadOverview(), loadCustomer(selectedCustomer.id)]);
+      await refreshCustomer();
       setSupportForm(initialSupportForm);
-      setSuccess(response.receiptDelivery?.message || "Billing support action recorded.");
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Failed to record support action.");
-    } finally {
-      setBusy(null);
-    }
-  }
+      return response.receiptDelivery?.message || t("billing.supportRecorded");
+    });
+  };
 
-  if (isLoading || !user) {
+  const header = (
+    <PageHeader
+      eyebrow={t("billing.eyebrow")}
+      title={t("billing.title")}
+      subtitle={t("billing.subtitle")}
+      actions={
+        dashboard && (
+          <Button onClick={handleTriggerReconciliation} isLoading={busy === "reconcile"}>
+            {t("billing.runReconciliation")}
+          </Button>
+        )
+      }
+    />
+  );
+
+  if (loading) {
     return (
-      <div className="flex justify-center py-24">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
+      <div>
+        {header}
+        <SkeletonList rows={4} />
       </div>
     );
   }
 
-  if (loading || !dashboard) {
+  if (!dashboard) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex justify-center py-24">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-emerald-600" />
-        </div>
+      <div>
+        {header}
+        <ErrorState message={loadError} onRetry={() => void loadOverview()} />
       </div>
     );
   }
+
+  const m = dashboard.metrics;
+  const sub = selectedCustomer?.subscription;
+  const profile = selectedCustomer?.billingProfile;
+  const ent = selectedCustomer?.billingEntitlementState;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
-      <section className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-100 via-white to-emerald-50 p-8">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700 mb-3">
-              Admin Billing Operations
-            </p>
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Reconciliation, support, and pricing safety</h1>
-            <p className="max-w-3xl text-lg text-gray-600">
-              Track webhook health, subscription state drift, pending refunds, and entitlement sync issues before they become finance or support escalations.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link href="/admin">
-              <Button variant="outline">Back to admin</Button>
-            </Link>
-            <Button onClick={handleTriggerReconciliation} disabled={busy === "reconcile"}>
-              {busy === "reconcile" ? "Running..." : "Run reconciliation"}
-            </Button>
-          </div>
-        </div>
-      </section>
+    <div className="space-y-6">
+      {header}
 
-      {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+      {error && <Notice tone="error" onDismiss={() => setError(null)}>{error}</Notice>}
+      {success && <Notice tone="success" onDismiss={() => setSuccess(null)}>{success}</Notice>}
 
-      {success && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {success}
-        </div>
-      )}
-
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Successful payments</p>
-            <p className="mt-3 text-3xl font-bold text-emerald-700">{dashboard.metrics.successfulPayments}</p>
-            <p className="mt-1 text-xs text-gray-500">Since {new Date(dashboard.windows.paymentsSince).toLocaleDateString()}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Failed payments</p>
-            <p className="mt-3 text-3xl font-bold text-amber-700">{dashboard.metrics.failedPayments}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Webhook failures</p>
-            <p className="mt-3 text-3xl font-bold text-red-700">{dashboard.metrics.webhookFailures}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Subscription mismatches</p>
-            <p className="mt-3 text-3xl font-bold text-slate-900">{dashboard.metrics.mismatchedSubscriptionStates}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Unpaid but entitled</p>
-            <p className="mt-3 text-3xl font-bold text-orange-700">{dashboard.metrics.unpaidButEntitled}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Paid but not entitled</p>
-            <p className="mt-3 text-3xl font-bold text-red-800">{dashboard.metrics.paidButNotEntitled}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Pending refunds</p>
-            <p className="mt-3 text-3xl font-bold text-blue-700">{dashboard.metrics.pendingRefunds}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Last reconciliation</p>
-            <p className="mt-3 text-lg font-bold text-slate-900">
-              {dashboard.lastReconciliationRun ? dashboard.lastReconciliationRun.status : "Never"}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              {dashboard.lastReconciliationRun
-                ? new Date(dashboard.lastReconciliationRun.startedAt).toLocaleString()
-                : "No run recorded yet"}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label={t("billing.statSuccessful")} value={fmt.number(m.successfulPayments)} hint={t("billing.since", { date: fmt.date(dashboard.windows.paymentsSince) })} tone="brand" />
+        <StatCard label={t("billing.statFailed")} value={fmt.number(m.failedPayments)} tone="warning" />
+        <StatCard label={t("billing.statWebhookFailures")} value={fmt.number(m.webhookFailures)} tone="danger" />
+        <StatCard label={t("billing.statMismatches")} value={fmt.number(m.mismatchedSubscriptionStates)} tone="neutral" />
+        <StatCard label={t("billing.statUnpaidEntitled")} value={fmt.number(m.unpaidButEntitled)} tone="warning" />
+        <StatCard label={t("billing.statPaidNotEntitled")} value={fmt.number(m.paidButNotEntitled)} tone="danger" />
+        <StatCard label={t("billing.statRefunds")} value={fmt.number(m.pendingRefunds)} tone="info" />
+        <StatCard
+          label={t("billing.statLastRun")}
+          value={dashboard.lastReconciliationRun ? label("reconStatus", dashboard.lastReconciliationRun.status) : t("common.never")}
+          hint={dashboard.lastReconciliationRun ? fmt.dateTime(dashboard.lastReconciliationRun.startedAt) : t("billing.noRunYet")}
+          tone="neutral"
+        />
       </div>
 
-      <Card className="border-slate-200">
-        <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">Find customer billing history</h2>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={handleSearch} className="flex flex-col gap-3 md:flex-row">
-            <Input
-              placeholder="Search by email, name, user ID, Stripe customer ID, or subscription ID"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
-            <Button type="submit" disabled={busy === "search"}>
-              {busy === "search" ? "Searching..." : "Search"}
-            </Button>
-          </form>
+      <Panel title={t("billing.findCustomer")}>
+        <form onSubmit={(e) => void handleSearch(e)} className="flex flex-col gap-3 md:flex-row">
+          <input
+            type="search"
+            aria-label={t("billing.findCustomer")}
+            placeholder={t("billing.searchPlaceholder")}
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className={fieldClass}
+          />
+          <Button type="submit" isLoading={busy === "search"} className="shrink-0">
+            {t("common.search")}
+          </Button>
+        </form>
 
-          {searchResults.length > 0 && (
-            <div className="grid gap-3">
-              {searchResults.map((result) => (
+        {searched && searchResults.length === 0 && <p className={`mt-4 text-sm ${muted}`}>{t("billing.noCustomers")}</p>}
+        {searchResults.length > 0 && (
+          <ul className="mt-4 grid gap-2">
+            {searchResults.map((result) => (
+              <li key={result.id}>
                 <button
-                  key={result.id}
                   type="button"
                   onClick={() => void loadCustomer(result.id)}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:border-emerald-300"
+                  className={`w-full rounded-xl border px-4 py-3 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                    selectedCustomer?.id === result.id ? "border-primary bg-primary-soft" : "border-line bg-surface hover:border-line-strong hover:bg-surface-sunken"
+                  }`}
                 >
                   <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-900">{result.name}</p>
-                      <p className="text-sm text-gray-600">{result.email}</p>
+                    <div className="min-w-0">
+                      <p className={`font-semibold ${strong}`}>{result.name}</p>
+                      <p className={`truncate text-sm ${muted}`}>{result.email}</p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="default">{result.subscription?.plan || "FREE"}</Badge>
-                      <Badge variant={result.subscription?.status === "ACTIVE" ? "success" : "warning"}>
-                        {result.subscription?.status || "INACTIVE"}
-                      </Badge>
-                      {result.billingProfile && (
-                        <Badge variant="info">
-                          {result.billingProfile.region} / {result.billingProfile.currency}
-                        </Badge>
-                      )}
+                    <div className="flex flex-wrap gap-1.5">
+                      <Pill tone="zinc">{planLabel(result.subscription?.plan)}</Pill>
+                      <Pill tone={statusTone(result.subscription?.status || "INACTIVE")}>{subStatusLabel(result.subscription?.status)}</Pill>
+                      {result.billingProfile && <Pill tone="blue">{result.billingProfile.region} / {result.billingProfile.currency}</Pill>}
                     </div>
                   </div>
                 </button>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
 
-      <div className="grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
-        <Card className="border-slate-200">
-          <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Open discrepancy queue</h2>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {openDiscrepancies.length === 0 ? (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
-                No open billing discrepancies. Reconciliation is clean right now.
-              </div>
-            ) : (
-              openDiscrepancies.map((item) => (
-                <div key={item.id} className="rounded-2xl border border-slate-200 p-4">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+        <Panel title={t("billing.discrepancies")}>
+          {openDiscrepancies.length === 0 ? (
+            <Notice tone="success">{t("billing.noDiscrepancies")}</Notice>
+          ) : (
+            <ul className="space-y-3">
+              {openDiscrepancies.map((item) => (
+                <li key={item.id} className="rounded-xl border border-line p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-900">{item.title}</p>
-                      <p className="mt-1 text-sm text-gray-600">
-                        {item.user?.email || "No linked user"} • {item.type.replaceAll("_", " ")}
+                    <div className="min-w-0">
+                      <p className={`font-semibold ${strong}`}>{item.title}</p>
+                      <p className={`mt-0.5 text-sm ${muted}`}>
+                        {item.user?.email || t("billing.noLinkedUser")} · {label("discType", item.type)}
                       </p>
-                      {item.reasonCode && (
-                        <p className="mt-2 text-xs uppercase tracking-[0.14em] text-gray-500">
-                          Reason: {item.reasonCode}
-                        </p>
-                      )}
+                      {item.reasonCode && <code className={`mt-1 block text-xs ${muted}`}>{item.reasonCode}</code>}
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant={item.severity === "CRITICAL" || item.severity === "HIGH" ? "danger" : "warning"}>
-                        {item.severity}
-                      </Badge>
-                      <Badge variant="info">{item.status}</Badge>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Pill tone={item.severity === "CRITICAL" || item.severity === "HIGH" ? "red" : "amber"}>{label("risk", item.severity)}</Pill>
+                      <Pill tone={statusTone(item.status)}>{label("discStatus", item.status)}</Pill>
                     </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500">
-                    <span>Detected {new Date(item.detectedAt).toLocaleString()}</span>
-                    {item.dueAt && <span>Due {new Date(item.dueAt).toLocaleString()}</span>}
-                  </div>
+                  <p className={`mt-2 text-xs ${muted}`}>
+                    {t("billing.detected", { time: fmt.dateTime(item.detectedAt) })}
+                    {item.dueAt ? ` · ${t("billing.due", { time: fmt.dateTime(item.dueAt) })}` : ""}
+                  </p>
                   {item.user?.id && (
-                    <div className="mt-4">
-                      <Button variant="outline" onClick={() => void loadCustomer(item.user!.id)}>
-                        Open customer
-                      </Button>
-                    </div>
+                    <Button size="sm" variant="outline" className="mt-3" onClick={() => void loadCustomer(item.user!.id)}>
+                      {t("billing.openCustomer")}
+                    </Button>
                   )}
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
 
-        <Card className="border-slate-200">
-          <CardHeader>
-            <h2 className="text-xl font-semibold text-gray-900">Recent reconciliation runs</h2>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {runs.length === 0 ? (
-              <p className="text-sm text-gray-600">No reconciliation runs recorded yet.</p>
-            ) : (
-              runs.map((run) => (
-                <div key={run.id} className="rounded-2xl border border-slate-200 p-4">
+        <Panel title={t("billing.runs")}>
+          {runs.length === 0 ? (
+            <p className={`text-sm ${muted}`}>{t("billing.noRuns")}</p>
+          ) : (
+            <ul className="space-y-3">
+              {runs.map((run) => (
+                <li key={run.id} className="rounded-xl border border-line p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="font-semibold text-gray-900">{run.status}</p>
-                    <Badge variant={run.status === "FAILED" ? "danger" : run.status === "PARTIAL" ? "warning" : "success"}>
-                      {run.checkedSubscriptions} checked
-                    </Badge>
+                    <Pill tone={statusTone(run.status)}>{label("reconStatus", run.status)}</Pill>
+                    <span className={`text-xs ${muted}`}>{fmt.dateTime(run.startedAt)}</span>
                   </div>
-                  <div className="mt-2 text-sm text-gray-600">
-                    <p>{new Date(run.startedAt).toLocaleString()}</p>
-                    <p>
-                      {run.subscriptionMismatches} mismatches • {run.failedPayments} failed payments • {run.pendingRefunds} pending refunds
-                    </p>
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+                  <p className="mt-2 text-sm text-fg-secondary">
+                    {t("billing.runSummary", {
+                      checked: fmt.number(run.checkedSubscriptions),
+                      mismatches: fmt.number(run.subscriptionMismatches),
+                      failed: fmt.number(run.failedPayments),
+                      refunds: fmt.number(run.pendingRefunds),
+                    })}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
       </div>
 
       {selectedCustomer && (
-        <section className="space-y-6">
-          <Card className="border-slate-200">
-            <CardHeader>
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold text-gray-900">{selectedCustomer.name}</h2>
-                  <p className="text-sm text-gray-600">{selectedCustomer.email}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="default">{selectedCustomer.subscription?.plan || "FREE"}</Badge>
-                  <Badge variant={selectedCustomer.subscription?.status === "ACTIVE" ? "success" : "warning"}>
-                    {selectedCustomer.subscription?.status || "INACTIVE"}
-                  </Badge>
-                  {selectedCustomer.billingProfile?.isGrandfathered && (
-                    <Badge variant="info">Grandfathered v{selectedCustomer.billingProfile.pricingVersion}</Badge>
-                  )}
-                </div>
+        <section className="space-y-6" aria-labelledby="billing-customer">
+          <Panel>
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div className="min-w-0">
+                <h2 id="billing-customer" className={`text-xl font-semibold ${strong}`}>{selectedCustomer.name}</h2>
+                <p className={`text-sm ${muted}`}>{selectedCustomer.email}</p>
               </div>
-            </CardHeader>
-            <CardContent className="grid gap-6 lg:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Billing profile</p>
-                <div className="mt-3 space-y-2 text-sm text-gray-700">
-                  <p>Region: {selectedCustomer.billingProfile?.region || "ROW"}</p>
-                  <p>Country: {selectedCustomer.billingProfile?.country || "n/a"}</p>
-                  <p>Stripe country: {selectedCustomer.billingProfile?.stripeCountry || "n/a"}</p>
-                  <p>Currency: {selectedCustomer.billingProfile?.currency || "USD"}</p>
-                  <p>VAT / Tax ID: {selectedCustomer.billingProfile?.taxIdValue || "n/a"}</p>
-                </div>
+              <div className="flex flex-wrap gap-1.5">
+                <Pill tone="zinc">{planLabel(sub?.plan)}</Pill>
+                <Pill tone={statusTone(sub?.status || "INACTIVE")}>{subStatusLabel(sub?.status)}</Pill>
+                {profile?.isGrandfathered && <Pill tone="blue">{t("billing.grandfathered", { version: profile.pricingVersion })}</Pill>}
               </div>
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Subscription</p>
-                <div className="mt-3 space-y-2 text-sm text-gray-700">
-                  <p>Provider: {selectedCustomer.subscription?.billingProvider || "n/a"}</p>
-                  <p>Provider customer: {selectedCustomer.subscription?.providerCustomerId || "n/a"}</p>
-                  <p>Provider subscription: {selectedCustomer.subscription?.providerSubscriptionId || "n/a"}</p>
-                  <p>Stripe customer: {selectedCustomer.subscription?.stripeCustomerId || "n/a"}</p>
-                  <p>Stripe subscription: {selectedCustomer.subscription?.stripeSubId || "n/a"}</p>
-                  <p>Current period end: {selectedCustomer.subscription?.currentPeriodEnd ? new Date(selectedCustomer.subscription.currentPeriodEnd).toLocaleString() : "n/a"}</p>
-                </div>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="rounded-xl border border-line p-4">
+                <p className={labelClass}>{t("billing.profile")}</p>
+                <KeyValueList
+                  items={[
+                    { label: t("billing.region"), value: profile?.region || "ROW" },
+                    { label: t("billing.country"), value: na(profile?.country) },
+                    { label: t("billing.stripeCountry"), value: na(profile?.stripeCountry) },
+                    { label: t("billing.currency"), value: profile?.currency || "USD" },
+                    { label: t("billing.taxId"), value: na(profile?.taxIdValue) },
+                  ]}
+                />
               </div>
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Entitlement state</p>
-                <div className="mt-3 space-y-2 text-sm text-gray-700">
-                  <p>Effective plan: {selectedCustomer.billingEntitlementState?.effectivePlan || "FREE"}</p>
-                  <p>Effective status: {selectedCustomer.billingEntitlementState?.effectiveStatus || "INACTIVE"}</p>
-                  <p>Synced: {selectedCustomer.billingEntitlementState?.lastSyncedAt ? new Date(selectedCustomer.billingEntitlementState.lastSyncedAt).toLocaleString() : "never"}</p>
-                  <p>Checksum: {selectedCustomer.billingEntitlementState?.checksum?.slice(0, 12) || "n/a"}</p>
-                </div>
-                <div className="mt-4">
-                  <Button variant="outline" onClick={handleResyncEntitlements} disabled={busy === "resync"}>
-                    {busy === "resync" ? "Re-syncing..." : "Re-sync entitlements"}
-                  </Button>
-                </div>
+              <div className="rounded-xl border border-line p-4">
+                <p className={labelClass}>{t("billing.subscription")}</p>
+                <KeyValueList
+                  items={[
+                    { label: t("billing.provider"), value: na(sub?.billingProvider) },
+                    { label: t("billing.providerCustomer"), value: na(sub?.providerCustomerId) },
+                    { label: t("billing.providerSubscription"), value: na(sub?.providerSubscriptionId) },
+                    { label: t("billing.stripeCustomer"), value: na(sub?.stripeCustomerId) },
+                    { label: t("billing.stripeSubscription"), value: na(sub?.stripeSubId) },
+                    { label: t("billing.periodEnd"), value: sub?.currentPeriodEnd ? fmt.dateTime(sub.currentPeriodEnd) : t("common.notAvailable") },
+                  ]}
+                />
               </div>
-            </CardContent>
-          </Card>
+              <div className="rounded-xl border border-line p-4">
+                <p className={labelClass}>{t("billing.entitlementState")}</p>
+                <KeyValueList
+                  items={[
+                    { label: t("billing.effectivePlan"), value: planLabel(ent?.effectivePlan) },
+                    { label: t("billing.effectiveStatus"), value: subStatusLabel(ent?.effectiveStatus) },
+                    { label: t("billing.synced"), value: ent?.lastSyncedAt ? fmt.dateTime(ent.lastSyncedAt) : t("common.never") },
+                    { label: t("billing.checksum"), value: <code>{ent?.checksum?.slice(0, 12) || t("common.notAvailable")}</code> },
+                  ]}
+                />
+                <Button variant="outline" size="sm" className="mt-3" onClick={handleResyncEntitlements} isLoading={busy === "resync"}>
+                  {t("billing.resync")}
+                </Button>
+              </div>
+            </div>
+          </Panel>
 
-          <Card className="border-slate-200">
-            <CardHeader>
-              <h3 className="text-xl font-semibold text-gray-900">Premium and AI capability control</h3>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="grid gap-4 lg:grid-cols-[0.9fr,1.1fr]">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Current effective capabilities</p>
-                  <div className="mt-3 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
-                    <p>AI resume reviews: {formatEntitlementLimit(effectiveEntitlements?.aiResumeReviews)}</p>
-                    <p>AI job matches: {formatEntitlementLimit(effectiveEntitlements?.aiJobMatches)}</p>
-                    <p>AI apply packs: {formatEntitlementLimit(effectiveEntitlements?.aiApplyPacks)}</p>
-                    <p>Chat access: {formatEntitlementLimit(effectiveEntitlements?.chatAccess)}</p>
-                    <p>Autopilot: {formatEntitlementLimit(effectiveEntitlements?.autopilot)}</p>
-                    <p>Priority support: {formatEntitlementLimit(effectiveEntitlements?.prioritySupport)}</p>
-                    <p>Talent search: {formatEntitlementLimit(effectiveEntitlements?.talentSearch)}</p>
-                    <p>API access: {formatEntitlementLimit(effectiveEntitlements?.apiAccess)}</p>
-                  </div>
-                </div>
+          <Panel title={t("billing.capabilityTitle")}>
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <div className="rounded-xl border border-line bg-surface-sunken p-4">
+                <p className={labelClass}>{t("billing.currentCapabilities")}</p>
+                <KeyValueList
+                  items={[
+                    { label: t("ent.aiResumeReviews"), value: limit(effectiveEntitlements?.aiResumeReviews) },
+                    { label: t("ent.aiJobMatches"), value: limit(effectiveEntitlements?.aiJobMatches) },
+                    { label: t("ent.aiApplyPacks"), value: limit(effectiveEntitlements?.aiApplyPacks) },
+                    { label: t("ent.chatAccess"), value: limit(effectiveEntitlements?.chatAccess) },
+                    { label: t("ent.autopilot"), value: limit(effectiveEntitlements?.autopilot) },
+                    { label: t("ent.prioritySupport"), value: limit(effectiveEntitlements?.prioritySupport) },
+                    { label: t("ent.talentSearch"), value: limit(effectiveEntitlements?.talentSearch) },
+                    { label: t("ent.apiAccess"), value: limit(effectiveEntitlements?.apiAccess) },
+                  ]}
+                />
+              </div>
 
-                <form onSubmit={handleCapabilityAccess} className="space-y-4 rounded-2xl border border-slate-200 p-4">
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                    Scoped controls map to approved plans, sync BillingEntitlementState, and write support/audit events. Use the raw subscription override only for non-standard cases.
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <label className="text-sm text-gray-700">
-                      <span className="mb-1 block">Capability</span>
-                      <select
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2"
-                        value={capabilityForm.capability}
-                        onChange={(event) =>
-                          setCapabilityForm((current) => ({
-                            ...current,
-                            capability: event.target.value as typeof capabilityForm.capability,
-                          }))
-                        }
-                      >
-                        {selectedCustomer.role === "EMPLOYER" ? (
-                          <option value="EMPLOYER_PREMIUM">Employer premium and AI tools</option>
-                        ) : (
-                          <>
-                            <option value="CANDIDATE_PREMIUM">Candidate premium</option>
-                            <option value="CANDIDATE_AI">Candidate AI tools</option>
-                          </>
-                        )}
+              <form onSubmit={handleCapabilityAccess} className="space-y-4 rounded-xl border border-line p-4">
+                <Notice tone="warning">{t("billing.capabilityHelp")}</Notice>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Field label={t("billing.capability")}>
+                    {(id) => (
+                      <select id={id} className={fieldClass} value={capabilityForm.capability}
+                        onChange={(e) => setCapabilityForm((c) => ({ ...c, capability: e.target.value as Capability }))}>
+                        {(selectedCustomer.role === "EMPLOYER" ? (["EMPLOYER_PREMIUM"] as const) : (["CANDIDATE_PREMIUM", "CANDIDATE_AI"] as const)).map((cap) => (
+                          <option key={cap} value={cap}>{t(`capability.${cap}`)}</option>
+                        ))}
                       </select>
-                    </label>
-                    <label className="text-sm text-gray-700">
-                      <span className="mb-1 block">Action</span>
-                      <select
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2"
-                        value={capabilityForm.action}
-                        onChange={(event) =>
-                          setCapabilityForm((current) => ({
-                            ...current,
-                            action: event.target.value as typeof capabilityForm.action,
-                          }))
-                        }
-                      >
-                        <option value="GRANT">Grant</option>
-                        <option value="REVOKE">Revoke</option>
+                    )}
+                  </Field>
+                  <Field label={t("trust.action")}>
+                    {(id) => (
+                      <select id={id} className={fieldClass} value={capabilityForm.action}
+                        onChange={(e) => setCapabilityForm((c) => ({ ...c, action: e.target.value as "GRANT" | "REVOKE" }))}>
+                        <option value="GRANT">{t("billing.grant")}</option>
+                        <option value="REVOKE">{t("billing.revoke")}</option>
                       </select>
-                    </label>
-                    <label className="text-sm text-gray-700">
-                      <span className="mb-1 block">Reason code</span>
-                      <Input
-                        value={capabilityForm.reasonCode}
-                        onChange={(event) =>
-                          setCapabilityForm((current) => ({
-                            ...current,
-                            reasonCode: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
-                  <label className="block text-sm text-gray-700">
-                    <span className="mb-1 block">Audit notes</span>
-                    <textarea
-                      className="min-h-[100px] w-full rounded-2xl border border-gray-300 px-3 py-3"
-                      value={capabilityForm.notes}
-                      onChange={(event) =>
-                        setCapabilityForm((current) => ({
-                          ...current,
-                          notes: event.target.value,
-                        }))
-                      }
-                      placeholder="Document the customer request, support ticket, or risk rationale."
-                    />
-                  </label>
-                  <Button type="submit" disabled={busy === "capability-access"}>
-                    {busy === "capability-access" ? "Updating..." : "Apply capability change"}
-                  </Button>
-                </form>
-              </div>
+                    )}
+                  </Field>
+                  <Field label={t("common.reasonCode")}>
+                    {(id) => <input id={id} className={`${fieldClass} font-mono`} value={capabilityForm.reasonCode}
+                      onChange={(e) => setCapabilityForm((c) => ({ ...c, reasonCode: e.target.value }))} />}
+                  </Field>
+                </div>
+                <Field label={t("billing.auditNotes")}>
+                  {(id) => <textarea id={id} rows={3} className={fieldClass} value={capabilityForm.notes} placeholder={t("billing.capabilityNotesPlaceholder")}
+                    onChange={(e) => setCapabilityForm((c) => ({ ...c, notes: e.target.value }))} />}
+                </Field>
+                <Button type="submit" isLoading={busy === "capability-access"}>{t("billing.applyCapability")}</Button>
+              </form>
+            </div>
 
-              {selectedPlanEntitlements.length > 0 && (
-                <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                  <table className="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+            {selectedPlanEntitlements.length > 0 && (
+              <div className="mt-5 overflow-hidden rounded-xl border border-line">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-line text-sm">
+                    <thead>
                       <tr>
-                        <th className="px-4 py-3">Plan</th>
-                        <th className="px-4 py-3">AI reviews</th>
-                        <th className="px-4 py-3">AI matches</th>
-                        <th className="px-4 py-3">Apply packs</th>
-                        <th className="px-4 py-3">Chat</th>
-                        <th className="px-4 py-3">Autopilot</th>
-                        <th className="px-4 py-3">Employer premium</th>
+                        <Th>{t("billing.plan")}</Th>
+                        <Th>{t("ent.aiResumeReviews")}</Th>
+                        <Th>{t("ent.aiJobMatches")}</Th>
+                        <Th>{t("ent.aiApplyPacks")}</Th>
+                        <Th>{t("ent.chatAccess")}</Th>
+                        <Th>{t("ent.autopilot")}</Th>
+                        <Th>{t("ent.employerPremium")}</Th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white text-gray-700">
+                    <tbody className="divide-y divide-line bg-surface">
                       {selectedPlanEntitlements.map((plan) => (
                         <tr key={plan.plan}>
-                          <td className="px-4 py-3 font-semibold text-gray-900">{plan.plan}</td>
-                          <td className="px-4 py-3">{formatEntitlementLimit(plan.aiResumeReviews)}</td>
-                          <td className="px-4 py-3">{formatEntitlementLimit(plan.aiJobMatches)}</td>
-                          <td className="px-4 py-3">{formatEntitlementLimit(plan.aiApplyPacks)}</td>
-                          <td className="px-4 py-3">{formatEntitlementLimit(plan.chatAccess)}</td>
-                          <td className="px-4 py-3">{formatEntitlementLimit(plan.autopilot)}</td>
-                          <td className="px-4 py-3">
-                            {formatEntitlementLimit(plan.apiAccess || plan.pipelineExports || plan.advancedFunnelMetrics)}
-                          </td>
+                          <Td className="font-semibold">{planLabel(plan.plan)}</Td>
+                          <Td>{limit(plan.aiResumeReviews)}</Td>
+                          <Td>{limit(plan.aiJobMatches)}</Td>
+                          <Td>{limit(plan.aiApplyPacks)}</Td>
+                          <Td>{limit(plan.chatAccess)}</Td>
+                          <Td>{limit(plan.autopilot)}</Td>
+                          <Td>{limit(plan.apiAccess || plan.pipelineExports || plan.advancedFunnelMetrics)}</Td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200">
-            <CardHeader>
-              <h3 className="text-xl font-semibold text-gray-900">Subscription access override</h3>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                This updates the existing subscription record and immediately re-syncs effective entitlements. It does not create a separate access system.
               </div>
-              {(selectedCustomer.subscription?.billingProvider
-                || selectedCustomer.subscription?.providerSubscriptionId
-                || selectedCustomer.subscription?.stripeSubId) && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                  A live provider-linked subscription is still attached to this account. Future billing webhooks may overwrite local plan or status changes.
-                </div>
-              )}
-              <form onSubmit={handleSubscriptionAccess} className="space-y-4 rounded-2xl border border-slate-200 p-4">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <label className="text-sm text-gray-700">
-                    <span className="mb-1 block">Plan</span>
-                    <select
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2"
-                      value={subscriptionAccessForm.plan}
-                      onChange={(event) =>
-                        setSubscriptionAccessForm((current) => ({
-                          ...current,
-                          plan: event.target.value as BillingStatus["plan"],
-                        }))
-                      }
-                    >
-                      {(selectedCustomer.role === "EMPLOYER" ? employerPlanOptions : candidatePlanOptions).map((plan) => (
-                        <option key={plan} value={plan}>
-                          {plan}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="text-sm text-gray-700">
-                    <span className="mb-1 block">Status</span>
-                    <select
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2"
-                      value={subscriptionAccessForm.status}
-                      onChange={(event) =>
-                        setSubscriptionAccessForm((current) => ({
-                          ...current,
-                          status: event.target.value as BillingStatus["status"],
-                        }))
-                      }
-                    >
-                      {subscriptionStatusOptions.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="text-sm text-gray-700">
-                    <span className="mb-1 block">Current period end</span>
-                    <Input
-                      type="datetime-local"
-                      value={subscriptionAccessForm.currentPeriodEnd}
-                      onChange={(event) =>
-                        setSubscriptionAccessForm((current) => ({
-                          ...current,
-                          currentPeriodEnd: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label className="text-sm text-gray-700">
-                    <span className="mb-1 block">Reason code</span>
-                    <Input
-                      value={subscriptionAccessForm.reasonCode}
-                      onChange={(event) =>
-                        setSubscriptionAccessForm((current) => ({
-                          ...current,
-                          reasonCode: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                </div>
-                <label className="block text-sm text-gray-700">
-                  <span className="mb-1 block">Audit notes</span>
-                  <textarea
-                    className="min-h-[120px] w-full rounded-2xl border border-gray-300 px-3 py-3"
-                    value={subscriptionAccessForm.notes}
-                    onChange={(event) =>
-                      setSubscriptionAccessForm((current) => ({
-                        ...current,
-                        notes: event.target.value,
-                      }))
-                    }
-                    placeholder="Document why access is being granted, changed, or revoked."
-                  />
-                </label>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button type="submit" disabled={busy === "subscription-access"}>
-                    {busy === "subscription-access" ? "Updating..." : "Update subscription access"}
-                  </Button>
-                  <p className="text-xs text-gray-500">
-                    Role-compatible plans only: {selectedCustomer.role === "EMPLOYER" ? "EMPLOYER_*" : "FREE, BASIC, PROFESSIONAL"}.
-                  </p>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+            )}
+          </Panel>
 
-          <div className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
-            <Card className="border-slate-200">
-              <CardHeader>
-                <h3 className="text-xl font-semibold text-gray-900">Payment, invoice, and webhook history</h3>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {selectedCustomer.billingEvents.length === 0 ? (
-                  <p className="text-sm text-gray-600">No billing events recorded yet.</p>
-                ) : (
-                  selectedCustomer.billingEvents.map((event) => (
-                    <div key={event.id} className="rounded-2xl border border-slate-200 p-4">
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div>
-                          <p className="font-semibold text-gray-900">{event.eventType}</p>
-                          <p className="mt-1 text-sm text-gray-600">
-                            {formatMinorAmount(event.amountMinor, event.currency)} • {event.source}
+          <Panel title={t("billing.overrideTitle")} description={t("billing.overrideHelp")}>
+            {(sub?.billingProvider || sub?.providerSubscriptionId || sub?.stripeSubId) && (
+              <Notice tone="warning">{t("billing.providerLinkedWarning")}</Notice>
+            )}
+            <form onSubmit={handleSubscriptionAccess} className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <Field label={t("billing.plan")}>
+                  {(id) => (
+                    <select id={id} className={fieldClass} value={subscriptionAccessForm.plan}
+                      onChange={(e) => setSubscriptionAccessForm((c) => ({ ...c, plan: e.target.value as BillingStatus["plan"] }))}>
+                      {(selectedCustomer.role === "EMPLOYER" ? employerPlanOptions : candidatePlanOptions).map((plan) => (
+                        <option key={plan} value={plan}>{planLabel(plan)}</option>
+                      ))}
+                    </select>
+                  )}
+                </Field>
+                <Field label={t("common.status")}>
+                  {(id) => (
+                    <select id={id} className={fieldClass} value={subscriptionAccessForm.status}
+                      onChange={(e) => setSubscriptionAccessForm((c) => ({ ...c, status: e.target.value as BillingStatus["status"] }))}>
+                      {subscriptionStatusOptions.map((s) => <option key={s} value={s}>{subStatusLabel(s)}</option>)}
+                    </select>
+                  )}
+                </Field>
+                <Field label={t("billing.periodEnd")}>
+                  {(id) => <input id={id} type="datetime-local" className={fieldClass} value={subscriptionAccessForm.currentPeriodEnd}
+                    onChange={(e) => setSubscriptionAccessForm((c) => ({ ...c, currentPeriodEnd: e.target.value }))} />}
+                </Field>
+                <Field label={t("common.reasonCode")}>
+                  {(id) => <input id={id} className={`${fieldClass} font-mono`} value={subscriptionAccessForm.reasonCode}
+                    onChange={(e) => setSubscriptionAccessForm((c) => ({ ...c, reasonCode: e.target.value }))} />}
+                </Field>
+              </div>
+              <Field label={t("billing.auditNotes")}>
+                {(id) => <textarea id={id} rows={4} className={fieldClass} value={subscriptionAccessForm.notes} placeholder={t("billing.overrideNotesPlaceholder")}
+                  onChange={(e) => setSubscriptionAccessForm((c) => ({ ...c, notes: e.target.value }))} />}
+              </Field>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="submit" isLoading={busy === "subscription-access"}>{t("billing.updateAccess")}</Button>
+                <p className={`text-xs ${muted}`}>
+                  {selectedCustomer.role === "EMPLOYER" ? t("billing.rolePlansEmployer") : t("billing.rolePlansCandidate")}
+                </p>
+              </div>
+            </form>
+          </Panel>
+
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+            <Panel title={t("billing.history")}>
+              {selectedCustomer.billingEvents.length === 0 ? (
+                <EmptyState title={t("billing.noEvents")} />
+              ) : (
+                <ul className="space-y-3">
+                  {selectedCustomer.billingEvents.map((event) => (
+                    <li key={event.id} className="rounded-xl border border-line p-4">
+                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                        <div className="min-w-0">
+                          <p className={`break-all font-mono text-sm font-semibold ${strong}`}>{event.eventType}</p>
+                          <p className={`mt-0.5 text-sm ${muted}`}>
+                            {fmt.money(event.amountMinor, event.currency)} · {event.source}
                           </p>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant={event.outcome === "FAILED" ? "danger" : event.outcome === "DUPLICATE" ? "warning" : "success"}>
-                            {event.outcome}
-                          </Badge>
-                          {event.status && <Badge variant="info">{event.status}</Badge>}
+                        <div className="flex flex-wrap gap-1.5">
+                          <Pill tone={statusTone(event.outcome)}>{label("eventOutcome", event.outcome)}</Pill>
+                          {event.status && <Pill tone="blue">{event.status}</Pill>}
                         </div>
                       </div>
-                      <div className="mt-3 text-xs text-gray-500">
-                        <p>{new Date(event.createdAt).toLocaleString()}</p>
-                        <p>Invoice: {event.stripeInvoiceId || "n/a"} • Refund: {event.stripeRefundId || "n/a"}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200">
-              <CardHeader>
-                <h3 className="text-xl font-semibold text-gray-900">Support actions</h3>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <form onSubmit={handleSupportAction} className="space-y-3 rounded-2xl border border-slate-200 p-4">
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <label className="text-sm text-gray-700">
-                      <span className="mb-1 block">Action type</span>
-                      <select
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2"
-                        value={supportForm.actionType}
-                        onChange={(event) =>
-                          setSupportForm((current) => ({
-                            ...current,
-                            actionType: event.target.value as typeof initialSupportForm.actionType,
-                          }))
-                        }
-                      >
-                        <option value="NOTE">Note</option>
-                        <option value="RESEND_RECEIPT">Resend receipt / invoice</option>
-                        <option value="REFUND_REVIEW">Refund review</option>
-                        <option value="CANCEL_SUBSCRIPTION">Cancellation review</option>
-                        <option value="UPGRADE_DOWNGRADE_CORRECTION">Plan correction</option>
-                        <option value="GRANDFATHER_OVERRIDE">Grandfather override</option>
-                      </select>
-                    </label>
-                    <label className="text-sm text-gray-700">
-                      <span className="mb-1 block">Reason code</span>
-                      <Input
-                        value={supportForm.reasonCode}
-                        onChange={(event) => setSupportForm((current) => ({ ...current, reasonCode: event.target.value }))}
-                      />
-                    </label>
-                  </div>
-                  <label className="text-sm text-gray-700 block">
-                    <span className="mb-1 block">Invoice ID for resend, if needed</span>
-                    <Input
-                      value={supportForm.invoiceId}
-                      onChange={(event) => setSupportForm((current) => ({ ...current, invoiceId: event.target.value }))}
-                      placeholder="in_..."
-                    />
-                  </label>
-                  <label className="text-sm text-gray-700 block">
-                    <span className="mb-1 block">Notes</span>
-                    <textarea
-                      className="min-h-[120px] w-full rounded-2xl border border-gray-300 px-3 py-3"
-                      value={supportForm.notes}
-                      onChange={(event) => setSupportForm((current) => ({ ...current, notes: event.target.value }))}
-                      placeholder="Summarize the support decision, customer context, or next step."
-                    />
-                  </label>
-                  <Button type="submit" disabled={busy === "support"}>
-                    {busy === "support" ? "Saving..." : "Record action"}
-                  </Button>
-                </form>
-
-                {selectedCustomer.billingSupportActions.length === 0 ? (
-                  <p className="text-sm text-gray-600">No support actions recorded yet.</p>
-                ) : (
-                  selectedCustomer.billingSupportActions.map((action) => (
-                    <div key={action.id} className="rounded-2xl border border-slate-200 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-semibold text-gray-900">{action.actionType.replaceAll("_", " ")}</p>
-                        <Badge variant="info">{action.reasonCode}</Badge>
-                      </div>
-                      <p className="mt-2 text-sm text-gray-600">{action.notes || "No notes recorded."}</p>
-                      <p className="mt-3 text-xs text-gray-500">
-                        {action.actor?.name || "Admin"} • {new Date(action.createdAt).toLocaleString()}
+                      <p className={`mt-2 text-xs ${muted}`}>{fmt.dateTime(event.createdAt)}</p>
+                      <p className={`break-all text-xs ${muted}`}>
+                        {t("billing.invoiceRefund", { invoice: na(event.stripeInvoiceId), refund: na(event.stripeRefundId) })}
                       </p>
-                    </div>
-                  ))
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+
+            <Panel title={t("billing.supportActions")}>
+              <form onSubmit={handleSupportAction} className="space-y-3 rounded-xl border border-line p-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label={t("billing.actionType")}>
+                    {(id) => (
+                      <select id={id} className={fieldClass} value={supportForm.actionType}
+                        onChange={(e) => setSupportForm((c) => ({ ...c, actionType: e.target.value as SupportActionType }))}>
+                        {SUPPORT_ACTIONS.map((a) => <option key={a} value={a}>{t(`billingAction.${a}`)}</option>)}
+                      </select>
+                    )}
+                  </Field>
+                  <Field label={t("common.reasonCode")}>
+                    {(id) => <input id={id} className={`${fieldClass} font-mono`} value={supportForm.reasonCode}
+                      onChange={(e) => setSupportForm((c) => ({ ...c, reasonCode: e.target.value }))} />}
+                  </Field>
+                </div>
+                <Field label={t("billing.invoiceId")}>
+                  {(id) => <input id={id} className={`${fieldClass} font-mono`} value={supportForm.invoiceId} placeholder={INVOICE_EXAMPLE}
+                    onChange={(e) => setSupportForm((c) => ({ ...c, invoiceId: e.target.value }))} />}
+                </Field>
+                <Field label={t("common.notes")}>
+                  {(id) => <textarea id={id} rows={4} className={fieldClass} value={supportForm.notes} placeholder={t("billing.supportNotesPlaceholder")}
+                    onChange={(e) => setSupportForm((c) => ({ ...c, notes: e.target.value }))} />}
+                </Field>
+                <Button type="submit" isLoading={busy === "support"}>{t("billing.recordAction")}</Button>
+              </form>
+
+              <div className="mt-4">
+                {selectedCustomer.billingSupportActions.length === 0 ? (
+                  <p className={`text-sm ${muted}`}>{t("billing.noSupportActions")}</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {selectedCustomer.billingSupportActions.map((action) => (
+                      <li key={action.id} className="rounded-xl border border-line p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className={`font-semibold ${strong}`}>{label("billingAction", action.actionType)}</p>
+                          <code className={`text-xs ${muted}`}>{action.reasonCode}</code>
+                        </div>
+                        <p className="mt-1 text-sm text-fg-secondary">{action.notes || t("common.noNotes")}</p>
+                        <p className={`mt-2 text-xs ${muted}`}>
+                          {action.actor?.name || t("role.ADMIN")} · {fmt.dateTime(action.createdAt)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           </div>
         </section>
       )}

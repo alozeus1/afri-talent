@@ -1,207 +1,188 @@
 "use client";
 
-import { ChangeEvent, useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { fetchAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { formatDistanceToNow } from "date-fns";
+import { useAdminEnum, useAdminFormatters, useAdminT } from "@/lib/i18n/admin-messages";
+import {
+  EmptyState,
+  ErrorState,
+  Field,
+  Notice,
+  PageHeader,
+  Panel,
+  Pill,
+  SkeletonList,
+  fieldClass,
+  muted,
+  statusTone,
+  strong,
+} from "@/components/admin/console-ui";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+// Mirrors the BulkOperationType enum accepted by POST /api/admin/bulk.
+const OPERATION_TYPES = [
+  "DATA_EXPORT",
+  "CUSTOM_QUERY",
+  "USER_RESTRICTION",
+  "PASSWORD_RESET",
+  "JOB_BATCH_REVIEW",
+  "VERIFICATION_BATCH_PROCESS",
+] as const;
+type OperationType = (typeof OPERATION_TYPES)[number];
+
+// Code sample shown as the filters placeholder (not user-facing copy).
+const FILTER_EXAMPLE = '{ "users": { "role": "CANDIDATE" } }';
 
 interface BulkOperation {
-    id: string;
-    operationType: string;
-    status: string;
-    targetCount: number;
-    successCount: number;
-    failureCount: number;
-    createdAt: string;
-    completedAt?: string;
+  id: string;
+  operationType: string;
+  status: string;
+  targetCount: number;
+  successCount: number;
+  failureCount: number;
+  createdAt: string;
+  completedAt?: string | null;
+  errorLog?: string | null;
 }
 
 export default function BulkPage() {
-    const router = useRouter();
-    const { user, isLoading } = useAuth();
-    const [operations, setOperations] = useState<BulkOperation[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [operationType, setOperationType] = useState(
-        "DATA_EXPORT"
-    );
-    const [filters, setFilters] = useState("");
+  const t = useAdminT();
+  const label = useAdminEnum();
+  const fmt = useAdminFormatters();
+  const [operations, setOperations] = useState<BulkOperation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [operationType, setOperationType] = useState<OperationType>("DATA_EXPORT");
+  const [filters, setFilters] = useState("");
+  const [reason, setReason] = useState("");
 
-    useEffect(() => {
-        if (!isLoading && (!user || user.role !== "ADMIN")) {
-            router.push(`/login?redirect=${encodeURIComponent("/admin/bulk")}`);
-        }
-    }, [user, isLoading, router]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchAPI<{ operations: BulkOperation[] }>("/api/admin/bulk?limit=50");
+      setOperations(data.operations ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
 
-    const loadOperations = useCallback(async () => {
-        setLoading(true);
-        try {
-            const response = await fetch(`${API_URL}/api/admin/bulk?limit=50`, {
-                credentials: "include",
-            });
-            const data = await response.json();
-            setOperations(data.operations || []);
-        } catch (error) {
-            console.error("Failed to load operations:", error);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-    useEffect(() => {
-        if (user?.role === "ADMIN") {
-            void loadOperations();
-        }
-    }, [user, loadOperations]);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setFormError(null);
+    setNotice(null);
+    let parsed: unknown = {};
+    if (filters.trim()) {
+      try {
+        parsed = JSON.parse(filters);
+      } catch {
+        setFormError(t("bulk.invalidJson"));
+        return;
+      }
+    }
+    setSubmitting(true);
+    try {
+      const result = await fetchAPI<{ status: string }>("/api/admin/bulk", {
+        method: "POST",
+        body: JSON.stringify({ operationType, filters: parsed, reason: reason.trim() || undefined }),
+      });
+      setNotice(t("bulk.created", { status: label("bulkStatus", result.status) }));
+      setFilters("");
+      setReason("");
+      await load();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.error"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    const handleCreateOperation = async () => {
-        try {
-            const response = await fetch(`${API_URL}/api/admin/bulk`, {
-                method: "POST",
-                credentials: "include",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    operationType,
-                    filters: filters ? JSON.parse(filters) : {},
-                }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                alert("Operation created successfully");
-                sessionStorage.removeItem("operation_filters");
-                loadOperations();
-            } else {
-                alert(`Error: ${data.error}`);
-            }
-        } catch (error) {
-            console.error("Failed to create operation:", error);
-            alert("Failed to create operation");
-        }
-    };
+  return (
+    <div>
+      <PageHeader title={t("bulk.title")} subtitle={t("bulk.subtitle")} />
 
-    if (isLoading) return <div>Loading...</div>;
-    if (!user || user.role !== "ADMIN") return null;
+      {notice && <Notice tone="success" onDismiss={() => setNotice(null)}>{notice}</Notice>}
 
-    const statusColors: Record<string, string> = {
-        PENDING: "warning",
-        IN_PROGRESS: "warning",
-        COMPLETED: "success",
-        FAILED: "danger",
-    };
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <Panel title={t("bulk.createTitle")} description={t("bulk.createHelp")} className="xl:self-start">
+          <form onSubmit={submit} className="space-y-4">
+            <Field label={t("bulk.type")} help={t(`bulkTypeHelp.${operationType}`)}>
+              {(id) => (
+                <select id={id} value={operationType} onChange={(e) => setOperationType(e.target.value as OperationType)} className={fieldClass}>
+                  {OPERATION_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {t(`bulkType.${type}`)}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+            <Field label={t("bulk.filters")} help={t("bulk.filtersHelp")}>
+              {(id) => (
+                <textarea
+                  id={id}
+                  value={filters}
+                  onChange={(e) => setFilters(e.target.value)}
+                  placeholder={FILTER_EXAMPLE}
+                  rows={5}
+                  spellCheck={false}
+                  className={`${fieldClass} font-mono text-xs`}
+                />
+              )}
+            </Field>
+            <Field label={t("common.reason")} help={t("common.reasonHelp")}>
+              {(id) => <input id={id} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} className={fieldClass} />}
+            </Field>
+            {formError && <p role="alert" className="text-sm text-danger">{formError}</p>}
+            <Button type="submit" isLoading={submitting}>
+              {t("bulk.create")}
+            </Button>
+          </form>
+        </Panel>
 
-    return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">Bulk Operations</h1>
-                <p className="text-gray-600">Manage administrative bulk tasks</p>
-            </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Create New Operation</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <label className="text-sm font-medium">Operation Type</label>
-                        <select
-                            value={operationType}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setOperationType(e.target.value)}
-                            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                        >
-                            <option value="DATA_EXPORT">Data Export</option>
-                            <option value="CUSTOM_QUERY">Custom Query</option>
-                            <option value="EMAIL_CAMPAIGN">Email Campaign</option>
-                            <option value="BULK_UPDATE">Bulk Update</option>
-                            <option value="DATA_IMPORT">Data Import</option>
-                            <option value="CLEANUP">Cleanup</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="text-sm font-medium">Filters (JSON)</label>
-                        <Textarea
-                            value={filters}
-                            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFilters(e.target.value)}
-                            placeholder='{"role": "RECRUITER"}'
-                            className="mt-1 font-mono text-xs"
-                            rows={4}
-                        />
-                    </div>
-
-                    <Button
-                        onClick={handleCreateOperation}
-                        disabled={loading}
-                        variant="primary"
-                    >
-                        Create Operation
-                    </Button>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Recent Operations</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {loading ? (
-                        <div>Loading...</div>
-                    ) : operations.length === 0 ? (
-                        <div className="text-gray-500">No operations found</div>
-                    ) : (
-                        <div className="space-y-3">
-                            {operations.map((op) => (
-                                <div key={op.id} className="border rounded-lg p-4">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div>
-                                            <div className="flex gap-2 items-center">
-                                                <span className="font-semibold">
-                                                    {op.operationType}
-                                                </span>
-                                                <Badge
-                                                    variant={
-                                                        statusColors[op.status] as
-                                                        | "default"
-                                                        | "success"
-                                                        | "warning"
-                                                        | "danger"
-                                                        | "info"
-                                                    }
-                                                >
-                                                    {op.status}
-                                                </Badge>
-                                            </div>
-                                            <div className="text-sm text-gray-600 mt-2">
-                                                <div>
-                                                    Targets: {op.targetCount} | Success:{" "}
-                                                    {op.successCount} | Failed: {op.failureCount}
-                                                </div>
-                                                <div className="text-xs text-gray-500 mt-1">
-                                                    Created:{" "}
-                                                    {formatDistanceToNow(new Date(op.createdAt), {
-                                                        addSuffix: true,
-                                                    })}
-                                                    {op.completedAt &&
-                                                        ` • Completed: ${formatDistanceToNow(
-                                                            new Date(op.completedAt),
-                                                            { addSuffix: true }
-                                                        )}`}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
-    );
+        <section aria-labelledby="bulk-recent">
+          <h2 id="bulk-recent" className={`mb-3 text-base font-semibold ${strong}`}>{t("bulk.recent")}</h2>
+          {loading ? (
+            <SkeletonList />
+          ) : error ? (
+            <ErrorState message={error} onRetry={() => void load()} />
+          ) : operations.length === 0 ? (
+            <EmptyState title={t("bulk.empty")} description={t("bulk.emptyHelp")} />
+          ) : (
+            <ul className="space-y-3">
+              {operations.map((op) => (
+                <li key={op.id} className="surface-panel rounded-2xl p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`font-semibold ${strong}`}>{label("bulkType", op.operationType)}</span>
+                    <Pill tone={statusTone(op.status)}>{label("bulkStatus", op.status)}</Pill>
+                  </div>
+                  <p className="mt-2 text-sm text-fg-secondary">
+                    {t("bulk.counts", {
+                      targets: fmt.number(op.targetCount),
+                      success: fmt.number(op.successCount),
+                      failed: fmt.number(op.failureCount),
+                    })}
+                  </p>
+                  <p className={`mt-1 text-xs ${muted}`}>
+                    {t("bulk.createdAt", { time: fmt.relative(op.createdAt) })}
+                    {op.completedAt ? ` · ${t("bulk.completedAt", { time: fmt.relative(op.completedAt) })}` : ""}
+                  </p>
+                  {op.errorLog && <p className="mt-2 text-xs text-danger">{op.errorLog}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </div>
+  );
 }

@@ -1,15 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import {
-  AFRICAN_COUNTRIES,
-  OTHER_COUNTRIES,
-  WORLDWIDE_CODE,
-  WORLDWIDE_OPTION,
-  countryDisplayName,
-} from "@/lib/countries";
-import { parseProfilePeriod } from "@/lib/profile-period";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { AFRICAN_COUNTRIES, OTHER_COUNTRIES, WORLDWIDE_CODE } from "@/lib/countries";
+import { parseProfilePeriod } from "@/lib/profile-period";
 import { useAuth } from "@/lib/auth-context";
 import {
   CandidateCertificationItem,
@@ -20,88 +16,25 @@ import {
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import FeedbackToast from "@/components/ui/feedback-toast";
-
-interface Toast {
-  type: "success" | "error";
-  message: string;
-}
-
-function TagInput({
-  label,
-  tags,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  tags: string[];
-  onChange: (tags: string[]) => void;
-  placeholder?: string;
-}) {
-  const [inputValue, setInputValue] = useState("");
-
-  const addTags = (value: string) => {
-    const newTags = value
-      .split(",")
-      .map((t) => t.trim())
-      .filter((t) => t.length > 0 && !tags.includes(t));
-    if (newTags.length > 0) {
-      onChange([...tags, ...newTags]);
-    }
-    setInputValue("");
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      addTags(inputValue);
-    }
-    if (e.key === "Backspace" && inputValue === "" && tags.length > 0) {
-      onChange(tags.slice(0, -1));
-    }
-  };
-
-  const removeTag = (tag: string) => {
-    onChange(tags.filter((t) => t !== tag));
-  };
-
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
-        {label}
-      </label>
-      <div className="flex flex-wrap gap-2 mb-2">
-        {tags.map((tag) => (
-          <span
-            key={tag}
-            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm bg-emerald-100 text-emerald-800"
-          >
-            {tag}
-            <button
-              type="button"
-              onClick={() => removeTag(tag)}
-              className="text-emerald-600 hover:text-emerald-800 font-bold"
-            >
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
-      <input
-        type="text"
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={() => inputValue.trim() && addTags(inputValue)}
-        placeholder={placeholder || "Type and press Enter or comma to add"}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors dark:border-zinc-700"
-      />
-    </div>
-  );
-}
+import { LoadingState } from "@/components/ui/loading-state";
+import {
+  CandidateBackLink,
+  CandidateLoadError,
+  CandidateNotice,
+  CandidatePageHeader,
+  CandidateSpinner,
+  CandidateSwitch,
+  CandidateTagInput,
+  URL_PLACEHOLDERS,
+  candidateFieldClass,
+  candidateLabelClass,
+  useCountryName,
+} from "@/components/candidate/candidate-ui";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { useCandidateT } from "@/lib/i18n/candidate-messages";
 
 // Country picker: dropdown-only entry (no free text) so targetCountries stays
-// clean for matching. African countries listed first.
+// clean for matching. African countries listed first; names are localised.
 function CountrySelect({
   label,
   values,
@@ -111,40 +44,58 @@ function CountrySelect({
   values: string[];
   onChange: (next: string[]) => void;
 }) {
+  const t = useCandidateT();
+  const countryName = useCountryName();
   const addCountry = (country: string) => {
     if (country && !values.includes(country)) onChange([...values, country]);
   };
+  const sortByName = (list: typeof AFRICAN_COUNTRIES) =>
+    [...list].sort((a, b) => countryName(a.code).localeCompare(countryName(b.code)));
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
-      <div className="flex flex-wrap gap-2 mb-2">
-        {values.map((country) => (
-          <span key={country} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-            {countryDisplayName(country)}
-            <button type="button" onClick={() => onChange(values.filter((c) => c !== country))} className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 font-bold" aria-label={`Remove ${countryDisplayName(country)}`}>
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
+      <p className={candidateLabelClass}>{label}</p>
+      {values.length > 0 ? (
+        <ul className="mb-2 flex flex-wrap gap-2">
+          {values.map((country) => (
+            <li
+              key={country}
+              className="inline-flex items-center gap-1 rounded-full border border-success-line bg-primary-soft py-1 pe-1.5 ps-3 text-sm text-primary-text"
+            >
+              {countryName(country)}
+              <button
+                type="button"
+                onClick={() => onChange(values.filter((c) => c !== country))}
+                className="rounded-full px-1 font-semibold hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                aria-label={t("ui.removeTag", { tag: countryName(country) })}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <select
         value=""
         onChange={(e) => addCountry(e.target.value)}
-        className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        aria-label={`Add ${label.toLowerCase()}`}
+        className={candidateFieldClass}
+        aria-label={t("profile.addCountryLabel")}
       >
-        <option value="">Add a country…</option>
+        <option value="">{t("profile.addCountry")}</option>
         {/* Values are ISO codes ("NG", "GLOBAL") so they match
             Job.eligibleCountries exactly in search and retention matching. */}
-        <option value={WORLDWIDE_CODE}>{WORLDWIDE_OPTION}</option>
-        <optgroup label="Africa">
-          {AFRICAN_COUNTRIES.map((c) => (
-            <option key={c.code} value={c.code}>{c.name}</option>
+        <option value={WORLDWIDE_CODE}>{t("ui.worldwide")}</option>
+        <optgroup label={t("profile.africa")}>
+          {sortByName(AFRICAN_COUNTRIES).map((c) => (
+            <option key={c.code} value={c.code}>
+              {countryName(c.code)}
+            </option>
           ))}
         </optgroup>
-        <optgroup label="Rest of world">
-          {OTHER_COUNTRIES.map((c) => (
-            <option key={c.code} value={c.code}>{c.name}</option>
+        <optgroup label={t("profile.restOfWorld")}>
+          {sortByName(OTHER_COUNTRIES).map((c) => (
+            <option key={c.code} value={c.code}>
+              {countryName(c.code)}
+            </option>
           ))}
         </optgroup>
       </select>
@@ -154,8 +105,10 @@ function CountrySelect({
 
 // Period picker: calendar month inputs instead of free text. Serializes to the
 // existing string format ("2022-03 – Present") so no schema change is needed;
-// best-effort parses previously saved free-text values.
+// best-effort parses previously saved free-text values. "Present" is stored
+// in English on purpose (it is data, not UI copy).
 function PeriodPicker({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const t = useCandidateT();
   const { start, end, isPresent } = parseProfilePeriod(value);
 
   const emit = (s: string, e: string, present: boolean) => {
@@ -164,48 +117,102 @@ function PeriodPicker({ value, onChange }: { value: string; onChange: (next: str
   };
 
   return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Period</label>
+    <fieldset>
+      <legend className={candidateLabelClass}>{t("profile.period")}</legend>
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="month"
           value={start}
           onChange={(e) => emit(e.target.value, end, isPresent)}
-          className="px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 text-sm"
-          aria-label="Start month"
+          className={`${candidateFieldClass} w-auto`}
+          aria-label={t("profile.period.start")}
         />
-        <span className="text-gray-400">–</span>
+        <span aria-hidden="true" className="text-fg-muted">
+          –
+        </span>
         <input
           type="month"
           value={end}
           disabled={isPresent}
           onChange={(e) => emit(start, e.target.value, false)}
-          className="px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 text-sm disabled:opacity-50"
-          aria-label="End month"
+          className={`${candidateFieldClass} w-auto`}
+          aria-label={t("profile.period.end")}
         />
-        <label className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+        <label className="inline-flex items-center gap-1.5 text-sm text-fg-secondary">
           <input
             type="checkbox"
             checked={isPresent}
             onChange={(e) => emit(start, end, e.target.checked)}
-            className="rounded border-gray-300 dark:border-zinc-700"
+            className="h-4 w-4 rounded border-line-strong accent-[var(--primary)]"
           />
-          Present
+          {t("profile.period.present")}
         </label>
       </div>
+    </fieldset>
+  );
+}
+
+function SectionCard({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-fg">{title}</h2>
+            {description ? <p className="mt-0.5 text-sm text-fg-muted">{description}</p> : null}
+          </div>
+          {action}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">{children}</CardContent>
+    </Card>
+  );
+}
+
+function RepeatableItem({ title, onRemove, children }: { title: string; onRemove: () => void; children: ReactNode }) {
+  const t = useCandidateT();
+  return (
+    <div className="space-y-4 rounded-2xl border border-line bg-surface-sunken p-4">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm font-semibold text-fg">{title}</p>
+        <Button type="button" variant="ghost" size="sm" className="text-danger hover:text-danger" onClick={onRemove}>
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+          {t("ui.remove")}
+        </Button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function EmptyRow({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken px-4 py-5 text-sm text-fg-secondary">
+      {children}
     </div>
   );
 }
 
 export default function CandidateProfilePage() {
   const router = useRouter();
+  const locale = useLocale();
+  const t = useCandidateT();
   const { user, isLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<Toast | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [saveState, setSaveState] = useState<"saved" | "failed" | null>(null);
 
-  // Form state
   const [headline, setHeadline] = useState("");
   const [bio, setBio] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
@@ -224,9 +231,9 @@ export default function CandidateProfilePage() {
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "CANDIDATE")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -251,7 +258,7 @@ export default function CandidateProfilePage() {
         setCompleteness(data.profileCompleteness);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load profile");
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -263,16 +270,15 @@ export default function CandidateProfilePage() {
     }
   }, [user, loadProfile]);
 
-  // Auto-dismiss toast
   useEffect(() => {
-    if (toast) {
-      const timer = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [toast]);
+    if (saveState !== "saved") return;
+    const timer = setTimeout(() => setSaveState(null), 4000);
+    return () => clearTimeout(timer);
+  }, [saveState]);
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveState(null);
     try {
       const updated = await profile.update({
         headline: headline || null,
@@ -291,508 +297,369 @@ export default function CandidateProfilePage() {
         openToWork,
       });
       setCompleteness(updated.profileCompleteness);
-      setToast({ type: "success", message: "Profile updated successfully!" });
-    } catch (err) {
-      setToast({
-        type: "error",
-        message: err instanceof Error ? err.message : "Failed to save profile",
-      });
+      setSaveState("saved");
+    } catch {
+      setSaveState("failed");
     } finally {
       setSaving(false);
     }
   };
 
   const updateWorkHistory = (index: number, field: keyof CandidateWorkHistoryItem, value: string) => {
-    setWorkHistory((current) =>
-      current.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [field]: value } : item,
-      ),
-    );
+    setWorkHistory((current) => current.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
   };
 
   const updateEducationHistory = (index: number, field: keyof CandidateEducationItem, value: string) => {
-    setEducationHistory((current) =>
-      current.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [field]: value } : item,
-      ),
-    );
+    setEducationHistory((current) => current.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
   };
 
   const updateCertification = (index: number, field: keyof CandidateCertificationItem, value: string) => {
-    setCertifications((current) =>
-      current.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [field]: value } : item,
-      ),
-    );
+    setCertifications((current) => current.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
   };
 
   if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+    return <CandidateSpinner className="py-24" />;
   }
 
   if (loading) {
     return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+      <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
+        <LoadingState lines={8} />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-          {error}
-        </div>
+      <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+        <CandidateLoadError error={error} subject={t("ui.subject.profile")} onRetry={loadProfile} />
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Toast */}
-      {toast && toast.type === "error" && (
-        <div className="fixed top-4 right-4 z-50 px-6 py-3 rounded-xl shadow-lg text-sm font-medium bg-red-50 border border-red-200 text-red-800">
-          {toast.message}
-        </div>
-      )}
-      <FeedbackToast 
-        visible={toast?.type === "success"} 
-        onClose={() => setToast(null)} 
-        mode="success" 
-        title="Success!"
-        message={toast?.message}
-      />
+    <div className="mx-auto max-w-3xl px-4 pb-28 pt-10 sm:px-6 lg:px-8 lg:pt-12">
+      <CandidateBackLink href={localizePath("/candidate", locale)}>{t("nav.backToDashboard")}</CandidateBackLink>
+      <CandidatePageHeader title={t("profile.title")} description={t("profile.subtitle")} />
 
-      <h1 className="text-3xl font-bold text-gray-900 mb-2 dark:text-gray-100">Edit Profile</h1>
-      <p className="text-gray-600 mb-8 dark:text-gray-400">
-        Complete your profile to stand out to employers
-      </p>
-
-      {/* Profile Completeness */}
       <Card className="mb-8">
-        <CardContent className="p-6">
+        <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <div className="relative h-16 w-16 flex-shrink-0">
-              <svg className="h-16 w-16 -rotate-90" viewBox="0 0 36 36">
+            <div
+              className="relative h-16 w-16 shrink-0"
+              role="progressbar"
+              aria-valuenow={completeness}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={t("profile.completeness")}
+            >
+              <svg className="h-16 w-16 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+                <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--line-strong)" strokeWidth="3" />
                 <circle
                   cx="18"
                   cy="18"
                   r="15.9155"
                   fill="none"
-                  stroke="#e5e7eb"
-                  strokeWidth="3"
-                />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.9155"
-                  fill="none"
-                  stroke={completeness >= 80 ? "#059669" : "#f59e0b"}
+                  stroke={completeness >= 80 ? "var(--success)" : "var(--warning)"}
                   strokeWidth="3"
                   strokeDasharray={`${completeness} ${100 - completeness}`}
                   strokeLinecap="round"
                 />
               </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-gray-900 dark:text-gray-100">
+              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums text-fg">
                 {completeness}%
               </span>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                Profile Completeness
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {completeness >= 80
-                  ? "Your profile looks great!"
-                  : "Fill in more details to improve your visibility"}
+              <h2 className="text-sm font-semibold text-fg">{t("profile.completeness")}</h2>
+              <p className="text-sm text-fg-muted">
+                {completeness >= 80 ? t("profile.completeness.great") : t("profile.completeness.more")}
               </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Section 1: Personal Info */}
-      <Card className="mb-6">
-        <CardHeader>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Personal Information
-          </h2>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Input
-            id="headline"
-            label="Headline"
-            value={headline}
-            onChange={(e) => setHeadline(e.target.value)}
-            placeholder="e.g. Senior Full-Stack Developer"
-          />
-          <div>
-            <label
-              htmlFor="bio"
-              className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300"
-            >
-              Bio
-            </label>
-            <textarea
-              id="bio"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder="Tell employers about yourself, your experience, and what you're looking for"
-              rows={4}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors resize-none dark:border-zinc-700"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Section 2: Skills */}
-      <Card className="mb-6">
-        <CardHeader>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Skills</h2>
-        </CardHeader>
-        <CardContent>
-          <TagInput
-            label="Your Skills"
-            tags={skills}
-            onChange={setSkills}
-            placeholder="e.g. React, Node.js, Python (comma-separated)"
-          />
-        </CardContent>
-      </Card>
-
-      {/* Section 3: Career Preferences */}
-      <Card className="mb-6">
-        <CardHeader>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Career Preferences
-          </h2>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <TagInput
-            label="Target Roles"
-            tags={targetRoles}
-            onChange={setTargetRoles}
-            placeholder="e.g. Software Engineer, Product Manager"
-          />
-          <CountrySelect
-            label="Target Countries"
-            values={targetCountries}
-            onChange={setTargetCountries}
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              id="yearsExperience"
-              label="Years of Experience"
-              type="number"
-              min={0}
-              value={yearsExperience}
-              onChange={(e) =>
-                setYearsExperience(
-                  e.target.value === "" ? "" : Number(e.target.value)
-                )
-              }
-              placeholder="e.g. 5"
-            />
-            <Input
-              id="visaStatus"
-              label="Visa Status"
-              value={visaStatus}
-              onChange={(e) => setVisaStatus(e.target.value)}
-              placeholder="e.g. EU Citizen, H1B, etc."
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Work History</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Structured roles make your profile more credible and easier for employers to review.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                setWorkHistory((current) => [
-                  ...current,
-                  { company: "", title: "", period: "", description: "" },
-                ])
-              }
-            >
-              Add role
+          <Link href={localizePath("/candidate/trust", locale)} className="shrink-0">
+            <Button variant="outline" size="sm">
+              <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+              {t("profile.viewTrust")}
             </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {workHistory.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600 dark:text-gray-400 dark:border-zinc-700">
-              No structured work history yet. Add recent roles with clear titles, employers, and dates.
-            </div>
-          ) : (
-            workHistory.map((item, index) => (
-              <div key={`work-${index}`} className="rounded-2xl border border-gray-200 p-4 space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Role {index + 1}</p>
-                  <button
-                    type="button"
-                    onClick={() => setWorkHistory((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                    className="text-sm font-medium text-red-600 hover:text-red-700"
-                  >
-                    Remove
-                  </button>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Input
-                    label="Job title"
-                    value={item.title || ""}
-                    onChange={(event) => updateWorkHistory(index, "title", event.target.value)}
-                    placeholder="Senior Product Designer"
-                  />
-                  <Input
-                    label="Company"
-                    value={item.company || ""}
-                    onChange={(event) => updateWorkHistory(index, "company", event.target.value)}
-                    placeholder="AfriTalent"
-                  />
-                  <PeriodPicker
-                    value={item.period || ""}
-                    onChange={(next) => updateWorkHistory(index, "period", next)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
-                    Highlights
-                  </label>
-                  <textarea
-                    value={item.description || ""}
-                    onChange={(event) => updateWorkHistory(index, "description", event.target.value)}
-                    rows={3}
-                    placeholder="What did you ship, improve, or own in this role?"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors resize-none dark:border-zinc-700"
-                  />
-                </div>
-              </div>
-            ))
-          )}
+          </Link>
         </CardContent>
       </Card>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Education</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Add universities, bootcamps, or formal training so partner and credential checks have context.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                setEducationHistory((current) => [
-                  ...current,
-                  { institution: "", degree: "", period: "" },
-                ])
-              }
-            >
-              Add education
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {educationHistory.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600 dark:text-gray-400 dark:border-zinc-700">
-              No education history yet.
-            </div>
-          ) : (
-            educationHistory.map((item, index) => (
-              <div key={`education-${index}`} className="rounded-2xl border border-gray-200 p-4 space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Education {index + 1}</p>
-                  <button
-                    type="button"
-                    onClick={() => setEducationHistory((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                    className="text-sm font-medium text-red-600 hover:text-red-700"
-                  >
-                    Remove
-                  </button>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <Input
-                    label="Institution"
-                    value={item.institution || ""}
-                    onChange={(event) => updateEducationHistory(index, "institution", event.target.value)}
-                    placeholder="University of Ghana"
-                  />
-                  <Input
-                    label="Degree or program"
-                    value={item.degree || ""}
-                    onChange={(event) => updateEducationHistory(index, "degree", event.target.value)}
-                    placeholder="BSc Computer Science"
-                  />
-                  <PeriodPicker
-                    value={item.period || ""}
-                    onChange={(next) => updateEducationHistory(index, "period", next)}
-                  />
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+      <SectionCard title={t("profile.personal")}>
+        <Input
+          id="headline"
+          label={t("profile.headline")}
+          value={headline}
+          onChange={(e) => setHeadline(e.target.value)}
+          placeholder={t("profile.headlinePlaceholder")}
+        />
+        <div>
+          <label htmlFor="bio" className={candidateLabelClass}>
+            {t("profile.bio")}
+          </label>
+          <textarea
+            id="bio"
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder={t("profile.bioPlaceholder")}
+            rows={4}
+            className={`${candidateFieldClass} resize-y`}
+          />
+        </div>
+      </SectionCard>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Certifications</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Add certifications here, then verify them from your trust profile with a document or credential link.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                setCertifications((current) => [
-                  ...current,
-                  { name: "", issuer: "", credentialUrl: "" },
-                ])
-              }
-            >
-              Add certification
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {certifications.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-600 dark:text-gray-400 dark:border-zinc-700">
-              No certifications added yet.
-            </div>
-          ) : (
-            certifications.map((item, index) => (
-              <div key={`certification-${index}`} className="rounded-2xl border border-gray-200 p-4 space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Certification {index + 1}</p>
-                  <button
-                    type="button"
-                    onClick={() => setCertifications((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                    className="text-sm font-medium text-red-600 hover:text-red-700"
-                  >
-                    Remove
-                  </button>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <Input
-                    label="Certification"
-                    value={item.name || ""}
-                    onChange={(event) => updateCertification(index, "name", event.target.value)}
-                    placeholder="AWS Certified Developer"
-                  />
-                  <Input
-                    label="Issuer"
-                    value={item.issuer || ""}
-                    onChange={(event) => updateCertification(index, "issuer", event.target.value)}
-                    placeholder="Amazon Web Services"
-                  />
-                  <Input
-                    label="Credential URL"
-                    type="url"
-                    value={item.credentialUrl || ""}
-                    onChange={(event) => updateCertification(index, "credentialUrl", event.target.value)}
-                    placeholder="https://credential.example"
-                  />
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+      <SectionCard title={t("profile.skills")}>
+        <CandidateTagInput
+          id="skills"
+          label={t("profile.yourSkills")}
+          tags={skills}
+          onChange={setSkills}
+          placeholder={t("profile.skillsPlaceholder")}
+        />
+      </SectionCard>
 
-      {/* Section 4: Links */}
-      <Card className="mb-6">
-        <CardHeader>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Links</h2>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <SectionCard title={t("profile.career")}>
+        <CandidateTagInput
+          id="target-roles"
+          label={t("profile.targetRoles")}
+          tags={targetRoles}
+          onChange={setTargetRoles}
+          placeholder={t("profile.targetRolesPlaceholder")}
+        />
+        <CountrySelect label={t("profile.targetCountries")} values={targetCountries} onChange={setTargetCountries} />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
-            id="linkedinUrl"
-            label="LinkedIn URL"
-            type="url"
-            value={linkedinUrl}
-            onChange={(e) => setLinkedinUrl(e.target.value)}
-            placeholder="https://linkedin.com/in/your-profile"
+            id="yearsExperience"
+            label={t("profile.years")}
+            type="number"
+            min={0}
+            value={yearsExperience}
+            onChange={(e) => setYearsExperience(e.target.value === "" ? "" : Number(e.target.value))}
+            placeholder={t("profile.yearsPlaceholder")}
           />
           <Input
-            id="githubUrl"
-            label="GitHub URL"
-            type="url"
-            value={githubUrl}
-            onChange={(e) => setGithubUrl(e.target.value)}
-            placeholder="https://github.com/your-username"
+            id="visaStatus"
+            label={t("profile.visa")}
+            value={visaStatus}
+            onChange={(e) => setVisaStatus(e.target.value)}
+            placeholder={t("profile.visaPlaceholder")}
           />
-          <Input
-            id="portfolioUrl"
-            label="Portfolio URL"
-            type="url"
-            value={portfolioUrl}
-            onChange={(e) => setPortfolioUrl(e.target.value)}
-            placeholder="https://your-portfolio.com"
-          />
-        </CardContent>
-      </Card>
+        </div>
+      </SectionCard>
 
-      {/* Section 5: Open to Work */}
-      <Card className="mb-8">
-        <CardHeader>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Job Visibility
-          </h2>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setOpenToWork(!openToWork)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                openToWork ? "bg-emerald-600" : "bg-gray-300"
-              }`}
+      <SectionCard
+        title={t("profile.work")}
+        description={t("profile.work.desc")}
+        action={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setWorkHistory((current) => [...current, { company: "", title: "", period: "", description: "" }])}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {t("profile.work.add")}
+          </Button>
+        }
+      >
+        {workHistory.length === 0 ? (
+          <EmptyRow>{t("profile.work.empty")}</EmptyRow>
+        ) : (
+          workHistory.map((item, index) => (
+            <RepeatableItem
+              key={`work-${index}`}
+              title={t("profile.work.item", { n: index + 1 })}
+              onRemove={() => setWorkHistory((current) => current.filter((_, i) => i !== index))}
             >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  openToWork ? "translate-x-6" : "translate-x-1"
-                }`}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  id={`work-${index}-title`}
+                  label={t("profile.work.title")}
+                  value={item.title || ""}
+                  onChange={(event) => updateWorkHistory(index, "title", event.target.value)}
+                  placeholder={t("profile.work.titlePlaceholder")}
+                />
+                <Input
+                  id={`work-${index}-company`}
+                  label={t("profile.work.company")}
+                  value={item.company || ""}
+                  onChange={(event) => updateWorkHistory(index, "company", event.target.value)}
+                  placeholder={t("profile.work.companyPlaceholder")}
+                />
+              </div>
+              <PeriodPicker value={item.period || ""} onChange={(next) => updateWorkHistory(index, "period", next)} />
+              <div>
+                <label htmlFor={`work-${index}-highlights`} className={candidateLabelClass}>
+                  {t("profile.work.highlights")}
+                </label>
+                <textarea
+                  id={`work-${index}-highlights`}
+                  value={item.description || ""}
+                  onChange={(event) => updateWorkHistory(index, "description", event.target.value)}
+                  rows={3}
+                  placeholder={t("profile.work.highlightsPlaceholder")}
+                  className={`${candidateFieldClass} resize-y`}
+                />
+              </div>
+            </RepeatableItem>
+          ))
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title={t("profile.edu")}
+        description={t("profile.edu.desc")}
+        action={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setEducationHistory((current) => [...current, { institution: "", degree: "", period: "" }])}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {t("profile.edu.add")}
+          </Button>
+        }
+      >
+        {educationHistory.length === 0 ? (
+          <EmptyRow>{t("profile.edu.empty")}</EmptyRow>
+        ) : (
+          educationHistory.map((item, index) => (
+            <RepeatableItem
+              key={`education-${index}`}
+              title={t("profile.edu.item", { n: index + 1 })}
+              onRemove={() => setEducationHistory((current) => current.filter((_, i) => i !== index))}
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  id={`edu-${index}-institution`}
+                  label={t("profile.edu.institution")}
+                  value={item.institution || ""}
+                  onChange={(event) => updateEducationHistory(index, "institution", event.target.value)}
+                  placeholder={t("profile.edu.institutionPlaceholder")}
+                />
+                <Input
+                  id={`edu-${index}-degree`}
+                  label={t("profile.edu.degree")}
+                  value={item.degree || ""}
+                  onChange={(event) => updateEducationHistory(index, "degree", event.target.value)}
+                  placeholder={t("profile.edu.degreePlaceholder")}
+                />
+              </div>
+              <PeriodPicker value={item.period || ""} onChange={(next) => updateEducationHistory(index, "period", next)} />
+            </RepeatableItem>
+          ))
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title={t("profile.cert")}
+        description={t("profile.cert.desc")}
+        action={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setCertifications((current) => [...current, { name: "", issuer: "", credentialUrl: "" }])}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {t("profile.cert.add")}
+          </Button>
+        }
+      >
+        {certifications.length === 0 ? (
+          <EmptyRow>{t("profile.cert.empty")}</EmptyRow>
+        ) : (
+          certifications.map((item, index) => (
+            <RepeatableItem
+              key={`certification-${index}`}
+              title={t("profile.cert.item", { n: index + 1 })}
+              onRemove={() => setCertifications((current) => current.filter((_, i) => i !== index))}
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  id={`cert-${index}-name`}
+                  label={t("profile.cert.name")}
+                  value={item.name || ""}
+                  onChange={(event) => updateCertification(index, "name", event.target.value)}
+                  placeholder={t("profile.cert.namePlaceholder")}
+                />
+                <Input
+                  id={`cert-${index}-issuer`}
+                  label={t("profile.cert.issuer")}
+                  value={item.issuer || ""}
+                  onChange={(event) => updateCertification(index, "issuer", event.target.value)}
+                  placeholder={t("profile.cert.issuerPlaceholder")}
+                />
+              </div>
+              <Input
+                id={`cert-${index}-url`}
+                label={t("profile.cert.url")}
+                type="url"
+                value={item.credentialUrl || ""}
+                onChange={(event) => updateCertification(index, "credentialUrl", event.target.value)}
+                placeholder={URL_PLACEHOLDERS.generic}
               />
-            </button>
-            <div>
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {openToWork ? "Open to Work" : "Not Looking"}
-              </span>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {openToWork
-                  ? "Your profile is visible to employers"
-                  : "Your profile is hidden from employer searches"}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </RepeatableItem>
+          ))
+        )}
+      </SectionCard>
 
-      {/* Save Button */}
-      <div className="flex justify-end">
-        <Button size="lg" onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save Profile"}
-        </Button>
+      <SectionCard title={t("profile.links")}>
+        <Input
+          id="linkedinUrl"
+          label={t("profile.linkedin")}
+          type="url"
+          value={linkedinUrl}
+          onChange={(e) => setLinkedinUrl(e.target.value)}
+          placeholder={URL_PLACEHOLDERS.linkedin}
+        />
+        <Input
+          id="githubUrl"
+          label={t("profile.github")}
+          type="url"
+          value={githubUrl}
+          onChange={(e) => setGithubUrl(e.target.value)}
+          placeholder={URL_PLACEHOLDERS.github}
+        />
+        <Input
+          id="portfolioUrl"
+          label={t("profile.portfolio")}
+          type="url"
+          value={portfolioUrl}
+          onChange={(e) => setPortfolioUrl(e.target.value)}
+          placeholder={URL_PLACEHOLDERS.generic}
+        />
+      </SectionCard>
+
+      <SectionCard title={t("profile.visibility")}>
+        <div className="flex items-center gap-3">
+          <CandidateSwitch checked={openToWork} onChange={setOpenToWork} label={t("profile.openToWork")} />
+          <div>
+            <span className="text-sm font-medium text-fg">
+              {openToWork ? t("profile.openToWork") : t("profile.notLooking")}
+            </span>
+            <p className="text-xs text-fg-muted">{openToWork ? t("profile.visible") : t("profile.hidden")}</p>
+          </div>
+        </div>
+      </SectionCard>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
+        <div className="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <div aria-live="polite" className="min-h-5 text-sm">
+            {saveState === "saved" ? (
+              <span className="font-medium text-success">{t("profile.saved")}</span>
+            ) : saveState === "failed" ? (
+              <CandidateNotice className="py-2">{t("profile.saveFailed")}</CandidateNotice>
+            ) : (
+              <span className="text-fg-muted">{t("profile.unsaved")}</span>
+            )}
+          </div>
+          <Button size="lg" onClick={handleSave} disabled={saving} isLoading={saving}>
+            {t("profile.save")}
+          </Button>
+        </div>
       </div>
     </div>
   );

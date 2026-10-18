@@ -1,6 +1,21 @@
-import { render, screen } from "@testing-library/react";
-import { JobCard } from "../job-card";
-import { Job } from "@/lib/api";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { JobCard, MAX_CARD_SIGNALS, selectCardSignals } from "../job-card";
+import { ApiError, Job } from "@/lib/api";
+
+const saveMock = jest.fn();
+const unsaveMock = jest.fn();
+
+jest.mock("@/lib/api", () => {
+  const actual = jest.requireActual("@/lib/api");
+  return {
+    ...actual,
+    savedJobs: {
+      ...actual.savedJobs,
+      save: (id: string) => saveMock(id),
+      unsave: (id: string) => unsaveMock(id),
+    },
+  };
+});
 
 const job: Job = {
   id: "job-1",
@@ -98,35 +113,118 @@ const job: Job = {
 };
 
 describe("JobCard", () => {
-  it("renders trust and discovery indicators", () => {
+  beforeEach(() => {
+    saveMock.mockReset();
+    unsaveMock.mockReset();
+  });
+
+  it("shows at most three signals, counting the salary line as one", () => {
     render(<JobCard job={job} />);
 
-    expect(screen.getByText("Trusted job")).toBeInTheDocument();
-    expect(screen.getByText("Cross-checked x2")).toBeInTheDocument();
-    expect(screen.getByText("Salary disclosed")).toBeInTheDocument();
-    expect(screen.getByText("Verified ATS path")).toBeInTheDocument();
-    expect(screen.getByText("Direct ATS apply")).toBeInTheDocument();
-    expect(screen.getByText(/Recently refreshed job listing/i)).toBeInTheDocument();
+    // Salary + visa (mobility) + freshness = three signals.
+    expect(screen.getByText(/USD/)).toBeInTheDocument();
+    expect(screen.getByText("Visa sponsored")).toBeInTheDocument();
+    expect(screen.getByText("New")).toBeInTheDocument();
+    const signals = screen.getByTestId("job-card-signals");
+    expect(signals.children).toHaveLength(MAX_CARD_SIGNALS - 1);
+    expect(screen.queryByText("Trusted job")).not.toBeInTheDocument();
+    expect(screen.queryByText("Relocation support")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Senior Backend Engineer/i })).toHaveAttribute(
       "href",
       "/en/jobs/senior-backend-engineer",
     );
   });
 
-  it("shows the Africa-eligibility pill when confirmed via eligible countries", () => {
+  it("drops the boilerplate ranking sentence, tags and discovery pills", () => {
     render(<JobCard job={job} />);
-    expect(screen.getByText("Open to Africa")).toBeInTheDocument();
+    expect(screen.queryByText(/Recently refreshed job listing/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Salary disclosed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Direct ATS apply")).not.toBeInTheDocument();
+    expect(screen.queryByText("Node.js")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cross-checked/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Why this looks credible/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/2026-01-02/)).not.toBeInTheDocument();
   });
 
-  it("suppresses the Africa pill when the Hires from Africa badge already renders", () => {
+  it("keeps the company and location line", () => {
+    render(<JobCard job={job} />);
+    expect(screen.getByText("AfriTalent Labs")).toBeInTheDocument();
+    expect(screen.getByText(/Remote - Europe/)).toBeInTheDocument();
+  });
+
+  it("shows a relative posted label after mount", async () => {
+    render(<JobCard job={{ ...job, publishedAt: new Date().toISOString() }} />);
+    expect(await screen.findByText("Posted today")).toBeInTheDocument();
+  });
+
+  it("hides the company line when the company is unknown", () => {
+    render(<JobCard job={{ ...job, employer: { companyName: "", location: "Remote" }, sourceName: undefined }} />);
+    expect(screen.queryByText("Unknown")).not.toBeInTheDocument();
+    expect(screen.queryByText("AfriTalent Labs")).not.toBeInTheDocument();
+  });
+
+  it("prefers Hires from Africa over the visa signal", () => {
     render(<JobCard job={{ ...job, hiresFromAfrica: true }} />);
     expect(screen.getByText("Hires from Africa")).toBeInTheDocument();
+    expect(screen.queryByText("Visa sponsored")).not.toBeInTheDocument();
     expect(screen.queryByText("Open to Africa")).not.toBeInTheDocument();
   });
 
-  it("shows Region-restricted and Expired pills", () => {
-    render(<JobCard job={{ ...job, eligibleCountries: ["DE", "US"], isExpired: true }} />);
-    expect(screen.getByText("Region-restricted")).toBeInTheDocument();
+  it("always keeps a caution signal (Expired wins) without pulsing", () => {
+    const { container } = render(
+      <JobCard
+        job={{
+          ...job,
+          eligibleCountries: ["DE", "US"],
+          isExpired: true,
+          trust: { ...job.trust!, newEmployerCaution: true },
+        }}
+      />,
+    );
     expect(screen.getByText("Expired")).toBeInTheDocument();
+    expect(screen.queryByText("Region-restricted")).not.toBeInTheDocument();
+    expect(screen.queryByText("New employer review")).not.toBeInTheDocument();
+    expect(screen.queryByText("New")).not.toBeInTheDocument();
+    expect(container.querySelector(".animate-pulse")).toBeNull();
+  });
+
+  it("fills three badge slots by priority when no salary is disclosed", () => {
+    const signals = selectCardSignals(
+      {
+        ...job,
+        hiresFromAfrica: true,
+        eligibleCountries: ["DE"],
+        trust: { ...job.trust!, newEmployerCaution: true },
+      },
+      { hasSalary: false },
+    );
+    expect(signals.map((s) => s.key)).toEqual(["new-employer", "hires-from-africa", "fresh"]);
+  });
+
+  it("uses only two badge slots when the salary line is shown", () => {
+    const signals = selectCardSignals(job, { hasSalary: true });
+    expect(signals.map((s) => s.key)).toEqual(["visa", "fresh"]);
+  });
+
+  it("persists the heart optimistically via savedJobs", async () => {
+    saveMock.mockResolvedValue({ saved: { id: "s1", jobId: "job-1" } });
+    render(<JobCard job={job} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Save job" }));
+    expect(screen.getByRole("button", { name: "Remove saved job" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(saveMock).toHaveBeenCalledWith("job-1"));
+  });
+
+  it("unsaves when initially saved and rolls back on failure", async () => {
+    unsaveMock.mockRejectedValue(new ApiError("boom", 500));
+    render(<JobCard job={job} initialSaved />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Remove saved job" }));
+    });
+    expect(unsaveMock).toHaveBeenCalledWith("job-1");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Remove saved job" })).toHaveAttribute("aria-pressed", "true"),
+    );
   });
 });

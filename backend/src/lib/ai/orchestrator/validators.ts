@@ -9,18 +9,18 @@ import { z } from "zod/v4";
 const ResumeExperienceValidator = z.object({
   company: z.string(),
   title: z.string(),
-  start_date: z.string().optional(),
+  start_date: z.string().nullable().optional(),
   end_date: z.string().nullable().optional(),
-  description: z.string().optional(),
+  description: z.string().nullable().optional(),
   metrics: z.array(z.string()).default([]),
   technologies: z.array(z.string()).default([]),
 });
 
 const ResumeEducationValidator = z.object({
   institution: z.string(),
-  degree: z.string().optional(),
-  field: z.string().optional(),
-  graduation_year: z.string().optional(),
+  degree: z.string().nullable().optional(),
+  field: z.string().nullable().optional(),
+  graduation_year: z.string().nullable().optional(),
 });
 
 export const ResumeSchemaValidator = z.object({
@@ -111,7 +111,7 @@ export const CoverLetterPackSchemaValidator = z.object({
 const GuardIssueValidator = z.object({
   type: z.enum(["fabrication", "inconsistency", "exaggeration"]),
   field: z.string(),
-  original_value: z.string(),
+  original_value: z.string().nullable().optional(),
   fabricated_value: z.string(),
   severity: z.enum(["high", "medium", "low"]),
 });

@@ -1,9 +1,23 @@
 import { Job, JobListParams, JobListResponse, PricingData, PublicStats, UserPricingData } from "@/lib/api";
 
-const SERVER_API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  "http://localhost:4000";
+/**
+ * Base URL for API calls made from this module.
+ *
+ * On the server, INTERNAL_API_URL (a non-public runtime env var, e.g.
+ * http://backend:4000 inside docker compose) wins so SSR can reach the backend
+ * over the container network; "localhost" inside the frontend container is the
+ * frontend itself. Read at call time so it is never inlined at build. Deployed
+ * environments leave it unset and fall back to the public URL. In the browser
+ * (client components import this module too) the public URL is always used.
+ */
+export function getServerApiBaseUrl(isServer: boolean = typeof window === "undefined"): string {
+  return (
+    (isServer && process.env.INTERNAL_API_URL) ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    "http://localhost:4000"
+  );
+}
 
 const DEFAULT_TIMEOUT_MS = 5000;
 
@@ -36,7 +50,7 @@ async function fetchServerPublicApi<T>(
     }
   }
 
-  const response = await fetch(`${SERVER_API_URL}${path}`, {
+  const response = await fetch(`${getServerApiBaseUrl()}${path}`, {
     ...init,
     cache: "no-store",
     signal: buildTimeoutSignal(timeoutMs),
@@ -52,7 +66,7 @@ async function fetchServerPublicApi<T>(
   return response.json();
 }
 
-function buildJobsQuery(params: JobListParams) {
+export function buildJobsQuery(params: JobListParams) {
   const searchParams = new URLSearchParams();
   if (params.search) searchParams.set("search", params.search);
   if (params.location) searchParams.set("location", params.location);
@@ -62,7 +76,9 @@ function buildJobsQuery(params: JobListParams) {
   if (params.seniority) searchParams.set("seniority", params.seniority);
   if (params.visaSponsorship) searchParams.set("visaSponsorship", params.visaSponsorship);
   if (params.relocationAssistance) searchParams.set("relocationAssistance", params.relocationAssistance);
+  if (params.hiresFromAfrica) searchParams.set("hiresFromAfrica", params.hiresFromAfrica);
   if (params.remote) searchParams.set("remote", params.remote);
+  if (params.sortBy && params.sortBy !== "relevance") searchParams.set("sortBy", params.sortBy);
   if (params.salaryMin) searchParams.set("salaryMin", params.salaryMin.toString());
   if (params.salaryMax) searchParams.set("salaryMax", params.salaryMax.toString());
   if (params.country) searchParams.set("country", params.country);

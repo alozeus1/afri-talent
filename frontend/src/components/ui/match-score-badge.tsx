@@ -1,8 +1,13 @@
+"use client";
+
+import { useT } from "@/lib/i18n/client";
+
 interface MatchScoreBadgeProps {
   score: number;
 }
 
 export function MatchScoreBadge({ score }: MatchScoreBadgeProps) {
+  const t = useT();
   if (score < 50) return null;
   const isStrong = score >= 80;
   return (
@@ -11,7 +16,7 @@ export function MatchScoreBadge({ score }: MatchScoreBadgeProps) {
         isStrong ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
       }`}
     >
-      {isStrong ? "✦" : "◆"} {score}% match
+      {isStrong ? "✦" : "◆"} {t("common.ui.matchPercent", { score })}
     </span>
   );
 }

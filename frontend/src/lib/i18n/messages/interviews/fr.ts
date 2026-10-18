@@ -1,0 +1,28 @@
+import type en from "./en";
+
+export default {
+  "interviews.title": "Aperçus des entretiens",
+  "interviews.subtitle": "Apprenez de la communauté. Lisez de vraies expériences d'entretiens et préparez-vous pour votre prochaine opportunité.",
+  "interviews.practiceSubtitle": "Pratiquez avec des scénarios d'exemple clairement étiquetés. Les vraies expériences communautaires apparaîtront après que les premiers testeurs soumettent des entrées vérifiées.",
+  "interviews.searchPlaceholder": "Rechercher par nom d'entreprise ou titre de poste...",
+  "interviews.clearFilters": "Effacer les filtres",
+  "interviews.noMatch": "Aucun scénario d'entretien correspondant pour l'instant",
+  "interviews.noMatchDesc": "Essayez d'effacer les filtres ou utilisez les scénarios d'exemple pour pratiquer.",
+  "interviews.shareExperience": "Partager votre expérience",
+  "interviews.sampleScenario": "Scénario d'entretien d'exemple",
+  "interviews.viewDetails": "Voir les détails",
+  "interviews.hideDetails": "Masquer les détails",
+  "interviews.fullProcess": "Processus d'entretien complet",
+  "interviews.questionsLabel": "Questions d'entretien",
+  "interviews.tipsLabel": "Conseils",
+  "interviews.durationLabel": "Durée",
+  "interviews.shareSuccess": "Expérience partagée avec succès ! Merci d'aider la communauté.",
+  "interviews.companyId": "ID de l'entreprise",
+  "interviews.jobTitle": "Titre du poste",
+  "interviews.interviewProcess": "Processus d'entretien",
+  "interviews.interviewQuestions": "Questions d'entretien",
+  "interviews.tipsForOthers": "Conseils pour les autres",
+  "interviews.duration": "Durée",
+  "interviews.addQuestion": "+ Ajouter une question",
+  "interviews.shareButton": "Partager l'expérience",
+} satisfies Record<keyof typeof en, string>;

@@ -1,6 +1,6 @@
 // ATS Resume Scanner — checks resume against job description for keyword gaps
 
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "../anthropic-client.js";
 import logger from "../../logger.js";
 
 const QUALITY_MODEL = process.env.AI_QUALITY_MODEL || "claude-sonnet-4-6";
@@ -34,7 +34,7 @@ export async function scanResumeAts(input: AtsScanInput): Promise<AtsScanResult>
 }
 
 async function generateWithClaude(input: AtsScanInput): Promise<AtsScanResult> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = getAnthropicClient();
 
   const prompt = `You are an ATS (Applicant Tracking System) expert. Analyze the resume against the job description.
 

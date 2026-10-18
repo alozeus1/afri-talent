@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "../../ai/anthropic-client.js";
 import { z } from "zod/v4";
 import { nanoid } from "nanoid";
 import logger from "../../logger.js";
@@ -27,7 +28,7 @@ function getClient(): Anthropic {
     if (!process.env.ANTHROPIC_API_KEY) {
       throw new Error("ANTHROPIC_API_KEY not set — BlogWriterAgent unavailable");
     }
-    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    _client = getAnthropicClient();
   }
   return _client;
 }

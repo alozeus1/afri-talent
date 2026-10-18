@@ -6,6 +6,7 @@ const useNetworkProfileMock = jest.fn();
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ refresh }),
+  usePathname: () => "/",
 }));
 
 jest.mock("@/lib/network-profile", () => ({

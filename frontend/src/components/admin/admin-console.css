@@ -1,0 +1,36 @@
+/*
+ * Admin console dark-mode safety net.
+ *
+ * Older admin sub-pages (trust, billing, partners, ...) were written with
+ * light-only Tailwind colours (text-gray-900 on bg-white). Inside the console
+ * shell we remap those utilities so text stays legible in dark mode. Plain
+ * (unlayered) CSS wins over Tailwind's utility layer, and everything is scoped
+ * to .admin-console so the rest of the site is untouched.
+ */
+html.dark .admin-console :is(.text-gray-900, .text-gray-800, .text-slate-900, .text-slate-800, .text-black) {
+  color: #f4f4f5;
+}
+
+html.dark .admin-console :is(.text-gray-700, .text-slate-700) {
+  color: #e4e4e7;
+}
+
+html.dark .admin-console :is(.text-gray-600, .text-gray-500, .text-slate-600, .text-slate-500) {
+  color: #a1a1aa;
+}
+
+html.dark .admin-console :is(.bg-white, .bg-gray-50, .bg-slate-50, .bg-gray-100, .bg-slate-100) {
+  background-color: var(--surface-strong);
+}
+
+html.dark .admin-console :is(.border-gray-200, .border-gray-100, .border-slate-200, .border-slate-100) {
+  border-color: var(--border-soft);
+}
+
+html.dark .admin-console :is(.divide-gray-200, .divide-slate-200) > :not(:last-child) {
+  border-color: var(--border-soft);
+}
+
+html.dark .admin-console :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
+  color-scheme: dark;
+}

@@ -8,6 +8,7 @@ const requestAccountDeletionMock = jest.fn();
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
+  usePathname: () => "/en/candidate/settings",
 }));
 
 jest.mock("@/lib/auth-context", () => ({

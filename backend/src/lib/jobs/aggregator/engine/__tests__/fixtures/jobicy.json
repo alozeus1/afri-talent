@@ -1,0 +1,142 @@
+{
+  "apiVersion": "2.2.19",
+  "documentationUrl": "https://jobi.cy/apidocs",
+  "friendlyNotice": "Thanks for using Jobicy API! Please ensure Jobicy is clearly credited with a direct link to the source, and all application buttons redirect to the original job URL provided in this feed. That’s all! You might be building something amazing, we wish you the best of luck!",
+  "jobCount": 6,
+  "lastUpdate": "2026-10-14T16:56:40+00:00",
+  "nextCursor": "AgAAAABq0DOBAAAAAGrPtEYAAAAAAAJewpGStyjVOt7ULMvdFdHp_0xjGsH--7hP_G6cSgT0AUpIpsjkGskAGwuQMG-wI7tNwU67UNie09Gb-k1_sVyCrBo",
+  "hasMore": true,
+  "appliedFilters": {
+    "count": 6
+  },
+  "jobs": [
+    {
+      "id": 155332,
+      "url": "https://jobicy.com/jobs/155332-sr-director-maintainx-ai",
+      "jobSlug": "155332-sr-director-maintainx-ai",
+      "jobTitle": "Sr. Director, MaintainX AI",
+      "companyName": "MaintainX",
+      "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2025/08/f0177662-221.png",
+      "jobIndustry": [
+        "Data Science & Analytics"
+      ],
+      "jobType": [
+        "Full-Time"
+      ],
+      "jobGeo": "USA",
+      "jobLevel": "Director",
+      "jobExcerpt": "MaintainX is a leading mobile-first work execution platform for industrial and frontline teams. More than 13,000 customers, including Duracell, McDonald's, Shell, DHL and Volvo, use MaintainX to cut unplanned downtime and run better operations, across 13.9 million managed assets and 79.5 million completed work orders. In August 2026 MaintainX became part of Autodesk, joining Autodesk&hellip;",
+      "jobDescription": "<p><em><strong><a href=\"https://jobicy.com/company/maintainx\" target=\"_blank\" rel=\"noopener\">MaintainX</a> is a leading mobile-first work execution platform </strong>for industrial and frontline teams. <strong>More than 13,000 customers</strong>, including Duracell, McDonald's, Shell, DHL and Volvo, use MaintainX to cut unplanned downtime and run better operations, across 13.9 million managed assets and 79.5 million completed work orders.</em></p>\n<p><em><strong>In August 2026 MaintainX became part of Autodesk, joining </strong></em><a href=\"https://adsknews.autodesk.com/en/views/inside-autodesk-operations-solutions/\" rel=\"nofollow ugc noopener\" target=\"_blank\"><em><strong>Autodesk Operation",
+      "pubDate": "2026-10-14T16:56:40+00:00"
+    },
+    {
+      "id": 155336,
+      "url": "https://jobicy.com/jobs/155336-senior-applied-data-scientist-fleet-intelligence",
+      "jobSlug": "155336-senior-applied-data-scientist-fleet-intelligence",
+      "jobTitle": "Senior Applied Data Scientist, Fleet Intelligence",
+      "companyName": "Fleetio",
+      "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2023/07/e571b83c37e0ed5371754d319be16e76.jpeg",
+      "jobIndustry": [
+        "Data Science & Analytics"
+      ],
+      "jobType": [
+        "Full-Time"
+      ],
+      "jobGeo": "Canada,  Mexico,  USA",
+      "jobLevel": "Senior",
+      "jobExcerpt": "A little about us…Fleetio is a modern software platform that helps thousands of organizations worldwide manage their fleet operations. Transportation technology is a hot market, and we’re leading the charge with raving fans and new customers signing up every day. We raised $450M in our Series D funding round in March of 2025 and are&hellip;",
+      "jobDescription": "<p>A little about us…<a href=\"https://jobicy.com/company/fleetio\" target=\"_blank\" rel=\"noopener\">Fleetio</a> is a modern software platform that helps thousands of organizations worldwide manage their fleet operations. Transportation technology is a hot market, and we’re leading the charge with raving fans and new customers signing up every day. We raised $450M in our Series D funding round in March of 2025 and are on an exciting trajectory as a company. Fleetio is also a proud <a href=\"https://rubyonrails.org/foundation\" rel=\"nofollow ugc noopener\" target=\"_blank\">founding member of the Rails Foundation</a>!</p>\n<p><strong>More about our team and company:</strong></p>\n<ul>\n<li>Fleetio overvi",
+      "pubDate": "2026-10-14T16:56:39+00:00"
+    },
+    {
+      "id": 155335,
+      "url": "https://jobicy.com/jobs/155335-senior-product-designer-ai",
+      "jobSlug": "155335-senior-product-designer-ai",
+      "jobTitle": "Senior Product Designer, AI",
+      "companyName": "MaintainX",
+      "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2025/08/f0177662-221.png",
+      "jobIndustry": [
+        "Web, UI & UX Design"
+      ],
+      "jobType": [
+        "Full-Time"
+      ],
+      "jobGeo": "Canada",
+      "jobLevel": "Director",
+      "jobExcerpt": "MaintainX is a leading mobile-first work execution platform for industrial and frontline teams. More than 13,000 customers, including Duracell, McDonald's, Shell, DHL and Volvo, use MaintainX to cut unplanned downtime and run better operations, across 13.9 million managed assets and 79.5 million completed work orders. In August 2026 MaintainX became part of Autodesk, joining Autodesk&hellip;",
+      "jobDescription": "<p><em><strong><a href=\"https://jobicy.com/company/maintainx\" target=\"_blank\" rel=\"noopener\">MaintainX</a> is a leading mobile-first work execution platform </strong>for industrial and frontline teams. <strong>More than 13,000 customers</strong>, including Duracell, McDonald's, Shell, DHL and Volvo, use MaintainX to cut unplanned downtime and run better operations, across 13.9 million managed assets and 79.5 million completed work orders.</em></p>\n<p><em><strong>In August 2026 MaintainX became part of Autodesk, joining </strong></em><a href=\"https://adsknews.autodesk.com/en/views/inside-autodesk-operations-solutions/\" rel=\"nofollow ugc noopener\" target=\"_blank\"><em><strong>Autodesk Operation",
+      "pubDate": "2026-10-14T16:56:38+00:00",
+      "salaryMin": 115000,
+      "salaryMax": 175000,
+      "salaryCurrency": "CAD",
+      "salaryPeriod": "yearly"
+    },
+    {
+      "id": 155334,
+      "url": "https://jobicy.com/jobs/155334-director-enterprise-portfolio-management",
+      "jobSlug": "155334-director-enterprise-portfolio-management",
+      "jobTitle": "Director, Enterprise Portfolio Management",
+      "companyName": "Clover Health",
+      "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2025/06/8d4e74b3-221.jpg",
+      "jobIndustry": [
+        "Project & Program Management"
+      ],
+      "jobType": [
+        "Full-Time"
+      ],
+      "jobGeo": "USA",
+      "jobLevel": "Director",
+      "jobExcerpt": "Clover Health’s People Operations team is the strategic force behind our human capital management. We attract and recruit top talent, manage employee lifecycle processes, and foster career development and continuous learning. We’re proud of our data-driven approach to talent engagement and feel privileged to support our global workforce. We are seeking a Director, Enterprise Initiatives&hellip;",
+      "jobDescription": "<p><a href=\"https://jobicy.com/company/clover-health\" target=\"_blank\" rel=\"noopener\">Clover Health</a>’s People Operations team is the strategic force behind our human capital management. We attract and recruit top talent, manage employee lifecycle processes, and foster career development and continuous learning. We’re proud of our data-driven approach to talent engagement and feel privileged to support our global workforce.</p>\n<p>We are seeking a Director, Enterprise Initiatives &amp; Enablement, to lead change management across employee-impacting initiatives and help our people understand, adopt, and sustain changes that improve how we work. Reporting to our Chief People Officer, you will",
+      "pubDate": "2026-10-14T16:56:38+00:00",
+      "salaryMin": 150000,
+      "salaryMax": 195000,
+      "salaryCurrency": "USD",
+      "salaryPeriod": "yearly"
+    },
+    {
+      "id": 155331,
+      "url": "https://jobicy.com/jobs/155331-clinical-field-scheduling-logistics-specialist",
+      "jobSlug": "155331-clinical-field-scheduling-logistics-specialist",
+      "jobTitle": "Clinical Field Scheduling & Logistics Specialist",
+      "companyName": "Clover Health",
+      "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2025/06/8d4e74b3-221.jpg",
+      "jobIndustry": [
+        "Healthcare & Medical"
+      ],
+      "jobType": [
+        "Full-Time"
+      ],
+      "jobGeo": "USA",
+      "jobLevel": "Senior",
+      "jobExcerpt": "This role is remote, though we're prioritizing candidates based in New Jersey. The Clover Home Care team is responsible for ensuring patients have access to the right care at the right time, in the right setting. We are a group of caring and passionate professionals dedicated to improving the lives of our most vulnerable members&hellip;",
+      "jobDescription": "<p><em><strong>This role is remote, though we're prioritizing candidates based in New Jersey.</strong></em></p>\n<p>The Clover Home Care team is responsible for ensuring patients have access to the right care at the right time, in the right setting. We are a group of caring and passionate professionals dedicated to improving the lives of our most vulnerable members by providing in-home primary care, annual wellness visits, supportive care services, behavioral health and community services coordination. </p>\n<p>The Clinical Field Scheduling &amp; Logistics Specialist supports the daily scheduling and logistics of our growing field-based clinical workforce. This role manages provider availabili",
+      "pubDate": "2026-10-14T16:56:38+00:00",
+      "salaryMin": 57700,
+      "salaryMax": 75000,
+      "salaryCurrency": "USD",
+      "salaryPeriod": "yearly"
+    },
+    {
+      "id": 155330,
+      "url": "https://jobicy.com/jobs/155330-manager-revenue-operations",
+      "jobSlug": "155330-manager-revenue-operations",
+      "jobTitle": "Manager, Revenue Operations",
+      "companyName": "Fleetio",
+      "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2023/07/e571b83c37e0ed5371754d319be16e76.jpeg",
+      "jobIndustry": [
+        "Product & Operations"
+      ],
+      "jobType": [
+        "Full-Time"
+      ],
+      "jobGeo": "USA",
+      "jobLevel": "Director",
+      "jobExcerpt": "A little about us…Fleetio is a modern software platform that helps thousands of organizations worldwide manage their fleet operations. Transportation technology is a hot market, and we’re leading the charge with raving fans and new customers signing up every day. We raised $450M in our Series D funding round in March of 2025 and are&hellip;",
+      "jobDescription": "<p>A little about us…<a href=\"https://jobicy.com/company/fleetio\" target=\"_blank\" rel=\"noopener\">Fleetio</a> is a modern software platform that helps thousands of organizations worldwide manage their fleet operations. Transportation technology is a hot market, and we’re leading the charge with raving fans and new customers signing up every day. We raised $450M in our Series D funding round in March of 2025 and are on an exciting trajectory as a company. Fleetio is also a proud <a href=\"https://rubyonrails.org/foundation\" rel=\"nofollow ugc noopener\" target=\"_blank\">founding member of the Rails Foundation</a>!</p>\n<p><strong>More about our team and company:</strong></p>\n<ul>\n<li>Fleetio overvi",
+      "pubDate": "2026-10-14T16:56:38+00:00"
+    }
+  ],
+  "statusCode": 200,
+  "success": true
+}

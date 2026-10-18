@@ -359,6 +359,9 @@ export function buildJobSearchWhere(filters: JobSearchFilters): Prisma.JobWhereI
     conditions.push({
       OR: [
         { location: { contains: "remote", mode: "insensitive" } },
+        // Employer-posted jobs carry an explicit workplace type even when the
+        // location is a city ("Lagos" + REMOTE).
+        { workplaceType: { equals: "REMOTE", mode: "insensitive" } },
         { eligibleCountries: { isEmpty: false } },
       ],
     });

@@ -4,21 +4,48 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { Job } from "@/lib/api";
+import { CreateJobData, jobs } from "@/lib/api";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { useEmployerI18n } from "@/lib/i18n/employer-messages";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  EMPTY_JOB_MOBILITY,
+  JobMobilityFields,
+  type JobMobilityValues,
+} from "@/components/employer/job-mobility-fields";
+import {
+  BackLink,
+  EmployerDialog,
+  Eyebrow,
+  Notice,
+  PageSpinner,
+  controlClass,
+  labelClass,
+} from "@/components/employer/employer-ui";
+import {
+  CURRENCIES,
+  JOB_TYPES,
+  SALARY_PERIOD_KEYS,
+  SALARY_PERIODS,
+  SENIORITY_LEVELS,
+  type SalaryPeriodOption,
+} from "@/components/employer/job-form-options";
+import { parseCountryList } from "@/lib/job-options";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
-const jobTypes = ["Full-time", "Part-time", "Contract", "Freelance", "Internship"];
-const seniorityLevels = ["Junior", "Mid-level", "Senior", "Lead", "Executive"];
+/** Keep a stored value selectable even if it predates the current option list. */
+function withCurrent(options: readonly string[], current: string): string[] {
+  return current && !options.includes(current) ? [current, ...options] : [...options];
+}
 
 export default function EditJobPage() {
   const router = useRouter();
   const params = useParams();
   const jobId = params.id as string;
   const { user, isLoading } = useAuth();
+  const locale = useLocale();
+  const { t, tv } = useEmployerI18n();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -29,32 +56,35 @@ export default function EditJobPage() {
     salaryMin: "",
     salaryMax: "",
     currency: "USD",
+    salaryPeriod: "YEARLY",
     tags: "",
   });
+  const [mobility, setMobility] = useState<JobMobilityValues>(EMPTY_JOB_MOBILITY);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // "" means the load failed without a server message (shown as a generic error).
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "EMPLOYER")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
 
   const loadJob = useCallback(async () => {
     try {
-      // Use the id to fetch the job — jobs.get accepts a slug,
-      // so we try fetching by id directly via fetchAPI pattern
-      const res = await fetch(`${API_URL}/api/jobs/${jobId}`, {
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!res.ok) {
-        throw new Error("Failed to load job");
+      // GET /api/jobs/:slug is the public slug route, so resolve the job by id
+      // from the employer's own job list (also enforces ownership).
+      const myJobs = await jobs.myJobs();
+      const job = myJobs.find((candidate) => candidate.id === jobId);
+      if (!job) {
+        setNotFound(true);
+        return;
       }
-      const job: Job = await res.json();
       setFormData({
         title: job.title || "",
         description: job.description || "",
@@ -64,10 +94,18 @@ export default function EditJobPage() {
         salaryMin: job.salaryMin?.toString() || "",
         salaryMax: job.salaryMax?.toString() || "",
         currency: job.currency || "USD",
+        salaryPeriod: job.salaryPeriod || "YEARLY",
         tags: job.tags?.join(", ") || "",
       });
+      setMobility({
+        workplaceType: job.workplaceType || "",
+        jobField: job.jobField || "",
+        visaSponsorship: job.visaSponsorship || "UNKNOWN",
+        relocationAssistance: Boolean(job.relocationAssistance),
+        eligibleCountries: job.eligibleCountries?.join(", ") || "",
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load job");
+      setLoadError(err instanceof Error && err.message ? err.message : "");
     } finally {
       setLoading(false);
     }
@@ -91,27 +129,23 @@ export default function EditJobPage() {
         location: formData.location,
         type: formData.type,
         seniority: formData.seniority,
-        salaryMin: formData.salaryMin ? parseInt(formData.salaryMin) : undefined,
-        salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : undefined,
+        salaryMin: formData.salaryMin ? parseInt(formData.salaryMin, 10) : undefined,
+        salaryMax: formData.salaryMax ? parseInt(formData.salaryMax, 10) : undefined,
         currency: formData.currency || undefined,
-        tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()) : undefined,
+        salaryPeriod: formData.salaryPeriod as SalaryPeriodOption,
+        tags: formData.tags ? formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : undefined,
+        workplaceType: mobility.workplaceType || undefined,
+        jobField: mobility.jobField || undefined,
+        visaSponsorship: mobility.visaSponsorship as CreateJobData["visaSponsorship"],
+        relocationAssistance: mobility.relocationAssistance,
+        eligibleCountries: parseCountryList(mobility.eligibleCountries),
       };
 
-      const res = await fetch(`${API_URL}/api/jobs/${jobId}`, {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      await jobs.update(jobId, body);
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: "Failed to update job" }));
-        throw new Error(data.error || "Failed to update job");
-      }
-
-      router.push("/employer");
+      router.push(localizePath("/employer", locale));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update job");
+      setError(err instanceof Error && err.message ? err.message : t("jobs.errUpdate"));
     } finally {
       setSaving(false);
     }
@@ -120,20 +154,11 @@ export default function EditJobPage() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const res = await fetch(`${API_URL}/api/jobs/${jobId}`, {
-        method: "DELETE",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
+      await jobs.remove(jobId);
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: "Failed to delete job" }));
-        throw new Error(data.error || "Failed to delete job");
-      }
-
-      router.push("/employer");
+      router.push(localizePath("/employer", locale));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete job");
+      setError(err instanceof Error && err.message ? err.message : t("jobs.errDelete"));
       setShowDeleteModal(false);
     } finally {
       setDeleting(false);
@@ -144,104 +169,87 @@ export default function EditJobPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+  const updateMobility = <K extends keyof JobMobilityValues>(field: K, value: JobMobilityValues[K]) => {
+    setMobility((prev) => ({ ...prev, [field]: value }));
+  };
+
+  if (isLoading || !user || loading) {
+    return <PageSpinner />;
   }
 
-  if (loading) {
+  if (notFound) {
     return (
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex justify-center py-24">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-        </div>
+      <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6 lg:px-8">
+        <BackLink href={localizePath("/employer", locale)}>{t("common.backToDashboard")}</BackLink>
+        <Card>
+          <CardContent className="py-10 text-center">
+            <h1 className="text-xl font-semibold text-fg">{t("jobs.notFoundTitle")}</h1>
+            <p className="mt-2 text-sm text-fg-secondary">{t("jobs.notFoundBody")}</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Delete Confirmation Modal */}
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <CardContent className="p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Delete Job</h3>
-              <p className="text-gray-600 mb-6">
-                Are you sure you want to delete this job? This action cannot be undone.
-                All associated applications will also be affected.
-              </p>
-              <div className="flex gap-3">
-                <Button
-                  variant="danger"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="flex-1"
-                >
-                  {deleting ? "Deleting..." : "Delete Job"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowDeleteModal(false)}
-                  disabled={deleting}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <EmployerDialog
+          title={t("jobs.deleteTitle")}
+          description={t("jobs.deleteBody")}
+          onClose={() => !deleting && setShowDeleteModal(false)}
+        >
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setShowDeleteModal(false)} disabled={deleting}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="danger" onClick={handleDelete} isLoading={deleting} disabled={deleting}>
+              {deleting ? t("jobs.deleting") : t("jobs.deleteConfirm")}
+            </Button>
+          </div>
+        </EmployerDialog>
       )}
 
-      <Link href="/employer" className="inline-flex items-center text-emerald-600 hover:text-emerald-700 mb-6">
-        <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Dashboard
-      </Link>
+      <BackLink href={localizePath("/employer", locale)}>{t("common.backToDashboard")}</BackLink>
 
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Edit Job</h1>
-              <p className="text-gray-600">Update your job posting details</p>
+              <Eyebrow>{t("jobs.editEyebrow")}</Eyebrow>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-fg">{t("jobs.editTitle")}</h1>
+              <p className="mt-1 text-sm text-fg-secondary">{t("jobs.editSubtitle")}</p>
             </div>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => setShowDeleteModal(true)}
-            >
-              Delete Job
+            <Button variant="danger" size="sm" onClick={() => setShowDeleteModal(true)}>
+              {t("jobs.deleteConfirm")}
             </Button>
           </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">{error}</div>
+            {(error || loadError !== null) && (
+              <Notice tone="danger" role="alert">
+                {error || loadError || t("jobs.errLoad")}
+              </Notice>
             )}
 
             <Input
               id="title"
-              label="Job Title"
-              placeholder="e.g., Senior Full-Stack Engineer"
+              label={t("jobs.fieldTitle")}
+              placeholder={t("jobs.titlePlaceholder")}
               value={formData.title}
               onChange={(e) => updateField("title", e.target.value)}
               required
             />
 
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                Job Description
+              <label htmlFor="description" className={labelClass}>
+                {t("jobs.fieldDescription")}
               </label>
               <textarea
                 id="description"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[200px]"
-                placeholder="Describe the role, responsibilities, requirements, and benefits..."
+                className={`${controlClass} min-h-[200px]`}
+                placeholder={t("jobs.descriptionPlaceholder")}
                 value={formData.description}
                 onChange={(e) => updateField("description", e.target.value)}
                 required
@@ -250,51 +258,53 @@ export default function EditJobPage() {
 
             <Input
               id="location"
-              label="Location"
-              placeholder="e.g., Remote, Lagos, Nigeria"
+              label={t("jobs.fieldLocation")}
+              placeholder={t("jobs.locationPlaceholder")}
               value={formData.location}
               onChange={(e) => updateField("location", e.target.value)}
               required
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
-                  Job Type
+                <label htmlFor="type" className={labelClass}>
+                  {t("jobs.fieldType")}
                 </label>
                 <select
                   id="type"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className={controlClass}
                   value={formData.type}
                   onChange={(e) => updateField("type", e.target.value)}
                 >
-                  {jobTypes.map((t) => (
-                    <option key={t} value={t}>{t}</option>
+                  {withCurrent(JOB_TYPES, formData.type).map((value) => (
+                    <option key={value} value={value}>{tv("opt.jobType", value)}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label htmlFor="seniority" className="block text-sm font-medium text-gray-700 mb-1">
-                  Seniority Level
+                <label htmlFor="seniority" className={labelClass}>
+                  {t("jobs.fieldSeniority")}
                 </label>
                 <select
                   id="seniority"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className={controlClass}
                   value={formData.seniority}
                   onChange={(e) => updateField("seniority", e.target.value)}
                 >
-                  {seniorityLevels.map((s) => (
-                    <option key={s} value={s}>{s}</option>
+                  {withCurrent(SENIORITY_LEVELS, formData.seniority).map((value) => (
+                    <option key={value} value={value}>{tv("opt.seniority", value)}</option>
                   ))}
                 </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Input
                 id="salaryMin"
                 type="number"
-                label="Min Salary (optional)"
+                inputMode="numeric"
+                min={0}
+                label={t("jobs.fieldSalaryMinOptional")}
                 placeholder="60000"
                 value={formData.salaryMin}
                 onChange={(e) => updateField("salaryMin", e.target.value)}
@@ -302,45 +312,63 @@ export default function EditJobPage() {
               <Input
                 id="salaryMax"
                 type="number"
-                label="Max Salary (optional)"
+                inputMode="numeric"
+                min={0}
+                label={t("jobs.fieldSalaryMaxOptional")}
                 placeholder="90000"
                 value={formData.salaryMax}
                 onChange={(e) => updateField("salaryMax", e.target.value)}
               />
               <div>
-                <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-1">
-                  Currency
+                <label htmlFor="currency" className={labelClass}>
+                  {t("jobs.fieldCurrency")}
                 </label>
                 <select
                   id="currency"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className={controlClass}
                   value={formData.currency}
                   onChange={(e) => updateField("currency", e.target.value)}
                 >
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="GBP">GBP</option>
-                  <option value="NGN">NGN</option>
-                  <option value="KES">KES</option>
-                  <option value="ZAR">ZAR</option>
+                  {withCurrent(CURRENCIES, formData.currency).map((code) => (
+                    <option key={code} value={code}>{code}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="salaryPeriod" className={labelClass}>
+                  {t("jobs.fieldSalaryPeriod")}
+                </label>
+                <select
+                  id="salaryPeriod"
+                  className={controlClass}
+                  value={formData.salaryPeriod}
+                  onChange={(e) => updateField("salaryPeriod", e.target.value)}
+                >
+                  {SALARY_PERIODS.map((value) => (
+                    <option key={value} value={value}>{t(SALARY_PERIOD_KEYS[value])}</option>
+                  ))}
                 </select>
               </div>
             </div>
 
+            <JobMobilityFields values={mobility} onChange={updateMobility} />
+
             <Input
               id="tags"
-              label="Skills / Tags (comma-separated)"
-              placeholder="e.g., React, Node.js, PostgreSQL"
+              label={t("jobs.fieldTagsComma")}
+              placeholder={t("jobs.tagsPlaceholder")}
               value={formData.tags}
               onChange={(e) => updateField("tags", e.target.value)}
             />
 
-            <div className="flex gap-4">
-              <Button type="submit" className="flex-1" disabled={saving}>
-                {saving ? "Saving..." : "Save Changes"}
+            <div className="flex flex-wrap gap-3 border-t border-line pt-6">
+              <Button type="submit" className="flex-1" isLoading={saving} disabled={saving}>
+                {saving ? t("common.saving") : t("common.saveChanges")}
               </Button>
-              <Link href="/employer">
-                <Button type="button" variant="outline">Cancel</Button>
+              <Link href={localizePath("/employer", locale)}>
+                <Button type="button" variant="ghost">
+                  {t("common.cancel")}
+                </Button>
               </Link>
             </div>
           </form>

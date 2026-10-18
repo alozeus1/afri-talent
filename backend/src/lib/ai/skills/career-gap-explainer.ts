@@ -1,6 +1,6 @@
 // Career Gap Explainer — helps African job seekers reframe career gaps positively
 
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "../anthropic-client.js";
 import logger from "../../logger.js";
 
 const QUALITY_MODEL = process.env.AI_QUALITY_MODEL || "claude-sonnet-4-6";
@@ -36,7 +36,7 @@ export async function explainCareerGap(input: CareerGapInput): Promise<CareerGap
 }
 
 async function generateWithClaude(input: CareerGapInput): Promise<CareerGapResult> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = getAnthropicClient();
 
   const prompt = `You are a career coach specializing in helping African professionals navigate career gaps.
 Many African job seekers have gaps due to economic conditions, family obligations, or market factors — help them present these positively.

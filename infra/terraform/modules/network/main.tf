@@ -1,4 +1,5 @@
 data "aws_availability_zones" "available" {
+  # checkov:skip=CKV_AWS_394: Result is only consumed via slice(names, 0, var.az_count), so a newly added AZ cannot expand the subnet set; pinning zone names would hard-code region-specific IDs into a reusable module.
   state = "available"
 }
 

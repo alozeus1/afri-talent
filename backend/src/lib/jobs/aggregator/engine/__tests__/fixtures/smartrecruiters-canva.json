@@ -1,0 +1,643 @@
+{
+  "offset": 0,
+  "limit": 5,
+  "totalFound": 123,
+  "content": [
+    {
+      "id": "6000000001489280",
+      "name": "Global Benefits Manager (12 months FTC)",
+      "uuid": "669ac330-6e24-4f3f-8e65-bb0c58d56d97",
+      "jobAdId": "4a250448-7976-45e9-9376-48358e0ee6e5",
+      "defaultJobAd": true,
+      "refNumber": "R103112",
+      "company": {
+        "identifier": "Canva",
+        "name": "Canva"
+      },
+      "releasedDate": "2026-10-15T01:02:51.364Z",
+      "location": {
+        "city": "Sydney",
+        "region": "NSW",
+        "country": "au",
+        "remote": false,
+        "hybrid": true,
+        "fullLocation": "Sydney, NSW, Australia"
+      },
+      "industry": {
+        "id": "computer_software",
+        "label": "Computer Software"
+      },
+      "department": {},
+      "function": {
+        "id": "human_resources",
+        "label": "Human Resources"
+      },
+      "typeOfEmployment": {
+        "id": "permanent",
+        "label": "Full-time"
+      },
+      "experienceLevel": {
+        "id": "mid_senior_level",
+        "label": "Mid-Senior Level"
+      },
+      "customField": [
+        {
+          "fieldId": "651ba0114967807d2e86fe5a",
+          "fieldLabel": "Team",
+          "valueId": "d72904e5618a1000e76c95b9939c0000",
+          "valueLabel": "Reward"
+        },
+        {
+          "fieldId": "651ba508aac0da4b9cbd91cb",
+          "fieldLabel": "Worker type",
+          "valueId": "d588c41a446c11de98360015c5e6daf6",
+          "valueLabel": "Employee"
+        },
+        {
+          "fieldId": "67db425d21ec03315da962cb",
+          "fieldLabel": "Org",
+          "valueId": "552b243cafd4100169ad44e7ce180000",
+          "valueLabel": "People"
+        },
+        {
+          "fieldId": "651b8b8aaac0da4b9cbd91c9",
+          "fieldLabel": "Recruitment type",
+          "valueId": "ebb715ae-0c50-4bc4-b6b9-d3613ed950d5",
+          "valueLabel": "Fixed Term"
+        },
+        {
+          "fieldId": "651ba0b93066d20abe11145b",
+          "fieldLabel": "Specialty",
+          "valueId": "220b5c7e743d011262dbdba7b8008b13",
+          "valueLabel": "People"
+        },
+        {
+          "fieldId": "651b8bc23066d20abe111459",
+          "fieldLabel": "Supergroup",
+          "valueId": "220b5c7e743d0116d05e9fcd9700fb05",
+          "valueLabel": "People"
+        },
+        {
+          "fieldId": "651ba1c7aac0da4b9cbd91ca",
+          "fieldLabel": "Role level",
+          "valueId": "B3",
+          "valueLabel": "B3"
+        },
+        {
+          "fieldId": "651b99e25ddc3c31d9224321",
+          "fieldLabel": "Group",
+          "valueId": "927a1768417e100083b5202b696f0000",
+          "valueLabel": "Reward & Global Mobility"
+        },
+        {
+          "fieldId": "651ba171eec5b66729429433",
+          "fieldLabel": "Subspecialty",
+          "valueId": "220b5c7e743d010c858419f4b7002913",
+          "valueLabel": "Rewards"
+        },
+        {
+          "fieldId": "COUNTRY",
+          "fieldLabel": "Country/Region",
+          "valueId": "au",
+          "valueLabel": "Australia"
+        },
+        {
+          "fieldId": "6514d94a9c140e09b2e649f5",
+          "fieldLabel": "Brands",
+          "valueId": "default",
+          "valueLabel": "Canva"
+        },
+        {
+          "fieldId": "651b8a7b58759b40ab8abd45",
+          "fieldLabel": "Employment type",
+          "valueId": "01ca83be4eaa01c10689432ca5005501",
+          "valueLabel": "Fixed Term (Fixed Term)"
+        },
+        {
+          "fieldId": "651ba22058759b40ab8abd46",
+          "fieldLabel": "Time type",
+          "valueId": "2ca83e80de45013371c1658ff3029500",
+          "valueLabel": "Full time"
+        }
+      ],
+      "visibility": "PUBLIC",
+      "ref": "https://api.smartrecruiters.com/v1/companies/Canva/postings/6000000001489280",
+      "creator": {
+        "name": "Tyan Bekooy"
+      },
+      "language": {
+        "code": "en",
+        "label": "English",
+        "labelNative": "English (US)"
+      }
+    },
+    {
+      "id": "6000000001488854",
+      "name": "Senior Operations Expert - Trust & Safety",
+      "uuid": "7d311332-a3a1-44c9-b435-5075dba5e01f",
+      "jobAdId": "24cf0a68-760a-4cf3-a551-24bbfba5bcfc",
+      "defaultJobAd": true,
+      "refNumber": "R103053",
+      "company": {
+        "identifier": "Canva",
+        "name": "Canva"
+      },
+      "releasedDate": "2026-10-15T00:26:28.521Z",
+      "location": {
+        "city": "Makati City",
+        "region": "NCR",
+        "country": "ph",
+        "remote": false,
+        "hybrid": true,
+        "latitude": "14.5573752",
+        "longitude": "121.0227371",
+        "fullLocation": "Makati City, NCR, Philippines"
+      },
+      "industry": {
+        "id": "computer_software",
+        "label": "Computer Software"
+      },
+      "department": {},
+      "function": {
+        "id": "customer_service",
+        "label": "Customer Service"
+      },
+      "typeOfEmployment": {
+        "id": "permanent",
+        "label": "Full-time"
+      },
+      "experienceLevel": {
+        "id": "mid_senior_level",
+        "label": "Mid-Senior Level"
+      },
+      "customField": [
+        {
+          "fieldId": "651ba0114967807d2e86fe5a",
+          "fieldLabel": "Team",
+          "valueId": "82d293b9758f1000d2422e5fd59c0000",
+          "valueLabel": "Trust & Safety Operations"
+        },
+        {
+          "fieldId": "651ba508aac0da4b9cbd91cb",
+          "fieldLabel": "Worker type",
+          "valueId": "d588c41a446c11de98360015c5e6daf6",
+          "valueLabel": "Employee"
+        },
+        {
+          "fieldId": "67db425d21ec03315da962cb",
+          "fieldLabel": "Org",
+          "valueId": "d7055559fd68100169cce9e25c3d0000",
+          "valueLabel": "Security, Trust & IT"
+        },
+        {
+          "fieldId": "651b8b8aaac0da4b9cbd91c9",
+          "fieldLabel": "Recruitment type",
+          "valueId": "2c2d396a-3d34-4286-8196-61a215221fd5",
+          "valueLabel": "Permanent"
+        },
+        {
+          "fieldId": "651ba0b93066d20abe11145b",
+          "fieldLabel": "Specialty",
+          "valueId": "220b5c7e743d011f5058dba7b8008913",
+          "valueLabel": "Customer Service"
+        },
+        {
+          "fieldId": "651b8bc23066d20abe111459",
+          "fieldLabel": "Supergroup",
+          "valueId": "560e41ade9330100d7e173192cd60000",
+          "valueLabel": "Security & Trust"
+        },
+        {
+          "fieldId": "651ba1c7aac0da4b9cbd91ca",
+          "fieldLabel": "Role level",
+          "valueId": "B2",
+          "valueLabel": "B2"
+        },
+        {
+          "fieldId": "651b99e25ddc3c31d9224321",
+          "fieldLabel": "Group",
+          "valueId": "86c8c75badf10100dba54d87e6a90000",
+          "valueLabel": "Trust & Safety"
+        },
+        {
+          "fieldId": "651ba171eec5b66729429433",
+          "fieldLabel": "Subspecialty",
+          "valueId": "220b5c7e743d01dea0d016f4b7001713",
+          "valueLabel": "Customer Service Operations"
+        },
+        {
+          "fieldId": "COUNTRY",
+          "fieldLabel": "Country/Region",
+          "valueId": "ph",
+          "valueLabel": "Philippines"
+        },
+        {
+          "fieldId": "6514d94a9c140e09b2e649f5",
+          "fieldLabel": "Brands",
+          "valueId": "default",
+          "valueLabel": "Canva"
+        },
+        {
+          "fieldId": "651b8a7b58759b40ab8abd45",
+          "fieldLabel": "Employment type",
+          "valueId": "01ca83be4eaa01d34208432ca5005301",
+          "valueLabel": "Permanent"
+        },
+        {
+          "fieldId": "651ba22058759b40ab8abd46",
+          "fieldLabel": "Time type",
+          "valueId": "2ca83e80de45013371c1658ff3029500",
+          "valueLabel": "Full time"
+        }
+      ],
+      "visibility": "PUBLIC",
+      "ref": "https://api.smartrecruiters.com/v1/companies/Canva/postings/6000000001488854",
+      "language": {
+        "code": "en",
+        "label": "English",
+        "labelNative": "English (US)"
+      }
+    },
+    {
+      "id": "6000000001488851",
+      "name": "Senior Social Media Operations Team Lead",
+      "uuid": "b7d3924f-f761-4b7f-856c-1b1f3d7c86f4",
+      "jobAdId": "7867ad37-8dbd-4147-994e-4ba7cbd49c6c",
+      "defaultJobAd": true,
+      "refNumber": "R102351",
+      "company": {
+        "identifier": "Canva",
+        "name": "Canva"
+      },
+      "releasedDate": "2026-10-15T00:25:24.504Z",
+      "location": {
+        "city": "Makati",
+        "country": "ph",
+        "remote": false,
+        "hybrid": false,
+        "fullLocation": "Makati, , Philippines"
+      },
+      "industry": {
+        "id": "computer_software",
+        "label": "Computer Software"
+      },
+      "department": {},
+      "function": {
+        "id": "customer_service",
+        "label": "Customer Service"
+      },
+      "typeOfEmployment": {
+        "id": "permanent",
+        "label": "Full-time"
+      },
+      "experienceLevel": {
+        "id": "not_applicable",
+        "label": "Not Applicable"
+      },
+      "customField": [
+        {
+          "fieldId": "651ba0114967807d2e86fe5a",
+          "fieldLabel": "Team",
+          "valueId": "37687a384ad2010191d4591ea8190000",
+          "valueLabel": "High Sensitivity Support PH"
+        },
+        {
+          "fieldId": "651ba508aac0da4b9cbd91cb",
+          "fieldLabel": "Worker type",
+          "valueId": "d588c41a446c11de98360015c5e6daf6",
+          "valueLabel": "Employee"
+        },
+        {
+          "fieldId": "67db425d21ec03315da962cb",
+          "fieldLabel": "Org",
+          "valueId": "552b243cafd4100169ad384f50320000",
+          "valueLabel": "User Voice"
+        },
+        {
+          "fieldId": "651b8b8aaac0da4b9cbd91c9",
+          "fieldLabel": "Recruitment type",
+          "valueId": "2c2d396a-3d34-4286-8196-61a215221fd5",
+          "valueLabel": "Permanent"
+        },
+        {
+          "fieldId": "651ba0b93066d20abe11145b",
+          "fieldLabel": "Specialty",
+          "valueId": "220b5c7e743d011f5058dba7b8008913",
+          "valueLabel": "Customer Service"
+        },
+        {
+          "fieldId": "651b8bc23066d20abe111459",
+          "fieldLabel": "Supergroup",
+          "valueId": "220b5c7e743d01dd569da1cd97000706",
+          "valueLabel": "User Voice"
+        },
+        {
+          "fieldId": "651ba1c7aac0da4b9cbd91ca",
+          "fieldLabel": "Role level",
+          "valueId": "C1",
+          "valueLabel": "C1"
+        },
+        {
+          "fieldId": "651b99e25ddc3c31d9224321",
+          "fieldLabel": "Group",
+          "valueId": "37687a384ad20101909ae26588520000",
+          "valueLabel": "Specialist Operations"
+        },
+        {
+          "fieldId": "651ba171eec5b66729429433",
+          "fieldLabel": "Subspecialty",
+          "valueId": "220b5c7e743d01dea0d016f4b7001713",
+          "valueLabel": "Customer Service Operations"
+        },
+        {
+          "fieldId": "COUNTRY",
+          "fieldLabel": "Country/Region",
+          "valueId": "ph",
+          "valueLabel": "Philippines"
+        },
+        {
+          "fieldId": "6514d94a9c140e09b2e649f5",
+          "fieldLabel": "Brands",
+          "valueId": "default",
+          "valueLabel": "Canva"
+        },
+        {
+          "fieldId": "651b8a7b58759b40ab8abd45",
+          "fieldLabel": "Employment type",
+          "valueId": "01ca83be4eaa01d34208432ca5005301",
+          "valueLabel": "Permanent"
+        },
+        {
+          "fieldId": "651b8e51da1ddb62f488492c",
+          "fieldLabel": "Subgroup",
+          "valueId": "41d431ee2359010147d70aa519810000",
+          "valueLabel": "High Sensitivity & Escalations"
+        },
+        {
+          "fieldId": "651ba22058759b40ab8abd46",
+          "fieldLabel": "Time type",
+          "valueId": "2ca83e80de45013371c1658ff3029500",
+          "valueLabel": "Full time"
+        }
+      ],
+      "visibility": "PUBLIC",
+      "ref": "https://api.smartrecruiters.com/v1/companies/Canva/postings/6000000001488851",
+      "language": {
+        "code": "en",
+        "label": "English",
+        "labelNative": "English (US)"
+      }
+    },
+    {
+      "id": "6000000001488765",
+      "name": "Cloud Hosting Finance Analyst",
+      "uuid": "115baf19-5c52-4e19-9758-a045e7ea1da9",
+      "jobAdId": "15358205-b3ce-41ab-8d2c-59d18fe7bffe",
+      "defaultJobAd": true,
+      "refNumber": "R103046",
+      "company": {
+        "identifier": "Canva",
+        "name": "Canva"
+      },
+      "releasedDate": "2026-10-15T00:09:06.549Z",
+      "location": {
+        "city": "San Francisco",
+        "region": "CA",
+        "country": "us",
+        "remote": false,
+        "hybrid": true,
+        "latitude": "37.7749295",
+        "longitude": "-122.4194155",
+        "fullLocation": "San Francisco, CA, United States"
+      },
+      "industry": {
+        "id": "computer_software",
+        "label": "Computer Software"
+      },
+      "department": {},
+      "function": {
+        "id": "finance",
+        "label": "Finance"
+      },
+      "typeOfEmployment": {
+        "id": "permanent",
+        "label": "Full-time"
+      },
+      "experienceLevel": {
+        "id": "mid_senior_level",
+        "label": "Mid-Senior Level"
+      },
+      "customField": [
+        {
+          "fieldId": "651ba0114967807d2e86fe5a",
+          "fieldLabel": "Team",
+          "valueId": "87ac77d3d6021001c8ef6cbce4c50000",
+          "valueLabel": "Platform & Technology FP&A"
+        },
+        {
+          "fieldId": "651ba508aac0da4b9cbd91cb",
+          "fieldLabel": "Worker type",
+          "valueId": "d588c41a446c11de98360015c5e6daf6",
+          "valueLabel": "Employee"
+        },
+        {
+          "fieldId": "651ba0b93066d20abe11145b",
+          "fieldLabel": "Specialty",
+          "valueId": "220b5c7e743d014b9b4bdda7b8009113",
+          "valueLabel": "Finance"
+        },
+        {
+          "fieldId": "651ba171eec5b66729429433",
+          "fieldLabel": "Subspecialty",
+          "valueId": "a9813f82b55010017ee250bcddd50000",
+          "valueLabel": "FP&A"
+        },
+        {
+          "fieldId": "COUNTRY",
+          "fieldLabel": "Country/Region",
+          "valueId": "us",
+          "valueLabel": "United States"
+        },
+        {
+          "fieldId": "6514d94a9c140e09b2e649f5",
+          "fieldLabel": "Brands",
+          "valueId": "default",
+          "valueLabel": "Canva"
+        },
+        {
+          "fieldId": "651ba22058759b40ab8abd46",
+          "fieldLabel": "Time type",
+          "valueId": "2ca83e80de45013371c1658ff3029500",
+          "valueLabel": "Full time"
+        },
+        {
+          "fieldId": "67db425d21ec03315da962cb",
+          "fieldLabel": "Org",
+          "valueId": "d7055559fd68100169ccfdbb5e6a0000",
+          "valueLabel": "Finance"
+        },
+        {
+          "fieldId": "651b8b8aaac0da4b9cbd91c9",
+          "fieldLabel": "Recruitment type",
+          "valueId": "2c2d396a-3d34-4286-8196-61a215221fd5",
+          "valueLabel": "Permanent"
+        },
+        {
+          "fieldId": "651b8bc23066d20abe111459",
+          "fieldLabel": "Supergroup",
+          "valueId": "02a6f5468ba21001865a0fe7d99c0000",
+          "valueLabel": "Finance"
+        },
+        {
+          "fieldId": "651ba1c7aac0da4b9cbd91ca",
+          "fieldLabel": "Role level",
+          "valueId": "B3",
+          "valueLabel": "B3"
+        },
+        {
+          "fieldId": "651b99e25ddc3c31d9224321",
+          "fieldLabel": "Group",
+          "valueId": "f85d3bc99a3410018686dc0a0fbf0000",
+          "valueLabel": "FP&A"
+        },
+        {
+          "fieldId": "651b8a7b58759b40ab8abd45",
+          "fieldLabel": "Employment type",
+          "valueId": "01ca83be4eaa01d34208432ca5005301",
+          "valueLabel": "Permanent"
+        },
+        {
+          "fieldId": "651b8e51da1ddb62f488492c",
+          "fieldLabel": "Subgroup",
+          "valueId": "f85d3bc99a34100188489687a02d0000",
+          "valueLabel": "Business Finance FP&A"
+        }
+      ],
+      "visibility": "PUBLIC",
+      "ref": "https://api.smartrecruiters.com/v1/companies/Canva/postings/6000000001488765",
+      "language": {
+        "code": "en",
+        "label": "English",
+        "labelNative": "English (US)"
+      }
+    },
+    {
+      "id": "6000000001488524",
+      "name": "Strategic Account Executive",
+      "uuid": "1f6504c2-a4cf-4a88-9523-662c34490664",
+      "jobAdId": "4a7be99a-08ef-4616-8edf-d976f67a6ac2",
+      "defaultJobAd": true,
+      "refNumber": "R102972",
+      "company": {
+        "identifier": "Canva",
+        "name": "Canva"
+      },
+      "releasedDate": "2026-10-14T23:05:14.281Z",
+      "location": {
+        "city": "Sydney",
+        "country": "au",
+        "remote": false,
+        "hybrid": true,
+        "fullLocation": "Sydney, , Australia"
+      },
+      "industry": {
+        "id": "computer_software",
+        "label": "Computer Software"
+      },
+      "department": {},
+      "function": {
+        "id": "sales",
+        "label": "Sales"
+      },
+      "typeOfEmployment": {
+        "id": "permanent",
+        "label": "Full-time"
+      },
+      "experienceLevel": {
+        "id": "not_applicable",
+        "label": "Not Applicable"
+      },
+      "customField": [
+        {
+          "fieldId": "651ba508aac0da4b9cbd91cb",
+          "fieldLabel": "Worker type",
+          "valueId": "d588c41a446c11de98360015c5e6daf6",
+          "valueLabel": "Employee"
+        },
+        {
+          "fieldId": "67db425d21ec03315da962cb",
+          "fieldLabel": "Org",
+          "valueId": "552b243cafd4100169ad594c750c0000",
+          "valueLabel": "Go To Market"
+        },
+        {
+          "fieldId": "651b8b8aaac0da4b9cbd91c9",
+          "fieldLabel": "Recruitment type",
+          "valueId": "2c2d396a-3d34-4286-8196-61a215221fd5",
+          "valueLabel": "Permanent"
+        },
+        {
+          "fieldId": "651ba0b93066d20abe11145b",
+          "fieldLabel": "Specialty",
+          "valueId": "220b5c7e743d01c7acafdaa7b8008513",
+          "valueLabel": "Sales & Success"
+        },
+        {
+          "fieldId": "651b8bc23066d20abe111459",
+          "fieldLabel": "Supergroup",
+          "valueId": "d7055559fd68100169cd0af372c80000",
+          "valueLabel": "Sales & Success"
+        },
+        {
+          "fieldId": "651ba1c7aac0da4b9cbd91ca",
+          "fieldLabel": "Role level",
+          "valueId": "S4",
+          "valueLabel": "S4"
+        },
+        {
+          "fieldId": "651b99e25ddc3c31d9224321",
+          "fieldLabel": "Group",
+          "valueId": "d72904e5618a1000e76b300305890000",
+          "valueLabel": "APJ Sales"
+        },
+        {
+          "fieldId": "651ba171eec5b66729429433",
+          "fieldLabel": "Subspecialty",
+          "valueId": "220b5c7e743d01c4f25814f4b7000713",
+          "valueLabel": "Account Management"
+        },
+        {
+          "fieldId": "COUNTRY",
+          "fieldLabel": "Country/Region",
+          "valueId": "au",
+          "valueLabel": "Australia"
+        },
+        {
+          "fieldId": "6514d94a9c140e09b2e649f5",
+          "fieldLabel": "Brands",
+          "valueId": "default",
+          "valueLabel": "Canva"
+        },
+        {
+          "fieldId": "651b8a7b58759b40ab8abd45",
+          "fieldLabel": "Employment type",
+          "valueId": "01ca83be4eaa01d34208432ca5005301",
+          "valueLabel": "Permanent"
+        },
+        {
+          "fieldId": "651ba22058759b40ab8abd46",
+          "fieldLabel": "Time type",
+          "valueId": "2ca83e80de45013371c1658ff3029500",
+          "valueLabel": "Full time"
+        }
+      ],
+      "visibility": "PUBLIC",
+      "ref": "https://api.smartrecruiters.com/v1/companies/Canva/postings/6000000001488524",
+      "language": {
+        "code": "en",
+        "label": "English",
+        "labelNative": "English (US)"
+      }
+    }
+  ]
+}

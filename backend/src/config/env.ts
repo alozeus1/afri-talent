@@ -40,7 +40,13 @@ export function validateRuntimeEnv(): void {
     if (process.env.FLUTTERWAVE_SECRET_KEY?.trim()) {
       requireEnv("FLUTTERWAVE_SECRET_HASH");
     }
-    requireEnv("ANTHROPIC_API_KEY");
+    // The Anthropic key is only needed when real Claude calls can happen.
+    // MOCK_AI=1 (deterministic stubs) and AI_DISABLED=1 (503 kill switch)
+    // never call the API, so a production-mode local stack can boot without it.
+    const aiOffline = process.env.MOCK_AI === "1" || process.env.AI_DISABLED === "1";
+    if (!aiOffline) {
+      requireEnv("ANTHROPIC_API_KEY");
+    }
     // SENTRY_DSN is optional — initSentry() disables itself when absent.
     if (!process.env.SENTRY_DSN?.trim()) {
       console.warn("[env] SENTRY_DSN not set — Sentry error tracking disabled");
@@ -50,6 +56,14 @@ export function validateRuntimeEnv(): void {
     // is mandatory. Without it the emitter cannot sign requests and the inbound
     // callback rejects everything (fail closed). Fail the deploy instead of
     // shipping an unauthenticated approval path.
+    // Same for the support-ticket hand-off: never ship unsigned events.
+    if (
+      process.env.N8N_SUPPORT_WEBHOOK_URL?.trim() &&
+      !process.env.N8N_SUPPORT_HMAC_SECRET?.trim() &&
+      !process.env.N8N_WEBHOOK_SECRET?.trim()
+    ) {
+      throw new Error("N8N_WEBHOOK_SECRET or N8N_SUPPORT_HMAC_SECRET must be set");
+    }
     if (process.env.N8N_APPROVAL_WEBHOOK_URL?.trim()) {
       requireEnv("N8N_APPROVAL_HMAC_SECRET");
     }

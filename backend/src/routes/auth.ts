@@ -3,6 +3,7 @@ import { hashPassword, comparePassword, isHashBelowCurrentCost } from "../lib/pa
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { signToken, getTokenExpiresIn } from "../lib/jwt.js";
+import { clearExpiredSuspension, evaluateAccountAccess } from "../lib/account-access.js";
 import { authenticate, optionalAuth } from "../middleware/auth.js";
 import { authLimiter, registerLimiter } from "../middleware/security.js";
 import { issueCsrfToken } from "../middleware/csrf.js";
@@ -102,7 +103,7 @@ router.post("/register", registerLimiter, validateHumanAuthSubmission, async (re
           reason: "missing_employer_fields",
         },
       });
-      res.status(400).json({ error: "Employer registration requires companyName and location" });
+      res.status(400).json({ error: "Please add your company name and company location to create an employer account." });
       return;
     }
 
@@ -365,6 +366,25 @@ router.post("/login", authLimiter, validateHumanAuthSubmission, async (req: Requ
       });
       res.status(403).json({ error: "This account has been closed." });
       return;
+    }
+
+    // Admin console — suspended / banned accounts cannot sign in. An expired
+    // temporary suspension is lifted transparently.
+    const access = evaluateAccountAccess(user);
+    if (!access.allowed) {
+      recordOpsEvent({
+        metricName: "login_failure",
+        category: "auth",
+        outcome: "failure",
+        severity: "warning",
+        durationMs: Date.now() - startedAt,
+        details: { reason: access.code.toLowerCase() },
+      });
+      res.status(access.status).json({ error: access.error, code: access.code, until: access.until });
+      return;
+    }
+    if (access.suspensionExpired) {
+      clearExpiredSuspension(user.id);
     }
 
     // "Sign in to cancel" — a successful login within the grace window cancels a

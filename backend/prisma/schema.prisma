@@ -27,11 +27,22 @@ enum SupportedLocale {
   AR
 }
 
+enum SalaryPeriod {
+  HOURLY
+  DAILY
+  MONTHLY
+  YEARLY
+}
+
 enum JobStatus {
   DRAFT
   PENDING_REVIEW
   PUBLISHED
   REJECTED
+  // Admin console — a closed listing no longer accepts applications; a removed
+  // listing was taken down by moderation. Both are hidden from public search.
+  CLOSED
+  REMOVED
 }
 
 enum ApplicationStatus {
@@ -159,6 +170,8 @@ enum NotificationType {
   EMAIL_VERIFIED
   NEW_APPLICATION
   JOB_PUBLISHED
+  ADMIN_MESSAGE
+  SUPPORT_REPLY
 }
 
 enum NotificationStatus {
@@ -452,6 +465,9 @@ enum AccountRestrictionStatus {
   ACTIVE
   LIMITED
   SUSPENDED
+  // Admin console — permanent revocation. Blocked at login and on every
+  // authenticated request until an admin reactivates the account.
+  BANNED
 }
 
 enum PhoneVerificationStatus {
@@ -521,6 +537,20 @@ enum AdminAction {
   BULK_OPERATION_COMPLETED
   SYSTEM_CONFIGURATION_CHANGED
   ALERT_SETTINGS_UPDATED
+  // Admin console lifecycle + moderation actions
+  USER_SUSPENDED
+  USER_BANNED
+  USER_REACTIVATED
+  USER_SESSIONS_REVOKED
+  USER_EMAIL_REVERIFICATION_FORCED
+  USER_MESSAGED
+  USERS_BROADCAST_SENT
+  JOB_CLOSED
+  JOB_REOPENED
+  JOB_FEATURED
+  JOB_UNFEATURED
+  JOB_REMOVED
+  EMPLOYER_VERIFICATION_UPDATED
 }
 
 enum AlertSeverity {
@@ -774,6 +804,10 @@ model User {
   accountRestrictionStatus AccountRestrictionStatus @default(ACTIVE)
   accountRestrictionReason String?                  @db.VarChar(160)
   accountRestrictedAt      DateTime?
+  // Admin console — optional end of a temporary suspension (null = indefinite).
+  accountRestrictedUntil   DateTime?
+  // Admin console — JWTs issued before this instant are rejected.
+  sessionsRevokedAt        DateTime?
   deletionRequestedAt      DateTime?
   deletedAt                DateTime?
   phoneNumber              String?                  @db.VarChar(30)
@@ -797,6 +831,10 @@ model User {
   savedSearches                 SavedSearch[]
   jobAlerts                     JobAlert[]
   companyReviews                CompanyReview[]
+  companyReviewHelpfulVotes     CompanyReviewHelpfulVote[]
+  supportTickets                SupportTicket[]               @relation("SupportTicketSubmitter")
+  assignedSupportTickets        SupportTicket[]               @relation("SupportTicketAssignee")
+  supportTicketReplies          SupportTicketReply[]          @relation("SupportTicketReplyAuthor")
   learningFeedbackSubmissions   LearningFeedback[]            @relation("LearningFeedbackSubmitter")
   moderatedLearningFeedback     LearningFeedback[]            @relation("LearningFeedbackModerator")
   skillAssessments              SkillAssessment[]
@@ -968,9 +1006,17 @@ model Job {
   salaryMin          Int?
   salaryMax          Int?
   currency           String?
+  // Pay period of salaryMin/salaryMax. Null = unknown (legacy rows); the UI
+  // then only labels the range "/year" when the amount is plausibly annual.
+  salaryPeriod       SalaryPeriod?
   tags               String[]
   status             JobStatus
   publishedAt        DateTime?
+  // Admin console moderation
+  isFeatured         Boolean        @default(false)
+  featuredAt         DateTime?
+  closedAt           DateTime?
+  moderationReason   String?        @db.VarChar(500)
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
@@ -991,6 +1037,10 @@ model Job {
   // §4.2 — tri-key dedup K1 (`normCompany:normTitle:normCity`). Persisted
   // for O(1) lookup on insert; populated by the ingest write-path.
   dedupKeyV2                 String?               @db.VarChar(255)
+  // Aggregator engine — sha256 of the normalised ingest payload. When an
+  // incoming posting hashes identically the engine only touches
+  // sourceLastSeenAt and skips classification/LLM work entirely.
+  contentHash                String?               @db.VarChar(64)
   sourceLineage              Json?
   sourceFirstSeenAt          DateTime?
   sourceLastSeenAt           DateTime?
@@ -1054,6 +1104,27 @@ model Job {
   @@index([sourceLastSeenAt])
   @@index([freshnessScore, qualityScore])
   @@index([riskLevel, riskScore])
+  @@index([isFeatured, status])
+}
+
+// Aggregator engine — one row per ingestion run (cron, manual or dry-run).
+// `sources` holds the per-source metrics array (fetched/eligible/new/updated/
+// unchanged/rejected/duplicates/errors/durationMs/circuit state) exposed to
+// the admin via GET /api/aggregator/runs.
+model AggregatorRun {
+  id         String    @id @default(uuid())
+  trigger    String    @db.VarChar(32)
+  dryRun     Boolean   @default(false)
+  status     String    @db.VarChar(16)
+  startedAt  DateTime
+  finishedAt DateTime?
+  durationMs Int       @default(0)
+  totals     Json
+  sources    Json
+  createdAt  DateTime  @default(now())
+
+  @@index([startedAt(sort: Desc)])
+  @@index([status, startedAt])
 }
 
 model CompanyCareerSource {
@@ -2593,12 +2664,31 @@ model CompanyReview {
   isVerified        Boolean  @default(false)
   isApproved        Boolean  @default(false)
   helpfulCount      Int      @default(0)
+  // Moderation trail (additive). Pending = !isApproved && rejectedAt == null.
+  moderatedAt       DateTime?
+  rejectedAt        DateTime?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  helpfulVotes CompanyReviewHelpfulVote[]
 
   @@index([companyId, isApproved])
   @@index([userId])
   @@index([createdAt(sort: Desc)])
+}
+
+// One "helpful" vote per user per review; CompanyReview.helpfulCount is the
+// denormalized counter kept in step inside the same transaction.
+model CompanyReviewHelpfulVote {
+  id        String        @id @default(uuid())
+  reviewId  String
+  review    CompanyReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@unique([userId, reviewId])
+  @@index([reviewId])
 }
 
 model CompanyRatingAggregate {
@@ -3450,4 +3540,80 @@ model SavedJob {
 
   @@unique([userId, jobId])
   @@index([userId, createdAt(sort: Desc)])
+}
+
+// ──────────────── Customer Support ────────────────
+
+enum SupportTicketStatus {
+  OPEN // new, awaiting first response
+  PENDING // answered, awaiting the customer (or a third party)
+  RESOLVED
+}
+
+enum SupportTicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum SupportTicketTopic {
+  GENERAL
+  ACCOUNT
+  JOBS
+  EMPLOYER
+  TRUST_SAFETY
+  TECHNICAL
+  FEEDBACK
+  PARTNERSHIP
+  PRIVACY
+  OTHER
+}
+
+model SupportTicket {
+  id              String                @id @default(uuid())
+  reference       String                @unique @db.VarChar(20) // human-friendly, e.g. AT-7K3F9Q
+  name            String                @db.VarChar(120)
+  email           String                @db.VarChar(255)
+  topic           SupportTicketTopic    @default(GENERAL)
+  subject         String?               @db.VarChar(200)
+  message         String                @db.Text
+  status          SupportTicketStatus   @default(OPEN)
+  priority        SupportTicketPriority @default(NORMAL)
+  userId          String?
+  user            User?                 @relation("SupportTicketSubmitter", fields: [userId], references: [id], onDelete: SetNull)
+  userRole        String?               @db.VarChar(20)
+  assigneeId      String?
+  assignee        User?                 @relation("SupportTicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  internalNotes   String?               @db.Text
+  locale          String?               @db.VarChar(10)
+  pageUrl         String?               @db.VarChar(500)
+  userAgent       String?               @db.VarChar(500)
+  firstResponseAt DateTime?
+  lastReplyAt     DateTime?
+  resolvedAt      DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  replies SupportTicketReply[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([priority])
+  @@index([topic])
+  @@index([assigneeId])
+  @@index([userId])
+  @@index([email])
+}
+
+model SupportTicketReply {
+  id        String        @id @default(uuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String?
+  author    User?         @relation("SupportTicketReplyAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  body      String        @db.Text
+  emailSent Boolean       @default(false)
+  createdAt DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
 }

@@ -1,4 +1,5 @@
 import {
+  formatSalaryParts,
   formatSalaryRange,
   normalizeSalaryPeriod,
   salaryPeriodLabel,
@@ -41,5 +42,21 @@ describe("salary utils", () => {
     expect(salaryPeriodLabel("hourly")).toBe("hour");
     expect(salaryPeriodSchemaUnit("hourly")).toBe("HOUR");
     expect(salaryPeriodSchemaUnit("monthly")).toBe("MONTH");
+  });
+
+  it("never labels a sub-1000 amount as yearly", () => {
+    expect(formatSalaryRange({ salaryMin: 60, salaryMax: 120, currency: "USD" })).toBe("USD 60 - USD 120");
+    expect(formatSalaryRange({ salaryMin: 60, salaryMax: 120, currency: "USD", salaryPeriod: "YEARLY" })).toBe(
+      "USD 60 - USD 120",
+    );
+    expect(formatSalaryRange({ salaryMin: 60, salaryMax: 120, currency: "USD", salaryPeriod: "HOURLY" })).toBe(
+      "USD 60 - USD 120/hour",
+    );
+    expect(formatSalaryParts({ salaryMax: 950, salaryPeriod: "DAILY" })).toEqual({ amount: "USD 950", period: "daily" });
+  });
+
+  it("accepts the backend enum casing", () => {
+    expect(formatSalaryRange({ salaryMin: 2000, salaryPeriod: "MONTHLY" })).toBe("USD 2,000/month");
+    expect(formatSalaryRange({ salaryMin: 60000, salaryMax: 90000 })).toBe("USD 60,000 - USD 90,000/year");
   });
 });

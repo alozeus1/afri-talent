@@ -1,0 +1,28 @@
+import type en from "./en";
+
+export default {
+  "interviews.title": "رؤى المقابلات",
+  "interviews.subtitle": "تعلّم من المجتمع. اقرأ تجارب مقابلات حقيقية واستعد لفرصتك القادمة.",
+  "interviews.practiceSubtitle": "تدرّب مع سيناريوهات نموذجية موصوفة بوضوح الآن. ستظهر تجارب المجتمع الحقيقية بعد إرسال المختبرين المبكرين لمشاركات موثّقة.",
+  "interviews.searchPlaceholder": "البحث باسم الشركة أو المسمى الوظيفي...",
+  "interviews.clearFilters": "مسح الفلاتر",
+  "interviews.noMatch": "لا توجد سيناريوهات مقابلة مطابقة بعد",
+  "interviews.noMatchDesc": "حاول مسح الفلاتر أو استخدام السيناريوهات النموذجية للتدريب.",
+  "interviews.shareExperience": "شارك تجربتك",
+  "interviews.sampleScenario": "سيناريو مقابلة نموذجي",
+  "interviews.viewDetails": "عرض التفاصيل",
+  "interviews.hideDetails": "إخفاء التفاصيل",
+  "interviews.fullProcess": "عملية المقابلة الكاملة",
+  "interviews.questionsLabel": "أسئلة المقابلة",
+  "interviews.tipsLabel": "نصائح",
+  "interviews.durationLabel": "المدة",
+  "interviews.shareSuccess": "تمت مشاركة التجربة بنجاح! شكراً لمساعدة المجتمع.",
+  "interviews.companyId": "معرّف الشركة",
+  "interviews.jobTitle": "المسمى الوظيفي",
+  "interviews.interviewProcess": "عملية المقابلة",
+  "interviews.interviewQuestions": "أسئلة المقابلة",
+  "interviews.tipsForOthers": "نصائح للآخرين",
+  "interviews.duration": "المدة",
+  "interviews.addQuestion": "+ إضافة سؤال",
+  "interviews.shareButton": "مشاركة التجربة",
+} satisfies Record<keyof typeof en, string>;

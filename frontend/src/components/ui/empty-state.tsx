@@ -44,19 +44,19 @@ export function EmptyState({
       role="status"
       aria-live="polite"
       data-testid={testId ?? "empty-state"}
-      className={`flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white/60 px-6 py-12 text-center ${className}`}
+      className={`flex flex-col items-center justify-center rounded-2xl border border-dashed border-line-strong bg-surface/60 px-6 py-12 text-center ${className}`}
     >
       {icon && (
         <div
           aria-hidden="true"
-          className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"
+          className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary-soft text-primary-text"
         >
           {icon}
         </div>
       )}
-      <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+      <h3 className="text-lg font-semibold text-fg">{title}</h3>
       {description && (
-        <p className="mt-2 max-w-md text-sm text-gray-600">{description}</p>
+        <p className="mt-2 max-w-md text-sm text-fg-secondary">{description}</p>
       )}
       {(primaryAction || secondaryAction) && (
         <div className="mt-6 flex flex-col items-center gap-2 sm:flex-row">
@@ -64,7 +64,7 @@ export function EmptyState({
             (primaryAction.href ? (
               <Link
                 href={primaryAction.href}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-fg shadow-xs hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
               >
                 {primaryAction.label}
               </Link>
@@ -72,7 +72,7 @@ export function EmptyState({
               <button
                 type="button"
                 onClick={primaryAction.onClick}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-fg shadow-xs hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
               >
                 {primaryAction.label}
               </button>
@@ -81,7 +81,7 @@ export function EmptyState({
             (secondaryAction.href ? (
               <Link
                 href={secondaryAction.href}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+                className="rounded-lg border border-line-strong px-4 py-2 text-sm font-medium text-fg-secondary hover:bg-surface-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
               >
                 {secondaryAction.label}
               </Link>
@@ -89,7 +89,7 @@ export function EmptyState({
               <button
                 type="button"
                 onClick={secondaryAction.onClick}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+                className="rounded-lg border border-line-strong px-4 py-2 text-sm font-medium text-fg-secondary hover:bg-surface-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
               >
                 {secondaryAction.label}
               </button>

@@ -4,7 +4,7 @@ import prisma from "../lib/prisma.js";
 import { authenticate, authorize, optionalAuth } from "../middleware/auth.js";
 import { anonymousJobsLimiter, blockAnonymousJobsAutomation } from "../middleware/bot-protection.js";
 import { JobStatus, Role, TrustEntityType, TrustRiskLevel } from "@prisma/client";
-import { buildCacheKey, getCachedJson, setCachedJson } from "../lib/cache.js";
+import { buildCacheKey, delCache, getCachedJson, setCachedJson } from "../lib/cache.js";
 import { requireAccountStanding } from "../middleware/account-standing.js";
 import { assessJobPostingRisk } from "../lib/trust/risk.js";
 import { buildJobIntelligenceUpdate, scoreJobForSearch } from "../lib/jobs/discovery.js";
@@ -46,11 +46,27 @@ const createJobSchema = z.object({
   salaryMin: z.coerce.number().optional(),
   salaryMax: z.coerce.number().optional(),
   currency: z.string().optional(),
+  salaryPeriod: z.enum(["HOURLY", "DAILY", "MONTHLY", "YEARLY"]).optional(),
   tags: z.array(z.string()).optional(),
   applicationUrl: z.string().url().max(500).optional().or(z.literal("")),
+  // Mobility fields map 1:1 onto existing Job columns (no migration). They
+  // drive the Visa Sponsored / Relocation / Remote search filters.
+  visaSponsorship: z.enum(["YES", "NO", "UNKNOWN"]).optional(),
+  relocationAssistance: z.boolean().optional(),
+  eligibleCountries: z.array(z.string().trim().min(1).max(80)).max(60).optional(),
 });
 
-const updateJobSchema = createJobSchema.partial();
+// JobStatus has no CLOSED value; DRAFT is the closest "not accepting
+// applications / not publicly listed" state. Employers may close (DRAFT) or
+// reopen (PUBLISHED — which still goes through trust/moderation below).
+const CLOSED_JOB_STATUS = JobStatus.DRAFT;
+const updateJobSchema = createJobSchema.partial().extend({
+  status: z.enum([JobStatus.DRAFT, JobStatus.PUBLISHED]).optional(),
+});
+
+function invalidateJobDetailCache(slug: string): Promise<void> {
+  return delCache(buildCacheKey("jobs:detail", { slug }));
+}
 
 function generateSlug(title: string): string {
   return title
@@ -492,6 +508,9 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
       type: jobData.type,
       jobField: jobData.jobField ?? null,
       workplaceType: jobData.workplaceType ?? null,
+      visaSponsorship: jobData.visaSponsorship ?? null,
+      relocationAssistance: jobData.relocationAssistance ?? null,
+      eligibleCountries: jobData.eligibleCountries ?? [],
       seniority: jobData.seniority,
       salaryMin: jobData.salaryMin ?? null,
       salaryMax: jobData.salaryMax ?? null,
@@ -656,7 +675,7 @@ router.post("/", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(
 router.put("/:id", authenticate, authorize(Role.EMPLOYER), requireAccountStanding(), async (req: Request, res: Response) => {
   const startedAt = Date.now();
   try {
-    const data = updateJobSchema.parse(req.body);
+    const { status: requestedStatus, ...data } = updateJobSchema.parse(req.body);
 
     const employer = await prisma.employer.findUnique({
       where: { userId: req.user!.userId },
@@ -695,6 +714,19 @@ router.put("/:id", authenticate, authorize(Role.EMPLOYER), requireAccountStandin
         },
       });
       res.status(404).json({ error: "Job not found" });
+      return;
+    }
+
+    // Closing a job only flips its status; other fields in the same request
+    // are ignored so an unpublished job can't sidestep the risk re-scoring
+    // that runs when it is reopened.
+    if (requestedStatus === CLOSED_JOB_STATUS) {
+      const closedJob = await prisma.job.update({
+        where: { id: existingJob.id },
+        data: { status: CLOSED_JOB_STATUS },
+      });
+      await invalidateJobDetailCache(existingJob.slug);
+      res.json({ ...closedJob, closed: true });
       return;
     }
 
@@ -740,6 +772,14 @@ router.put("/:id", authenticate, authorize(Role.EMPLOYER), requireAccountStandin
       description: data.description ?? existingJob.description,
       location: data.location ?? existingJob.location,
       type: data.type ?? existingJob.type,
+      jobField: data.jobField ?? existingJob.jobField,
+      workplaceType: data.workplaceType ?? existingJob.workplaceType,
+      visaSponsorship: data.visaSponsorship ?? existingJob.visaSponsorship,
+      relocationAssistance: data.relocationAssistance ?? existingJob.relocationAssistance,
+      eligibleCountries: data.eligibleCountries ?? existingJob.eligibleCountries,
+      // buildJobIntelligenceUpdate echoes applicationUrl back into the update,
+      // so pass the effective value or an edit would silently clear it.
+      applicationUrl: data.applicationUrl !== undefined ? data.applicationUrl || null : existingJob.applicationUrl,
       seniority: data.seniority ?? existingJob.seniority,
       salaryMin: data.salaryMin ?? existingJob.salaryMin ?? null,
       salaryMax: data.salaryMax ?? existingJob.salaryMax ?? null,
@@ -780,6 +820,8 @@ router.put("/:id", authenticate, authorize(Role.EMPLOYER), requireAccountStandin
         ...intelligence,
       },
     });
+
+    await invalidateJobDetailCache(existingJob.slug);
 
     if (jobRisk.score > 0) {
       await recordTrustRiskEvent({
@@ -891,10 +933,35 @@ router.delete("/:id", authenticate, authorize(Role.EMPLOYER), async (req: Reques
       return;
     }
 
-    await prisma.job.delete({ where: { id: req.params.id } });
+    // Applications reference the job with ON DELETE RESTRICT, and candidates
+    // need their application history, so a job with applicants is closed
+    // (unpublished) instead of hard-deleted.
+    const applicationCount = await prisma.application.count({
+      where: { jobId: existingJob.id },
+    });
+
+    if (applicationCount > 0) {
+      await prisma.job.update({
+        where: { id: existingJob.id },
+        data: { status: CLOSED_JOB_STATUS },
+      });
+      await invalidateJobDetailCache(existingJob.slug);
+      res.json({
+        closed: true,
+        message: "Job has applications, so it was closed instead of deleted",
+      });
+      return;
+    }
+
+    await prisma.job.delete({ where: { id: existingJob.id } });
+    await invalidateJobDetailCache(existingJob.slug);
 
     res.json({ message: "Job deleted successfully" });
   } catch (error) {
+    if ((error as { code?: string }).code === "P2003") {
+      res.status(409).json({ error: "Job has related records and cannot be deleted. Close it instead." });
+      return;
+    }
     console.error("Delete job error:", error);
     res.status(500).json({ error: "Internal server error" });
   }

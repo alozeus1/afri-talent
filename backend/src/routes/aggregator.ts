@@ -9,6 +9,13 @@ import { JobAggregator, getJobAggregator } from "../lib/jobs/aggregator/index.js
 import type { JobQuery } from "../lib/jobs/aggregator/sources/base.js";
 import { JOB_FIELDS } from "../lib/jobs/aggregator/taxonomy.js";
 import type { CompanyCareerSourceConfig, CompanyCareerProvider } from "../lib/jobs/aggregator/sources/company-careers.js";
+import { CircuitBreakerRegistry } from "../lib/jobs/aggregator/engine/circuit-breaker.js";
+import {
+  buildFeedSources,
+  getSharedCircuitBreakers,
+  runIngestion,
+  useLegacyAggregator,
+} from "../lib/jobs/aggregator/engine/index.js";
 
 const router = Router();
 const aggregator = getJobAggregator(prisma);
@@ -29,7 +36,7 @@ const DEFAULT_FIELD_KEYWORDS = [
 ];
 
 function isCompanyCareerProvider(value: string): value is CompanyCareerProvider {
-  return ["GREENHOUSE", "LEVER", "ASHBY", "SMARTRECRUITERS", "RECRUITEE", "GENERIC"].includes(value);
+  return ["GREENHOUSE", "LEVER", "ASHBY", "SMARTRECRUITERS", "RECRUITEE", "WORKABLE", "GENERIC"].includes(value);
 }
 
 async function loadActiveCompanyCareerSources(): Promise<CompanyCareerSourceConfig[]> {
@@ -62,6 +69,20 @@ async function loadActiveCompanyCareerSources(): Promise<CompanyCareerSourceConf
 
 // POST /api/aggregator/sync - Trigger manual job sync (Admin only)
 router.post("/sync", authenticate, authorize("ADMIN"), async (req, res) => {
+  if (!useLegacyAggregator()) {
+    try {
+      const report = await runIngestion({ prisma, trigger: "manual", ignoreMinInterval: true });
+      res.json({
+        success: report.status !== "failure",
+        message: `Ingestion ${report.status}: ${report.totals.inserted} new, ${report.totals.updated} updated, ${report.totals.unchanged} unchanged`,
+        report,
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: "Job sync failed", details: String(error) });
+    }
+    return;
+  }
+
   const {
     keywords = DEFAULT_FIELD_KEYWORDS,
     fields,
@@ -124,6 +145,48 @@ router.post("/sync", authenticate, authorize("ADMIN"), async (req, res) => {
       details: String(error),
     });
   }
+});
+
+// GET /api/aggregator/runs?limit=20 - Recent ingestion runs with per-source
+// metrics (Admin only). See lib/jobs/aggregator/engine/README.md for the shape.
+router.get("/runs", authenticate, authorize("ADMIN"), async (req, res) => {
+  const limit = Math.min(Math.max(Number.parseInt(String(req.query.limit ?? "20"), 10) || 20, 1), 100);
+  const runs = await prisma.aggregatorRun.findMany({
+    orderBy: { startedAt: "desc" },
+    take: limit,
+  });
+  res.json({ runs });
+});
+
+// GET /api/aggregator/runs/latest - Most recent ingestion run (Admin only)
+router.get("/runs/latest", authenticate, authorize("ADMIN"), async (_req, res) => {
+  const run = await prisma.aggregatorRun.findFirst({ orderBy: { startedAt: "desc" } });
+  res.json({ run });
+});
+
+// GET /api/aggregator/health - Feed catalog + live circuit-breaker state (Admin only)
+router.get("/health", authenticate, authorize("ADMIN"), async (_req, res) => {
+  const careerSourceRows = await prisma.companyCareerSource.findMany({
+    where: { active: true, allowedToCrawl: true },
+    select: { id: true, provider: true, providerKey: true, companyName: true, careersUrl: true },
+  });
+  const { feeds, companies } = buildFeedSources({ careerSourceRows });
+  const circuits = new Map(getSharedCircuitBreakers().snapshot().map((entry) => [entry.source, entry]));
+  res.json({
+    engine: useLegacyAggregator() ? "legacy" : "engine",
+    feeds: feeds.map((feed) => ({
+      id: feed.id,
+      name: feed.name,
+      kind: feed.kind,
+      minIntervalMinutes: feed.minIntervalMinutes,
+      circuit: circuits.get(feed.id) ?? { source: feed.id, state: "closed", consecutiveFailures: 0, lastSuccessAt: null },
+    })),
+    atsCompanies: companies.length,
+    atsCompaniesByProvider: companies.reduce<Record<string, number>>((acc, company) => {
+      acc[company.provider] = (acc[company.provider] ?? 0) + 1;
+      return acc;
+    }, {}),
+  });
 });
 
 // GET /api/aggregator/sources - List available job sources
@@ -217,6 +280,36 @@ router.post("/company-sources", authenticate, authorize("ADMIN"), async (req, re
 
 // GET /api/aggregator/preview - Preview jobs without saving (Admin only)
 router.get("/preview", authenticate, authorize("ADMIN"), async (req, res) => {
+  if (!useLegacyAggregator()) {
+    try {
+      const limit = Math.min(Math.max(Number.parseInt(String(req.query.limit ?? "10"), 10) || 10, 1), 50);
+      // Isolated breaker registry so a preview never shifts the cron's
+      // min-interval / circuit state.
+      const report = await runIngestion({
+        dryRun: true,
+        ignoreMinInterval: true,
+        breakers: new CircuitBreakerRegistry(),
+        sampleSize: Math.max(1, Math.ceil(limit / 5)),
+      });
+      res.json({
+        totalJobs: report.totals.fetched,
+        africaFriendlyJobs: report.totals.eligible,
+        bySource: report.sources.map((metric) => ({
+          source: metric.source,
+          count: metric.fetched,
+          eligible: metric.eligible,
+          status: metric.status,
+          errors: metric.errorSamples,
+        })),
+        preview: (report.sample ?? []).slice(0, limit),
+        report,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Preview failed", details: String(error) });
+    }
+    return;
+  }
+
   const keywords = (req.query.keywords as string)?.split(",") || DEFAULT_FIELD_KEYWORDS;
   const limit = parseInt(req.query.limit as string) || 50;
   const fields = (req.query.fields as string | undefined)?.split(",").filter(Boolean);

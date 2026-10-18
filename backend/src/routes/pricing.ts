@@ -3,6 +3,7 @@ import { z } from "zod";
 import { BillingRegion, BillingInterval } from "@prisma/client";
 import { authenticate } from "../middleware/auth.js";
 import prisma from "../lib/prisma.js";
+import { isFreeMode } from "../lib/billing/free-mode.js";
 import {
   resolveUserRegion,
   setUserBillingCountry,
@@ -55,6 +56,7 @@ router.get("/", async (req: Request, res: Response) => {
     });
 
     res.json({
+      freeMode: isFreeMode(),
       region: resolvedRegion,
       currency: currency?.toUpperCase() || regionConfig?.defaultCurrency || "USD",
       availableCurrencies: regionConfig?.currencies ?? REGION_DEFAULTS[resolvedRegion]?.currencies ?? ["USD"],
@@ -94,6 +96,7 @@ router.get("/me", authenticate, async (req: Request, res: Response) => {
     });
 
     res.json({
+      freeMode: isFreeMode(),
       region: resolved.region,
       country: resolved.country,
       currency: resolved.currency,

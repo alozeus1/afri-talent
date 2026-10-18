@@ -369,6 +369,73 @@ describe("Jobs API", () => {
         });
     });
 
+    describe("mobility fields", () => {
+        it("persists workplaceType/visa/relocation/eligibleCountries and the job matches remote + visa filters", async () => {
+            const token = makeEmployerToken();
+            (prisma.employer.findUnique as any).mockResolvedValueOnce({
+                id: "emp123", userId: "emp123", companyName: "TechCorp", createdAt: new Date(),
+            });
+            (prisma.job.create as any).mockImplementationOnce(({ data }: { data: Record<string, unknown> }) =>
+                Promise.resolve({ ...DUMMY_JOB, ...data, id: "mobility_job" }));
+
+            const createRes = await request(app).post("/api/jobs")
+                .set("Authorization", `Bearer ${token}`)
+                .send({
+                    title: "Platform Engineer",
+                    description: "Own our Kubernetes platform and developer tooling end to end.",
+                    location: "Lagos, Nigeria",
+                    type: "Full-time",
+                    seniority: "Senior",
+                    jobField: "Technology",
+                    workplaceType: "REMOTE",
+                    visaSponsorship: "YES",
+                    relocationAssistance: true,
+                    eligibleCountries: ["Nigeria", "Kenya"],
+                });
+
+            expect(createRes.status).toBe(201);
+            const createData = (prisma.job.create as any).mock.calls[0][0].data;
+            expect(createData).toMatchObject({
+                jobField: "Technology",
+                workplaceType: "REMOTE",
+                visaSponsorship: "YES",
+                relocationAssistance: true,
+                eligibleCountries: ["Nigeria", "Kenya"],
+            });
+
+            const created = { ...DUMMY_JOB, ...createData, id: "mobility_job" };
+            (prisma.job.findMany as any).mockResolvedValueOnce([created]);
+            const listRes = await request(app).get("/api/jobs?remote=true&visaSponsorship=YES");
+            expect(listRes.status).toBe(200);
+            expect(listRes.body.jobs.map((job: { id: string }) => job.id)).toContain("mobility_job");
+
+            const where = (prisma.job.findMany as any).mock.calls.at(-1)[0].where;
+            expect(where.AND).toEqual(expect.arrayContaining([
+                { visaSponsorship: "YES" },
+                {
+                    OR: expect.arrayContaining([
+                        { workplaceType: { equals: "REMOTE", mode: "insensitive" } },
+                    ]),
+                },
+            ]));
+        });
+
+        it("rejects an invalid visaSponsorship value", async () => {
+            const token = makeEmployerToken();
+            const res = await request(app).post("/api/jobs")
+                .set("Authorization", `Bearer ${token}`)
+                .send({
+                    title: "Platform Engineer",
+                    description: "Own our Kubernetes platform.",
+                    location: "Remote",
+                    type: "Full-time",
+                    seniority: "Senior",
+                    visaSponsorship: "MAYBE",
+                });
+            expect(res.status).toBe(400);
+        });
+    });
+
     describe("PUT /api/jobs/:id", () => {
         it("returns 404 if job not found during update", async () => {
             const token = makeEmployerToken();
@@ -408,7 +475,7 @@ describe("Jobs API", () => {
 
             const res = await request(app).put("/api/jobs/job123")
                 .set("Authorization", `Bearer ${token}`)
-                .send({ title: "Updated Title", description: "Updated Dev", location: "Lagos", type: "CONTRACT", seniority: "JUNIOR", status: "DRAFT" });
+                .send({ title: "Updated Title", description: "Updated Dev", location: "Lagos", type: "CONTRACT", seniority: "JUNIOR" });
 
             expect(res.status).toBe(200);
             expect(res.body.title).toBe("Updated Title");

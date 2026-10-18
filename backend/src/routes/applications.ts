@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize, requireVerifiedEmail } from "../middleware/auth.js";
 import {
@@ -31,10 +33,13 @@ import {
   refreshCandidateTrustProfile,
 } from "../lib/trust/service.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
+import { isFreeMode } from "../lib/billing/free-mode.js";
 import {
   maybeCreateAtsApplicationLink,
   syncApplicationStatusToAts,
 } from "../lib/ats/service.js";
+import { bucketForScope } from "../lib/upload-buckets.js";
+import { getS3Client } from "./files.js";
 import { isSafeExternalHttpsUrl } from "../lib/security/external-url.js";
 
 const router = Router();
@@ -118,7 +123,7 @@ router.post(
           reason: "duplicate_application",
         },
       });
-      res.status(400).json({ error: "You have already applied to this job" });
+      res.status(409).json({ error: "You have already applied to this job" });
       return;
     }
 
@@ -267,6 +272,12 @@ router.post(
       res.status(400).json({ error: "Validation failed", details: error.issues });
       return;
     }
+    // Concurrent duplicate submits race past the pre-check and hit the
+    // @@unique([jobId, candidateId]) constraint.
+    if ((error as { code?: string }).code === "P2002") {
+      res.status(409).json({ error: "You have already applied to this job" });
+      return;
+    }
     console.error("Apply error:", error);
     recordOpsEvent({
       metricName: "application_submission_failure",
@@ -342,17 +353,38 @@ router.get("/job/:jobId", authenticate, authorize(Role.EMPLOYER), async (req: Re
       },
       include: {
         candidate: {
-          select: { id: true, name: true, email: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            candidateProfile: {
+              select: {
+                headline: true,
+                skills: true,
+                yearsExperience: true,
+                linkedinUrl: true,
+                githubUrl: true,
+                portfolioUrl: true,
+                profileCompleteness: true,
+              },
+            },
+            // CandidateProfile has no location column; the candidate's
+            // public location lives on SocialProfile.
+            socialProfile: {
+              select: { location: true },
+            },
+          },
         },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    const subscription = await prisma.subscription.findUnique({
+    const subscription = isFreeMode() ? null : await prisma.subscription.findUnique({
       where: { userId: req.user!.userId },
       select: { plan: true, status: true },
     }).catch(() => null);
     const canViewFullCandidates =
+      isFreeMode() ||
       subscription?.status === SubscriptionStatus.ACTIVE &&
       (subscription.plan === SubscriptionPlan.EMPLOYER_BASIC || subscription.plan === SubscriptionPlan.EMPLOYER_PREMIUM);
 
@@ -452,6 +484,92 @@ router.put("/:id/status", authenticate, authorize(Role.EMPLOYER), async (req: Re
       return;
     }
     console.error("Update application status error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+const CV_LINK_EXPIRY_SECONDS = 300;
+
+// GET /api/applications/:id/cv - Employer (job owner) or admin: resolve the
+// applicant's CV. Returns { url } for an http(s) cvUrl or a short-lived
+// presigned S3 GET for an uploaded resume key; otherwise (no S3 configured,
+// e.g. local Docker, or a resume-builder resume) returns { text } from the
+// candidate's UserResume.
+router.get("/:id/cv", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async (req: Request, res: Response) => {
+  try {
+    const application = await prisma.application.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        cvUrl: true,
+        candidateId: true,
+        riskLevel: true,
+        job: { select: { employerId: true } },
+      },
+    });
+
+    if (!application) {
+      res.status(404).json({ error: "Application not found" });
+      return;
+    }
+
+    if (req.user!.role !== Role.ADMIN) {
+      const employer = await prisma.employer.findUnique({
+        where: { userId: req.user!.userId },
+        select: { id: true },
+      });
+      if (!employer || application.job.employerId !== employer.id) {
+        res.status(403).json({ error: "Not authorized to view this CV" });
+        return;
+      }
+      // Held (HIGH/CRITICAL) applications are hidden from employers.
+      if (application.riskLevel === TrustRiskLevel.HIGH || application.riskLevel === TrustRiskLevel.CRITICAL) {
+        res.status(404).json({ error: "Application not found" });
+        return;
+      }
+    }
+
+    const cvUrl = application.cvUrl?.trim() || null;
+    if (cvUrl && /^https?:\/\//i.test(cvUrl)) {
+      res.json({ url: cvUrl });
+      return;
+    }
+
+    // Uploaded files stay unavailable to employers until the malware scanner
+    // has recorded CLEAN (fail-closed on PENDING_SCAN/QUARANTINED/REJECTED).
+    const bucket = bucketForScope("resume");
+    const cleanUpload = cvUrl && bucket
+      ? await prisma.resume.findFirst({
+          where: {
+            s3Key: cvUrl,
+            profile: { userId: application.candidateId },
+            securityStatus: "CLEAN",
+          },
+          select: { id: true },
+        })
+      : null;
+    if (cvUrl && bucket && cleanUpload) {
+      const url = await getSignedUrl(
+        getS3Client(),
+        new GetObjectCommand({ Bucket: bucket, Key: cvUrl }),
+        { expiresIn: CV_LINK_EXPIRY_SECONDS },
+      );
+      res.json({ url, expiresIn: CV_LINK_EXPIRY_SECONDS });
+      return;
+    }
+
+    const resume = await prisma.userResume.findUnique({
+      where: { userId: application.candidateId },
+      select: { rawText: true },
+    });
+    if (resume?.rawText?.trim()) {
+      res.json({ text: resume.rawText });
+      return;
+    }
+
+    res.status(404).json({ error: "This candidate has not attached a CV", code: "CV_NOT_AVAILABLE" });
+  } catch (error) {
+    console.error("Get application CV error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });

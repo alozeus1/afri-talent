@@ -1,0 +1,25 @@
+import type en from "./en";
+
+export default {
+  "salaries.title": "Conheça seu valor",
+  "salaries.subtitle": "Explore dados salariais anônimos de profissionais africanos trabalhando globalmente.",
+  "salaries.practicalSubtitle": "Explore dados salariais anônimos disponíveis, mais orientação de mercado claramente rotulada para funções globais.",
+  "salaries.searchSalaries": "Pesquisar salários",
+  "salaries.compareCountries": "Comparar entre países",
+  "salaries.compareDesc": "Selecione um título de cargo para ver salários médios em diferentes países",
+  "salaries.distributionByLevel": "Distribuição salarial por nível",
+  "salaries.distributionDesc": "Faixas de remuneração de amostra apenas para fins educacionais.",
+  "salaries.topPayingRoles": "Funções mais bem pagas",
+  "salaries.topPayingDesc": "Relatórios salariais da comunidade ao vivo quando disponíveis.",
+  "salaries.submitSalary": "Enviar seu salário",
+  "salaries.submitButton": "Enviar salário",
+  "salaries.searchButton": "Pesquisar",
+  "salaries.compareButton": "Comparar",
+  "salaries.allCountries": "Todos os países",
+  "salaries.noReportsFound": "Nenhum relatório salarial encontrado para esta pesquisa. Seja o primeiro a contribuir!",
+  "salaries.noCompareData": "Nenhum dado de comparação disponível para este título de cargo.",
+  "salaries.noVerifiedReports": "Ainda não há relatórios salariais verificados da comunidade",
+  "salaries.noVerifiedDesc": "AfriTalent mostrará as funções mais bem pagas após envios suficientes de salários reais.",
+  "salaries.jobTitlePlaceholder": "Título do cargo (ex. Engenheiro de Software)",
+  "salaries.compareJobTitle": "Título do cargo (ex. Cientista de Dados)",
+} satisfies Record<keyof typeof en, string>;

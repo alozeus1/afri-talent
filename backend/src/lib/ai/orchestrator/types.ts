@@ -47,18 +47,18 @@ export interface OrchestratorInput {
 export interface ResumeExperience {
   company: string;
   title: string;
-  start_date?: string;
+  start_date?: string | null;
   end_date?: string | null;
-  description?: string;
+  description?: string | null;
   metrics: string[];       // quantifiable achievements, may be empty
   technologies: string[];  // tools/tech mentioned in this role
 }
 
 export interface ResumeEducation {
   institution: string;
-  degree?: string;
-  field?: string;
-  graduation_year?: string;
+  degree?: string | null;
+  field?: string | null;
+  graduation_year?: string | null;
 }
 
 export interface ResumeSchema {
@@ -155,7 +155,7 @@ export type IssueSeverity = "high" | "medium" | "low";
 export interface GuardIssue {
   type: IssueType;
   field: string;
-  original_value: string;
+  original_value?: string | null;
   fabricated_value: string;
   severity: IssueSeverity;
 }

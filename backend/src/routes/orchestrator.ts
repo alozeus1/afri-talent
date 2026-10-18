@@ -14,7 +14,7 @@ import { z } from "zod";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { checkDailyQuota } from "../middleware/quotas.js";
 import { runOrchestrator } from "../lib/ai/orchestrator/index.js";
-import { createAiRun, completeAiRun, getRunHistory } from "../lib/ai/persistence.js";
+import { createAiRun, completeAiRun, failAiRun, getRunHistory } from "../lib/ai/persistence.js";
 import logger from "../lib/logger.js";
 import { Role } from "@prisma/client";
 
@@ -71,18 +71,18 @@ const LimitsSchema = z.object({
 const ResumeExperienceSchema = z.object({
   company:      z.string(),
   title:        z.string(),
-  start_date:   z.string().optional(),
+  start_date:   z.string().nullable().optional(),
   end_date:     z.string().nullable().optional(),
-  description:  z.string().optional(),
+  description:  z.string().nullable().optional(),
   metrics:      z.array(z.string()),
   technologies: z.array(z.string()),
 });
 
 const ResumeEducationSchema = z.object({
   institution:     z.string(),
-  degree:          z.string().optional(),
-  field:           z.string().optional(),
-  graduation_year: z.string().optional(),
+  degree:          z.string().nullable().optional(),
+  field:           z.string().nullable().optional(),
+  graduation_year: z.string().nullable().optional(),
 });
 
 const ResumeJsonSchema = z.object({
@@ -186,9 +186,12 @@ router.post(
       return;
     }
 
-    // Persist run start (non-fatal)
+    // Persist run start (non-fatal). Awaited so the RUNNING row exists before
+    // the run starts: checkDailyQuota counts recent RUNNING rows, which closes
+    // the check-then-act window for concurrent requests, and completeAiRun /
+    // failAiRun can never race ahead of the create.
     const resumeHash = createHash("sha256").update(parsed.data.resume_text).digest("hex").slice(0, 64);
-    void createAiRun(userId, run_id, run_type, resumeHash, tokenBudget);
+    await createAiRun(userId, run_id, run_type, resumeHash, tokenBudget);
 
     logger.info({
       run_id,
@@ -235,6 +238,9 @@ router.post(
       const message = (err as Error).message ?? "unknown error";
       logger.error({ run_id, user_id_prefix: userId.slice(0, 8), run_type, err_msg: (err as Error).message }, "[orchestrator route] error");
 
+      // Close out the RUNNING row so it stops counting against the quota.
+      await failAiRun(run_id, message);
+
       if (message.includes("ANTHROPIC_API_KEY")) {
         sendError(503, "AI service is not configured on this server", "misconfiguration");
         return;
@@ -247,8 +253,12 @@ router.post(
         sendError(429, message, "token_budget_exceeded");
         return;
       }
-      if (message.includes("schema validation failed")) {
-        sendError(502, `Agent returned malformed output: ${message}`, "agent_schema_error");
+      if (message.includes("schema validation failed") || message.includes("failed schema validation")) {
+        sendError(
+          502,
+          "The AI returned an unexpected response. Please try again in a moment.",
+          "agent_schema_error"
+        );
         return;
       }
 

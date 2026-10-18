@@ -18,6 +18,7 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 vi.mock("../lib/ai/persistence.js", () => ({
   createAiRun: vi.fn().mockResolvedValue(undefined),
   completeAiRun: vi.fn().mockResolvedValue(undefined),
+  failAiRun: vi.fn().mockResolvedValue(undefined),
   getRunHistory: vi.fn().mockResolvedValue([]),
 }));
 

@@ -1,13 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Copy } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { skills, SalaryBenchmarkRow } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/ui/loading-state";
+import { FREE_MODE } from "@/lib/free-mode";
+import {
+  CandidateBackLink,
+  CandidateNotice,
+  CandidatePageHeader,
+  CandidateSpinner,
+  candidateFieldClass,
+  candidateLabelClass,
+} from "@/components/candidate/candidate-ui";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { useCandidateFormatters, useCandidateT } from "@/lib/i18n/candidate-messages";
+import { useLocationLabel, usePublicLabel } from "@/lib/i18n/public-labels";
 
 interface NegotiationResult {
   recommendedRange: string;
@@ -17,11 +30,16 @@ interface NegotiationResult {
   source: "ai" | "template";
 }
 
-const CURRENCIES = ["USD", "NGN", "KES", "ZAR", "GHS", "GBP", "EUR"];
+const CURRENCIES = ["USD", "NGN", "KES", "ZAR", "GHS", "EGP", "MAD", "XOF", "GBP", "EUR"];
 
 export default function SalaryPage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const locale = useLocale();
+  const t = useCandidateT();
+  const levelLabel = usePublicLabel();
+  const locationLabel = useLocationLabel();
+  const fmt = useCandidateFormatters();
 
   const [role, setRole] = useState("");
   const [location, setLocation] = useState("");
@@ -32,19 +50,20 @@ export default function SalaryPage() {
   const [result, setResult] = useState<NegotiationResult | null>(null);
   const [benchmarks, setBenchmarks] = useState<SalaryBenchmarkRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  if (authLoading) return null;
-  if (!user) {
-    router.push("/login");
-    return null;
-  }
+  useEffect(() => {
+    if (!authLoading && !user) router.push(localizePath("/login", locale));
+  }, [authLoading, user, router, locale]);
 
-  async function handleSubmit() {
+  if (authLoading || !user) return <CandidateSpinner className="py-24" />;
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     if (!role.trim() || !location.trim()) return;
     setLoading(true);
-    setError(null);
+    setFailed(false);
     setResult(null);
     setBenchmarks([]);
 
@@ -65,8 +84,8 @@ export default function SalaryPage() {
         targetSalary: targetSalary ? Number(targetSalary) : undefined,
       });
       setResult(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate negotiation guide");
+    } catch {
+      setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -74,9 +93,13 @@ export default function SalaryPage() {
 
   async function handleCopy() {
     if (!result?.negotiationScript) return;
-    await navigator.clipboard.writeText(result.negotiationScript);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(result.negotiationScript);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
   }
 
   function handleReset() {
@@ -88,131 +111,133 @@ export default function SalaryPage() {
     setTargetSalary("");
     setResult(null);
     setBenchmarks([]);
-    setError(null);
+    setFailed(false);
     setCopied(false);
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Salary Negotiation Guide</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Get market-aware negotiation scripts for African and global markets
-            </p>
-          </div>
-          <Badge variant="info">Premium</Badge>
-        </div>
+  const optional = <span className="text-xs font-normal text-fg-muted">{t("ai.optional")}</span>;
+  const required = (
+    <span aria-hidden="true" className="text-danger">
+      *
+    </span>
+  );
 
-        {error && (
-          <div className="rounded-md bg-red-50 border border-red-200 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:py-12">
+      <CandidateBackLink href={localizePath("/candidate", locale)}>{t("ai.backToDashboard")}</CandidateBackLink>
+      <CandidatePageHeader
+        title={t("sal.title")}
+        description={t("sal.subtitle")}
+        actions={<Badge variant={FREE_MODE ? "success" : "info"}>{FREE_MODE ? t("ui.includedFree") : t("ui.premium")}</Badge>}
+      />
+
+      <div className="space-y-6">
+        {failed && <CandidateNotice>{t("sal.failed")}</CandidateNotice>}
 
         {!result && (
           <Card>
             <CardHeader>
-              <h2 className="text-lg font-semibold">Your Details</h2>
+              <h2 className="text-lg font-semibold text-fg">{t("sal.details")}</h2>
             </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Role / Job Title <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g. Senior Software Engineer"
-                  />
+            <CardContent>
+              <form className="space-y-5" onSubmit={handleSubmit}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="sal-role" className={candidateLabelClass}>
+                      {t("sal.role")} {required}
+                    </label>
+                    <input
+                      id="sal-role"
+                      type="text"
+                      required
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      className={candidateFieldClass}
+                      placeholder={t("sal.rolePlaceholder")}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="sal-location" className={candidateLabelClass}>
+                      {t("sal.location")} {required}
+                    </label>
+                    <input
+                      id="sal-location"
+                      type="text"
+                      required
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className={candidateFieldClass}
+                      placeholder={t("sal.locationPlaceholder")}
+                    />
+                  </div>
                 </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Location <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g. Lagos, Nigeria"
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                  <select
-                    value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                  >
-                    {CURRENCIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="sal-currency" className={candidateLabelClass}>
+                      {t("sal.currency")}
+                    </label>
+                    <select id="sal-currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className={candidateFieldClass}>
+                      {CURRENCIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="sal-years" className={candidateLabelClass}>
+                      {t("sal.years")} {optional}
+                    </label>
+                    <input
+                      id="sal-years"
+                      type="number"
+                      min={0}
+                      value={yearsExperience}
+                      onChange={(e) => setYearsExperience(e.target.value)}
+                      className={candidateFieldClass}
+                      placeholder="5"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Years of Experience{" "}
-                    <span className="text-gray-400 text-xs font-normal">(optional)</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={yearsExperience}
-                    onChange={(e) => setYearsExperience(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g. 5"
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Current / Offered Salary{" "}
-                    <span className="text-gray-400 text-xs font-normal">(optional)</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={currentSalary}
-                    onChange={(e) => setCurrentSalary(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g. 150000"
-                  />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="sal-current" className={candidateLabelClass}>
+                      {t("sal.current")} {optional}
+                    </label>
+                    <input
+                      id="sal-current"
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={currentSalary}
+                      onChange={(e) => setCurrentSalary(e.target.value)}
+                      className={candidateFieldClass}
+                      placeholder="150000"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="sal-target" className={candidateLabelClass}>
+                      {t("sal.target")} {optional}
+                    </label>
+                    <input
+                      id="sal-target"
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      value={targetSalary}
+                      onChange={(e) => setTargetSalary(e.target.value)}
+                      className={candidateFieldClass}
+                      placeholder="180000"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Target Salary{" "}
-                    <span className="text-gray-400 text-xs font-normal">(optional)</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={targetSalary}
-                    onChange={(e) => setTargetSalary(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g. 180000"
-                  />
-                </div>
-              </div>
 
-              <Button
-                onClick={handleSubmit}
-                disabled={loading || !role.trim() || !location.trim()}
-                className="w-full"
-              >
-                {loading ? "Generating guide..." : "Generate Negotiation Guide"}
-              </Button>
+                <Button type="submit" disabled={loading || !role.trim() || !location.trim()} className="w-full">
+                  {loading ? t("sal.generating") : t("sal.generate")}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         )}
@@ -227,72 +252,61 @@ export default function SalaryPage() {
 
         {result && !loading && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <Badge variant={result.source === "ai" ? "success" : "default"}>
-                {result.source === "ai" ? "AI Generated" : "Template"}
+                {result.source === "ai" ? t("ai.source.ai") : t("ai.source.template")}
               </Badge>
-              <Button
-                onClick={handleReset}
-                className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-4 py-2"
-              >
-                Start Over
+              <Button variant="outline" size="sm" onClick={handleReset}>
+                {t("sal.startOver")}
               </Button>
             </div>
 
-            {/* Recommended Range */}
-            <Card className="border-green-200 bg-green-50">
+            <Card className="border-success-line bg-success-soft">
               <CardHeader>
-                <h2 className="text-base font-semibold text-green-800 uppercase tracking-wide text-xs">
-                  Recommended Range
-                </h2>
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-success">{t("sal.range")}</h2>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold text-green-700">{result.recommendedRange}</p>
-                <p className="text-sm text-green-600 mt-1">
-                  Based on {role} in {location} ({currency})
+                <p className="text-3xl font-semibold tabular-nums text-fg" dir="auto">
+                  {result.recommendedRange}
                 </p>
+                <p className="mt-1 text-sm text-fg-secondary">{t("sal.basedOn", { role, location, currency })}</p>
               </CardContent>
             </Card>
 
-            {/* Market Data — shown only when benchmark rows exist */}
             {benchmarks.length > 0 && (
               <Card>
                 <CardHeader>
-                  <h2 className="text-base font-semibold text-gray-900">Market Data</h2>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Salary benchmarks matching &quot;{role}&quot; from our database
-                  </p>
+                  <h2 className="text-base font-semibold text-fg">{t("sal.market")}</h2>
+                  <p className="mt-1 text-xs text-fg-muted">{t("sal.marketBody", { role })}</p>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                  <div className="-mx-2 overflow-x-auto px-2">
+                    <table className="w-full min-w-[560px] text-sm">
                       <thead>
-                        <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
-                          <th className="py-2 pr-4 font-medium">Role</th>
-                          <th className="py-2 pr-4 font-medium">Level</th>
-                          <th className="py-2 pr-4 font-medium">Country</th>
-                          <th className="py-2 pr-4 font-medium">Min</th>
-                          <th className="py-2 pr-4 font-medium">Median</th>
-                          <th className="py-2 pr-4 font-medium">Max</th>
-                          <th className="py-2 font-medium">Sample</th>
+                        <tr className="border-b border-line text-start text-xs uppercase tracking-wide text-fg-muted">
+                          <th scope="col" className="py-2 pe-4 text-start font-medium">{t("sal.col.role")}</th>
+                          <th scope="col" className="py-2 pe-4 text-start font-medium">{t("sal.col.level")}</th>
+                          <th scope="col" className="py-2 pe-4 text-start font-medium">{t("sal.col.country")}</th>
+                          <th scope="col" className="py-2 pe-4 text-end font-medium">{t("sal.col.min")}</th>
+                          <th scope="col" className="py-2 pe-4 text-end font-medium">{t("sal.col.median")}</th>
+                          <th scope="col" className="py-2 pe-4 text-end font-medium">{t("sal.col.max")}</th>
+                          <th scope="col" className="py-2 text-end font-medium">{t("sal.col.sample")}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {benchmarks.map((row, i) => (
-                          <tr key={i} className="border-b border-gray-100 text-gray-700">
-                            <td className="py-2 pr-4">{row.role}</td>
-                            <td className="py-2 pr-4 capitalize">{row.level}</td>
-                            <td className="py-2 pr-4">{row.country}</td>
-                            <td className="py-2 pr-4">
-                              {row.currency} {row.salaryMin.toLocaleString()}
+                          <tr key={i} className="border-b border-line text-fg-secondary">
+                            <td className="py-2 pe-4" data-user-content>{row.role}</td>
+                            <td className="py-2 pe-4">
+                              {row.level ? levelLabel(row.level.charAt(0).toUpperCase() + row.level.slice(1)) : ""}
                             </td>
-                            <td className="py-2 pr-4 font-semibold text-gray-900">
-                              {row.currency} {row.salaryMedian.toLocaleString()}
+                            <td className="py-2 pe-4">{locationLabel(row.country)}</td>
+                            <td className="py-2 pe-4 text-end tabular-nums">{fmt.currency(row.salaryMin, row.currency)}</td>
+                            <td className="py-2 pe-4 text-end font-semibold tabular-nums text-fg">
+                              {fmt.currency(row.salaryMedian, row.currency)}
                             </td>
-                            <td className="py-2 pr-4">
-                              {row.currency} {row.salaryMax.toLocaleString()}
-                            </td>
-                            <td className="py-2 text-gray-500">{row.sampleSize}</td>
+                            <td className="py-2 pe-4 text-end tabular-nums">{fmt.currency(row.salaryMax, row.currency)}</td>
+                            <td className="py-2 text-end tabular-nums text-fg-muted">{fmt.number(row.sampleSize)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -302,27 +316,22 @@ export default function SalaryPage() {
               </Card>
             )}
 
-            {/* Talking Points */}
             <Card>
               <CardHeader>
-                <h2 className="text-base font-semibold text-gray-900">Talking Points</h2>
+                <h2 className="text-base font-semibold text-fg">{t("sal.points")}</h2>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-2">
+                <ul className="list-disc space-y-2 ps-5 text-sm leading-relaxed text-fg-secondary marker:text-info" dir="auto">
                   {result.talkingPoints.map((point, i) => (
-                    <li key={i} className="flex gap-2 text-sm text-gray-700">
-                      <span className="text-blue-500 mt-0.5 flex-shrink-0">•</span>
-                      <span className="leading-relaxed">{point}</span>
-                    </li>
+                    <li key={i}>{point}</li>
                   ))}
                 </ul>
               </CardContent>
             </Card>
 
-            {/* Benefits to Negotiate */}
             <Card>
               <CardHeader>
-                <h2 className="text-base font-semibold text-gray-900">Benefits to Negotiate</h2>
+                <h2 className="text-base font-semibold text-fg">{t("sal.benefits")}</h2>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
@@ -335,29 +344,26 @@ export default function SalaryPage() {
               </CardContent>
             </Card>
 
-            {/* Negotiation Script */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-gray-900">Negotiation Script</h2>
-                  <Button
-                    onClick={handleCopy}
-                    className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1"
-                  >
-                    {copied ? "Copied!" : "Copy"}
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-base font-semibold text-fg">{t("sal.script")}</h2>
+                  <Button variant="outline" size="sm" onClick={handleCopy} aria-live="polite">
+                    <Copy className="h-4 w-4" aria-hidden="true" />
+                    {copied ? t("ui.copied") : t("ui.copy")}
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 <textarea
                   readOnly
+                  aria-label={t("sal.script")}
                   value={result.negotiationScript}
                   rows={12}
-                  className="w-full rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 leading-relaxed resize-none focus:outline-none"
+                  dir="auto"
+                  className={`${candidateFieldClass} resize-y bg-surface-sunken leading-relaxed`}
                 />
-                <p className="text-xs text-gray-400 mt-2">
-                  Adapt this script to your own voice and specific situation before using it.
-                </p>
+                <p className="mt-2 text-xs text-fg-muted">{t("sal.scriptHint")}</p>
               </CardContent>
             </Card>
           </div>

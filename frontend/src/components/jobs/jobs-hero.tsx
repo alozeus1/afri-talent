@@ -1,29 +1,67 @@
 "use client";
 
+import { useEffect, useId, useRef, useState } from "react";
+import { Info } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
+import { usePublicT } from "@/lib/i18n/public-messages";
 
+/**
+ * Compact page header for job search: a title (plus a one-line subtitle on
+ * wider screens) and a small "how ranking works" disclosure, so the search
+ * bar and the first results sit above the fold, including on phones.
+ */
 export function JobsHero() {
   const t = useT();
+  const tp = usePublicT();
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   return (
-    <div className="relative overflow-hidden rounded-[2.5rem] border border-[var(--border-soft)] bg-gradient-to-br from-[#0c1824] via-[#0a5c5e] to-[#f59e0b] animate-gradient-breath px-6 py-12 text-white shadow-[0_30px_110px_rgba(11,20,32,0.2)] md:px-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_28%),radial-gradient(circle_at_75%_25%,rgba(255,255,255,0.1),transparent_20%)]" />
-      <div className="relative grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.26em] text-white/68">{t("jobs.hero.signal")}</p>
-          <h1 className="font-display mt-4 text-4xl font-bold leading-tight md:text-5xl">{t("jobs.hero.heading")}</h1>
-          <p className="mt-4 max-w-2xl text-lg leading-8 text-white/78">
-            {t("jobs.hero.description")}
-          </p>
-        </div>
-        <div className="surface-panel gloss-card flex flex-col justify-between rounded-[1.75rem] p-5 text-gray-900 dark:text-white">
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-gray-500 dark:text-gray-400">{t("jobs.hero.rankingSignals")}</p>
-            <p className="mt-3 font-display text-2xl font-bold">{t("jobs.hero.rankingDesc")}</p>
+    <div className="mb-4 flex items-start justify-between gap-3 md:mb-6 md:items-center">
+      <div className="min-w-0 md:flex md:items-baseline md:gap-4">
+        <h1 className="font-display text-2xl font-bold tracking-tight text-fg md:shrink-0 md:text-3xl">
+          {t("jobs.hero.compactTitle")}
+        </h1>
+        <p className="mt-1 hidden truncate text-sm text-fg-secondary md:block">{t("jobs.subtitle")}</p>
+      </div>
+      <div ref={wrapperRef} className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-raised px-3 py-1.5 text-xs font-semibold text-fg-secondary shadow-xs transition-colors hover:border-line-strong hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          <Info className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="hidden sm:inline">{t("jobs.hero.rankingInfo")}</span>
+          <span className="sr-only sm:hidden">{t("jobs.hero.rankingInfo")}</span>
+        </button>
+        {open && (
+          <div
+            id={panelId}
+            role="note"
+            className="absolute end-0 top-full z-30 mt-2 w-72 rounded-xl border border-line bg-surface-raised p-4 text-sm leading-6 text-fg-secondary shadow-overlay"
+          >
+            {tp("discover.results.rankingNote")}
           </div>
-          <p className="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-300">
-            AfriTalent prioritizes roles that feel more credible and more actionable, not just more plentiful.
-          </p>
-        </div>
+        )}
       </div>
     </div>
   );

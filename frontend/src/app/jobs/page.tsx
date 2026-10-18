@@ -28,7 +28,7 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
   }).length;
 
   return (
-    <div className="page-frame py-10 md:py-14">
+    <div className="page-frame py-5 md:py-8">
       <JobsHero />
 
       <JobsBrowseExperience

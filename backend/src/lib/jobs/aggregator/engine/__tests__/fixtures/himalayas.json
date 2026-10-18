@@ -1,0 +1,253 @@
+{
+  "comments": "21/08/2026: Cursor pagination is now available and is the preferred way to page through the feed. Pass the nextCursor value from each response back as ?cursor=. It is faster than offset and will never return the same job twice. The offset parameter is deprecated and will be removed in a future release. 13/03/2026: The API has been updated to include the companySlug field in the response.",
+  "updatedAt": 1792029532,
+  "offset": 0,
+  "limit": 6,
+  "totalCount": 123417,
+  "nextCursor": "MjAyNi0xMC0xNVQwMTozMDoyOC43NzcyNjdafDI0MDU1MzA",
+  "jobs": [
+    {
+      "title": "Software Engineer, Enterprise Apps",
+      "excerpt": "Ready to do the most impactful work of your career?",
+      "companyName": "Coinbase",
+      "companySlug": "coinbase",
+      "companyLogo": "https://cdn-images.himalayas.app/bw3uazt2dbln3uvrihkgimiwit2b",
+      "employmentType": "Full Time",
+      "minSalary": 341240,
+      "maxSalary": 359200,
+      "salaryPeriod": "annual",
+      "seniority": [
+        "Mid-level"
+      ],
+      "currency": "BRL",
+      "locationRestrictions": [
+        "Brazil"
+      ],
+      "timezoneRestrictions": [
+        -5,
+        -4,
+        -3,
+        -2
+      ],
+      "categories": [
+        "Software-Engineer",
+        "Backend-Engineer",
+        "Full-Stack-Engineer",
+        "Enterprise-Applications-Engineer",
+        "Enterprise-Software-Engineer",
+        "Enterprise-Application-Engineer",
+        "Enterprise-Software-Developer",
+        "Application-Software-Engineer",
+        "Enterprise-Applications-Developer",
+        "Enterprise-Application-Developer"
+      ],
+      "parentCategories": [
+        "Developer"
+      ],
+      "description": "<div class=\"content-intro\"><p>Ready to do the most impactful work of your career? At <a href=\"https://himalayas.app/companies/coinbase\">Coinbase</a>, we are uncompromising on our mission to increase economic freedom. The bar is high, the environment is intense, and we like it that way. This isn't a place for complacency, it’s a place to be pushed past your perceived limits. If you're ready to build the future of finance alongside people who refuse to settle for \"good enough,\" you belong here. <a href=\"https://himalayas.app/companies/coinbase\">Coinbase</a> is a remote-first, but not remote-only company. Expect to get together quarterly for intense in-person working sessions called “surges.” l",
+      "pubDate": 1792029532,
+      "expiryDate": 1797213531,
+      "applicationLink": "https://himalayas.app/companies/coinbase/jobs/software-engineer-enterprise-apps-9697565633",
+      "guid": "https://himalayas.app/companies/coinbase/jobs/software-engineer-enterprise-apps-9697565633"
+    },
+    {
+      "title": "Storyous | Senior Software Engineer (Full-stack)",
+      "excerpt": "About Storyous:Twelve years ago, Storyous started as a small start-up, helping cafés and restaurants run their business with a Point of Sale (POS) system on a simple wooden stand.",
+      "companyName": "Teya",
+      "companySlug": "teya",
+      "companyLogo": "https://cdn-images.himalayas.app/umfzqh4d5yznkm0cq7m930ynq28l",
+      "employmentType": "Full Time",
+      "minSalary": null,
+      "maxSalary": null,
+      "salaryPeriod": "annual",
+      "seniority": [
+        "Senior"
+      ],
+      "currency": null,
+      "locationRestrictions": [
+        "Czechia"
+      ],
+      "timezoneRestrictions": [
+        1
+      ],
+      "categories": [
+        "Full-Stack-Engineer",
+        "¿Senior-Fullstack-Engineering",
+        "Senior-Full-Stack-Engineering",
+        "Senior-Full-Stack-Engineer-(React-Node.Js)",
+        "Senior-Fullstack-Developer",
+        "Senior-Full-Stack-Engineer-(Node.Js-Vue)",
+        "Senior-Full-Stack-Engineer-(Java-+-React)"
+      ],
+      "parentCategories": [
+        "Developer"
+      ],
+      "description": "<h3>About Storyous:</h3><p>Twelve years ago, Storyous started as a small start-up, helping cafés and restaurants run their business with a Point of Sale (POS) system on a simple wooden stand. Today, we're one of the market leaders in Czechia, providing an all-in-one platform that powers thousands of hospitality businesses.</p><p>Our product has grown far beyond POS to include menu and table management, inventory management, user management and access controls, delivery integrations, and integrated payments. Since joining forces with British FinTech <a href=\"https://himalayas.app/companies/teya\">Teya</a> (formerly SaltPay) in 2021, we've continued to expand our platform while staying true to ",
+      "pubDate": 1792029199,
+      "expiryDate": 1797213199,
+      "applicationLink": "https://himalayas.app/companies/teya/jobs/storyous-senior-software-engineer-full-stack",
+      "guid": "https://himalayas.app/companies/teya/jobs/storyous-senior-software-engineer-full-stack"
+    },
+    {
+      "title": "Forward Deployed Engineer (Founding)",
+      "excerpt": "Forward Deployed EngineerNango (YC W23) lets developers build product integrations with AI.",
+      "companyName": "Nango",
+      "companySlug": "nango",
+      "companyLogo": "https://cdn-images.himalayas.app/qxs44h5vycz26r0bv9waie9efqvr",
+      "employmentType": "Full Time",
+      "minSalary": 120000,
+      "maxSalary": 200000,
+      "salaryPeriod": "annual",
+      "seniority": [
+        "Senior",
+        "Executive"
+      ],
+      "currency": "USD",
+      "locationRestrictions": [
+        "Canada",
+        "Switzerland",
+        "United Kingdom",
+        "United States"
+      ],
+      "timezoneRestrictions": [
+        -10,
+        -9,
+        -8,
+        -7,
+        -6,
+        -5,
+        -4,
+        -3.5,
+        0,
+        1,
+        14
+      ],
+      "categories": [
+        "Forward-Deployed-Engineer",
+        "Forward-Deployment-Engineer",
+        "Forward-Deploy-Engineer",
+        "Forward-Deployed-Software-Engineer"
+      ],
+      "parentCategories": [
+        "Developer"
+      ],
+      "description": "<h3>Forward Deployed Engineer</h3><p><a href=\"https://himalayas.app/companies/nango\">Nango</a> (YC W23) lets developers build product integrations with AI. It gives agents and applications access to the APIs their users rely on.</p><p>More than 700 paying customers use <a href=\"https://himalayas.app/companies/nango\">Nango</a> today, including ServiceNow, Replit, Ramp. We are a YC-backed team of 14 from AWS, GitHub, Okta, Snyk, Netlify, Uber, Samsara, Workato, and other leading developer-tool companies.</p><p>We are hiring a Forward Deployed Engineer to help customers build with <a href=\"https://himalayas.app/companies/nango\">Nango</a> and turn their needs into better products. This is a full",
+      "pubDate": 1792029181,
+      "expiryDate": 1797213181,
+      "applicationLink": "https://himalayas.app/companies/nango/jobs/forward-deployed-engineer-founding",
+      "guid": "https://himalayas.app/companies/nango/jobs/forward-deployed-engineer-founding"
+    },
+    {
+      "title": "Lead Engineer - Taiwan",
+      "excerpt": "About DoitWe are focused on reinventing how people spend, save, invest, exchange, travel, and more.",
+      "companyName": "Bjak",
+      "companySlug": "bjak",
+      "companyLogo": "https://cdn-images.himalayas.app/8ub8wtihrfrm3vfivlkcojai4np3",
+      "employmentType": "Full Time",
+      "minSalary": null,
+      "maxSalary": null,
+      "salaryPeriod": "annual",
+      "seniority": [
+        "Senior",
+        "Manager"
+      ],
+      "currency": null,
+      "locationRestrictions": [
+        "Taiwan"
+      ],
+      "timezoneRestrictions": [
+        8
+      ],
+      "categories": [
+        "Lead-Engineer",
+        "Engineering-Lead",
+        "Senior-Lead-Engineer",
+        "Technical-Lead-Engineer",
+        "Team-Lead-Engineering",
+        "Senior-Lead-Engineering",
+        "Senior-Engineering-Lead"
+      ],
+      "parentCategories": [],
+      "description": "<h3><strong>About Doit</strong></h3><p>We are focused on reinventing how people spend, save, invest, exchange, travel, and more. Our objective is to build tools that will help people get more from their money and become an expert at ease. We believe AI will help make finance smart, assessible and safe.   </p><p>We are looking for the most talented and driven people we can find. We are looking for people who work for their passion, not counting hours. Who loves building great next-generation products, not status quo. Who cares about redefining how everyone around us can get the best financial applications, not for an exclusive few. We have teams working around the world, with over 20 national",
+      "pubDate": 1792029112,
+      "expiryDate": 1797213111,
+      "applicationLink": "https://himalayas.app/companies/bjak/jobs/lead-engineer-taiwan-1509420289",
+      "guid": "https://himalayas.app/companies/bjak/jobs/lead-engineer-taiwan-1509420289"
+    },
+    {
+      "title": "Remote Senior Cost Accounting Mgr",
+      "excerpt": "Senior Cost Accounting Mgr needs 8 12 (w/o Masters) or 6 8 years (with Masters) years of relevant experience in biotech or pharmaceutical industry Senior Cost Accounting Mgr requires:Experience using Hyperion, Microsoft Excel, and PowerPoint is a plus.",
+      "companyName": "Global Channel Management, Inc.",
+      "companySlug": "global-channel-management-inc",
+      "companyLogo": "",
+      "employmentType": "Full Time",
+      "minSalary": null,
+      "maxSalary": null,
+      "salaryPeriod": "annual",
+      "seniority": [
+        "Senior",
+        "Manager"
+      ],
+      "currency": "USD",
+      "locationRestrictions": [
+        "United States"
+      ],
+      "timezoneRestrictions": [
+        -10,
+        -9,
+        -8,
+        -7,
+        -6,
+        -5,
+        14
+      ],
+      "categories": [
+        "Cost-Accounting-Manager",
+        "Cost-Accountant",
+        "Senior-Cost-Accountant",
+        "Finance-Manager",
+        "Accounting-Manager",
+        "Senior-Cost-Accounting-Manager"
+      ],
+      "parentCategories": [
+        "Finance"
+      ],
+      "description": "<p>Senior Cost Accounting Mgr needs 8  12 (w/o Masters) or 6  8 years (with Masters) years of relevant experience in biotech or pharmaceutical industry</p><h3>Senior Cost Accounting Mgr requires:</h3><p>Experience using Hyperion, Microsoft Excel, and PowerPoint is a plus.</p><p>Experience/exposure to Financial Reporting is a plus.</p><p>Advanced expertise in SAP and Oracle costing. </p><h3>Cost Accounting experience required.</h3><h3>COGS</h3><h3>Inventory control</h3><h3>Oracle</h3><h3>SAP</h3><p>Bachelors degree in finance or accounting</p><p>Appetite to learn about the business areas supported and how the financials tie into the strategy.</p><p>Ability to work within a team, sharing ideas",
+      "pubDate": 1792029111,
+      "expiryDate": 1797213110,
+      "applicationLink": "https://himalayas.app/companies/global-channel-management-inc/jobs/remote-senior-cost-accounting-mgr",
+      "guid": "https://himalayas.app/companies/global-channel-management-inc/jobs/remote-senior-cost-accounting-mgr"
+    },
+    {
+      "title": "Personalized Internet Assessor - Japanese speakers in Japan",
+      "excerpt": "Looking for a freelance opportunity where you can make an impact on technology from the comfort of your home?",
+      "companyName": "TELUS International AI Inc",
+      "companySlug": "telus-international-ai-inc",
+      "companyLogo": "https://cdn-images.himalayas.app/omzyubeqs0dlp6huhehruwkpipyy",
+      "employmentType": "Part Time",
+      "minSalary": null,
+      "maxSalary": null,
+      "salaryPeriod": "hourly",
+      "seniority": [
+        "Entry-level"
+      ],
+      "currency": "USD",
+      "locationRestrictions": [
+        "Japan"
+      ],
+      "timezoneRestrictions": [
+        9
+      ],
+      "categories": [
+        "Internet-Assessor",
+        "Internet-Evaluator"
+      ],
+      "parentCategories": [],
+      "description": "<p><span>Looking for a freelance opportunity where you can make an impact on technology from the comfort of your home? If you are dynamic, tech-savvy, and always online to learn more, this part-time flexible project is the perfect fit for you!&nbsp;</span></p><p><strong>A Day in the Life of a Personalized Internet Assessor:</strong></p><ul class=\"list-disc list-outside leading-3 -mt-2\">\n<li class=\"leading-normal -mb-2\"><p><span>In this role, you’ll be analyzing and providing feedback on texts, pages, images, and other types of information for top search engines, using an online tool</span></p></li>\n<li class=\"leading-normal -mb-2\"><p><span>Through reviewing and rating search results for rele",
+      "pubDate": 1792027828,
+      "expiryDate": 1794575357,
+      "applicationLink": "https://himalayas.app/companies/telus-international-ai-inc/jobs/personalized-internet-assessor-japanese-speakers-in-japan",
+      "guid": "https://himalayas.app/companies/telus-international-ai-inc/jobs/personalized-internet-assessor-japanese-speakers-in-japan"
+    }
+  ]
+}

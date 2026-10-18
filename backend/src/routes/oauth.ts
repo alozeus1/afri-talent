@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { signToken, getTokenExpiresIn } from "../lib/jwt.js";
+import { clearExpiredSuspension, evaluateAccountAccess } from "../lib/account-access.js";
 import { authLimiter } from "../middleware/security.js";
 import { OAuthProvider, Role } from "@prisma/client";
 import { issueEmailVerification } from "./email-verification.js";
@@ -435,7 +436,12 @@ async function handleOAuthLogin(res: Response, profile: OAuthProfile) {
   });
 
   if (existingOAuth) {
-    // Existing OAuth user — just sign in
+    // Existing OAuth user — just sign in (unless suspended / banned)
+    const access = evaluateAccountAccess(existingOAuth.user);
+    if (!access.allowed) {
+      return res.status(access.status).json({ error: access.error, code: access.code, until: access.until });
+    }
+    if (access.suspensionExpired) clearExpiredSuspension(existingOAuth.user.id);
     const token = signToken({
       userId: existingOAuth.user.id,
       email: existingOAuth.user.email,
@@ -580,6 +586,14 @@ async function handleOAuthLogin(res: Response, profile: OAuthProfile) {
       });
     }
   }
+
+  const linkedAccess = evaluateAccountAccess(user);
+  if (!linkedAccess.allowed) {
+    return res
+      .status(linkedAccess.status)
+      .json({ error: linkedAccess.error, code: linkedAccess.code, until: linkedAccess.until });
+  }
+  if (linkedAccess.suspensionExpired) clearExpiredSuspension(user.id);
 
   const token = signToken({
     userId: user.id,

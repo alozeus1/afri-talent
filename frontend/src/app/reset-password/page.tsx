@@ -7,8 +7,13 @@ import { passwordReset } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { usePublicT } from "@/lib/i18n/public-messages";
 
 function ResetPasswordForm() {
+  const t = useT();
+  const tp = usePublicT();
+  const locale = useLocale();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
@@ -23,21 +28,21 @@ function ResetPasswordForm() {
     const errors: { password?: string; confirmPassword?: string } = {};
 
     if (!password) {
-      errors.password = "Password is required";
+      errors["password"] = tp("site.auth.passwordRequired");
     } else if (password.length < 8) {
-      errors.password = "Password must be at least 8 characters";
+      errors["password"] = tp("site.auth.passwordMin");
     } else if (!/[A-Z]/.test(password)) {
-      errors.password = "Password must contain an uppercase letter";
+      errors["password"] = tp("site.auth.passwordUpper");
     } else if (!/[a-z]/.test(password)) {
-      errors.password = "Password must contain a lowercase letter";
+      errors["password"] = tp("site.auth.passwordLower");
     } else if (!/[0-9]/.test(password)) {
-      errors.password = "Password must contain a number";
+      errors["password"] = tp("site.auth.passwordNumber");
     }
 
     if (!confirmPassword) {
-      errors.confirmPassword = "Please confirm your password";
+      errors["confirmPassword"] = tp("site.auth.confirmRequired");
     } else if (password !== confirmPassword) {
-      errors.confirmPassword = "Passwords do not match";
+      errors["confirmPassword"] = tp("site.auth.passwordMismatch");
     }
 
     setFieldErrors(errors);
@@ -50,7 +55,7 @@ function ResetPasswordForm() {
 
     if (!validateForm()) return;
     if (!token) {
-      setError("Invalid or missing reset token. Please request a new reset link.");
+      setError(tp("site.auth.tokenMissing"));
       return;
     }
 
@@ -59,9 +64,9 @@ function ResetPasswordForm() {
       await passwordReset.resetPassword(token, password);
       setSuccess(true);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Request failed";
+      const message = err instanceof Error ? err.message : tp("site.auth.requestFailed");
       if (message.toLowerCase().includes("expired") || message.toLowerCase().includes("invalid")) {
-        setError("This reset link has expired or is invalid. Please request a new one.");
+        setError(tp("site.auth.tokenExpired"));
       } else {
         setError(message);
       }
@@ -74,15 +79,15 @@ function ResetPasswordForm() {
     return (
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Invalid Link</h1>
+          <h1 className="text-2xl font-bold text-fg">{tp("site.auth.invalidLinkTitle")}</h1>
         </CardHeader>
         <CardContent>
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4">
-            This password reset link is invalid or missing. Please request a new one.
+          <div role="alert" className="mb-4 rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger">
+            {tp("site.auth.invalidLinkBody")}
           </div>
-          <div className="text-center text-sm text-gray-600">
-            <Link href="/forgot-password" className="text-emerald-600 hover:text-emerald-700 font-medium">
-              Request New Reset Link
+          <div className="text-center text-sm text-fg-secondary">
+            <Link href={localizePath("/forgot-password", locale)} className="font-medium text-primary-text hover:underline">
+              {tp("site.auth.requestNewLink")}
             </Link>
           </div>
         </CardContent>
@@ -93,18 +98,18 @@ function ResetPasswordForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Reset Password</h1>
-        <p className="text-gray-600">Enter your new password</p>
+        <h1 className="text-2xl font-bold text-fg">{tp("site.auth.resetTitle")}</h1>
+        <p className="text-fg-secondary">{tp("site.auth.resetSubtitle")}</p>
       </CardHeader>
       <CardContent>
         {success ? (
           <div className="space-y-4">
-            <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm">
-              Your password has been reset successfully.
+            <div role="status" className="rounded-lg border border-success-line bg-success-soft p-3 text-sm text-success">
+              {tp("site.auth.resetSuccess")}
             </div>
-            <div className="text-center text-sm text-gray-600">
-              <Link href="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
-                Sign In
+            <div className="text-center text-sm text-fg-secondary">
+              <Link href={localizePath("/login", locale)} className="font-medium text-primary-text hover:underline">
+                {t("auth.signIn")}
               </Link>
             </div>
           </div>
@@ -112,7 +117,7 @@ function ResetPasswordForm() {
           <>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+                <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger">
                   {error}
                 </div>
               )}
@@ -120,8 +125,9 @@ function ResetPasswordForm() {
               <Input
                 id="password"
                 type="password"
-                label="New Password"
-                placeholder="Enter your new password"
+                label={tp("site.auth.newPassword")}
+                autoComplete="new-password"
+                placeholder={tp("site.auth.newPasswordPlaceholder")}
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setFieldErrors(prev => ({ ...prev, password: undefined })); }}
                 error={fieldErrors.password}
@@ -130,22 +136,23 @@ function ResetPasswordForm() {
               <Input
                 id="confirmPassword"
                 type="password"
-                label="Confirm Password"
-                placeholder="Confirm your new password"
+                label={tp("site.auth.confirmPassword")}
+                autoComplete="new-password"
+                placeholder={tp("site.auth.confirmPlaceholder")}
                 value={confirmPassword}
                 onChange={(e) => { setConfirmPassword(e.target.value); setFieldErrors(prev => ({ ...prev, confirmPassword: undefined })); }}
                 error={fieldErrors.confirmPassword}
               />
 
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Resetting..." : "Reset Password"}
+                {loading ? tp("site.auth.resetting") : tp("site.auth.resetTitle")}
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm text-gray-600">
-              Remember your password?{" "}
-              <Link href="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
-                Sign In
+            <div className="mt-6 text-center text-sm text-fg-secondary">
+              {tp("site.auth.rememberPassword")}{" "}
+              <Link href={localizePath("/login", locale)} className="font-medium text-primary-text hover:underline">
+                {t("auth.signIn")}
               </Link>
             </div>
           </>
@@ -158,7 +165,7 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
-      <Suspense fallback={<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>}>
+      <Suspense fallback={<div role="status" aria-busy="true" className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>}>
         <ResetPasswordForm />
       </Suspense>
     </div>

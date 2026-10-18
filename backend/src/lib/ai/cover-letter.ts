@@ -7,14 +7,14 @@
 // Falls back to a template-based letter when AI is unavailable.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "./anthropic-client.js";
 import logger from "../logger.js";
 
 const FAST_MODEL = process.env.AI_FAST_MODEL || "claude-haiku-4-5-20251001";
 const AI_DISABLED = process.env.AI_DISABLED === "1";
 const MOCK_AI = process.env.MOCK_AI === "1";
 
-interface CoverLetterInput {
+export interface CoverLetterInput {
   candidateName: string;
   headline?: string | null;
   skills: string[];
@@ -44,11 +44,11 @@ export async function generateQuickCoverLetter(
   }
 
   // Template fallback
-  return { coverLetter: generateTemplate(input), source: "template" };
+  return { coverLetter: generateTemplateCoverLetter(input), source: "template" };
 }
 
 async function generateWithAI(input: CoverLetterInput): Promise<string> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = getAnthropicClient();
 
   const skillsText = input.skills.slice(0, 10).join(", ");
   const experience = input.yearsExperience
@@ -85,17 +85,54 @@ Return ONLY the cover letter text. No salutation, no subject line, no "Dear Hiri
   return content.text.trim();
 }
 
-function generateTemplate(input: CoverLetterInput): string {
-  const skillsText = input.skills.slice(0, 6).join(", ");
-  const experience = input.yearsExperience
-    ? `With ${input.yearsExperience} years of experience`
-    : "With my background";
+const BIO_MAX_CHARS = 300;
 
-  return `${experience} in ${skillsText}, I am well-positioned to contribute to the ${input.jobTitle} role at ${input.companyName}.
+/**
+ * Trim a bio to at most `max` characters, cutting at the last sentence
+ * boundary inside that window so employers never see a half-word. Falls back
+ * to the last word boundary (with an ellipsis) when no sentence ends in range.
+ */
+export function trimBioAtSentence(bio: string, max = BIO_MAX_CHARS): string {
+  const clean = bio.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const window = clean.slice(0, max);
+  const sentenceEnd = Math.max(
+    window.lastIndexOf(". "),
+    window.lastIndexOf("! "),
+    window.lastIndexOf("? "),
+    /[.!?]$/.test(window) ? window.length - 1 : -1,
+  );
+  if (sentenceEnd > 0) return window.slice(0, sentenceEnd + 1).trim();
+  const wordEnd = window.lastIndexOf(" ");
+  return `${(wordEnd > 0 ? window.slice(0, wordEnd) : window).replace(/[,;:\s]+$/, "")}…`;
+}
 
-${input.headline ? `${input.headline}. ` : ""}My technical expertise and hands-on experience align closely with the requirements of this position. I bring a strong track record of delivering results and collaborating effectively with cross-functional teams.
+/**
+ * Deterministic cover letter used under MOCK_AI, with no API key, or when the
+ * AI call fails. Every optional input (skills, bio, headline, experience) is
+ * dropped cleanly when empty: no dangling "in ," clauses or double spaces.
+ */
+export function generateTemplateCoverLetter(input: CoverLetterInput): string {
+  const skills = input.skills.map((s) => s.trim()).filter(Boolean).slice(0, 6);
+  const skillsText = skills.join(", ");
+  const headline = input.headline?.trim().replace(/[.\s]+$/, "");
+  const bio = input.bio?.trim() ? trimBioAtSentence(input.bio) : "";
 
-${input.bio ? input.bio.slice(0, 300) : `I am passionate about leveraging my skills in ${skillsText} to drive impact at ${input.companyName}.`}
+  const lead = input.yearsExperience
+    ? `With ${input.yearsExperience} years of experience${skillsText ? ` in ${skillsText}` : ""}`
+    : skillsText
+      ? `With my background in ${skillsText}`
+      : "With my background and experience";
 
-I would welcome the opportunity to discuss how my background and skills can contribute to your team's success.`;
+  const paragraphs = [
+    `${lead}, I am well-positioned to contribute to the ${input.jobTitle} role at ${input.companyName}.`,
+    `${headline ? `${headline}. ` : ""}My experience aligns closely with the requirements of this position, and I bring a strong track record of delivering results and collaborating effectively with cross-functional teams.`,
+    bio ||
+      (skillsText
+        ? `I am excited to apply my skills in ${skillsText} to drive impact at ${input.companyName}.`
+        : `I am excited to bring my experience to ${input.companyName} and make a meaningful impact.`),
+    "I would welcome the opportunity to discuss how my background and skills can contribute to your team's success.",
+  ];
+
+  return paragraphs.map((p) => p.replace(/ {2,}/g, " ").trim()).join("\n\n");
 }

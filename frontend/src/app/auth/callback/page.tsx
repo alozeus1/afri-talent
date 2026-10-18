@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import Link from "next/link";
 import { trackEvent } from "@/lib/analytics";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { usePublicT, type PublicT } from "@/lib/i18n/public-messages";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -27,25 +29,27 @@ function clearStoredOAuthSession() {
   sessionStorage.removeItem("oauth_provider");
 }
 
-function describeOAuthError(codeOrMessage: string): string {
+function describeOAuthError(codeOrMessage: string, tp: PublicT): string {
   const normalized = codeOrMessage.toUpperCase();
   if (normalized.includes("OAUTH_CALLBACK_MISMATCH") || normalized.includes("REDIRECT_URI")) {
-    return "Google sign-in is almost configured, but this callback URL is not registered for the current environment. Ask an admin to add this app URL in Google Cloud OAuth settings.";
+    return tp("site.oauth.errMismatch");
   }
   if (normalized.includes("OAUTH_MISSING_CONFIG") || normalized.includes("NOT CONFIGURED")) {
-    return "Google sign-in is not configured for this environment yet. You can continue with email and password.";
+    return tp("site.oauth.errMissingConfig");
   }
   if (normalized.includes("ACCESS_DENIED") || normalized.includes("USER_CANCEL")) {
-    return "Sign-in was cancelled. You can try again or continue with email and password.";
+    return tp("site.oauth.errCancelled");
   }
   if (normalized.includes("OAUTH_PROVIDER_UNAVAILABLE")) {
-    return "The OAuth provider is temporarily unavailable. Try again later or continue with email and password.";
+    return tp("site.oauth.errUnavailable");
   }
-  return codeOrMessage || "Authentication failed. Try again or continue with email and password.";
+  return codeOrMessage || tp("site.oauth.errGeneric");
 }
 
 function OAuthCallbackInner() {
   const searchParams = useSearchParams();
+  const tp = usePublicT();
+  const locale = useLocale();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,7 +69,7 @@ function OAuthCallbackInner() {
         stage: "provider_redirect",
         error: errorParam,
       });
-      setError(describeOAuthError(errorParam));
+      setError(describeOAuthError(errorParam, tp));
       clearStoredOAuthSession();
       return;
     }
@@ -75,7 +79,7 @@ function OAuthCallbackInner() {
         provider,
         stage: "missing_code",
       });
-      setError("No authorization code was received from the provider. Try signing in again.");
+      setError(tp("site.oauth.errNoCode"));
       clearStoredOAuthSession();
       return;
     }
@@ -85,7 +89,7 @@ function OAuthCallbackInner() {
         provider,
         stage: "missing_state",
       });
-      setError("The provider did not return a state value. Please try signing in again.");
+      setError(tp("site.oauth.errNoState"));
       clearStoredOAuthSession();
       return;
     }
@@ -142,27 +146,28 @@ function OAuthCallbackInner() {
           provider,
           stage: "exchange",
         });
-        setError(describeOAuthError(err instanceof Error ? err.message : "Authentication failed"));
+        setError(describeOAuthError(err instanceof Error ? err.message : "", tp));
         clearStoredOAuthSession();
       }
     };
 
     exchangeCode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run the code exchange once per callback URL
   }, [searchParams]);
 
   if (error) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center px-4">
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-            <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-16 h-16 mx-auto mb-4 bg-danger-soft rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Authentication Failed</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
-          <Link href="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
-            Back to Login
+          <h2 className="text-xl font-semibold text-fg mb-2">{tp("site.oauth.failedTitle")}</h2>
+          <p className="text-fg-secondary mb-4">{error}</p>
+          <Link href={localizePath("/login", locale)} className="font-medium text-primary-text hover:underline">
+            {tp("site.auth.backToLogin")}
           </Link>
         </div>
       </div>
@@ -173,7 +178,7 @@ function OAuthCallbackInner() {
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600 mx-auto mb-4" />
-        <p className="text-gray-600 dark:text-gray-300">Completing sign in...</p>
+        <p role="status" className="text-fg-secondary">{tp("site.oauth.completing")}</p>
       </div>
     </div>
   );

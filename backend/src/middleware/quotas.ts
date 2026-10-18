@@ -5,11 +5,16 @@ import { Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { AiRunType, SubscriptionPlan } from "@prisma/client";
+import { getUserEntitlements } from "../lib/billing/entitlements.js";
+import { freeModeMonthlySkillLimit, isFreeMode } from "../lib/billing/free-mode.js";
 
 // Configurable daily limits
 const DAILY_APPLY_PACK_LIMIT = parseInt(process.env.DAILY_APPLY_PACK_LIMIT || "5", 10);
 const DAILY_JOB_MATCH_LIMIT = parseInt(process.env.DAILY_JOB_MATCH_LIMIT || "20", 10);
 const DAILY_RESUME_REVIEW_LIMIT = parseInt(process.env.DAILY_RESUME_REVIEW_LIMIT || "10", 10);
+
+// In-flight (RUNNING) runs younger than this count toward the daily quota.
+const RUNNING_WINDOW_MS = 15 * 60 * 1000;
 
 const LIMITS: Record<string, number> = {
   apply_pack: DAILY_APPLY_PACK_LIMIT,
@@ -55,13 +60,20 @@ export async function checkDailyQuota(
       resume_review: AiRunType.RESUME_REVIEW,
     };
 
+    // Runs still in flight are counted too (if started in the last
+    // RUNNING_WINDOW_MS) so concurrent requests cannot all pass the check
+    // before any of them completes. Older RUNNING rows are treated as stale.
+    const runningSince = new Date(Date.now() - RUNNING_WINDOW_MS);
     const count = await aiRunModel.count({
       where: {
         userId,
         runType: typeMap[run_type],
         createdAt: { gte: startOfDay },
-        // Only count completed/partial runs (not blocked/failed)
-        status: { in: ["COMPLETE", "PARTIAL"] as any },
+        // Count completed/partial runs plus recent in-flight runs (not blocked/failed)
+        OR: [
+          { status: { in: ["COMPLETE", "PARTIAL"] as any } },
+          { status: "RUNNING" as any, createdAt: { gte: runningSince } },
+        ],
       },
     });
 
@@ -86,7 +98,9 @@ export async function checkDailyQuota(
 /**
  * Monthly free-tier skill quota middleware factory.
  * FREE plan users are limited to `freeLimit` uses per calendar month.
- * BASIC+ users are unlimited.
+ * Users with an ACTIVE paid plan (resolved via getUserEntitlements) are
+ * unlimited. In FREE_MODE everyone gets the same cost-safety cap
+ * (FREE_MODE_MONTHLY_SKILL_LIMIT, default 30) with neutral copy.
  */
 export function makeMonthlySkillQuota(runType: AiRunType, freeLimit: number) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -94,14 +108,16 @@ export function makeMonthlySkillQuota(runType: AiRunType, freeLimit: number) {
     if (!userId) { next(); return; }
 
     try {
-      const sub = await (prisma as any).subscription?.findFirst({
-        where: { userId },
-        select: { plan: true, status: true },
-      });
-      const plan: SubscriptionPlan = sub?.plan ?? SubscriptionPlan.FREE;
+      const freeMode = isFreeMode();
+      const limit = freeMode ? freeModeMonthlySkillLimit() : freeLimit;
 
-      // BASIC and PROFESSIONAL have unlimited access
-      if (plan !== SubscriptionPlan.FREE) { next(); return; }
+      if (!freeMode) {
+        // getUserEntitlements whitelists ACTIVE subscriptions; anything else
+        // (PAST_DUE, CANCELLED, INACTIVE, no row) resolves to FREE.
+        const { plan } = await getUserEntitlements(userId);
+        const hasPaidPlan = plan !== SubscriptionPlan.FREE && plan !== SubscriptionPlan.EMPLOYER_FREE;
+        if (hasPaidPlan) { next(); return; }
+      }
 
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
@@ -119,11 +135,15 @@ export function makeMonthlySkillQuota(runType: AiRunType, freeLimit: number) {
         },
       });
 
-      if (count >= freeLimit) {
+      if (count >= limit) {
         res.status(429).json({
           error: "monthly_quota_exceeded",
-          message: `Free tier includes ${freeLimit} uses per month for this feature. Upgrade to Professional for unlimited access.`,
-          quota: { used: count, limit: freeLimit, plan: "FREE", resets: "1st of next month" },
+          message: freeMode
+            ? "Monthly limit reached for this tool. It resets on the 1st."
+            : `Free tier includes ${limit} uses per month for this feature. Upgrade to Professional for unlimited access.`,
+          quota: freeMode
+            ? { used: count, limit, resets: "1st of next month" }
+            : { used: count, limit, plan: "FREE", resets: "1st of next month" },
         });
         return;
       }

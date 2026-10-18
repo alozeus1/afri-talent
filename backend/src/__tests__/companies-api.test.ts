@@ -90,6 +90,22 @@ describe("GET /api/companies", () => {
         expect(byId["emp-1"].trustBadge).toBe("Domain verified employer");
         expect(byId["emp-2"].trustBadge).toBe("Unverified employer");
     });
+
+    it("hides erased employers and their review-only shadow company", async () => {
+        vi.mocked(prisma.company.findMany).mockResolvedValue([
+            { id: "emp-gone", name: "Gone Co", headquarters: null, verifiedAt: null, _count: { reviews: 1 } },
+        ] as never);
+        vi.mocked(prisma.employer.findMany).mockResolvedValue([
+            makeEmployer({ user: { deletedAt: null } }),
+            makeEmployer({ id: "emp-gone", companyName: "Gone Co", user: { deletedAt: new Date() } }),
+        ] as never);
+        vi.mocked(prisma.job.groupBy).mockResolvedValue([] as never);
+
+        const res = await request(app).get("/api/companies");
+
+        expect(res.status).toBe(200);
+        expect(res.body.companies.map((c: { id: string }) => c.id)).toEqual(["emp-1"]);
+    });
 });
 
 describe("GET /api/companies/:id", () => {

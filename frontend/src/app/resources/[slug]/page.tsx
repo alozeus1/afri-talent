@@ -8,10 +8,16 @@ import { notFound } from "next/navigation";
 import type { Resource } from "@/lib/api";
 import ResourceArticle from "./resource-article";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:4000";
+// Server component: INTERNAL_API_URL (runtime, server-only) lets SSR reach the
+// backend over the container network in local docker compose. Unset in deploys.
+function getApiUrl(): string {
+  return (
+    process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:4000"
+  );
+}
 
 // Published resources change rarely; revalidate every 5 minutes.
 const REVALIDATE_SECONDS = 300;
@@ -25,7 +31,7 @@ type FetchResult =
 // 429, network) must surface as an error state, not "Resource not found".
 async function fetchResource(slug: string): Promise<FetchResult> {
   try {
-    const res = await fetch(`${API_URL}/api/resources/${encodeURIComponent(slug)}`, {
+    const res = await fetch(`${getApiUrl()}/api/resources/${encodeURIComponent(slug)}`, {
       next: { revalidate: REVALIDATE_SECONDS },
     });
     if (res.status === 404) return { kind: "not-found" };

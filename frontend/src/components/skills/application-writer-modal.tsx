@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { skills } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { toFriendlyError, type FriendlyError } from "@/lib/friendly-error";
+import { useCandidateT } from "@/lib/i18n/candidate-messages";
 
 interface ApplicationWriterModalProps {
   jobId: string;
@@ -22,6 +23,7 @@ export function ApplicationWriterModal({
   onClose,
   onSuccess,
 }: ApplicationWriterModalProps) {
+  const t = useCandidateT();
   const [step, setStep] = useState<"idle" | "generating" | "review" | "submitting" | "done">("idle");
   const [coverLetter, setCoverLetter] = useState("");
   const [source, setSource] = useState<"ai" | "template" | null>(null);
@@ -83,20 +85,20 @@ export function ApplicationWriterModal({
       aria-modal="true"
       aria-labelledby="application-writer-title"
     >
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+      <div className="bg-surface rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-line">
           <div>
-            <h2 id="application-writer-title" className="text-lg font-semibold text-gray-900">Apply with AI</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {jobTitle} at {jobCompany}
+            <h2 id="application-writer-title" className="text-lg font-semibold text-fg">{t("aw.title")}</h2>
+            <p className="text-sm text-fg-muted mt-0.5">
+              {t("aw.jobAt", { title: jobTitle, company: jobCompany })}
             </p>
           </div>
           <button
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            aria-label="Close Application Writer"
-            className="text-gray-400 hover:text-gray-600 text-xl leading-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+            aria-label={t("aw.closeLabel")}
+            className="text-gray-400 hover:text-fg-secondary text-xl leading-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
           >
             <span aria-hidden="true">×</span>
           </button>
@@ -123,46 +125,45 @@ export function ApplicationWriterModal({
 
           {step === "done" && (
             <div className="text-center py-8">
-              <p className="text-lg font-semibold text-green-700">Application Submitted!</p>
-              <p className="text-sm text-gray-500 mt-1">
-                Your application to {jobCompany} has been sent.
+              <p className="text-lg font-semibold text-green-700">{t("aw.doneTitle")}</p>
+              <p className="text-sm text-fg-muted mt-1">
+                {t("aw.doneBody", { company: jobCompany })}
               </p>
               <Button onClick={onClose} className="mt-4">
-                Close
+                {t("aw.close")}
               </Button>
             </div>
           )}
 
           {step === "idle" && (
             <div className="py-4 space-y-4">
-              <p className="text-sm text-gray-600 text-center">
-                Claude will generate a personalised cover letter using your saved resume and this job description.
-                You can review and edit it before submitting.
+              <p className="text-sm text-fg-secondary text-center">
+                {t("aw.intro")}
               </p>
-              <div role="radiogroup" aria-label="Cover letter tone">
-                <p className="block text-xs font-medium text-gray-600 mb-2">Tone</p>
+              <div role="radiogroup" aria-label={t("aw.toneLabel")}>
+                <p className="block text-xs font-medium text-fg-secondary mb-2">{t("aw.tone")}</p>
                 <div className="grid grid-cols-3 gap-2">
-                  {(["professional", "conversational", "executive"] as Tone[]).map((t) => (
+                  {(["professional", "conversational", "executive"] as Tone[]).map((option) => (
                     <button
-                      key={t}
+                      key={option}
                       type="button"
                       role="radio"
-                      aria-checked={tone === t}
-                      onClick={() => setTone(t)}
-                      className={`rounded-md border px-3 py-2 text-xs capitalize transition-colors ${
-                        tone === t
+                      aria-checked={tone === option}
+                      onClick={() => setTone(option)}
+                      className={`rounded-md border px-3 py-2 text-xs transition-colors ${
+                        tone === option
                           ? "border-blue-500 bg-blue-50 text-blue-700"
-                          : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                          : "border-line bg-surface text-fg-secondary hover:border-line-strong"
                       }`}
                     >
-                      {t}
+                      {t(`aw.tone.${option}` as const)}
                     </button>
                   ))}
                 </div>
               </div>
               <div className="text-center">
                 <Button onClick={handleGenerate} data-testid="generate-cover-letter-btn">
-                  Generate Cover Letter
+                  {t("aw.generate")}
                 </Button>
               </div>
             </div>
@@ -170,7 +171,7 @@ export function ApplicationWriterModal({
 
           {step === "generating" && (
             <div className="text-center py-8">
-              <p className="text-sm text-gray-500">Writing your cover letter with Claude...</p>
+              <p className="text-sm text-fg-muted">{t("aw.generating")}</p>
             </div>
           )}
 
@@ -179,13 +180,13 @@ export function ApplicationWriterModal({
               {source && (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-400">
-                    {source === "ai" ? "Generated by Claude" : "Template (AI unavailable)"}
+                    {source === "ai" ? t("aw.sourceAi") : t("aw.sourceTemplate")}
                   </span>
                 </div>
               )}
               <div>
-                <label htmlFor="application-writer-textarea" className="block text-sm font-medium text-gray-700 mb-2">
-                  Cover Letter <span className="text-gray-400 font-normal">(editable)</span>
+                <label htmlFor="application-writer-textarea" className="block text-sm font-medium text-fg-secondary mb-2">
+                  {t("aw.coverLetter")} <span className="text-gray-400 font-normal">{t("aw.editable")}</span>
                 </label>
                 <textarea
                   id="application-writer-textarea"
@@ -193,16 +194,16 @@ export function ApplicationWriterModal({
                   onChange={(e) => setCoverLetter(e.target.value)}
                   rows={12}
                   data-testid="cover-letter-textarea"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full rounded-md border border-line-strong px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
               </div>
               <div className="flex gap-3 pt-2">
                 <Button
                   onClick={handleGenerate}
                   disabled={step === "submitting"}
-                  className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  className="border border-line-strong bg-surface text-fg-secondary hover:bg-surface-sunken"
                 >
-                  Regenerate
+                  {t("aw.regenerate")}
                 </Button>
                 <Button
                   onClick={handleSubmit}
@@ -210,7 +211,7 @@ export function ApplicationWriterModal({
                   data-testid="submit-application-btn"
                   className="flex-1"
                 >
-                  {step === "submitting" ? "Submitting..." : "Submit Application"}
+                  {step === "submitting" ? t("aw.submitting") : t("aw.submit")}
                 </Button>
               </div>
             </>

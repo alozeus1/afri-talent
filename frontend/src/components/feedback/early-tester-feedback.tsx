@@ -6,12 +6,16 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { trackEvent } from "@/lib/analytics";
+import { useLocale, useT } from "@/lib/i18n/client";
 
 interface EarlyTesterFeedbackProps {
   area: string;
   areaSlug?: string;
   showApprovedFeedback?: boolean;
 }
+
+// Mirrors the backend submitFeedbackSchema (comment min 10).
+const MIN_COMMENT_LENGTH = 10;
 
 function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -28,7 +32,7 @@ function Stars({ rating }: { rating: number }) {
   return (
     <span className="inline-flex gap-0.5 text-xs">
       {Array.from({ length: 5 }, (_, index) => index + 1).map((value) => (
-        <span key={value} className={value <= rating ? "text-amber-500" : "text-gray-300"}>
+        <span key={value} className={value <= rating ? "text-amber-500" : "text-fg-muted"}>
           ★
         </span>
       ))}
@@ -42,6 +46,8 @@ export function EarlyTesterFeedback({
   showApprovedFeedback = false,
 }: EarlyTesterFeedbackProps) {
   const { user } = useAuth();
+  const t = useT();
+  const locale = useLocale();
   const [open, setOpen] = useState(showApprovedFeedback);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -86,7 +92,7 @@ export function EarlyTesterFeedback({
   }, [resolvedAreaSlug, showApprovedFeedback]);
 
   async function handleSubmit() {
-    if (!rating) return;
+    if (!rating || comment.trim().length < MIN_COMMENT_LENGTH) return;
 
     setLoading(true);
     setError(null);
@@ -112,20 +118,18 @@ export function EarlyTesterFeedback({
       setComment("");
       setRating(0);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Failed to submit feedback");
+      setError(submitError instanceof Error ? submitError.message : t("common.feedback.error"));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+    <div className="rounded-xl border border-success-line bg-success-soft p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-emerald-950">Early tester feedback</p>
-          <p className="mt-1 text-xs text-emerald-800">
-            Share a short note. Submissions stay hidden until an admin approves them.
-          </p>
+          <p className="text-sm font-semibold text-fg">{t("common.feedback.title")}</p>
+          <p className="mt-1 text-xs text-fg-secondary">{t("common.feedback.subtitle")}</p>
         </div>
         <Button
           type="button"
@@ -134,7 +138,7 @@ export function EarlyTesterFeedback({
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
         >
-          {open ? "Close feedback" : "Give feedback"}
+          {open ? t("common.feedback.close") : t("common.feedback.open")}
         </Button>
       </div>
 
@@ -142,28 +146,28 @@ export function EarlyTesterFeedback({
         <div className="mt-4 space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1">
-              <span className="text-xs font-medium text-emerald-900">First name</span>
+              <span className="text-xs font-medium text-fg">{t("common.feedback.firstName")}</span>
               <input
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
-                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="First name"
+                className="w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-focus"
+                placeholder={t("common.feedback.firstName")}
                 autoComplete="given-name"
               />
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-medium text-emerald-900">Last name</span>
+              <span className="text-xs font-medium text-fg">{t("common.feedback.lastName")}</span>
               <input
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
-                className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="Last name"
+                className="w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-focus"
+                placeholder={t("common.feedback.lastName")}
                 autoComplete="family-name"
               />
             </label>
           </div>
 
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={`Rate ${area}`}>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t("common.feedback.rate")}>
             {[1, 2, 3, 4, 5].map((value) => (
               <button
                 key={value}
@@ -177,8 +181,8 @@ export function EarlyTesterFeedback({
                 disabled={!hydrated}
                 className={`h-9 w-9 rounded-full border text-sm font-semibold transition-colors ${
                   rating === value
-                    ? "border-emerald-700 bg-emerald-700 text-white"
-                    : "border-emerald-200 bg-white text-emerald-800 hover:border-emerald-500"
+                    ? "border-primary bg-primary text-primary-fg"
+                    : "border-line-strong bg-surface text-primary-text hover:border-primary"
                 }`}
               >
                 {value}
@@ -190,39 +194,48 @@ export function EarlyTesterFeedback({
             value={comment}
             onChange={(event) => setComment(event.target.value)}
             rows={4}
-            className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="Tell us what was useful, confusing, or missing."
+            maxLength={2000}
+            aria-describedby="early-tester-feedback-hint"
+            className="w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-focus"
+            placeholder={t("common.feedback.placeholder")}
           />
+          <p id="early-tester-feedback-hint" className="-mt-2 text-xs text-fg-secondary">
+            {!rating
+              ? t("common.feedback.hintPick", { count: MIN_COMMENT_LENGTH })
+              : comment.trim().length < MIN_COMMENT_LENGTH
+                ? t("common.feedback.hintMore", { count: MIN_COMMENT_LENGTH - comment.trim().length })
+                : t("common.feedback.ready")}
+          </p>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <label className="flex items-center gap-2 text-xs text-emerald-800">
+            <label className="flex items-center gap-2 text-xs text-fg-secondary">
               <input
                 type="checkbox"
                 checked={canAttachPhoto && attachPhoto}
                 onChange={(event) => setAttachPhoto(event.target.checked)}
                 disabled={!canAttachPhoto}
-                className="h-4 w-4 rounded border-emerald-300 text-emerald-700 disabled:cursor-not-allowed"
+                className="h-4 w-4 rounded border-line-strong accent-emerald-700 disabled:cursor-not-allowed"
               />
-              {canAttachPhoto ? "Attach my profile photo if this comment is approved" : "Anonymous submissions show your name only if you are logged in"}
+              {canAttachPhoto ? t("common.feedback.attachPhoto") : t("common.feedback.anonymousNote")}
             </label>
             <Button
               size="sm"
               onClick={handleSubmit}
-              disabled={!hydrated || !rating || loading}
+              disabled={!hydrated || !rating || loading || comment.trim().length < MIN_COMMENT_LENGTH}
             >
-              {loading ? "Submitting..." : "Submit feedback"}
+              {loading ? t("common.submitting") : t("common.feedback.submit")}
             </Button>
           </div>
 
           {error && (
-            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <p className="rounded-md border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">
               {error}
             </p>
           )}
 
           {submitted && (
-            <p className="text-sm font-medium text-emerald-800" role="status">
-              Feedback submitted for review. It will appear after admin approval.
+            <p className="text-sm font-medium text-success" role="status">
+              {t("common.feedback.submitted")}
             </p>
           )}
         </div>
@@ -231,7 +244,7 @@ export function EarlyTesterFeedback({
       {showApprovedFeedback && (
         <div className="mt-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-emerald-950">Approved learner notes</h3>
+            <h3 className="text-sm font-semibold text-fg">{t("common.feedback.approvedTitle")}</h3>
             <Button
               size="sm"
               variant="ghost"
@@ -242,18 +255,18 @@ export function EarlyTesterFeedback({
                   .catch(() => setFeedback([]));
               }}
             >
-              Refresh
+              {t("common.feedback.refresh")}
             </Button>
           </div>
           {feedback.length === 0 ? (
-            <p className="text-xs text-emerald-700">No approved feedback yet.</p>
+            <p className="text-xs text-fg-secondary">{t("common.feedback.noneApproved")}</p>
           ) : (
             <div className="grid gap-3">
               {feedback.map((entry) => (
-                <Card key={entry.id} className="border-emerald-100 bg-white/90">
+                <Card key={entry.id} className="border-line bg-surface">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800">
+                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-primary-soft text-sm font-semibold text-primary-text">
                         {entry.avatarUrl ? (
                           <img src={entry.avatarUrl} alt={entry.displayName} className="h-full w-full object-cover" />
                         ) : (
@@ -268,14 +281,14 @@ export function EarlyTesterFeedback({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <div>
-                            <p className="text-sm font-semibold text-gray-900">{entry.displayName}</p>
+                            <p className="text-sm font-semibold text-fg">{entry.displayName}</p>
                             <Stars rating={entry.rating} />
                           </div>
-                          <p className="text-[11px] text-gray-400">
-                            {new Date(entry.createdAt).toLocaleDateString()}
+                          <p className="text-[11px] text-fg-muted">
+                            {new Date(entry.createdAt).toLocaleDateString(locale)}
                           </p>
                         </div>
-                        <p className="mt-2 text-sm text-gray-700">{entry.comment}</p>
+                        <p className="mt-2 text-sm text-fg-secondary">{entry.comment}</p>
                       </div>
                     </div>
                   </CardContent>

@@ -1,57 +1,152 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Job } from "@/lib/api";
+import { Job, savedJobs } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrustBadge } from "@/components/trust/trust-badge";
 import { africaPill } from "@/lib/job-trust-labels";
+import { jobSourceDisplayName } from "@/lib/job-source";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { formatSalaryRange } from "@/lib/salary";
+import { SalaryText } from "@/components/jobs/salary-text";
 import { jobDiscoveryEvents } from "@/lib/analytics";
-import { MapPin, Briefcase, Globe, Plane, Heart } from "lucide-react";
-import { Coachmark } from "@/components/ui/coachmark";
+import { formatPostedShort } from "@/lib/posted-age";
+import { MapPin, Briefcase, Heart, Clock } from "lucide-react";
+import { usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
+import { usePublicLabel, useLocationLabel } from "@/lib/i18n/public-labels";
 
 interface JobCardProps {
   job: Job;
+  /** Saved state from a single savedJobs.ids() call made by the parent list. */
+  initialSaved?: boolean;
 }
 
-export function JobCard({ job }: JobCardProps) {
+export type CardSignal = {
+  key: string;
+  messageKey: PublicMessageKey;
+  variant: "success" | "info" | "warning" | "danger";
+};
+
+/** At most three signals per card; the disclosed salary counts as one. */
+export const MAX_CARD_SIGNALS = 3;
+
+/**
+ * Picks the few signals a list card shows, in a fixed priority:
+ * a caution (expired, region-restricted, new employer) always wins a slot,
+ * then the Africa-mobility signal (Hires from Africa > visa > open to
+ * Africa), then freshness, then trust, then relocation. A disclosed salary
+ * is rendered as its own line and takes one of the three slots. The detail
+ * page carries the full trust breakdown.
+ */
+export function selectCardSignals(job: Job, options: { hasSalary: boolean }): CardSignal[] {
+  const africa = africaPill(job);
+  const freshness = job.discovery?.freshnessLabel;
+
+  const caution: CardSignal | null = job.isExpired || freshness === "EXPIRED"
+    ? { key: "expired", messageKey: "discover.badge.expired", variant: "danger" }
+    : africa?.variant === "warning"
+      ? { key: "africa", messageKey: "discover.label.regionRestricted", variant: "warning" }
+      : job.trust?.newEmployerCaution
+        ? { key: "new-employer", messageKey: "discover.badge.newEmployer", variant: "warning" }
+        : null;
+
+  const mobility: CardSignal | null = job.hiresFromAfrica
+    ? { key: "hires-from-africa", messageKey: "discover.badge.hiresFromAfrica", variant: "success" }
+    : job.visaSponsorship === "YES"
+      ? { key: "visa", messageKey: "discover.card.visa", variant: "info" }
+      : africa?.variant === "success"
+        ? { key: "africa", messageKey: "discover.label.openToAfrica", variant: "success" }
+        : africa?.variant === "info"
+          ? { key: "africa", messageKey: "discover.label.possiblyOpen", variant: "info" }
+          : null;
+
+  const fresh: CardSignal | null =
+    !job.isExpired && (freshness === "FRESH" || freshness === "RECENT")
+      ? { key: "fresh", messageKey: "discover.card.newListing", variant: "info" }
+      : null;
+
+  const trusted: CardSignal | null =
+    job.discovery?.trustedJob || job.employer?.trust
+      ? { key: "trusted", messageKey: "discover.badge.trustedJob", variant: "success" }
+      : null;
+
+  const relocation: CardSignal | null = job.relocationAssistance
+    ? { key: "relocation", messageKey: "discover.card.relocation", variant: "info" }
+    : null;
+
+  const slots = MAX_CARD_SIGNALS - (options.hasSalary ? 1 : 0);
+  return [caution, mobility, fresh, trusted, relocation]
+    .filter((signal): signal is CardSignal => signal !== null)
+    .slice(0, slots);
+}
+
+export function JobCard({ job, initialSaved = false }: JobCardProps) {
   const locale = useLocale();
-  const [isSaved, setIsSaved] = useState(false);
+  const locationLabel = useLocationLabel();
+  const tp = usePublicT();
+  const label = usePublicLabel();
+  const [isSaved, setIsSaved] = useState(initialSaved);
   const [isSaving, setIsSaving] = useState(false);
-  const tags = Array.isArray(job.tags) ? job.tags : [];
+  // Relative dates depend on "now", so compute after mount to keep server and
+  // client markup identical (no hydration mismatch).
+  const [postedLabel, setPostedLabel] = useState<string | null>(null);
   const salary = formatSalaryRange({
     salaryMin: job.salaryMin,
     salaryMax: job.salaryMax,
     currency: job.currency,
     salaryPeriod: job.salaryPeriod,
   });
-  const freshnessLabel = job.discovery?.freshnessLabel?.toLowerCase() ?? null;
-  const africa = africaPill(job);
-  const discoverySummary = job.rankingExplanation?.summary || job.trust?.guidance;
-  // Use ISO date (YYYY-MM-DD) to keep server and client output identical and avoid
-  // React hydration mismatches caused by locale-sensitive formatters.
-  const lastSeenText = job.discovery?.lastSeenAt
-    ? new Date(job.discovery.lastSeenAt).toISOString().slice(0, 10)
-    : null;
-  const trustReasons = [
-    job.employer?.trust?.badge,
-    job.trust?.companyReviewed ? "Company reviewed" : null,
-    job.trust?.jobQualityChecked ? "Job quality checked" : null,
-    job.discovery?.salaryTransparent ? "Salary disclosed" : null,
-    job.discovery?.sourceVerification === "ATS_PRIMARY" ? "Primary ATS source" : null,
-    job.discovery?.sourceVerification === "DIRECT_EMPLOYER" ? "Direct employer posting" : null,
-    job.discovery?.sourceCount && job.discovery.sourceCount > 1
-      ? `Cross-checked across ${job.discovery.sourceCount} sources`
-      : null,
-  ].filter(Boolean) as string[];
+  const companyName = job.employer?.companyName || job.sourceName || null;
+  const sourceName = jobSourceDisplayName(job);
+  const signals = selectCardSignals(job, { hasSalary: Boolean(salary) });
+  const place = locationLabel(job.location, { compact: true });
+  const workplace = job.workplaceType ? label(job.workplaceType) : "";
+  // Skip the workplace suffix when the place already says it ("Remote (CET ±3h)").
+  const locationLine =
+    workplace && !place.toLocaleLowerCase(locale).includes(workplace.toLocaleLowerCase(locale))
+      ? [place, workplace].filter(Boolean).join(" · ")
+      : place || workplace;
+  const roleLine = [job.type ? label(job.type) : null, job.seniority ? label(job.seniority) : null]
+    .filter(Boolean)
+    .join(" · ");
+
+  useEffect(() => {
+    setIsSaved(initialSaved);
+  }, [initialSaved]);
+
+  useEffect(() => {
+    setPostedLabel(formatPostedShort(job.publishedAt || job.createdAt));
+  }, [job.publishedAt, job.createdAt]);
+
+  const toggleSaved = async () => {
+    if (isSaving) return;
+    const next = !isSaved;
+    setIsSaving(true);
+    setIsSaved(next); // optimistic
+    try {
+      if (next) {
+        await savedJobs.save(job.id);
+      } else {
+        await savedJobs.unsave(job.id);
+      }
+    } catch (err) {
+      setIsSaved(!next); // roll back
+      if ((err as { status?: number })?.status === 401) {
+        const current = `${window.location.pathname}${window.location.search}`;
+        window.location.assign(
+          localizePath(`/login?redirect=${encodeURIComponent(current)}`, locale),
+        );
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <Link
       href={localizePath(`/jobs/${job.slug}`, locale)}
-      className="group block h-full"
+      className="group block h-full rounded-2xl focus-visible:outline-none"
       prefetch={false}
       onClick={() => {
         jobDiscoveryEvents.resultClicked({
@@ -64,199 +159,81 @@ export function JobCard({ job }: JobCardProps) {
         });
       }}
     >
-      <Card className="isolate h-full cursor-pointer transition-all duration-300 border border-[var(--border-soft)] bg-white dark:bg-zinc-950 hover:bg-gradient-to-br hover:from-white hover:to-emerald-50/50 dark:hover:from-zinc-950 dark:hover:to-emerald-950/20 group-hover:-translate-y-1 hover:border-emerald-300 dark:hover:border-emerald-700 shadow-sm hover:shadow-[0_8px_24px_rgba(0,0,0,0.15)] relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/0 to-emerald-500/0 group-hover:via-emerald-500/5 transition-all duration-500 rounded-xl pointer-events-none" />
-        <CardContent className="relative z-10 flex h-full flex-col p-6">
-          <div className="flex justify-between items-start mb-3">
-            <div className="flex-1 pr-4">
-              <h3 className="font-display text-lg font-bold text-gray-900 dark:text-gray-100 mb-1 line-clamp-2">
+      <Card className="relative h-full cursor-pointer border border-line bg-surface shadow-xs transition-[transform,box-shadow,border-color] duration-200 group-hover:-translate-y-0.5 group-hover:border-line-strong group-hover:shadow-raised group-focus-visible:ring-2 group-focus-visible:ring-focus motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
+        <CardContent className="flex h-full flex-col gap-3 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="font-display text-base font-semibold leading-snug text-fg line-clamp-2 group-hover:text-primary-text">
                 {job.title}
               </h3>
-              <p className="font-medium text-emerald-700 dark:text-emerald-300">
-                {job.employer?.companyName || job.sourceName || "Unknown"}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {job.employer?.trust && (
-                  <Coachmark 
-                    title="Verified Trust Standard" 
-                    description="This employer has passed strict vetting criteria to ensure a transparent and credible hiring process for global talent."
-                  >
-                    <TrustBadge
-                      label={job.employer.trust.badge}
-                      riskLevel={job.employer.trust.riskLevel}
-                      variant="success"
-                    />
-                  </Coachmark>
-                )}
-                {job.hiresFromAfrica && (
-                  <Coachmark
-                    title="Hires from Africa"
-                    description="This role is verified as open to applicants based in Africa — located in Africa, remote-worldwide, or offering visa sponsorship."
-                  >
-                    <TrustBadge label="Hires from Africa" variant="success" />
-                  </Coachmark>
-                )}
-                {africa && (
-                  <TrustBadge
-                    label={africa.label}
-                    variant={africa.variant === "default" ? "info" : africa.variant}
-                  />
-                )}
-                {job.isExpired && (
-                  <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-900/30 dark:text-red-300">
-                    Expired
-                  </span>
-                )}
-                {job.trust?.companyReviewed && (
-                  <TrustBadge label="Company reviewed" variant="info" />
-                )}
-                {job.trust?.jobQualityChecked && (
-                  <TrustBadge label="Job quality checked" variant="success" />
-                )}
-                {job.trust?.newEmployerCaution && (
-                  <span className="animate-pulse inline-block">
-                    <TrustBadge label="New employer review" riskLevel="MEDIUM" variant="warning" />
-                  </span>
-                )}
-                {job.discovery?.trustedJob && (
-                  <TrustBadge label="Trusted job" variant="success" />
-                )}
-                {job.discovery?.sourceVerification === "DIRECT_EMPLOYER" && (
-                  <TrustBadge label="Direct employer source" variant="success" />
-                )}
-                {job.discovery?.sourceVerification === "ATS_PRIMARY" && (
-                  <TrustBadge label="Verified ATS path" variant="info" />
-                )}
-                {job.discovery?.sourceCount && job.discovery.sourceCount > 1 && (
-                  <TrustBadge label={`Cross-checked x${job.discovery.sourceCount}`} variant="info" />
-                )}
-              </div>
+              {companyName && (
+                <p className="mt-1 truncate text-sm font-medium text-fg-secondary">{companyName}</p>
+              )}
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (isSaving) return;
-                  setIsSaving(true);
-                  setIsSaved((current) => !current);
-                  window.setTimeout(() => setIsSaving(false), 250);
-                }}
-                disabled={isSaving}
-                className={`p-2 rounded-full transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-70 ${
-                  isSaved 
-                    ? "bg-rose-50 text-rose-500 shadow-sm ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-500/30"
-                    : "bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:bg-zinc-800/50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-                }`}
-                aria-pressed={isSaved}
-                aria-label={isSaved ? "Remove saved job" : "Save job"}
-              >
-                <Heart className={`w-5 h-5 transition-transform duration-300 ${isSaved ? "fill-current scale-110" : "scale-100 active:scale-90"}`} />
-              </button>
-              <Badge variant="success">{job.type}</Badge>
-              {job.jobField && <Badge variant="default">{job.jobField}</Badge>}
-            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void toggleSaved();
+              }}
+              disabled={isSaving}
+              className={`-me-1 -mt-1 shrink-0 rounded-full p-2 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-70 ${
+                isSaved
+                  ? "bg-rose-50 text-rose-600 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30"
+                  : "text-fg-muted hover:bg-surface-muted hover:text-fg"
+              }`}
+              aria-pressed={isSaved}
+              aria-label={isSaved ? tp("discover.card.unsave") : tp("discover.card.save")}
+            >
+              <Heart aria-hidden="true" className={`h-5 w-5 ${isSaved ? "fill-current" : ""}`} />
+            </button>
           </div>
 
-          <div className="flex flex-wrap gap-4 mb-4">
-            <span className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300">
-              <MapPin className="w-4 h-4 mr-1.5 text-emerald-600 dark:text-emerald-400" />
-              {job.workplaceType ? `${job.location} · ${job.workplaceType.toLowerCase()}` : job.location}
-            </span>
-            <span className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300">
-              <Briefcase className="w-4 h-4 mr-1.5 text-emerald-600 dark:text-emerald-400" />
-              {job.seniority}
-            </span>
+          <div className="space-y-1 text-sm text-fg-secondary">
+            <p className="flex min-w-0 items-center gap-1.5">
+              <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-fg-muted" />
+              <span className="truncate">{locationLine}</span>
+            </p>
+            {roleLine && (
+              <p className="flex min-w-0 items-center gap-1.5">
+                <Briefcase aria-hidden="true" className="h-4 w-4 shrink-0 text-fg-muted" />
+                <span className="truncate">{roleLine}</span>
+              </p>
+            )}
           </div>
 
           {salary && (
-            <p className="mb-4 font-display text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors duration-200">{salary}</p>
-          )}
-
-          {job.discovery && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {job.discovery.freshnessLabel && job.discovery.freshnessLabel !== "ACTIVE" && freshnessLabel && (
-                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/30 dark:text-emerald-300">
-                  {freshnessLabel}
-                </span>
-              )}
-              {job.discovery.salaryTransparent && (
-                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                  Salary disclosed
-                </span>
-              )}
-              {job.discovery.verifiedApplyPath && job.discovery.applyPathType === "ATS" && (
-                <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-900/30 dark:text-indigo-300">
-                  Direct ATS apply
-                </span>
-              )}
-              {job.discovery.deliveryModel === "ON_PLATFORM" && (
-                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-900/30 dark:text-emerald-300">
-                  Apply on AfriTalent
-                </span>
-              )}
-              {job.discovery.visaClear && job.visaSponsorship === "YES" && (
-                <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:border-blue-500/20 dark:bg-blue-900/30 dark:text-blue-300">
-                  Visa clarified
-                </span>
-              )}
-            </div>
-          )}
-
-          {discoverySummary && (
-            <p className="mb-4 text-sm leading-6 text-gray-600 dark:text-gray-300">
-              {discoverySummary}
+            <p className="font-display text-base font-semibold tabular-nums text-fg">
+              <SalaryText salary={job} />
             </p>
           )}
 
-          {trustReasons.length > 0 && (
-            <p className="mb-4 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              Why this looks credible: {trustReasons.slice(0, 3).join(" • ")}
-            </p>
-          )}
-
-          {(job.visaSponsorship === "YES" || job.relocationAssistance) && (
-            <div className="flex flex-wrap gap-2 mb-3">
-              {job.visaSponsorship === "YES" && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50/80 border border-blue-100 dark:border-blue-900/50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-semibold shadow-sm">
-                  <Globe className="w-3.5 h-3.5" />
-                  Visa Sponsored
-                </span>
-              )}
-              {job.relocationAssistance && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50/80 border border-purple-100 dark:border-purple-900/50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-semibold shadow-sm">
-                  <Plane className="w-3.5 h-3.5" />
-                  Relocation Support
-                </span>
-              )}
-            </div>
-          )}
-
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {tags.slice(0, 3).map((tag) => (
-                <Badge key={tag} variant="default">
-                  {tag}
+          {signals.length > 0 && (
+            <div className="flex flex-wrap gap-1.5" data-testid="job-card-signals">
+              {signals.map((signal) => (
+                <Badge key={signal.key} variant={signal.variant}>
+                  {tp(signal.messageKey)}
                 </Badge>
               ))}
-              {tags.length > 3 && (
-                <Badge variant="default">+{tags.length - 3}</Badge>
-              )}
             </div>
           )}
 
-          <div className="mt-auto" />
-
-          <div className="mt-4 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-zinc-800/60 pt-4">
-            <span className="flex items-center gap-1.5 font-medium">
-              <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-              {job.discovery?.verifiedApplyPath ? "Verified application path" : "External listing, verify before applying"}
-            </span>
-            {job.discovery?.sourceCount && job.discovery.sourceCount > 1 && (
-              <span>Cross-checked x{job.discovery.sourceCount}{lastSeenText && ` • ${lastSeenText}`}</span>
+          <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-3 text-xs text-fg-muted">
+            {sourceName ? (
+              <span data-testid="job-source-badge" className="truncate font-medium">
+                {tp("discover.card.via", { source: sourceName })}
+              </span>
+            ) : job.discovery?.deliveryModel === "ON_PLATFORM" ? (
+              <span className="truncate font-medium text-primary-text">{tp("discover.label.applyOnAfriTalent")}</span>
+            ) : (
+              <span />
+            )}
+            {postedLabel && (
+              <span className="inline-flex shrink-0 items-center gap-1" data-testid="job-card-posted">
+                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                {label(postedLabel)}
+              </span>
             )}
           </div>
         </CardContent>

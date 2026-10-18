@@ -38,6 +38,27 @@ export async function createAiRun(
   }
 }
 
+/**
+ * Mark a run that threw before completing as BLOCKED so it no longer sits in
+ * RUNNING forever. BLOCKED rows are not counted by the daily quota (only
+ * COMPLETE/PARTIAL and recent RUNNING rows are), so a failed run does not
+ * consume the user's allowance. Non-fatal.
+ */
+export async function failAiRun(runId: string, reason: string): Promise<void> {
+  try {
+    await prisma.aiRun.update({
+      where: { runId },
+      data: {
+        status: AiRunStatus.BLOCKED,
+        notes: [`failed: ${reason.slice(0, 200)}`],
+        completedAt: new Date(),
+      },
+    });
+  } catch (err) {
+    logger.warn({ run_id: runId, err }, "[persistence] failAiRun failed (non-fatal)");
+  }
+}
+
 export async function completeAiRun(
   runId: string,
   output: OrchestratorOutput

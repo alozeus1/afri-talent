@@ -1,9 +1,14 @@
+"use client";
+
+import { useT } from "@/lib/i18n/client";
+
 interface ATSScoreDisplayProps {
   score: number;
   size?: "sm" | "md" | "lg";
 }
 
 export function ATSScoreDisplay({ score, size = "md" }: ATSScoreDisplayProps) {
+  const t = useT();
   const clampedScore = Math.min(100, Math.max(0, Math.round(score)));
   const color =
     clampedScore >= 80
@@ -18,7 +23,7 @@ export function ATSScoreDisplay({ score, size = "md" }: ATSScoreDisplayProps) {
         ? "bg-yellow-50 border-yellow-200"
         : "bg-red-50 border-red-200";
   const label =
-    clampedScore >= 80 ? "Strong Match" : clampedScore >= 60 ? "Good Match" : "Needs Work";
+    clampedScore >= 80 ? t("common.ui.strongMatch") : clampedScore >= 60 ? t("common.ui.goodMatch") : t("common.ui.needsWork");
   const sizeClass =
     size === "lg" ? "text-4xl" : size === "sm" ? "text-xl" : "text-3xl";
 
@@ -28,7 +33,7 @@ export function ATSScoreDisplay({ score, size = "md" }: ATSScoreDisplayProps) {
     >
       <span className={`font-bold ${sizeClass} ${color}`}>{clampedScore}%</span>
       <span className={`text-xs font-medium mt-0.5 ${color}`}>{label}</span>
-      <span className="text-xs text-gray-500 mt-0.5">ATS Score</span>
+      <span className="text-xs text-fg-muted mt-0.5">{t("common.ui.atsScore")}</span>
     </div>
   );
 }

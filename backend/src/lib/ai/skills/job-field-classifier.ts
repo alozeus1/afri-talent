@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient } from "../anthropic-client.js";
 import { z } from "zod";
 import logger from "../../logger.js";
 import { emitClassifierEvaluation, emitClassifierCorrect } from "../../observability/metrics.js";
@@ -289,7 +289,7 @@ function classifyByKeywords(input: ClassifierInput): { field: TaxonomyField; con
 
 async function classifyByLlm(input: ClassifierInput): Promise<ClassificationResult | null> {
   if (MOCK_AI || !ANTHROPIC_KEY) return null;
-  const client = new Anthropic({ apiKey: ANTHROPIC_KEY });
+  const client = getAnthropicClient();
 
   const allowed = JOB_TAXONOMY.join(", ");
   const prompt = `Classify the following job into EXACTLY ONE of these categories: ${allowed}.
@@ -359,6 +359,14 @@ async function classifyJobFieldInner(input: ClassifierInput): Promise<Classifica
         : "No category-distinctive keywords found; defaulted to OTHER",
     source: "keyword_fallback",
   };
+}
+
+// Aggregator engine: deterministic first pass. The engine only escalates to
+// classifyJobField (LLM) when this confidence is below MIN_LLM_CONFIDENCE and
+// its per-run LLM budget allows — never once per upsert.
+export const CLASSIFIER_MIN_LLM_CONFIDENCE = MIN_LLM_CONFIDENCE;
+export function classifyJobFieldDeterministic(input: ClassifierInput): ClassificationResult {
+  return classifyByKeywordsForTesting(input);
 }
 
 // Exposed for the eval test — exercises the deterministic path without

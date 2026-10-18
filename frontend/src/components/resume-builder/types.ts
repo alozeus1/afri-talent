@@ -4,18 +4,6 @@ export type TemplateId = "classic" | "modern" | "minimal";
 
 export const TEMPLATE_IDS: readonly TemplateId[] = ["classic", "modern", "minimal"] as const;
 
-export interface TemplateMeta {
-  id: TemplateId;
-  label: string;
-  description: string;
-}
-
-export const TEMPLATES: readonly TemplateMeta[] = [
-  { id: "classic", label: "Classic", description: "Serif, single-column, ATS-safe." },
-  { id: "modern", label: "Modern", description: "Sans-serif with a two-column header." },
-  { id: "minimal", label: "Minimal", description: "Tight monoline, single-column, no color." },
-] as const;
-
 export interface ResumePreviewData {
   fullName: string;
   email: string;
@@ -41,7 +29,7 @@ export interface RubricSwatchTone {
 }
 
 export function rubricSwatch(score: number): RubricSwatchTone {
-  if (score >= 80) return { bg: "bg-emerald-50", text: "text-emerald-900", bar: "bg-emerald-500" };
-  if (score >= 60) return { bg: "bg-amber-50", text: "text-amber-900", bar: "bg-amber-500" };
-  return { bg: "bg-red-50", text: "text-red-900", bar: "bg-red-500" };
+  if (score >= 80) return { bg: "bg-success-soft", text: "text-success", bar: "bg-success" };
+  if (score >= 60) return { bg: "bg-warning-soft", text: "text-warning", bar: "bg-warning" };
+  return { bg: "bg-danger-soft", text: "text-danger", bar: "bg-danger" };
 }

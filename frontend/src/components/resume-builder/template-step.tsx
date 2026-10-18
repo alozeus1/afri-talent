@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TEMPLATES, type TemplateId } from "@/components/resume-builder/types";
+import { TEMPLATE_IDS, type TemplateId } from "@/components/resume-builder/types";
+import { useCandidateT, type CandidateMessageKey } from "@/lib/i18n/candidate-messages";
 
 interface TemplateStepProps {
   selected: TemplateId;
@@ -21,6 +23,7 @@ export function TemplateStep({
   canGenerate,
   isActive,
 }: TemplateStepProps): ReactNode {
+  const t = useCandidateT();
   const firstCardRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -30,31 +33,29 @@ export function TemplateStep({
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-sm font-medium text-gray-700">Choose a template</p>
-        <p className="mt-0.5 text-xs text-gray-500">
-          Templates only change the visual layout. The same content appears in each.
-        </p>
+        <h3 className="text-sm font-semibold text-fg">{t("rb.tpl.choose")}</h3>
+        <p className="mt-0.5 text-xs text-fg-muted">{t("rb.tpl.hint")}</p>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {TEMPLATES.map((tpl, i) => {
-          const isSelected = tpl.id === selected;
+        {TEMPLATE_IDS.map((id, i) => {
+          const isSelected = id === selected;
           return (
             <button
-              key={tpl.id}
+              key={id}
               ref={i === 0 ? firstCardRef : undefined}
               type="button"
-              onClick={() => onSelect(tpl.id)}
-              data-testid={`resume-template-${tpl.id}`}
+              onClick={() => onSelect(id)}
+              data-testid={`resume-template-${id}`}
               data-selected={isSelected ? "true" : undefined}
               aria-pressed={isSelected}
-              className={`rounded-lg border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`rounded-xl border p-4 text-start transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                 isSelected
-                  ? "border-blue-600 bg-blue-50 ring-2 ring-blue-200"
-                  : "border-gray-200 bg-white hover:border-gray-300"
+                  ? "border-primary bg-primary-soft ring-1 ring-primary"
+                  : "border-line bg-surface hover:border-line-strong hover:bg-surface-raised"
               }`}
             >
-              <p className="text-sm font-semibold text-gray-900">{tpl.label}</p>
-              <p className="mt-1 text-xs text-gray-500">{tpl.description}</p>
+              <p className="text-sm font-semibold text-fg">{t(`rb.tpl.${id}` as CandidateMessageKey)}</p>
+              <p className="mt-1 text-xs text-fg-muted">{t(`rb.tpl.${id}.desc` as CandidateMessageKey)}</p>
             </button>
           );
         })}
@@ -62,17 +63,14 @@ export function TemplateStep({
       <Button
         onClick={onGenerate}
         disabled={generating || !canGenerate}
+        isLoading={generating}
         className="w-full"
         data-testid="resume-generate-trigger"
       >
-        {generating ? "Generating with Claude..." : "Generate Resume"}
+        {!generating && <Sparkles className="h-4 w-4" aria-hidden="true" />}
+        {generating ? t("rb.tpl.generating") : t("rb.tpl.generate")}
       </Button>
-      {!canGenerate && (
-        <p className="text-xs text-amber-700">
-          Add at least your name, email, target role, and one skill in the earlier steps to enable
-          generation.
-        </p>
-      )}
+      {!canGenerate && <p className="text-xs text-warning">{t("rb.tpl.needMore")}</p>}
     </div>
   );
 }

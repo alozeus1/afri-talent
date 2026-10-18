@@ -1,5 +1,6 @@
 import { SubscriptionPlan } from "@prisma/client";
 import prisma from "../prisma.js";
+import { isFreeMode, topTierPlanForRole } from "./free-mode.js";
 
 export interface Entitlements {
   plan: SubscriptionPlan;
@@ -207,6 +208,16 @@ export async function getEntitlements(plan: SubscriptionPlan): Promise<Entitleme
  * Get entitlements for a user (looks up their current subscription plan).
  */
 export async function getUserEntitlements(userId: string): Promise<Entitlements> {
+  // Free launch: read-time overlay only. Subscription rows are untouched and
+  // getEntitlements(plan) (used by reconciliation/admin/pricing) is unchanged.
+  if (isFreeMode()) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    return getEntitlements(topTierPlanForRole(user?.role));
+  }
+
   const sub = await prisma.subscription.findUnique({
     where: { userId },
     select: { plan: true, status: true },

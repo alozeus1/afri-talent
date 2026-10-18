@@ -75,7 +75,32 @@ describe("authenticate current-account enforcement", () => {
 
     expect(next).not.toHaveBeenCalled();
     expect(status).toHaveBeenCalledWith(401);
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ code: "ACCOUNT_DELETED" }));
+  });
+
+  it("rejects a valid token whose account no longer exists", async () => {
+    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    const req = requestWithToken(candidateToken());
+    const { res, status, json } = response();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(status).toHaveBeenCalledWith(401);
     expect(json).toHaveBeenCalledWith({ error: "Account is no longer active" });
+  });
+
+  it("fails closed when the account lookup errors", async () => {
+    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("db down"));
+    const req = requestWithToken(candidateToken());
+    const { res, status } = response();
+    const next = vi.fn();
+
+    await authenticate(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(status).toHaveBeenCalledWith(401);
   });
 
   it("rejects a valid token after the account is suspended", async () => {
@@ -92,8 +117,10 @@ describe("authenticate current-account enforcement", () => {
 
     await authenticate(req, res, next);
 
+    // Merged with the admin-console account gate: suspension is a 403 with a
+    // machine-readable code so the UI can explain it (still denied).
     expect(next).not.toHaveBeenCalled();
-    expect(status).toHaveBeenCalledWith(401);
-    expect(json).toHaveBeenCalledWith({ error: "Account is no longer active" });
+    expect(status).toHaveBeenCalledWith(403);
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ code: "ACCOUNT_SUSPENDED" }));
   });
 });

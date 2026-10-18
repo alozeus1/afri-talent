@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { Header } from "../header";
+import { isAdminPath } from "../use-dropdown";
 import type { User } from "@/lib/api";
 
 // Mock the AuthContext since Header depends on useAuth
@@ -74,8 +75,12 @@ describe('Header Components', () => {
 
         render(<Header />)
 
-        // Auth-only links
-        expect(screen.getByText('Dashboard')).toBeInTheDocument()
+        // Dashboard lives in the avatar menu
+        expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+        expect(screen.getByRole('menuitem', { name: 'Dashboard' })).toBeInTheDocument()
+        expect(screen.getByRole('menuitem', { name: 'AI Assistant' })).toBeInTheDocument()
+        expect(screen.getByRole('menuitem', { name: 'Logout' })).toBeInTheDocument()
         // Should not show employer-specific links
         expect(screen.queryByText('My Jobs')).not.toBeInTheDocument()
     })
@@ -89,8 +94,50 @@ describe('Header Components', () => {
 
         render(<Header />)
 
-        // Employer-only links
-        expect(screen.getByText('Dashboard')).toBeInTheDocument()
+        // Name is on the avatar trigger; Dashboard is inside the menu
         expect(screen.getByText('Tech Corp')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: 'Account menu' }))
+        expect(screen.getByRole('menuitem', { name: 'Dashboard' })).toBeInTheDocument()
+        expect(screen.queryByRole('menuitem', { name: 'AI Assistant' })).not.toBeInTheDocument()
+    })
+
+    it('collapses secondary links into the More menu', () => {
+        mockedUseAuth.mockReturnValue(createAuthState())
+
+        render(<Header />)
+
+        expect(screen.queryByRole('menuitem', { name: 'Salaries' })).not.toBeInTheDocument()
+        const more = screen.getByRole('button', { name: 'More links' })
+        fireEvent.click(more)
+        expect(more).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByRole('menuitem', { name: 'Salaries' })).toBeInTheDocument()
+        expect(screen.getByRole('menuitem', { name: 'Trust' })).toBeInTheDocument()
+
+        fireEvent.keyDown(document, { key: 'Escape' })
+        expect(screen.queryByRole('menuitem', { name: 'Salaries' })).not.toBeInTheDocument()
+    })
+
+    it('renders nothing on admin routes (the console has its own shell)', () => {
+        const navigation = jest.requireMock('next/navigation') as { usePathname: () => string }
+        const original = navigation.usePathname
+        navigation.usePathname = () => '/fr/admin/users'
+        try {
+            const { container } = render(<Header />)
+            expect(container).toBeEmptyDOMElement()
+        } finally {
+            navigation.usePathname = original
+        }
+    })
+})
+
+describe('isAdminPath', () => {
+    it('matches /admin with and without a locale prefix only', () => {
+        expect(isAdminPath('/admin')).toBe(true)
+        expect(isAdminPath('/admin/users')).toBe(true)
+        expect(isAdminPath('/pt/admin/jobs')).toBe(true)
+        expect(isAdminPath('/en')).toBe(false)
+        expect(isAdminPath('/en/administration')).toBe(false)
+        expect(isAdminPath('/jobs/admin')).toBe(false)
+        expect(isAdminPath(null)).toBe(false)
     })
 })

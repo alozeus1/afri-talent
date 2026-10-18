@@ -7,6 +7,26 @@ const SES_REGION = process.env.SES_REGION || process.env.AWS_REGION || "us-east-
 const FROM_EMAIL = process.env.SES_FROM_EMAIL;
 const IS_DEV = !FROM_EMAIL;
 
+/**
+ * Local-dev affordance: when SES is not configured the email body is never
+ * delivered, so account links (verify / reset) would be unreachable. Surface
+ * them at info level only when SES is unset AND we are outside a deployed
+ * environment (or the operator opts in with EMAIL_DEV_LOG_LINKS=1).
+ * Never logs when SES_FROM_EMAIL is configured.
+ */
+export function shouldLogDevEmailLinks(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.SES_FROM_EMAIL?.trim()) return false;
+  const nodeEnv = env.NODE_ENV ?? "development";
+  const deployed = nodeEnv === "production" || nodeEnv === "staging";
+  return !deployed || env.EMAIL_DEV_LOG_LINKS === "1";
+}
+
+function logDevEmailLink(fields: Record<string, string>, message: string): void {
+  if (IS_DEV && shouldLogDevEmailLinks()) {
+    logger.info(fields, message);
+  }
+}
+
 let _ses: SESClient | null = null;
 
 function getSES(): SESClient {
@@ -16,7 +36,7 @@ function getSES(): SESClient {
   return _ses;
 }
 
-interface SendEmailOptions {
+export interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
@@ -24,7 +44,7 @@ interface SendEmailOptions {
   templateName?: string;
 }
 
-async function sendEmail(opts: SendEmailOptions): Promise<void> {
+export async function sendEmail(opts: SendEmailOptions): Promise<void> {
   const recipientDomain = opts.to.includes("@") ? opts.to.split("@")[1] : "unknown";
 
   // No SES_FROM_EMAIL configured: log loudly and record a SKIP — never a
@@ -335,6 +355,7 @@ export async function passwordResetEmail(opts: {
   resetUrl: string;
   expiresInHours: number;
 }): Promise<void> {
+  logDevEmailLink({ resetUrl: opts.resetUrl }, "DEV password reset link");
   await sendEmail({
     to: opts.to,
     subject: "Reset your AfriTalent password",
@@ -438,6 +459,7 @@ export async function accountEmailVerificationEmail(opts: {
   verifyUrl: string;
   expiresInHours: number;
 }): Promise<void> {
+  logDevEmailLink({ verifyUrl: opts.verifyUrl }, "DEV email verification link");
   await sendEmail({
     to: opts.to,
     subject: "Verify your AfriTalent email",
@@ -570,5 +592,44 @@ export async function phoneVerifiedEmail(opts: {
       </div>
     `,
     text: `Hi ${opts.userName},\n\nYour phone number ending in ${opts.phoneMasked} is now verified.\n\nIf you didn't perform this verification, reset your password and contact support immediately.`,
+  });
+}
+
+// ── Admin console: direct message to a user ─────────────────────────────────
+
+export function isEmailDeliveryConfigured(): boolean {
+  return !IS_DEV;
+}
+
+function escapeAdminHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export async function adminMessageEmail(opts: {
+  to: string;
+  userName: string;
+  subject: string;
+  body: string;
+  appUrl: string;
+}): Promise<void> {
+  const safeBody = escapeAdminHtml(opts.body).replace(/\n/g, "<br />");
+  await sendEmail({
+    to: opts.to,
+    subject: opts.subject,
+    templateName: "admin_message",
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Hi ${escapeAdminHtml(opts.userName)},</h2>
+        <p>${safeBody}</p>
+        <p><a href="${opts.appUrl}/notifications" style="background:#059669;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Open AfriTalent</a></p>
+        <p style="color:#6b7280;font-size:12px;">Sent by the AfriTalent team.</p>
+      </div>
+    `,
+    text: `Hi ${opts.userName},\n\n${opts.body}\n\nOpen AfriTalent: ${opts.appUrl}/notifications\n\n— The AfriTalent team`,
   });
 }

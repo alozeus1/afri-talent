@@ -4,6 +4,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import logger from "../lib/logger.js";
+import { isFreeMode } from "../lib/billing/free-mode.js";
 import {
   candidateTrustSummary,
   canUseVerifiedCandidateFilter,
@@ -659,7 +660,12 @@ router.get("/", async (req: Request, res: Response) => {
     const requiresPremiumTrustFilters =
       parseBoolean(parsed.verifiedOnly) || parseBoolean(parsed.verifiedSkillsOnly) || parseBoolean(parsed.assessmentBackedOnly);
 
-    if (requiresPremiumTrustFilters && !canUseVerifiedCandidateFilter(subscription?.plan, req.user!.role)) {
+    const freeModeEmployer = isFreeMode() && req.user!.role === Role.EMPLOYER;
+    if (
+      requiresPremiumTrustFilters &&
+      !freeModeEmployer &&
+      !canUseVerifiedCandidateFilter(subscription?.plan, req.user!.role)
+    ) {
       res.status(403).json({
         error: "Verified-candidate filters are available to premium trusted employers.",
         code: "PREMIUM_VERIFIED_FILTER_REQUIRED",

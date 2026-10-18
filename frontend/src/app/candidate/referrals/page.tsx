@@ -1,13 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Handshake } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { referrals, ReferralItem, ReferralStats } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  CandidateBackLink,
+  CandidateLoadError,
+  CandidateNotice,
+  CandidatePageHeader,
+  CandidateSpinner,
+  CandidateStat,
+  URL_PLACEHOLDERS,
+  candidateFieldClass,
+  candidateLabelClass,
+} from "@/components/candidate/candidate-ui";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { enumLabel, useCandidateFormatters, useCandidateT, type CandidateMessageKey } from "@/lib/i18n/candidate-messages";
 
 const statusVariants: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
   PENDING: "warning",
@@ -16,76 +30,70 @@ const statusVariants: Record<string, "default" | "success" | "warning" | "danger
   EXPIRED: "default",
 };
 
-const statusLabels: Record<string, string> = {
-  PENDING: "Pending",
-  ACCEPTED: "Accepted",
-  HIRED: "Hired",
-  EXPIRED: "Expired",
-};
-
 export default function ReferralsPage() {
   const router = useRouter();
+  const locale = useLocale();
+  const t = useCandidateT();
+  const fmt = useCandidateFormatters();
   const { user, isLoading } = useAuth();
   const [myReferrals, setMyReferrals] = useState<ReferralItem[]>([]);
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
-  // Form state
   const [refereeEmail, setRefereeEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [jobLink, setJobLink] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<CandidateMessageKey | null>(null);
   const [formSuccess, setFormSuccess] = useState(false);
 
-  // Status update
   const [updating, setUpdating] = useState<string | null>(null);
+  const [updateFailed, setUpdateFailed] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "CANDIDATE")) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
 
-  useEffect(() => {
-    if (user?.role === "CANDIDATE") {
-      loadData();
-    }
-  }, [user]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [referralList, referralStats] = await Promise.all([
-        referrals.list(),
-        referrals.stats(),
-      ]);
+      const [referralList, referralStats] = await Promise.all([referrals.list(), referrals.stats()]);
       setMyReferrals(referralList);
       setStats(referralStats);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load referrals");
+      setError(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (user?.role === "CANDIDATE") loadData();
+  }, [user, loadData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!refereeEmail.trim()) {
-      setFormError("Email is required");
+      setFormError("ref.form.emailRequired");
       return;
     }
     setSubmitting(true);
     setFormError(null);
     setFormSuccess(false);
+    // The API has no job-link field yet, so the link travels inside the message.
+    const fullMessage = [message.trim(), jobLink.trim() ? t("ref.form.jobLinkPrefix", { url: jobLink.trim() }) : ""]
+      .filter(Boolean)
+      .join("\n\n");
     try {
       const newReferral = await referrals.create({
         refereeEmail: refereeEmail.trim(),
         companyName: companyName.trim() || undefined,
-        message: message.trim() || undefined,
+        message: fullMessage || undefined,
       });
       setMyReferrals((prev) => [newReferral, ...prev]);
       if (stats) {
@@ -96,9 +104,9 @@ export default function ReferralsPage() {
       setJobLink("");
       setMessage("");
       setFormSuccess(true);
-      setTimeout(() => setFormSuccess(false), 3000);
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Failed to create referral");
+      setTimeout(() => setFormSuccess(false), 4000);
+    } catch {
+      setFormError("ref.form.failed");
     } finally {
       setSubmitting(false);
     }
@@ -106,195 +114,162 @@ export default function ReferralsPage() {
 
   const handleStatusUpdate = async (id: string, status: string) => {
     setUpdating(id);
+    setUpdateFailed(false);
     try {
       const updated = await referrals.updateStatus(id, status);
       setMyReferrals((prev) => prev.map((r) => (r.id === id ? updated : r)));
-      // Refresh stats
-      const newStats = await referrals.stats();
-      setStats(newStats);
+      setStats(await referrals.stats());
     } catch (err) {
       console.error("Failed to update referral status:", err);
+      setUpdateFailed(true);
     } finally {
       setUpdating(null);
     }
   };
 
   if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+    return <CandidateSpinner className="py-24" />;
   }
 
+  const statValue = (n: number | undefined) => (loading ? "–" : fmt.number(n ?? 0));
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Referrals</h1>
-        <p className="text-gray-600">Refer talented professionals and help them find opportunities</p>
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+      <CandidateBackLink href={localizePath("/candidate", locale)}>{t("nav.backToDashboard")}</CandidateBackLink>
+      <CandidatePageHeader title={t("ref.title")} description={t("ref.subtitle")} />
+
+      {error ? (
+        <CandidateLoadError className="mb-6" error={error} subject={t("ui.subject.referrals")} onRetry={loadData} />
+      ) : null}
+
+      <div className="mb-8 grid gap-4 sm:grid-cols-3">
+        <CandidateStat label={t("ref.stat.made")} value={statValue(stats?.totalMade)} tone="primary" />
+        <CandidateStat label={t("ref.stat.accepted")} value={statValue(stats?.totalAccepted)} tone="info" />
+        <CandidateStat label={t("ref.stat.hired")} value={statValue(stats?.totalHired)} tone="success" />
       </div>
 
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-
-      {/* Stats Cards */}
-      <div className="grid md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-3xl font-bold text-emerald-600 mb-1">
-              {loading ? "–" : stats?.totalMade ?? 0}
-            </div>
-            <div className="text-gray-600">Referrals Made</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-3xl font-bold text-blue-600 mb-1">
-              {loading ? "–" : stats?.totalAccepted ?? 0}
-            </div>
-            <div className="text-gray-600">Accepted</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-3xl font-bold text-green-600 mb-1">
-              {loading ? "–" : stats?.totalHired ?? 0}
-            </div>
-            <div className="text-gray-600">Hired</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Refer a Friend Form */}
-      <Card className="mb-8">
-        <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">Refer a Friend</h2>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Email Address *"
-              type="email"
-              placeholder="friend@example.com"
-              value={refereeEmail}
-              onChange={(e) => setRefereeEmail(e.target.value)}
-              required
-            />
-            <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+        <Card className="self-start">
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-fg">{t("ref.form.title")}</h2>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <Input
-                label="Company Name (optional)"
+                id="referee-email"
+                label={`${t("ref.form.email")} *`}
+                type="email"
+                placeholder={t("ref.form.emailPlaceholder")}
+                value={refereeEmail}
+                onChange={(e) => setRefereeEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+              <Input
+                id="referee-company"
+                label={t("ref.form.company")}
                 type="text"
-                placeholder="Target company"
+                placeholder={t("ref.form.companyPlaceholder")}
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
               />
               <Input
-                label="Job Link (optional)"
+                id="referee-job-link"
+                label={t("ref.form.jobLink")}
                 type="url"
-                placeholder="https://..."
+                placeholder={URL_PLACEHOLDERS.generic}
                 value={jobLink}
                 onChange={(e) => setJobLink(e.target.value)}
               />
-            </div>
-            <div className="w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Personal Message (optional)
-              </label>
-              <textarea
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors resize-none"
-                rows={3}
-                placeholder="Add a personal note about why you're referring them..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-              />
-            </div>
-            {formError && (
-              <p className="text-sm text-red-600">{formError}</p>
-            )}
-            {formSuccess && (
-              <p className="text-sm text-emerald-600">Referral sent successfully!</p>
-            )}
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Sending..." : "Send Referral"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* My Referrals */}
-      <Card>
-        <CardHeader>
-          <h2 className="text-xl font-semibold text-gray-900">My Referrals</h2>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
-            </div>
-          ) : myReferrals.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">🤝</span>
+              <div>
+                <label htmlFor="referee-message" className={candidateLabelClass}>
+                  {t("ref.form.message")}
+                </label>
+                <textarea
+                  id="referee-message"
+                  className={`${candidateFieldClass} resize-none`}
+                  rows={3}
+                  placeholder={t("ref.form.messagePlaceholder")}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                />
               </div>
-              <p className="text-gray-600 mb-2">No referrals yet</p>
-              <p className="text-sm text-gray-500">
-                Refer talented professionals and help them find opportunities
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {myReferrals.map((referral) => (
-                <div key={referral.id} className="py-4">
-                  <div className="flex justify-between items-start">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-gray-900">{referral.refereeEmail}</span>
-                        <Badge variant={statusVariants[referral.status] || "default"}>
-                          {statusLabels[referral.status] || referral.status}
-                        </Badge>
+              {formError && <CandidateNotice>{t(formError)}</CandidateNotice>}
+              {formSuccess && <CandidateNotice tone="success">{t("ref.form.success")}</CandidateNotice>}
+              <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
+                {submitting ? t("ref.form.sending") : t("ref.form.send")}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-fg">{t("ref.list.title")}</h2>
+          </CardHeader>
+          <CardContent>
+            {updateFailed ? <CandidateNotice className="mb-4">{t("ref.updateFailed")}</CandidateNotice> : null}
+            {loading ? (
+              <CandidateSpinner className="py-8" />
+            ) : myReferrals.length === 0 ? (
+              <div className="py-12 text-center">
+                <span
+                  aria-hidden="true"
+                  className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary-text"
+                >
+                  <Handshake className="h-6 w-6" />
+                </span>
+                <p className="mb-1 font-semibold text-fg">{t("ref.list.emptyTitle")}</p>
+                <p className="mx-auto max-w-sm text-sm text-fg-muted">{t("ref.list.emptyBody")}</p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-line">
+                {myReferrals.map((referral) => (
+                  <li key={referral.id} className="py-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <span className="break-all font-medium text-fg">{referral.refereeEmail}</span>
+                          <Badge variant={statusVariants[referral.status] || "default"}>
+                            {enumLabel(t, "ref.status", referral.status)}
+                          </Badge>
+                        </div>
+                        {referral.companyName && <p className="text-sm text-fg-secondary">{referral.companyName}</p>}
+                        {referral.message && (
+                          <p className="mt-1 line-clamp-2 whitespace-pre-line text-sm text-fg-muted">{referral.message}</p>
+                        )}
+                        <p className="mt-1 text-xs text-fg-muted">{fmt.date(referral.createdAt)}</p>
                       </div>
-                      {referral.companyName && (
-                        <p className="text-sm text-gray-600">{referral.companyName}</p>
-                      )}
-                      {referral.message && (
-                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{referral.message}</p>
-                      )}
-                      <p className="text-xs text-gray-400 mt-1">
-                        {new Date(referral.createdAt).toLocaleDateString()}
-                      </p>
+                      <div className="flex shrink-0 gap-2">
+                        {referral.status === "PENDING" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStatusUpdate(referral.id, "ACCEPTED")}
+                            disabled={updating === referral.id}
+                          >
+                            {t("ref.markAccepted")}
+                          </Button>
+                        )}
+                        {(referral.status === "PENDING" || referral.status === "ACCEPTED") && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleStatusUpdate(referral.id, "HIRED")}
+                            disabled={updating === referral.id}
+                            isLoading={updating === referral.id}
+                          >
+                            {t("ref.markHired")}
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex gap-2 ml-4 flex-shrink-0">
-                      {referral.status === "PENDING" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleStatusUpdate(referral.id, "ACCEPTED")}
-                          disabled={updating === referral.id}
-                        >
-                          {updating === referral.id ? "..." : "Mark Accepted"}
-                        </Button>
-                      )}
-                      {(referral.status === "PENDING" || referral.status === "ACCEPTED") && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleStatusUpdate(referral.id, "HIRED")}
-                          disabled={updating === referral.id}
-                        >
-                          {updating === referral.id ? "..." : "Mark Hired"}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

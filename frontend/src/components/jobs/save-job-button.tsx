@@ -7,9 +7,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { savedJobs } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { usePublicT } from "@/lib/i18n/public-messages";
 
 export function SaveJobButton({ jobId }: { jobId: string }) {
   const router = useRouter();
+  const tp = usePublicT();
+  const locale = useLocale();
   const [saved, setSaved] = useState<boolean | null>(null); // null = unknown/anonymous
   const [busy, setBusy] = useState(false);
 
@@ -32,7 +36,7 @@ export function SaveJobButton({ jobId }: { jobId: string }) {
       }
     } catch (err) {
       if ((err as { status?: number })?.status === 401) {
-        router.push("/login");
+        router.push(localizePath("/login", locale));
         return;
       }
     } finally {
@@ -41,8 +45,8 @@ export function SaveJobButton({ jobId }: { jobId: string }) {
   };
 
   return (
-    <Button variant={saved ? "secondary" : "outline"} size="sm" onClick={toggle} disabled={busy || saved === null}>
-      {saved ? "★ Saved" : "☆ Save job"}
+    <Button variant={saved ? "secondary" : "outline"} size="sm" onClick={toggle} disabled={busy || saved === null} aria-pressed={Boolean(saved)}>
+      <span aria-hidden="true">{saved ? "★" : "☆"}</span> {saved ? tp("discover.card.saved") : tp("discover.card.save")}
     </Button>
   );
 }

@@ -32,7 +32,7 @@ import {
   type CompanyCareerSourceConfig,
 } from "./sources/company-careers.js";
 import type { BaseJobSource, JobQuery } from "./sources/base.js";
-import { classifyJobField, normalizeWorkplaceType } from "./taxonomy.js";
+import { classifyJobField, normalizeWorkplaceType, resolveJobField } from "./taxonomy.js";
 import { classifyJobField as classifyTaxonomyField } from "../../ai/skills/job-field-classifier.js";
 import { classifyApplyStrategy } from "../apply-strategy.js";
 import { resolveEffectiveApplyStrategy } from "../../apply/caps.js";
@@ -540,7 +540,7 @@ export class JobAggregator {
         description: job.description,
         tags: job.skills,
       }),
-      workplaceType: job.workplaceType ?? normalizeWorkplaceType(job.locationType),
+      workplaceType: job.workplaceType ?? normalizeWorkplaceType(job.locationType, { title: job.title, location: job.location }),
       tags: job.skills,
       salaryMin: job.salary?.min ?? null,
       salaryMax: job.salary?.max ?? null,
@@ -673,8 +673,10 @@ export class JobAggregator {
       description: job.description,
       location: normalizedLocation.display || job.location,
       type: job.jobType,
-      jobField: job.jobField ?? classifyJobField({
+      jobField: resolveJobField({
         title: job.title,
+        taxonomyField: classification.field,
+        existing: job.jobField,
         description: job.description,
         tags: job.skills,
       }),
@@ -685,7 +687,7 @@ export class JobAggregator {
       applyStrategy: finalStrategy,
       applyEmailDetected: finalApplyEmail,
       applyFormDomain: applyDecision.applyFormDomain ?? null,
-      workplaceType: job.workplaceType ?? normalizeWorkplaceType(job.locationType),
+      workplaceType: job.workplaceType ?? normalizeWorkplaceType(job.locationType, { title: job.title, location: job.location }),
       seniority: job.seniority || "Mid-level",
       salaryMin: job.salary?.min,
       salaryMax: job.salary?.max,

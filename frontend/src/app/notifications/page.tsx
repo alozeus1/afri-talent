@@ -2,82 +2,81 @@
 
 import * as Tabs from "@radix-ui/react-tabs";
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Bell, BellRing, Briefcase, CheckCheck, FileText, MessageSquare, Settings, Target } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { notifications, NotificationItem } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  CandidateLoadError,
+  CandidateNotice,
+  CandidatePageHeader,
+  CandidateSpinner,
+} from "@/components/candidate/candidate-ui";
+import { localizePath, useLocale } from "@/lib/i18n/client";
+import { useCandidateFormatters, useCandidateT, type CandidateMessageKey } from "@/lib/i18n/candidate-messages";
 
 type FilterTab = "ALL" | "UNREAD";
+type Feedback = "RELEVANT" | "NOT_RELEVANT" | "TOO_MANY" | "WRONG_ROLE" | "WRONG_LOCATION";
+const FEEDBACK: Feedback[] = ["RELEVANT", "NOT_RELEVANT", "TOO_MANY", "WRONG_ROLE", "WRONG_LOCATION"];
 
-function getNotificationIcon(type: string): string {
-  switch (type) {
-    case "MESSAGE":
-      return "💬";
-    case "APPLICATION":
-      return "📄";
-    case "JOB_MATCH":
-      return "🎯";
-    case "VERIFICATION":
-      return "✅";
-    default:
-      return "🔔";
-  }
-}
-
-function timeAgo(dateStr: string): string {
-  const now = new Date();
-  const date = new Date(dateStr);
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 4) return `${weeks}w ago`;
-  return date.toLocaleDateString();
+function NotificationIcon({ type }: { type: string }) {
+  const Icon =
+    type === "MESSAGE"
+      ? MessageSquare
+      : type === "APPLICATION"
+        ? FileText
+        : type === "JOB_MATCH"
+          ? Target
+          : type === "VERIFICATION"
+            ? CheckCheck
+            : type === "JOB"
+              ? Briefcase
+              : Bell;
+  return (
+    <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-text">
+      <Icon className="h-4 w-4" />
+    </span>
+  );
 }
 
 export default function NotificationsPage() {
   const router = useRouter();
+  const locale = useLocale();
+  const t = useCandidateT();
+  const fmt = useCandidateFormatters();
   const { user, isLoading } = useAuth();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState<FilterTab>("ALL");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [markingAllRead, setMarkingAllRead] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<"saved" | "failed" | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push("/login");
+      router.push(localizePath("/login", locale));
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, locale]);
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params: { status?: string; page: number; limit: number } = {
-        page,
-        limit: 10,
-      };
-      if (filter === "UNREAD") {
-        params.status = "UNREAD";
-      }
+      const params: { status?: string; page: number; limit: number } = { page, limit: 10 };
+      if (filter === "UNREAD") params.status = "UNREAD";
       const response = await notifications.list(params);
       setItems(response.notifications);
       setTotalPages(response.pagination.totalPages);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load notifications");
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -88,7 +87,7 @@ export default function NotificationsPage() {
       const res = await notifications.unreadCount();
       setUnreadCount(res.count);
     } catch {
-      // silently ignore
+      // The badge is optional; the list still renders.
     }
   }, []);
 
@@ -102,12 +101,10 @@ export default function NotificationsPage() {
   const handleMarkRead = async (id: string) => {
     try {
       await notifications.markRead(id);
-      setItems((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, status: "READ" } : n))
-      );
+      setItems((prev) => prev.map((n) => (n.id === id ? { ...n, status: "READ" } : n)));
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch {
-      // silently ignore
+      // Leave it unread; the user can retry.
     }
   };
 
@@ -118,22 +115,19 @@ export default function NotificationsPage() {
       setItems((prev) => prev.map((n) => ({ ...n, status: "READ" })));
       setUnreadCount(0);
     } catch {
-      // silently ignore
+      // Leave state unchanged on failure.
     } finally {
       setMarkingAllRead(false);
     }
   };
 
-  const handleFeedback = async (
-    id: string,
-    feedback: "RELEVANT" | "NOT_RELEVANT" | "TOO_MANY" | "WRONG_ROLE" | "WRONG_LOCATION",
-  ) => {
+  const handleFeedback = async (id: string, feedback: Feedback) => {
     try {
       const response = await notifications.feedback(id, feedback);
       setItems((prev) => prev.map((item) => (item.id === id ? response.notification : item)));
-      setFeedbackMessage("Notification feedback saved.");
+      setFeedbackMessage("saved");
     } catch {
-      setFeedbackMessage("Could not save feedback right now.");
+      setFeedbackMessage("failed");
     }
   };
 
@@ -143,184 +137,145 @@ export default function NotificationsPage() {
   };
 
   if (isLoading || !user) {
-    return (
-      <div className="flex justify-center py-24">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
+    return <CandidateSpinner className="py-24" />;
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
-          {unreadCount > 0 && (
-            <Badge variant="success">{unreadCount} unread</Badge>
-          )}
-        </div>
-        {unreadCount > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleMarkAllRead}
-            disabled={markingAllRead}
-          >
-            {markingAllRead ? "Marking…" : "Mark All Read"}
-          </Button>
-        )}
-      </div>
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+      <CandidatePageHeader
+        title={
+          <span className="flex flex-wrap items-center gap-3">
+            {t("notif.title")}
+            {unreadCount > 0 && <Badge variant="success">{t("notif.unread", { count: fmt.number(unreadCount) })}</Badge>}
+          </span>
+        }
+        actions={
+          <>
+            {unreadCount > 0 && (
+              <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={markingAllRead}>
+                <CheckCheck className="h-4 w-4" aria-hidden="true" />
+                {markingAllRead ? t("notif.marking") : t("notif.markAll")}
+              </Button>
+            )}
+            {user.role === "CANDIDATE" && (
+              <Link href={localizePath("/candidate/preferences", locale)}>
+                <Button variant="ghost" size="sm">
+                  <Settings className="h-4 w-4" aria-hidden="true" />
+                  {t("notif.preferences")}
+                </Button>
+              </Link>
+            )}
+          </>
+        }
+      />
 
-      {/* Filter Tabs */}
       <div className="mb-6 flex">
-        <Tabs.Root
-          value={filter}
-          onValueChange={(val) => handleFilterChange(val as FilterTab)}
-        >
+        <Tabs.Root value={filter} onValueChange={(val) => handleFilterChange(val as FilterTab)}>
           <Tabs.List
-            className="flex items-center gap-x-1 p-1 bg-white border border-gray-200 rounded-xl shadow-sm text-sm"
-            aria-label="Filter Notifications"
+            className="flex items-center gap-x-1 rounded-xl border border-line bg-surface p-1 text-sm shadow-xs"
+            aria-label={t("notif.filter")}
           >
             {(["ALL", "UNREAD"] as FilterTab[]).map((tab) => (
               <Tabs.Trigger
                 key={tab}
                 value={tab}
-                className="data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 data-[state=active]:shadow-sm outline-gray-800 py-2 px-6 rounded-lg transition-all duration-150 text-gray-500 hover:text-gray-700 hover:bg-gray-50 active:bg-gray-100 font-medium"
+                className="rounded-lg px-6 py-2 font-medium text-fg-muted transition-all duration-150 hover:bg-surface-sunken hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus data-[state=active]:bg-surface-muted data-[state=active]:text-fg data-[state=active]:shadow-xs"
               >
-                {tab === "ALL" ? "All" : "Unread"}
+                {t(`notif.tab.${tab}` as CandidateMessageKey)}
               </Tabs.Trigger>
             ))}
           </Tabs.List>
         </Tabs.Root>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-          {error}
-        </div>
-      )}
       {feedbackMessage && (
-        <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-          {feedbackMessage}
-        </div>
+        <CandidateNotice tone={feedbackMessage === "saved" ? "success" : "warning"} className="mb-6">
+          {feedbackMessage === "saved" ? t("notif.feedbackSaved") : t("notif.feedbackFailed")}
+        </CandidateNotice>
       )}
 
-      {/* Loading */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-        </div>
+        <CandidateSpinner />
+      ) : error ? (
+        <CandidateLoadError error={error} subject={t("notif.subject")} onRetry={fetchNotifications} />
       ) : items.length === 0 ? (
-        /* Empty State */
-        <Card>
-          <CardContent className="p-12 text-center">
-            <span className="text-4xl mb-4 block">🔔</span>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              No notifications yet
-            </h3>
-            <p className="text-gray-500">
-              {filter === "UNREAD"
-                ? "You're all caught up! No unread notifications."
-                : "You'll see notifications here when there's activity on your account."}
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={<BellRing className="h-6 w-6" />}
+          title={t("notif.empty")}
+          description={filter === "UNREAD" ? t("notif.emptyUnread") : t("notif.emptyAll")}
+        />
       ) : (
-        /* Notification List */
-        <div className="space-y-3">
+        <ul className="space-y-3">
           {items.map((notification) => {
             const isUnread = notification.status === "UNREAD";
             return (
-              <Card
-                key={notification.id}
-                className={`cursor-pointer hover:shadow-md transition-shadow ${
-                  isUnread ? "border-l-4 border-l-emerald-600" : ""
-                }`}
-                onClick={() => isUnread && handleMarkRead(notification.id)}
-              >
-                <CardContent className="p-4 flex items-start gap-4">
-                  <span className="text-2xl flex-shrink-0">
-                    {getNotificationIcon(notification.type)}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3
-                        className={`text-sm ${
-                          isUnread
-                            ? "font-semibold text-gray-900"
-                            : "font-medium text-gray-700"
-                        }`}
-                      >
-                        {notification.title}
-                      </h3>
-                      <span className="text-xs text-gray-400 flex-shrink-0">
-                        {timeAgo(notification.createdAt)}
+              <li key={notification.id}>
+                <Card className={`transition-shadow hover:shadow-card ${isUnread ? "border-s-4 border-s-primary" : ""}`}>
+                  <CardContent className="flex items-start gap-4 p-4">
+                    <NotificationIcon type={notification.type} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className={`text-sm ${isUnread ? "font-semibold text-fg" : "font-medium text-fg-secondary"}`}>
+                          {notification.title}
+                        </h3>
+                        <time dateTime={notification.createdAt} className="shrink-0 text-xs text-fg-muted">
+                          {fmt.relative(notification.createdAt)}
+                        </time>
+                      </div>
+                      <p className="mt-1 text-sm text-fg-muted">{notification.body}</p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label={t("notif.feedbackLabel")}>
+                        {FEEDBACK.map((value) => {
+                          const active = notification.metadata?.feedback === value;
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => void handleFeedback(notification.id, value)}
+                              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                                active
+                                  ? "border-success-line bg-success-soft text-success"
+                                  : "border-line text-fg-muted hover:border-line-strong hover:text-fg-secondary"
+                              }`}
+                            >
+                              {t(`notif.fb.${value}` as CandidateMessageKey)}
+                            </button>
+                          );
+                        })}
+                        {isUnread && (
+                          <button
+                            type="button"
+                            onClick={() => void handleMarkRead(notification.id)}
+                            className="ms-auto text-xs font-medium text-primary-text hover:underline"
+                          >
+                            {t("notif.markRead")}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {isUnread && (
+                      <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-primary">
+                        <span className="sr-only">{t("notif.unreadDot")}</span>
                       </span>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {notification.body}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {([
-                        ["RELEVANT", "Relevant"],
-                        ["NOT_RELEVANT", "Not relevant"],
-                        ["TOO_MANY", "Too many"],
-                        ["WRONG_ROLE", "Wrong role"],
-                        ["WRONG_LOCATION", "Wrong location"],
-                      ] as const).map(([value, label]) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleFeedback(notification.id, value);
-                          }}
-                          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-                            notification.metadata?.feedback === value
-                              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                              : "border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                          }`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {isUnread && (
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5"></span>
-                  )}
-                </CardContent>
-              </Card>
+                    )}
+                  </CardContent>
+                </Card>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-4 mt-8">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Previous
+        <nav className="mt-8 flex items-center justify-center gap-4" aria-label={t("notif.page", { page, total: totalPages })}>
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            {t("ui.previous")}
           </Button>
-          <span className="text-sm text-gray-600">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
+          <span className="text-sm text-fg-secondary">{t("notif.page", { page, total: totalPages })}</span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+            {t("ui.next")}
           </Button>
-        </div>
+        </nav>
       )}
     </div>
   );

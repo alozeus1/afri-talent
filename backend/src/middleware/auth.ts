@@ -3,6 +3,12 @@ import { verifyToken, JWTPayload } from "../lib/jwt.js";
 import { isTokenBlocked } from "../lib/redis.js";
 import { Role } from "@prisma/client";
 import prisma from "../lib/prisma.js";
+import {
+  clearExpiredSuspension,
+  evaluateAccountAccess,
+  loadCurrentAccount,
+  type CurrentAccount,
+} from "../lib/account-access.js";
 
 declare global {
   namespace Express {
@@ -54,24 +60,49 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
     // JWT claims are a session snapshot, not an authorization source of
     // truth. Rehydrate the account on every protected request so a role
-    // downgrade or account deletion takes effect immediately instead of when
-    // the (up-to-seven-day) token expires.
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: { id: true, email: true, role: true, deletedAt: true, accountRestrictionStatus: true },
-    });
-
-    if (!user || user.deletedAt || user.accountRestrictionStatus === "SUSPENDED") {
-      res.status(401).json({ error: "Account is no longer active" });
+    // downgrade, deletion, suspension, ban or admin session revocation takes
+    // effect immediately instead of when the (up-to-seven-day) token expires.
+    // A lookup failure throws into the catch below (fail closed).
+    const account = await resolveCurrentAccount(payload);
+    if (!account.ok) {
+      res.status(account.status).json(account.body);
       return;
     }
 
-    req.user = { ...payload, email: user.email, role: user.role };
+    req.user = { ...payload, email: account.user.email, role: account.user.role };
     req.rawToken = token;
     next();
   } catch {
     res.status(401).json({ error: "Invalid or expired token" });
   }
+}
+
+type CurrentAccountResult =
+  | { ok: true; user: CurrentAccount }
+  | {
+      ok: false;
+      status: number;
+      body: { error: string; code?: string; until?: string | null };
+    };
+
+async function resolveCurrentAccount(payload: JWTPayload): Promise<CurrentAccountResult> {
+  const user = await loadCurrentAccount(payload.userId);
+  if (!user) {
+    return { ok: false, status: 401, body: { error: "Account is no longer active" } };
+  }
+
+  const decision = evaluateAccountAccess(user, { tokenIssuedAtSeconds: payload.iat });
+  if (!decision.allowed) {
+    return {
+      ok: false,
+      status: decision.status,
+      body: { error: decision.error, code: decision.code, until: decision.until },
+    };
+  }
+  if (decision.suspensionExpired) {
+    clearExpiredSuspension(payload.userId);
+  }
+  return { ok: true, user };
 }
 
 export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
@@ -88,16 +119,13 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
       return;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: { id: true, email: true, role: true, deletedAt: true, accountRestrictionStatus: true },
-    });
-    if (!user || user.deletedAt || user.accountRestrictionStatus === "SUSPENDED") {
+    const account = await resolveCurrentAccount(payload);
+    if (!account.ok) {
       next();
       return;
     }
 
-    req.user = { ...payload, email: user.email, role: user.role };
+    req.user = { ...payload, email: account.user.email, role: account.user.role };
     req.rawToken = token;
   } catch {
     // Intentionally ignore bad tokens for optional auth paths.

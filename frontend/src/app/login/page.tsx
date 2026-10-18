@@ -11,6 +11,7 @@ import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { localizePath, useLocale, useT } from "@/lib/i18n/client";
 import { createBotShieldPayload } from "@/lib/bot-shield";
+import { usePublicT } from "@/lib/i18n/public-messages";
 
 const SHOW_DEMO_CREDENTIALS =
   process.env.NODE_ENV !== "production" &&
@@ -19,6 +20,7 @@ const SHOW_DEMO_CREDENTIALS =
 function LoginForm() {
   const locale = useLocale();
   const t = useT();
+  const tp = usePublicT();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, login } = useAuth();
@@ -45,13 +47,13 @@ function LoginForm() {
     const errors: { email?: string; password?: string } = {};
     
     if (!email) {
-      errors.email = "Email is required";
+      errors.email = tp("site.auth.emailRequired");
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.email = "Please enter a valid email";
+      errors.email = tp("site.auth.emailInvalid");
     }
     
     if (!password) {
-      errors.password = "Password is required";
+      errors["password"] = tp("site.auth.passwordRequired");
     }
     
     setFieldErrors(errors);
@@ -72,7 +74,7 @@ function LoginForm() {
       });
       // The useEffect will handle the redirect once the user object is populated
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : tp("site.auth.loginFailed"));
     } finally {
       setLoading(false);
     }
@@ -81,19 +83,19 @@ function LoginForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t("auth.welcomeBack")}</h1>
-        <p className="text-gray-600 dark:text-gray-300">{t("auth.signInToAccount")}</p>
+        <h1 className="text-2xl font-bold text-fg">{t("auth.welcomeBack")}</h1>
+        <p className="text-fg-secondary">{t("auth.signInToAccount")}</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 p-3 rounded-lg text-sm">
+            <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger">
               {error}
             </div>
           )}
 
           <div className="sr-only" aria-hidden="true">
-            <label htmlFor="website">Website</label>
+            <label htmlFor="website">{tp("site.auth.honeypot")}</label>
             <input
               id="website"
               name="website"
@@ -107,8 +109,9 @@ function LoginForm() {
           <Input
             id="email"
             type="email"
-            label="Email"
-            placeholder="you@example.com"
+            label={t("auth.email")}
+            autoComplete="email"
+            placeholder={tp("site.auth.emailPlaceholder")}
             value={email}
             onChange={(e) => { setEmail(e.target.value); setFieldErrors(prev => ({ ...prev, email: undefined })); }}
             error={fieldErrors.email}
@@ -117,40 +120,41 @@ function LoginForm() {
           <Input
             id="password"
             type="password"
-            label="Password"
-            placeholder="Enter your password"
+            label={t("auth.password")}
+            autoComplete="current-password"
+            placeholder={tp("site.auth.passwordPlaceholder")}
             value={password}
             onChange={(e) => { setPassword(e.target.value); setFieldErrors(prev => ({ ...prev, password: undefined })); }}
             error={fieldErrors.password}
           />
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in..." : t("auth.signIn")}
+            {loading ? tp("site.auth.signingIn") : t("auth.signIn")}
           </Button>
 
           <div className="text-right">
-            <Link href={localizePath("/forgot-password", locale)} className="text-sm text-emerald-600 hover:text-emerald-700">
-              Forgot your password?
+            <Link href={localizePath("/forgot-password", locale)} className="text-sm font-medium text-primary-text hover:underline">
+              {t("auth.forgotPassword")}
             </Link>
           </div>
         </form>
 
         <OAuthButtons mode="login" onError={(oauthError) => setError(oauthError)} />
 
-        <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
+        <div className="mt-6 text-center text-sm text-fg-secondary">
           {t("auth.dontHaveAccount")}{" "}
-          <Link href={localizePath("/register", locale)} className="text-emerald-600 hover:text-emerald-700 font-medium">
+          <Link href={localizePath("/register", locale)} className="font-medium text-primary-text hover:underline">
             {t("auth.createAccount")}
           </Link>
         </div>
 
         {SHOW_DEMO_CREDENTIALS && (
-          <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg text-sm text-gray-600 dark:text-gray-300">
-            <p className="font-medium mb-2">Demo Credentials:</p>
-            <p>Candidate: candidate@example.com</p>
-            <p>Employer: employer@example.com</p>
-            <p>Admin: admin@example.com</p>
-            <p className="mt-1">Password: Password123!</p>
+          <div className="mt-4 p-4 bg-surface-sunken rounded-lg text-sm text-fg-secondary">
+            <p className="font-medium mb-2">{tp("site.auth.demoCredentials")}</p>
+            <p>{`${t("auth.candidate")}: candidate@example.com`}</p>
+            <p>{`${t("auth.employer")}: employer@example.com`}</p>
+            <p>{`${tp("site.auth.admin")}: admin@example.com`}</p>
+            <p className="mt-1">{`${t("auth.password")}: Password123!`}</p>
           </div>
         )}
       </CardContent>

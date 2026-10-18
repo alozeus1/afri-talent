@@ -1,15 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Job, JobListResponse } from "@/lib/api";
+import { Job, JobListResponse, savedJobs } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { JobCard } from "@/components/jobs/job-card";
+import { rememberJobSearch } from "@/components/jobs/job-detail-links";
 import { JobsSearchShell } from "@/components/jobs/jobs-search-shell";
 import { Button } from "@/components/ui/button";
 import { RetryButton } from "@/components/ui/retry-button";
 import { JobResultsSkeletonGrid } from "@/components/ui/skeleton";
-import { JobSearchState, buildJobsHref, hasActiveJobFilters } from "@/lib/jobs-search";
+import {
+  DEFAULT_JOB_SORT,
+  JOB_SORT_OPTIONS,
+  JobSearchState,
+  JobSortOption,
+  buildJobsHref,
+  hasActiveJobFilters,
+} from "@/lib/jobs-search";
+import { usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
+
+const SORT_LABELS: Record<JobSortOption, PublicMessageKey> = {
+  relevance: "discover.sort.relevance",
+  newest: "discover.sort.newest",
+  salary: "discover.sort.salary",
+};
 
 interface JobsBrowseExperienceProps {
   filters: JobSearchState;
@@ -29,15 +45,6 @@ function buildPathAwareJobsHref(pathname: string, state: Partial<JobSearchState>
   return href.startsWith("/jobs") ? href.replace("/jobs", pathname || "/jobs") : href;
 }
 
-function StatPill({ label, value }: { label: string; value: number }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-[rgba(255,255,255,0.62)] px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] dark:bg-[rgba(7,17,29,0.58)] dark:text-gray-200">
-      <span className="font-display text-sm text-gray-950 dark:text-white">{value}</span>
-      {label}
-    </span>
-  );
-}
-
 export function JobsBrowseExperience({
   filters,
   jobs,
@@ -45,12 +52,35 @@ export function JobsBrowseExperience({
   error,
   resultMetrics,
 }: JobsBrowseExperienceProps) {
+  const tp = usePublicT();
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
   const resultsRef = useRef<HTMLElement | null>(null);
   const shouldScrollToResultsRef = useRef(false);
   const hasResults = jobs.length > 0;
+  const { user } = useAuth();
+  const isCandidate = user?.role === "CANDIDATE";
+  const [savedJobIds, setSavedJobIds] = useState<Set<string>>(() => new Set());
+
+  // One saved-ids request for the whole grid (not one per card).
+  useEffect(() => {
+    if (!isCandidate) {
+      return;
+    }
+    let cancelled = false;
+    savedJobs
+      .ids()
+      .then((data) => {
+        if (!cancelled) setSavedJobIds(new Set(data.jobIds));
+      })
+      .catch(() => {
+        // Non-blocking: hearts fall back to unsaved; toggling still works.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isCandidate]);
 
   const navigateToState = (nextState: JobSearchState, options?: { scrollToResults?: boolean }) => {
     const nextHref = buildPathAwareJobsHref(pathname, nextState);
@@ -70,6 +100,10 @@ export function JobsBrowseExperience({
   };
 
   useEffect(() => {
+    rememberJobSearch(buildPathAwareJobsHref(pathname, filters));
+  }, [pathname, filters]);
+
+  useEffect(() => {
     if (!isPending && shouldScrollToResultsRef.current) {
       resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       shouldScrollToResultsRef.current = false;
@@ -85,7 +119,9 @@ export function JobsBrowseExperience({
     seniority: "",
     visaSponsorship: "",
     relocationAssistance: "",
+    hiresFromAfrica: "",
     remote: "",
+    sortBy: filters.sortBy,
     page: 1,
     limit: filters.limit,
   });
@@ -109,44 +145,41 @@ export function JobsBrowseExperience({
         className="rounded-[2rem]"
         id="jobs-results"
       >
-        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-2">
-            <p className="font-display text-2xl font-bold text-gray-950 dark:text-white">
-              {pagination.total} job{pagination.total !== 1 ? "s" : ""} found
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              Search stays anchored while results refresh, so you can keep refining without losing context.
-            </p>
-          </div>
-
-          {resultMetrics && !error && (
-            <div className="flex flex-wrap gap-2">
-              <StatPill label="showing now" value={resultMetrics.visibleResults} />
-              <StatPill label="trusted cues" value={resultMetrics.trustedResults} />
-              <StatPill label="recently refreshed" value={resultMetrics.freshResults} />
-            </div>
-          )}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <p className="font-display text-lg font-semibold text-fg md:text-xl">
+            {tp("discover.results.count", { count: pagination.total })}
+          </p>
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-fg-secondary">
+            <span className="hidden sm:inline">{tp("discover.sort.label")}</span>
+            <select
+              value={filters.sortBy || DEFAULT_JOB_SORT}
+              onChange={(event) =>
+                navigateToState(
+                  { ...filters, sortBy: event.target.value as JobSortOption, page: 1 },
+                  { scrollToResults: false },
+                )
+              }
+              className="rounded-full border border-line-strong bg-surface-raised px-3 py-1.5 text-sm text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              aria-label={tp("discover.sort.aria")}
+            >
+              {JOB_SORT_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {tp(SORT_LABELS[option])}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
-        {hasResults && !error && (
-          <div className="mb-6 rounded-[1.5rem] border border-emerald-200 bg-emerald-50/75 px-4 py-4 text-sm text-emerald-900 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-100">
-            Search ranking prioritizes relevance, recent refreshes, verified employers, salary transparency, and visa or relocation fit when it matters.
-          </div>
-        )}
-
         {error ? (
-          <div className="surface-panel-strong rounded-[1.75rem] border border-red-200 px-6 py-8 dark:border-red-500/20">
-            <p className="font-display text-2xl font-bold text-gray-950 dark:text-white">
-              We couldn&apos;t load the latest roles just now.
-            </p>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-gray-600 dark:text-gray-300">
-              The search controls above are still available. Retry in a moment, or broaden the filters if the market is refreshing.
-            </p>
+          <div role="alert" className="surface-panel-strong rounded-[1.75rem] border border-danger-line px-6 py-8">
+            <p className="font-display text-2xl font-bold text-fg">{tp("discover.results.errorTitle")}</p>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-secondary">{tp("discover.results.errorBody")}</p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <RetryButton />
+              <RetryButton label={tp("site.error.retry")} />
               {hasActiveJobFilters(filters) && (
                 <Link href={clearFiltersHref}>
-                  <Button variant="ghost">Clear filters</Button>
+                  <Button variant="ghost">{tp("discover.filters.clear")}</Button>
                 </Link>
               )}
             </div>
@@ -154,17 +187,17 @@ export function JobsBrowseExperience({
         ) : hasResults ? (
           <div className="relative">
             <div
-              className={`grid gap-6 transition-opacity duration-200 md:grid-cols-2 lg:grid-cols-3 ${
+              className={`grid grid-cols-1 gap-4 transition-opacity duration-200 md:gap-5 md:grid-cols-2 lg:grid-cols-3 ${
                 isPending ? "opacity-35" : "opacity-100"
               }`}
             >
               {jobs.map((job) => (
-                <JobCard key={job.id} job={job} />
+                <JobCard key={job.id} job={job} initialSaved={isCandidate && savedJobIds.has(job.id)} />
               ))}
             </div>
 
             {isPending && (
-              <div className="pointer-events-none absolute inset-0 z-10 rounded-[1.75rem] bg-[rgba(244,239,229,0.72)] p-2 backdrop-blur-[2px] dark:bg-[rgba(7,17,29,0.55)]">
+              <div className="pointer-events-none absolute inset-0 z-10 rounded-[1.75rem] bg-canvas/70 p-2 backdrop-blur-[2px]">
                 <JobResultsSkeletonGrid count={Math.min(Math.max(jobs.length, 3), 6)} />
               </div>
             )}
@@ -173,19 +206,15 @@ export function JobsBrowseExperience({
           <JobResultsSkeletonGrid count={Math.min(filters.limit, 6)} />
         ) : (
           <div className="surface-panel-strong rounded-[1.75rem] px-6 py-10 text-center">
-            <p className="font-display text-2xl font-bold text-gray-950 dark:text-white">
-              No roles matched this search yet.
-            </p>
-            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-gray-600 dark:text-gray-300">
-              Try a broader title, a wider location, or clear the mobility filters to see more opportunities.
-            </p>
+            <p className="font-display text-2xl font-bold text-fg">{tp("discover.results.emptyTitle")}</p>
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-fg-secondary">{tp("discover.results.emptyBody")}</p>
             <div className="mt-5 flex flex-wrap justify-center gap-3">
               {hasActiveJobFilters(filters) ? (
                 <Link href={clearFiltersHref}>
-                  <Button variant="outline">Clear filters</Button>
+                  <Button variant="outline">{tp("discover.filters.clear")}</Button>
                 </Link>
               ) : (
-                <RetryButton />
+                <RetryButton label={tp("site.error.retry")} />
               )}
             </div>
           </div>
@@ -201,16 +230,16 @@ export function JobsBrowseExperience({
                     shouldScrollToResultsRef.current = true;
                   }}
                 >
-                  Previous
+                  {tp("discover.page.previous")}
                 </Button>
               </Link>
             ) : (
               <Button variant="outline" disabled>
-                Previous
+                {tp("discover.page.previous")}
               </Button>
             )}
-            <span className="flex items-center justify-center px-4 text-sm text-gray-600 dark:text-gray-300">
-              Page {filters.page} of {pagination.totalPages}
+            <span className="flex items-center justify-center px-4 text-sm text-fg-secondary">
+              {tp("discover.page.of", { page: filters.page, total: pagination.totalPages })}
             </span>
             {filters.page < pagination.totalPages && !isPending ? (
               <Link href={nextHref}>
@@ -220,12 +249,12 @@ export function JobsBrowseExperience({
                     shouldScrollToResultsRef.current = true;
                   }}
                 >
-                  Next
+                  {tp("discover.page.next")}
                 </Button>
               </Link>
             ) : (
               <Button variant="outline" disabled>
-                Next
+                {tp("discover.page.next")}
               </Button>
             )}
           </div>

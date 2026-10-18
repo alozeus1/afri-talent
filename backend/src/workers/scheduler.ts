@@ -16,7 +16,7 @@ import { redisClient } from "../lib/redis.js";
 import { runAggregatorCycle } from "./aggregator-cron.js";
 import { runJobMatcherCycle } from "./job-matcher.js";
 import { runAlertDispatchCycle } from "./alert-sender.js";
-import { runAutoApplyCycle, AUTO_APPLY_INTERVAL_MS } from "./auto-apply.js";
+import { runAutoApplyCycle, AUTO_APPLY_INTERVAL_MS, isAutoApplyEnabled } from "./auto-apply.js";
 import { runJobCleanupCycle, CLEANUP_INTERVAL_MS } from "./job-cleanup.js";
 import { runJobStaleCheckCycle, STALE_CHECK_INTERVAL_MS } from "./job-stale-check.js";
 import { runApplyClickoutNudgeCycle, APPLY_CLICKOUT_NUDGE_INTERVAL_MS } from "./apply-clickout-nudge.js";
@@ -223,9 +223,15 @@ export function startScheduler(): void {
     ),
   );
 
-  intervals.push(
-    setInterval(() => void safeRun("auto-apply", runAutoApplyCycle), AUTO_APPLY_INTERVAL_MS)
-  );
+  // Auto-apply creates employer-visible applications, so it is off unless
+  // AUTO_APPLY_ENABLED=1 (and then only for users who explicitly opted in).
+  if (isAutoApplyEnabled()) {
+    intervals.push(
+      setInterval(() => void safeRun("auto-apply", runAutoApplyCycle), AUTO_APPLY_INTERVAL_MS)
+    );
+  } else {
+    logger.info("[scheduler] auto-apply disabled (set AUTO_APPLY_ENABLED=1 to enable)");
+  }
 
   // Daily cleanup of stale/expired job listings
   intervals.push(

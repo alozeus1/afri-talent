@@ -266,6 +266,8 @@ module "ecs_fargate" {
     BLOG_AUTOMATION_ENABLED         = "1" # all blog API keys populated 2026-05-08
     LANGGRAPH_ENABLED               = "1"
     LANGGRAPH_JOB_INGESTION_QUALITY = "1"
+    FREE_MODE                       = "true" # free launch: read-time entitlements; "false" restores billing
+    AUTO_APPLY_ENABLED              = "1"    # worker still requires per-user opt-in
   }
 
   # SSM SecureString -> env var. Each value is the parameter ARN.

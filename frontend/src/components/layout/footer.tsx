@@ -1,4 +1,15 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { isAdminPath } from "@/components/layout/use-dropdown";
+import { FREE_MODE } from "@/lib/free-mode";
+import { localizePath, useLocale, useT } from "@/lib/i18n/client";
+import { usePublicT } from "@/lib/i18n/public-messages";
+
+// Brand names are not translated.
+const BRAND_NAME = "AfriTalent";
+const STUDIO_NAME = "Maralito Labs Studio";
 
 const socialLinks = [
   {
@@ -23,96 +34,107 @@ const socialLinks = [
   },
 ];
 
+/** Marketing footer. The admin console is a dedicated app shell and omits it. */
 export function Footer() {
+  const pathname = usePathname();
+  if (isAdminPath(pathname)) return null;
+  return <SiteFooter />;
+}
+
+function SiteFooter() {
+  const t = useT();
+  const tp = usePublicT();
+  const locale = useLocale();
+  const href = (path: string) => localizePath(path, locale);
   return (
-    <footer className="section-shell mt-12 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400">
+    <footer className="section-shell mt-12 border-t border-line bg-surface text-fg-secondary">
       <div className="page-frame py-14">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
-            <Link href="/" prefetch={false} className="mb-5 flex items-center space-x-3">
+            <Link href={href("/")} prefetch={false} className="mb-5 flex items-center space-x-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-500 bg-emerald-600 shadow-sm">
                 <span className="font-display text-lg font-bold text-white">A</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-display text-xl font-bold text-zinc-900 dark:text-zinc-50">AfriTalent</span>
-                <span className="text-[11px] uppercase tracking-widest text-zinc-600 dark:text-zinc-300">Africa to global</span>
+                <span className="font-display text-xl font-bold text-fg">{BRAND_NAME}</span>
+                <span className="text-[11px] uppercase tracking-widest text-fg-secondary">{tp("site.footer.brandTagline")}</span>
               </div>
             </Link>
-            <p className="max-w-lg text-sm leading-7 text-zinc-600 dark:text-zinc-400">
-              A trust-first hiring platform helping global teams discover African talent with stronger credibility, better workflow, and more signal than a generic job board.
+            <p className="max-w-lg text-sm leading-7 text-fg-secondary">
+              {tp("site.footer.about")}
             </p>
           </div>
 
           <div>
-            <h3 className="font-semibold text-lg mb-4">For Candidates</h3>
+            <h3 className="font-semibold text-lg mb-4">{tp("site.footer.forCandidates")}</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/jobs" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
-                  Browse Jobs
+                <Link href={href("/jobs")} prefetch={false} className="text-fg-secondary hover:text-fg transition-colors">
+                  {tp("site.footer.browseJobs")}
                 </Link>
               </li>
               <li>
-                <Link href="/companies" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
-                  Company Reviews
+                <Link href={href("/companies")} prefetch={false} className="text-fg-secondary hover:text-fg transition-colors">
+                  {tp("site.footer.companyReviews")}
                 </Link>
               </li>
               <li>
-                <Link href="/salaries" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
-                  Salary Comparison
+                <Link href={href("/salaries")} prefetch={false} className="text-fg-secondary hover:text-fg transition-colors">
+                  {tp("site.footer.salaryComparison")}
                 </Link>
               </li>
               <li>
-                <Link href="/interviews" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
-                  Interview Prep
+                <Link href={href("/interviews")} prefetch={false} className="text-fg-secondary hover:text-fg transition-colors">
+                  {tp("site.footer.interviewPrep")}
                 </Link>
               </li>
               <li>
-                <Link href="/immigration" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
-                  Visa Tracker
+                <Link href={href("/immigration")} prefetch={false} className="text-fg-secondary hover:text-fg transition-colors">
+                  {tp("site.footer.visaTracker")}
                 </Link>
               </li>
               <li>
-                <Link href="/learning" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
-                  Learning Hub
+                <Link href={href("/learning")} prefetch={false} className="text-fg-secondary hover:text-fg transition-colors">
+                  {tp("site.footer.learningHub")}
                 </Link>
               </li>
               <li>
-                <Link href="/resources" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
-                  Career Resources
+                <Link href={href("/resources")} prefetch={false} className="text-fg-secondary hover:text-fg transition-colors">
+                  {tp("site.footer.careerResources")}
                 </Link>
               </li>
               <li>
-                <Link href="/billing" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
-                  Pricing
+                <Link href={href("/pricing")} prefetch={false} className="text-fg-secondary hover:text-fg transition-colors">
+                  {FREE_MODE ? t("nav.freeForEveryone") : t("nav.pricing")}
                 </Link>
               </li>
             </ul>
           </div>
 
           <div>
-            <h3 className="font-semibold text-lg mb-4">For Employers</h3>
+            <h3 className="font-semibold text-lg mb-4">{tp("site.footer.forEmployers")}</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/register?role=employer" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
-                  Post a Job
+                <Link href={href("/register?role=employer")} prefetch={false} className="text-fg-secondary hover:text-fg transition-colors">
+                  {tp("site.footer.postJob")}
                 </Link>
               </li>
               <li>
-                <Link href="/employer/talent" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
-                  Browse Talent
+                <Link href={href("/employer/talent")} prefetch={false} className="text-fg-secondary hover:text-fg transition-colors">
+                  {tp("site.footer.browseTalent")}
                 </Link>
               </li>
               <li>
-                <Link href="/hiring-resources" prefetch={false} className="text-zinc-700 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-white transition-colors">
-                  Hiring Resources
+                <Link href={href("/hiring-resources")} prefetch={false} className="text-fg-secondary hover:text-fg transition-colors">
+                  {tp("site.footer.hiringResources")}
                 </Link>
               </li>
             </ul>
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col items-center justify-between gap-6 border-t border-zinc-200 pt-8 dark:border-white/10 md:flex-row">
-          <nav aria-label="Social links" className="flex items-center gap-3">
+        <div className="mt-12 flex flex-col items-center justify-between gap-6 border-t border-line pt-8 md:flex-row">
+          <nav aria-label={tp("site.footer.socialLinks")} className="flex items-center gap-3">
             {socialLinks.map((link) => (
               <a
                 key={link.name}
@@ -120,7 +142,7 @@ export function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={link.name}
-                className="flex h-11 w-11 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700 shadow-sm transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+                className="flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-surface-sunken text-fg-secondary shadow-sm transition-colors hover:bg-surface-muted hover:text-fg"
               >
                 <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   {link.icon}
@@ -130,22 +152,23 @@ export function Footer() {
           </nav>
 
           {/* Legal nav */}
-          <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-zinc-600 dark:text-zinc-400">
-            <Link href="/privacy-policy" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Privacy Policy</Link>
-            <Link href="/terms-of-service" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Terms of Service</Link>
-            <Link href="/cookies-policy" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Cookies Policy</Link>
-            <Link href="/accessibility" prefetch={false} className="hover:text-zinc-950 dark:hover:text-white transition-colors">Accessibility</Link>
+          <nav aria-label={tp("site.footer.legal")} className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-fg-secondary">
+            <Link href={href("/contact")} prefetch={false} className="hover:text-fg dark:hover:text-white transition-colors">{tp("site.footer.contact")}</Link>
+            <Link href={href("/privacy-policy")} prefetch={false} className="hover:text-fg dark:hover:text-white transition-colors">{tp("site.footer.privacy")}</Link>
+            <Link href={href("/terms-of-service")} prefetch={false} className="hover:text-fg dark:hover:text-white transition-colors">{tp("site.footer.terms")}</Link>
+            <Link href={href("/cookies-policy")} prefetch={false} className="hover:text-fg dark:hover:text-white transition-colors">{tp("site.footer.cookies")}</Link>
+            <Link href={href("/accessibility")} prefetch={false} className="hover:text-fg dark:hover:text-white transition-colors">{tp("site.footer.accessibility")}</Link>
           </nav>
 
-          <p className="whitespace-nowrap text-sm text-zinc-600 dark:text-zinc-400">
-            &copy; {new Date().getFullYear()} AfriTalent. All rights reserved.
+          <p className="whitespace-nowrap text-sm text-fg-secondary">
+            {tp("site.footer.copyright", { year: new Date().getFullYear() })}
           </p>
         </div>
 
-        <div className="mt-6 border-t border-zinc-200 pt-4 text-center dark:border-white/10">
-          <p className="text-xs text-zinc-600 dark:text-zinc-300">
-            Powered by <span className="font-semibold text-zinc-700 dark:text-zinc-200">Maralito Labs Studio</span>
-            <sup className="text-zinc-600 dark:text-zinc-300 ml-0.5">TM</sup>
+        <div className="mt-6 border-t border-line pt-4 text-center">
+          <p className="text-xs text-fg-secondary">
+            {tp("site.footer.poweredBy")} <span className="font-semibold text-fg-secondary">{STUDIO_NAME}</span>
+            <sup className="text-fg-secondary ms-0.5">{"TM"}</sup>
           </p>
         </div>
       </div>
