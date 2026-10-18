@@ -224,9 +224,9 @@ export default function CompaniesPage() {
               )}
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {data.companies.map((company) => (
-                <Link key={company.id} href={localizePath(`/companies/${company.id}`, locale)} className="group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+                <Link key={company.id} href={localizePath(`/companies/${company.id}`, locale)} className="group min-w-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                   <Card className="h-full cursor-pointer transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-raised">
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between mb-3">
