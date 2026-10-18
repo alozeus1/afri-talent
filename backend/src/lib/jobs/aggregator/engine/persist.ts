@@ -30,6 +30,7 @@ import {
 import { isGraphEnabled } from "../../../ai/langgraph/index.js";
 import { gateJobIngestion, jobPersistenceForDecision } from "../../../ai/langgraph/integration/jobIngestionAdapter.js";
 import type { AggregatedJob } from "../types.js";
+import { resolveJobField } from "../taxonomy.js";
 import { mapWithConcurrency } from "./circuit-breaker.js";
 import { contentHash } from "./dedupe.js";
 import type { PostingGroup } from "./dedupe.js";
@@ -346,7 +347,13 @@ async function buildWriteData(
     description: job.description,
     location: normalizedLocation.display || job.location,
     type: job.jobType,
-    jobField: job.jobField ?? null,
+    jobField: resolveJobField({
+      title: job.title,
+      taxonomyField: classification.field,
+      existing: job.jobField,
+      description: job.description,
+      tags: job.skills,
+    }),
     taxonomyField: classification.field,
     taxonomyVersion: classification.version,
     taxonomyConfidence: classification.confidence,
