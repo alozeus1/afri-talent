@@ -14,6 +14,7 @@ import prisma from "../../lib/prisma.js";
 import logger from "../../lib/logger.js";
 import { writeCoverLetter } from "../../lib/ai/skills/application-writer.js";
 import { gradeAiOutput } from "../../lib/ai/quality/quality-rubric.js";
+import { isSafeExternalHttpsUrl } from "../../lib/security/external-url.js";
 
 const router = Router();
 
@@ -36,7 +37,9 @@ const generateSchema = z.object({
 const submitSchema = z.object({
   jobId: z.string().uuid(),
   coverLetter: z.string().min(1).max(5000),
-  cvUrl: z.string().url().startsWith("https://").max(500).optional(),
+  cvUrl: z.string().url().max(500).refine(isSafeExternalHttpsUrl, {
+    message: "CV URL must use HTTPS and cannot include credentials",
+  }).optional(),
 });
 
 // ── POST /api/skills/application-writer/generate ─────────────────────────────

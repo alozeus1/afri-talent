@@ -164,6 +164,14 @@ export default function ResumesPage() {
   }
 
   const activeResume = resumes.find((r) => r.isActive);
+  const resumeSecurityLabel = (resume: ResumeFile) => {
+    switch (resume.securityStatus) {
+      case "CLEAN": return t("resumes.security.clean");
+      case "QUARANTINED": return t("resumes.security.quarantined");
+      case "REJECTED": return t("resumes.security.rejected");
+      default: return t("resumes.security.pending");
+    }
+  };
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
@@ -401,10 +409,15 @@ export default function ResumesPage() {
                     <div className="min-w-0">
                       <p className="truncate font-medium text-fg">{resume.fileName}</p>
                       <p className="text-sm text-fg-muted">{t("resumes.uploaded", { date: fmt.date(resume.uploadedAt) })}</p>
+                      <p className={`text-sm ${resume.securityStatus === "CLEAN" ? "text-success" : "text-warning"}`}>
+                        {resumeSecurityLabel(resume)}
+                      </p>
                     </div>
                   </div>
                   {resume.isActive ? (
                     <Badge variant="success">{t("resumes.activeBadge")}</Badge>
+                  ) : resume.securityStatus !== "CLEAN" ? (
+                    <Badge variant="warning">{resumeSecurityLabel(resume)}</Badge>
                   ) : (
                     <Button
                       variant="outline"

@@ -49,8 +49,10 @@ async function loadApplicantContext(userId: string) {
   const profile = await prisma.candidateProfile.findUnique({
     where: { userId },
     include: {
+      // Only scanner-cleared uploads may be attached (fail-closed on
+      // PENDING_SCAN / QUARANTINED / REJECTED).
       resumes: {
-        where: { isActive: true },
+        where: { isActive: true, securityStatus: "CLEAN" },
         take: 1,
       },
     },

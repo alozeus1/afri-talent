@@ -7,6 +7,9 @@ vi.mock("../middleware/account-standing.js", () => ({
 // Mock Prisma
 vi.mock("../lib/prisma.js", () => ({
     default: {
+        user: {
+            findUnique: vi.fn(),
+        },
         candidateProfile: {
             findUnique: vi.fn(),
         },
@@ -30,6 +33,27 @@ function makeCandidateToken(id = "can123"): string {
         userId: id,
         email: "candidate@test.com",
         role: Role.CANDIDATE,
+    });
+}
+
+function mockCurrentCandidate(): void {
+    (prisma.user.findUnique as any).mockImplementation((args: any) => {
+        const isAuthLookup =
+            args?.where?.id === "can123" &&
+            args?.select?.deletedAt === true &&
+            args?.select?.accountRestrictionStatus === true;
+
+        if (isAuthLookup) {
+            return Promise.resolve({
+                id: "can123",
+                email: "candidate@test.com",
+                role: Role.CANDIDATE,
+                deletedAt: null,
+                accountRestrictionStatus: "ACTIVE",
+            });
+        }
+
+        return undefined;
     });
 }
 
@@ -58,6 +82,7 @@ describe("GET /api/learning/recommended", () => {
     });
 
     it("returns gapSkills on each item when the candidate has profile skills", async () => {
+        mockCurrentCandidate();
         vi.mocked(prisma.candidateProfile.findUnique).mockResolvedValue({
             skills: ["React", "TypeScript"],
         } as never);
@@ -77,6 +102,7 @@ describe("GET /api/learning/recommended", () => {
     });
 
     it("never lists a skill the candidate already has as a gap", async () => {
+        mockCurrentCandidate();
         vi.mocked(prisma.candidateProfile.findUnique).mockResolvedValue({
             skills: ["Docker"],
         } as never);
@@ -96,6 +122,7 @@ describe("GET /api/learning/recommended", () => {
     });
 
     it("omits gapSkills on the featured fallback when the profile has no skills", async () => {
+        mockCurrentCandidate();
         vi.mocked(prisma.candidateProfile.findUnique).mockResolvedValue({
             skills: [],
         } as never);

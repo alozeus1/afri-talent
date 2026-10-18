@@ -4,12 +4,20 @@
  */
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
+// authenticate rehydrates the account per request; model the account behind
+// every token this suite mints (see helpers/current-account.ts).
+vi.mock("../lib/jwt.js", async (importOriginal) =>
+  (await import("./helpers/current-account.js")).mockJwtModule(importOriginal));
+vi.mock("../lib/account-access.js", async (importOriginal) =>
+  (await import("./helpers/current-account.js")).mockAccountAccessModule(importOriginal));
+
 const { db } = vi.hoisted(() => ({
   db: {
     user: { findUnique: vi.fn() },
     employer: { findUnique: vi.fn() },
     application: { findUnique: vi.fn() },
     userResume: { findUnique: vi.fn() },
+    resume: { findFirst: vi.fn() },
     $queryRaw: vi.fn().mockResolvedValue([]),
     $disconnect: vi.fn().mockResolvedValue(undefined),
   },
@@ -43,6 +51,7 @@ beforeEach(() => {
   );
   db.application.findUnique.mockResolvedValue(applicationWith("resumes/cand-1/cv.pdf"));
   db.userResume.findUnique.mockResolvedValue({ rawText: "Ada Lovelace\nEngineer" });
+  db.resume.findFirst.mockResolvedValue({ id: "resume-1" });
 });
 
 afterEach(() => {
@@ -96,6 +105,19 @@ describe("GET /api/applications/:id/cv", () => {
       .set("Authorization", `Bearer ${employerToken("owner-user")}`);
     expect(res.status).toBe(200);
     expect(res.body.url).toBe("https://s3.example.com/signed-get");
+    expect(db.resume.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ s3Key: "resumes/cand-1/cv.pdf", securityStatus: "CLEAN" }),
+    }));
+  });
+
+  it("never presigns an upload the malware scanner has not cleared", async () => {
+    vi.stubEnv("S3_UPLOADS_BUCKET", "uploads-bucket");
+    db.resume.findFirst.mockResolvedValue(null);
+    const res = await request(app)
+      .get(`/api/applications/${APP_ID}/cv`)
+      .set("Authorization", `Bearer ${employerToken("owner-user")}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ text: "Ada Lovelace\nEngineer" });
   });
 
   it("falls back to the candidate's resume text when S3 is not configured", async () => {

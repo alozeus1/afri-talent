@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Router, Request, Response } from "express";
+import { createHash } from "node:crypto";
 import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { recordOpsEvent } from "../lib/ops/events.js";
@@ -75,6 +76,8 @@ router.post("/approval", async (req: Request, res: Response) => {
   }
 
   const { graphRunId, action } = verified.claims;
+  const tokenJti = verified.claims.jti;
+  const tokenDigest = createHash("sha256").update(token).digest("hex");
 
   // The token only ever authorizes a deny. Defensive: reject anything else.
   if (action !== "deny") {
@@ -82,9 +85,13 @@ router.post("/approval", async (req: Request, res: Response) => {
     return;
   }
 
-  // Single-use (best-effort; deny is idempotent so failing open is safe).
-  const first = await consumeDecisionTokenOnce(graphRunId, DECISION_TOKEN_TTL_SECONDS);
-  if (!first) {
+  const completed = await prisma.n8nCallbackDecision.findUnique({ where: { tokenDigest } });
+  if (completed?.completedAt) {
+    if (completed.graphRunId !== graphRunId || completed.action !== action || (completed.tokenJti && completed.tokenJti !== tokenJti)) {
+      res.status(409).json({ error: "Callback identity conflict" });
+      return;
+    }
+    await consumeDecisionTokenOnce(graphRunId, DECISION_TOKEN_TTL_SECONDS).catch(() => undefined);
     res.status(200).json({ status: "already_processed", graphRunId });
     return;
   }
@@ -100,23 +107,50 @@ router.post("/approval", async (req: Request, res: Response) => {
     // calls assertGraphRunNotDenied() and refuses to resume a DENIED run, so a
     // later console/user approval can never drive the paused checkpoint into a
     // sensitive side effect (publish/send/verify) after an email deny.
-    await prisma.graphRun.update({
-      where: { graphRunId },
-      data: { approvalState: "DENIED", status: "BLOCKED" },
+    const transition = await prisma.$transaction(async (tx) => {
+      await tx.n8nCallbackDecision.create({ data: { tokenDigest, tokenJti, graphRunId, action } });
+      const result = await tx.graphRun.updateMany({
+        where: { graphRunId, approvalState: { not: "DENIED" } },
+        data: { approvalState: "DENIED", status: "BLOCKED" },
+      });
+      if (result.count === 0) return result;
+      await tx.graphRunEvent.create({
+        data: {
+          graphRunId,
+          type: "human_approval_denied",
+          node: "n8n_callback",
+          details: { source: "n8n_email", reason },
+        },
+      });
+      await tx.n8nCallbackDecision.update({ where: { tokenDigest }, data: { completedAt: new Date() } });
+      return result;
     });
-    await prisma.graphRunEvent.create({
-      data: {
-        graphRunId,
-        type: "human_approval_denied",
-        node: "n8n_callback",
-        details: { source: "n8n_email", reason },
-      },
-    });
+    if (transition.count === 0) {
+      res.status(200).json({ status: "already_processed", graphRunId });
+      return;
+    }
   } catch (err) {
+    const target = (err as { code?: string; meta?: { target?: unknown } })?.meta?.target;
+    const callbackDigestConflict = (err as { code?: string })?.code === "P2002"
+      && (Array.isArray(target) ? target.includes("tokenDigest") : String(target ?? "").includes("tokenDigest"));
+    if (callbackDigestConflict) {
+      const existing = await prisma.n8nCallbackDecision.findUnique({ where: { tokenDigest } });
+      if (existing?.completedAt && existing.graphRunId === graphRunId && existing.action === action && existing.tokenJti === tokenJti) {
+        await consumeDecisionTokenOnce(graphRunId, DECISION_TOKEN_TTL_SECONDS).catch(() => undefined);
+        res.status(200).json({ status: "already_processed", graphRunId });
+        return;
+      }
+      res.status(409).json({ error: "Callback identity conflict" });
+      return;
+    }
     logger.error({ err: String(err), graph_run_id: graphRunId }, "[n8n] deny persist failed");
     res.status(500).json({ error: "Failed to record denial" });
     return;
   }
+
+  // Finalize only after the denial is durable. A Redis failure is harmless:
+  // the persisted terminal state makes provider retries idempotent.
+  await consumeDecisionTokenOnce(graphRunId, DECISION_TOKEN_TTL_SECONDS).catch(() => undefined);
 
   const meta = gateMetaFor(run.workflowType);
   recordOpsEvent({

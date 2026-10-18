@@ -1,4 +1,4 @@
-import { AccountRestrictionStatus } from "@prisma/client";
+import { AccountRestrictionStatus, Role } from "@prisma/client";
 import prisma from "./prisma.js";
 import logger from "./logger.js";
 
@@ -97,73 +97,37 @@ export function evaluateAccountAccess(
   return { allowed: true, suspensionExpired };
 }
 
-// ── Per-request lookup with a short in-process cache ─────────────────────────
+// ── Per-request current-account lookup ──────────────────────────────────────
 //
-// Authenticated requests would otherwise pay one extra PK lookup each. The
-// cache TTL bounds how long a suspension takes to reach *other* API tasks;
-// the task that performed the admin action invalidates its entry immediately.
-// Disabled under NODE_ENV=test so mocked-prisma tests stay deterministic.
+// Deliberately uncached: JWT claims are a session snapshot, so `authenticate`
+// rehydrates role/email and re-evaluates access on every request. A role
+// downgrade, deletion, suspension, ban or session revocation therefore takes
+// effect on the very next request on every API task. Lookup errors propagate
+// so the middleware fails closed.
 
-const CACHE_TTL_MS = Number(process.env.ACCOUNT_ACCESS_CACHE_TTL_MS ?? 15_000);
-const CACHE_MAX_ENTRIES = 5_000;
-const cache = new Map<string, { record: AccountAccessRecord | null; expiresAt: number }>();
-
-function cacheEnabled(): boolean {
-  return process.env.NODE_ENV !== "test" && CACHE_TTL_MS > 0;
-}
-
-export function invalidateAccountAccess(userId: string): void {
-  cache.delete(userId);
-}
-
-export function __resetAccountAccessCache(): void {
-  cache.clear();
-}
-
-const ACCESS_SELECT = {
+const CURRENT_ACCOUNT_SELECT = {
+  id: true,
+  email: true,
+  role: true,
+  deletedAt: true,
   accountRestrictionStatus: true,
   accountRestrictionReason: true,
   accountRestrictedUntil: true,
   sessionsRevokedAt: true,
-  deletedAt: true,
 } as const;
 
-/**
- * Loads the access record for a user. Returns `undefined` when the lookup
- * could not be performed (DB error) — callers fail open in that case, since
- * the downstream route needs the same database and will fail on its own.
- */
-export async function loadAccountAccessRecord(
-  userId: string,
-): Promise<AccountAccessRecord | null | undefined> {
-  if (cacheEnabled()) {
-    const hit = cache.get(userId);
-    if (hit && hit.expiresAt > Date.now()) return hit.record;
-  }
+export interface CurrentAccount extends AccountAccessRecord {
+  id: string;
+  email: string;
+  role: Role;
+}
 
-  try {
-    const record = (await prisma.user.findFirst({
-      where: { id: userId },
-      select: ACCESS_SELECT,
-    })) as AccountAccessRecord | null | undefined;
-
-    if (record === undefined) return undefined;
-
-    if (cacheEnabled()) {
-      if (cache.size >= CACHE_MAX_ENTRIES) {
-        const oldest = cache.keys().next().value;
-        if (oldest !== undefined) cache.delete(oldest);
-      }
-      cache.set(userId, { record, expiresAt: Date.now() + CACHE_TTL_MS });
-    }
-    return record;
-  } catch (error) {
-    logger.warn(
-      { userId: userId.slice(0, 8), err: error instanceof Error ? error.message : "unknown" },
-      "[account-access] lookup failed; failing open",
-    );
-    return undefined;
-  }
+export async function loadCurrentAccount(userId: string): Promise<CurrentAccount | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: CURRENT_ACCOUNT_SELECT,
+  });
+  return (user as CurrentAccount | null | undefined) ?? null;
 }
 
 /**
@@ -190,7 +154,6 @@ export function clearExpiredSuspension(userId: string): void {
         accountRestrictedUntil: null,
       },
     }))
-      .then(() => invalidateAccountAccess(userId))
       .catch(onError);
   } catch (error) {
     onError(error);

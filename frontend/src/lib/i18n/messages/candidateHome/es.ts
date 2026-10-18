@@ -608,6 +608,8 @@ export default {
   "dash.bt.badge.employment": "Historial laboral comprobado",
   "dash.bt.badge.unverified": "Perfil no verificado",
   "dash.bt.warn.profile": "Completa más tu perfil para mejorar su autenticidad.",
+  "dash.bt.warn.resume": "Añade un currículum activo para que los empleadores confíen en los datos de tu perfil.",
+  "dash.bt.warn.history": "Asegúrate de que las fechas y los cargos de tu historial laboral sean coherentes.",
   "dash.bt.warn.reports": "Tu cuenta tiene reportes de confianza sin resolver.",
   "dash.bt.warn.volume": "Un volumen alto de candidaturas puede activar una revisión antispam.",
   "dash.bt.warn.evidence": "Añade habilidades respaldadas o enlaces de portafolio para aumentar la confianza de los empleadores.",

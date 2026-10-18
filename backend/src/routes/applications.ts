@@ -40,6 +40,7 @@ import {
 } from "../lib/ats/service.js";
 import { bucketForScope } from "../lib/upload-buckets.js";
 import { getS3Client } from "./files.js";
+import { isSafeExternalHttpsUrl } from "../lib/security/external-url.js";
 
 const router = Router();
 
@@ -49,16 +50,7 @@ const ALLOWED_CV_DOMAINS = process.env.ALLOWED_CV_DOMAINS
   : [];
 
 function validateCvUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:") return false;
-    if (ALLOWED_CV_DOMAINS.length > 0) {
-      return ALLOWED_CV_DOMAINS.some((domain) => parsed.hostname.endsWith(domain));
-    }
-    return true;
-  } catch {
-    return false;
-  }
+  return isSafeExternalHttpsUrl(url, ALLOWED_CV_DOMAINS);
 }
 
 const applySchema = z.object({
@@ -543,8 +535,20 @@ router.get("/:id/cv", authenticate, authorize(Role.EMPLOYER, Role.ADMIN), async 
       return;
     }
 
+    // Uploaded files stay unavailable to employers until the malware scanner
+    // has recorded CLEAN (fail-closed on PENDING_SCAN/QUARANTINED/REJECTED).
     const bucket = bucketForScope("resume");
-    if (cvUrl && bucket) {
+    const cleanUpload = cvUrl && bucket
+      ? await prisma.resume.findFirst({
+          where: {
+            s3Key: cvUrl,
+            profile: { userId: application.candidateId },
+            securityStatus: "CLEAN",
+          },
+          select: { id: true },
+        })
+      : null;
+    if (cvUrl && bucket && cleanUpload) {
       const url = await getSignedUrl(
         getS3Client(),
         new GetObjectCommand({ Bucket: bucket, Key: cvUrl }),

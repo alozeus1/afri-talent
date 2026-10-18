@@ -20,7 +20,6 @@ import prisma from "../lib/prisma.js";
 import logger from "../lib/logger.js";
 import { authenticate, authorize } from "../middleware/auth.js";
 import { checkPermission, enforceAdminRbac } from "../middleware/admin-rbac.js";
-import { invalidateAccountAccess } from "../lib/account-access.js";
 import { adminMessageEmail, isEmailDeliveryConfigured } from "../lib/email.js";
 import { issueEmailVerification } from "./email-verification.js";
 
@@ -593,8 +592,6 @@ router.post(
       });
       return result;
     });
-
-    invalidateAccountAccess(target.id);
 
     if (data.action === "force_reverify") {
       void issueEmailVerification({

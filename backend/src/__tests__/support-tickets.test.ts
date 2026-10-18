@@ -8,6 +8,13 @@ import jwt from "jsonwebtoken";
  *   - n8n webhook signing contract
  */
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+
+// authenticate rehydrates the account per request; model the account behind
+// every token this suite mints (see helpers/current-account.ts).
+vi.mock("../lib/jwt.js", async (importOriginal) =>
+  (await import("./helpers/current-account.js")).mockJwtModule(importOriginal));
+vi.mock("../lib/account-access.js", async (importOriginal) =>
+  (await import("./helpers/current-account.js")).mockAccountAccessModule(importOriginal));
 import { createHmac } from "node:crypto";
 
 vi.mock("../lib/prisma.js", () => ({

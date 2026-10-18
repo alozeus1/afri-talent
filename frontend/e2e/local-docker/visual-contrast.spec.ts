@@ -55,7 +55,10 @@ async function newThemedPage(browser: Browser, theme: Theme, viewport: (typeof V
 }
 
 async function expectNoContrastViolations(page: Page, label: string) {
-  await page.waitForLoadState("networkidle").catch(() => undefined);
+  // Best-effort settle: a Next.js link prefetch can stay pending under
+  // Chromium 151 (Playwright 1.62), so bound the wait instead of letting it
+  // consume the whole test timeout.
+  await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
   // Let entry animations and theme transitions settle before measuring.
   await page.waitForTimeout(600);
   const isDark = await page.evaluate(() => document.documentElement.classList.contains("dark"));
@@ -148,7 +151,7 @@ test.beforeAll(async ({ browser }, testInfo) => {
     ["company", "/en/companies", /^\/en\/companies\/[^/?#]+$/],
   ] as const) {
     await page2.goto(list);
-    await page2.waitForLoadState("networkidle").catch(() => undefined);
+    await page2.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
     const hrefs = await page2.locator("main a[href]").evaluateAll((as) => as.map((a) => a.getAttribute("href") ?? ""));
     const href = hrefs.find((h) => pattern.test(h));
     if (!href) throw new Error(`no ${kind} detail link on ${list}`);

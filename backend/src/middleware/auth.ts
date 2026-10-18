@@ -6,7 +6,8 @@ import prisma from "../lib/prisma.js";
 import {
   clearExpiredSuspension,
   evaluateAccountAccess,
-  loadAccountAccessRecord,
+  loadCurrentAccount,
+  type CurrentAccount,
 } from "../lib/account-access.js";
 
 declare global {
@@ -57,15 +58,18 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    // Admin console — suspended/banned accounts and revoked sessions are
-    // blocked on every protected route, not just at login.
-    const access = await checkAccountAccess(payload);
-    if (access && !access.allowed) {
-      res.status(access.status).json({ error: access.error, code: access.code, until: access.until });
+    // JWT claims are a session snapshot, not an authorization source of
+    // truth. Rehydrate the account on every protected request so a role
+    // downgrade, deletion, suspension, ban or admin session revocation takes
+    // effect immediately instead of when the (up-to-seven-day) token expires.
+    // A lookup failure throws into the catch below (fail closed).
+    const account = await resolveCurrentAccount(payload);
+    if (!account.ok) {
+      res.status(account.status).json(account.body);
       return;
     }
 
-    req.user = payload;
+    req.user = { ...payload, email: account.user.email, role: account.user.role };
     req.rawToken = token;
     next();
   } catch {
@@ -73,14 +77,32 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   }
 }
 
-async function checkAccountAccess(payload: JWTPayload) {
-  const record = await loadAccountAccessRecord(payload.userId);
-  if (!record) return null; // unknown user or lookup failure: route decides
-  const decision = evaluateAccountAccess(record, { tokenIssuedAtSeconds: payload.iat });
-  if (decision.allowed && decision.suspensionExpired) {
+type CurrentAccountResult =
+  | { ok: true; user: CurrentAccount }
+  | {
+      ok: false;
+      status: number;
+      body: { error: string; code?: string; until?: string | null };
+    };
+
+async function resolveCurrentAccount(payload: JWTPayload): Promise<CurrentAccountResult> {
+  const user = await loadCurrentAccount(payload.userId);
+  if (!user) {
+    return { ok: false, status: 401, body: { error: "Account is no longer active" } };
+  }
+
+  const decision = evaluateAccountAccess(user, { tokenIssuedAtSeconds: payload.iat });
+  if (!decision.allowed) {
+    return {
+      ok: false,
+      status: decision.status,
+      body: { error: decision.error, code: decision.code, until: decision.until },
+    };
+  }
+  if (decision.suspensionExpired) {
     clearExpiredSuspension(payload.userId);
   }
-  return decision;
+  return { ok: true, user };
 }
 
 export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
@@ -96,12 +118,14 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
       next();
       return;
     }
-    const access = await checkAccountAccess(payload);
-    if (access && !access.allowed) {
+
+    const account = await resolveCurrentAccount(payload);
+    if (!account.ok) {
       next();
       return;
     }
-    req.user = payload;
+
+    req.user = { ...payload, email: account.user.email, role: account.user.role };
     req.rawToken = token;
   } catch {
     // Intentionally ignore bad tokens for optional auth paths.

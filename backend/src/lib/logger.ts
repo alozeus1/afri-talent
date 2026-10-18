@@ -15,6 +15,12 @@ export const redactPaths = [
   "*.token",
   "secret",
   "*.secret",
+  "email",
+  "*.email",
+  "to",
+  "*.to",
+  "replyTo",
+  "*.replyTo",
   "phone",
   "*.phone",
   "phoneNumber",
@@ -82,7 +88,9 @@ export const httpLoggerConfig = {
     }) => ({
       id: req.id,
       method: req.method,
-      url: req.url,
+      // Query strings routinely carry reset, verification, and OAuth state
+      // values. Keep route-level observability without retaining them in logs.
+      url: req.url.split("?", 1)[0],
       userAgent: req.headers["user-agent"],
       remoteAddress: req.remoteAddress,
     }),

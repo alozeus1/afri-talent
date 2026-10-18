@@ -265,18 +265,22 @@ export const phoneOtpVerifyLimiter = rateLimit({
 });
 
 // Request sanitization middleware
-export function sanitizeRequest(req: Request, _res: Response, next: NextFunction): void {
+export const CONTROL_CHARACTER_FIELDS = "sanitizedControlCharacterFields";
+
+export function sanitizeRequest(req: Request, res: Response, next: NextFunction): void {
+  const controlCharacterFields = new Set<string>();
   // Remove potentially dangerous characters from string inputs
   if (req.body && typeof req.body === "object") {
-    sanitizeObject(req.body);
+    sanitizeObject(req.body, controlCharacterFields);
   }
   if (req.query && typeof req.query === "object") {
-    sanitizeObject(req.query as Record<string, unknown>);
+    sanitizeObject(req.query as Record<string, unknown>, controlCharacterFields);
   }
+  (res.locals ??= {})[CONTROL_CHARACTER_FIELDS] = controlCharacterFields;
   next();
 }
 
-function sanitizeObject(obj: Record<string, unknown>): void {
+function sanitizeObject(obj: Record<string, unknown>, controlCharacterFields: Set<string>): void {
   for (const key of Object.keys(obj)) {
     if (UNSAFE_OBJECT_KEYS.has(key)) {
       delete obj[key];
@@ -287,15 +291,18 @@ function sanitizeObject(obj: Record<string, unknown>): void {
 
     if (typeof value === "string") {
       // Remove null bytes and other control characters
+      if (/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(value)) {
+        controlCharacterFields.add(key);
+      }
       obj[key] = value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
     } else if (Array.isArray(value)) {
       value.forEach((entry) => {
         if (entry && typeof entry === "object") {
-          sanitizeObject(entry as Record<string, unknown>);
+          sanitizeObject(entry as Record<string, unknown>, controlCharacterFields);
         }
       });
     } else if (typeof value === "object" && value !== null) {
-      sanitizeObject(value as Record<string, unknown>);
+      sanitizeObject(value as Record<string, unknown>, controlCharacterFields);
     }
   }
 }

@@ -11,7 +11,7 @@
  * Persistence: mocked below so no DB is required.
  */
 
-import { vi, describe, it, expect } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 
 // ── Mocks (hoisted by vitest before imports) ──────────────────────────────────
 
@@ -24,6 +24,7 @@ vi.mock("../lib/ai/persistence.js", () => ({
 
 vi.mock("../lib/prisma.js", () => ({
   default: {
+    user: { findUnique: vi.fn() },
     $queryRaw: vi.fn().mockResolvedValue([]),
     $disconnect: vi.fn().mockResolvedValue(undefined),
   },
@@ -35,6 +36,7 @@ import request from "supertest";
 import app from "../app.js";
 import { signToken } from "../lib/jwt.js";
 import { Role } from "@prisma/client";
+import prisma from "../lib/prisma.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +54,32 @@ const VALID_RESUME = "A".repeat(100);
 
 /** Minimum-length job text (50 chars). */
 const VALID_JOB = "B".repeat(50);
+
+function mockCurrentCandidate(): void {
+  (prisma.user.findUnique as any).mockImplementation((args: any) => {
+    const isAuthLookup =
+      args?.where?.id === "test-candidate-uid" &&
+      args?.select?.deletedAt === true &&
+      args?.select?.accountRestrictionStatus === true;
+
+    if (isAuthLookup) {
+      return Promise.resolve({
+        id: "test-candidate-uid",
+        email: "candidate@test.com",
+        role: Role.CANDIDATE,
+        deletedAt: null,
+        accountRestrictionStatus: "ACTIVE",
+      });
+    }
+
+    return undefined;
+  });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockCurrentCandidate();
+});
 
 // ── Tests: POST /api/orchestrator/run ─────────────────────────────────────────
 

@@ -1,6 +1,6 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Router, Request, Response } from "express";
-import { BillingDiscrepancyType, BillingEventOutcome, BillingProvider, Prisma, SubscriptionPlan, SubscriptionStatus } from "@prisma/client";
+import { BillingDiscrepancyType, BillingEventOutcome, BillingProvider, Prisma, ResumeScanJobStatus, ResumeScanResult, ResumeSecurityStatus, SubscriptionPlan, SubscriptionStatus } from "@prisma/client";
 import { getStripe, getPlanFromPriceId, isStripeConfigured } from "../lib/stripe.js";
 import prisma from "../lib/prisma.js";
 import { updateStripeCountry } from "../lib/billing/region-resolver.js";
@@ -17,8 +17,147 @@ import {
 } from "../lib/billing/index.js";
 
 const router = Router();
+const RESUME_SCANNER_TOLERANCE_SECONDS = 300;
+
+router.post("/resume-scanner", async (req: Request, res: Response) => {
+  const secret = process.env.RESUME_SCANNER_WEBHOOK_SECRET;
+  const timestamp = req.header("x-afritalent-scan-timestamp");
+  const signature = req.header("x-afritalent-scan-signature");
+  const deliveryId = req.header("x-afritalent-scan-delivery-id");
+  const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from("");
+  if (!secret || !timestamp || !deliveryId || !/^v1=[a-f0-9]{64}$/.test(signature ?? "") || !/^\d+$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > RESUME_SCANNER_TOLERANCE_SECONDS) return res.status(401).json({ error: "Invalid scanner signature" });
+  const expected = createHmac("sha256", secret).update(`${timestamp}.`).update(raw).digest("hex");
+  if (!timingSafeEqual(Buffer.from((signature ?? "").slice(3)), Buffer.from(expected))) return res.status(401).json({ error: "Invalid scanner signature" });
+  let payload: { jobId:string; resumeId:string; bucket:string; objectKey:string; objectVersion?:string|null; result: ResumeScanResult };
+  try { payload = JSON.parse(raw.toString("utf8")); } catch { return res.status(400).json({ error: "Invalid scanner payload" }); }
+  try {
+    const outcome = await prisma.$transaction(async (tx) => {
+      const job = await tx.resumeScanJob.findUnique({ where: { id: payload.jobId }, include: { resume: true } });
+      if (!job || job.resumeId !== payload.resumeId || job.bucket !== payload.bucket || job.objectKey !== payload.objectKey || job.objectVersion !== (payload.objectVersion ?? null)) throw new Error("Scanner resource mismatch");
+      if (job.resultDeliveryId) return job.resultDeliveryId === deliveryId && job.result === payload.result ? "duplicate" : "conflict";
+      if (job.status === ResumeScanJobStatus.COMPLETED || job.status === ResumeScanJobStatus.EXHAUSTED) return "conflict";
+      const status = payload.result === "CLEAN" ? ResumeSecurityStatus.CLEAN : payload.result === "REJECTED" ? ResumeSecurityStatus.REJECTED : payload.result === "QUARANTINED" ? ResumeSecurityStatus.QUARANTINED : ResumeSecurityStatus.PENDING_SCAN;
+      const attempts = job.attemptCount + 1;
+      const jobStatus = payload.result === "ERROR" ? (attempts >= job.maxAttempts ? ResumeScanJobStatus.EXHAUSTED : ResumeScanJobStatus.FAILED) : ResumeScanJobStatus.COMPLETED;
+      await tx.resumeScanJob.update({ where:{id:job.id}, data:{ status: jobStatus, attemptCount: attempts, result: payload.result, resultDeliveryId: deliveryId, completedAt:new Date() }});
+      await tx.resume.update({ where:{id:job.resumeId}, data:{securityStatus:status, scanCompletedAt:new Date(), isActive: status === ResumeSecurityStatus.CLEAN }});
+      await tx.auditLog.create({ data: { action: "SYSTEM_CONFIGURATION_CHANGED", targetType: "RESUME_SCAN", targetId: job.resumeId, status: "SUCCESS", metadata: { result: payload.result, jobId: job.id, deliveryId } } });
+      return "processed";
+    });
+    return outcome === "conflict" ? res.status(409).json({error:"Conflicting scan delivery"}) : res.json({received:true, duplicate:outcome==="duplicate"});
+  } catch { return res.status(409).json({ error: "Scanner result rejected" }); }
+});
 
 const WEBHOOK_IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;
+const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300;
+const STRIPE_SUPPORTED_EVENT_TYPES = new Set([
+  "checkout.session.completed",
+  "payment_method.attached",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.payment_failed",
+  "invoice.paid",
+  "invoice.payment_succeeded",
+  "charge.refunded",
+  "refund.created",
+  "refund.updated",
+]);
+const STRIPE_LIFECYCLE_EVENT_TYPES = new Set([
+  "checkout.session.completed",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.payment_failed",
+  "invoice.paid",
+  "invoice.payment_succeeded",
+]);
+
+const STRIPE_LIFECYCLE_PRIORITY: Record<SubscriptionStatus, number> = {
+  [SubscriptionStatus.ACTIVE]: 10,
+  [SubscriptionStatus.PAST_DUE]: 20,
+  [SubscriptionStatus.INACTIVE]: 20,
+  [SubscriptionStatus.CANCELLED]: 30,
+};
+
+type LifecycleApplyResult =
+  | { applied: true; subscriptionId: string }
+  | { applied: false; reason: "stale" | "same_or_lower_priority" };
+
+function getStripeLifecyclePriority(eventType: string, status: SubscriptionStatus): number {
+  if (!STRIPE_LIFECYCLE_EVENT_TYPES.has(eventType)) {
+    throw new Error(`Stripe event ${eventType} is not a subscription lifecycle event`);
+  }
+  return STRIPE_LIFECYCLE_PRIORITY[status];
+}
+
+/**
+ * Atomically compare and apply a Stripe subscription transition. Exact event
+ * identity is reserved separately; this guard orders distinct events for the
+ * same subscription. Event IDs only break a true timestamp-and-priority tie,
+ * never establish provider chronology.
+ */
+async function applyStripeLifecycleTransition(input: {
+  subscriptionId: string;
+  eventId: string;
+  eventType: string;
+  occurredAt: Date;
+  status: SubscriptionStatus;
+  data: Prisma.SubscriptionUpdateManyMutationInput;
+}): Promise<LifecycleApplyResult> {
+  const priority = getStripeLifecyclePriority(input.eventType, input.status);
+
+  return prisma.$transaction(async (tx) => {
+    const result = await tx.subscription.updateMany({
+      where: {
+        id: input.subscriptionId,
+        OR: [
+          { stripeLifecycleOccurredAt: null },
+          { stripeLifecycleOccurredAt: { lt: input.occurredAt } },
+          {
+            stripeLifecycleOccurredAt: input.occurredAt,
+            stripeLifecyclePriority: { lt: priority },
+          },
+          {
+            stripeLifecycleOccurredAt: input.occurredAt,
+            stripeLifecyclePriority: priority,
+            OR: [
+              { stripeLifecycleEventId: null },
+              { stripeLifecycleEventId: { lt: input.eventId } },
+            ],
+          },
+        ],
+      },
+      data: {
+        ...input.data,
+        stripeLifecycleOccurredAt: input.occurredAt,
+        stripeLifecyclePriority: priority,
+        stripeLifecycleEventId: input.eventId,
+      },
+    });
+
+    if (result.count === 1) {
+      return { applied: true, subscriptionId: input.subscriptionId };
+    }
+
+    return { applied: false, reason: "stale" };
+  });
+}
+
+function hasFreshStripeSignatureTimestamp(signature: unknown): boolean {
+  if (typeof signature !== "string") return false;
+
+  const timestamps = signature
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.startsWith("t="))
+    .map((part) => part.slice(2));
+
+  if (timestamps.length !== 1 || !/^\d+$/.test(timestamps[0])) return false;
+
+  const timestamp = Number(timestamps[0]);
+  if (!Number.isSafeInteger(timestamp)) return false;
+
+  return Math.abs(Math.floor(Date.now() / 1000) - timestamp) <= STRIPE_WEBHOOK_TOLERANCE_SECONDS;
+}
 
 function parseRawJsonBody(req: Request): Record<string, unknown> | null {
   if (!req.body) {
@@ -53,7 +192,14 @@ async function reserveEventId(provider: BillingProvider, eventId: string): Promi
       },
     });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    const target = error instanceof Prisma.PrismaClientKnownRequestError
+      ? error.meta?.target
+      : undefined;
+    const targetValues = Array.isArray(target) ? target.map(String) : [String(target ?? "")];
+    const isIdempotencyKeyConflict = targetValues.some((value) =>
+      value === "key" || value.toLowerCase().includes("billingwebhookidempotencykey_key"),
+    );
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" && isIdempotencyKeyConflict) {
       return false;
     }
     throw error;
@@ -80,11 +226,18 @@ async function reserveEventId(provider: BillingProvider, eventId: string): Promi
  */
 async function releaseEventId(provider: BillingProvider, eventId: string): Promise<void> {
   const key = `${provider}:${eventId}`;
-  await prisma.billingWebhookIdempotencyKey
-    .delete({ where: { key } })
-    .catch(() => undefined);
+  try {
+    await prisma.billingWebhookIdempotencyKey.delete({ where: { key } });
+  } catch {
+    // Preserve the processing failure; an operator can reconcile a stranded
+    // reservation without exposing provider or database details to Stripe.
+  }
   if (redisClient) {
-    await redisClient.del(`idempotency:${key}`).catch(() => undefined);
+    try {
+      await redisClient.del(`idempotency:${key}`);
+    } catch {
+      // Redis is a secondary cache; the database reservation is authoritative.
+    }
   }
 }
 
@@ -268,16 +421,11 @@ router.post("/flutterwave", async (req: Request, res: Response) => {
           })
         : null;
       const checkoutMetadata = (checkoutEvent?.metadata ?? {}) as Record<string, unknown>;
-      const customer = (data.customer ?? {}) as Record<string, unknown>;
-      const customerEmail = typeof customer.email === "string" ? customer.email : undefined;
-      const user = checkoutEvent?.userId
-        ? { id: checkoutEvent.userId }
-        : customerEmail
-          ? await prisma.user.findUnique({
-              where: { email: customerEmail },
-              select: { id: true },
-            })
-          : null;
+      // The webhook body is not an ownership source, even after its shared
+      // secret has verified. Only our persisted checkout reference may select
+      // the account that receives an entitlement transition. The provider's
+      // verified response can still supply diagnostic metadata below.
+      const user = checkoutEvent?.userId ? { id: checkoutEvent.userId } : null;
 
       if (!user?.id) {
         await recordBillingEvent({
@@ -361,6 +509,9 @@ router.post("/flutterwave", async (req: Request, res: Response) => {
         }
 
         const card = (verified.card ?? {}) as Record<string, unknown>;
+        const customerEmail = typeof verified.customer?.email === "string"
+          ? verified.customer.email
+          : undefined;
         await activateFlutterwaveSubscription({
           userId: user.id,
           plan,
@@ -398,35 +549,55 @@ router.post("/flutterwave", async (req: Request, res: Response) => {
 
     if (event === "subscription.cancelled") {
       const customer = (data.customer ?? {}) as Record<string, unknown>;
-      const email = typeof customer.email === "string" ? customer.email : null;
-      if (email) {
-        const user = await prisma.user.findUnique({
-          where: { email },
-          select: { id: true },
+      const providerCustomerId = customer.id === undefined || customer.id === null
+        ? null
+        : String(customer.id);
+
+      // The payload email is diagnostic-only: a signed event must still bind
+      // to the customer ID recorded during our verified checkout flow. This
+      // prevents a provider payload (or a future integration mistake) from
+      // selecting an AfriTalent account by a mutable email address.
+      if (providerCustomerId) {
+        const subscription = await prisma.subscription.findFirst({
+          where: {
+            billingProvider: BillingProvider.FLUTTERWAVE,
+            providerCustomerId,
+          },
+          select: { id: true, userId: true },
         });
 
-        if (user?.id) {
-          const subscription = await prisma.subscription.update({
-            where: { userId: user.id },
+        if (subscription) {
+          // Re-check the binding in the write predicate. A concurrent billing
+          // update that changes or removes it must not receive entitlement or
+          // audit side effects for this cancellation event.
+          const update = await prisma.subscription.updateMany({
+            where: {
+              id: subscription.id,
+              billingProvider: BillingProvider.FLUTTERWAVE,
+              providerCustomerId,
+            },
             data: {
               status: SubscriptionStatus.CANCELLED,
-              billingProvider: BillingProvider.FLUTTERWAVE,
+              plan: SubscriptionPlan.FREE,
             },
-          }).catch(() => null);
-
-          await syncBillingEntitlementState(user.id, "flutterwave_subscription_cancelled");
-          await recordBillingEvent({
-            userId: user.id,
-            subscriptionId: subscription?.id ?? null,
-            source: "FLUTTERWAVE_WEBHOOK",
-            eventId: rawEventId,
-            eventType: event,
-            outcome: BillingEventOutcome.PROCESSED,
-            status: SubscriptionStatus.CANCELLED,
-            reasonCode: "flutterwave_subscription_cancelled",
-            rawPayload: payload as Prisma.InputJsonValue,
-            processedAt: new Date(),
           });
+
+          if (update.count === 1) {
+            await syncBillingEntitlementState(subscription.userId, "flutterwave_subscription_cancelled");
+            await recordBillingEvent({
+              userId: subscription.userId,
+              subscriptionId: subscription.id,
+              source: "FLUTTERWAVE_WEBHOOK",
+              eventId: rawEventId,
+              eventType: event,
+              outcome: BillingEventOutcome.PROCESSED,
+              plan: SubscriptionPlan.FREE,
+              status: SubscriptionStatus.CANCELLED,
+              reasonCode: "flutterwave_subscription_cancelled",
+              rawPayload: payload as Prisma.InputJsonValue,
+              processedAt: new Date(),
+            });
+          }
         }
       }
     }
@@ -519,9 +690,37 @@ router.post("/stripe", async (req: Request, res: Response) => {
     return;
   }
 
-  // Idempotency guard
-  const reserved = await reserveEventId(BillingProvider.STRIPE, event.id);
-  if (!reserved) {
+  // Stripe's SDK rejects timestamps that are too old, but a valid signature
+  // with a far-future timestamp must also fail closed to prevent delayed replay.
+  if (!hasFreshStripeSignatureTimestamp(sig)) {
+    recordOpsEvent({
+      metricName: "billing_checkout_failure",
+      category: "billing",
+      outcome: "failure",
+      severity: "warning",
+      durationMs: Date.now() - startedAt,
+      details: { reason: "stripe_signature_timestamp_out_of_range" },
+    });
+    res.status(400).json({ error: "Invalid webhook signature" });
+    return;
+  }
+
+  if (!STRIPE_SUPPORTED_EVENT_TYPES.has(event.type)) {
+    recordOpsEvent({
+      metricName: "billing_webhook_ignored",
+      category: "billing",
+      durationMs: Date.now() - startedAt,
+      details: { event_type: event.type },
+    });
+    res.json({ received: true, ignored: true });
+    return;
+  }
+
+  // A true return means this request created the durable reservation.
+  let reservationAcquired = false;
+  let processingCompleted = false;
+  const reservationCreated = await reserveEventId(BillingProvider.STRIPE, event.id);
+  if (!reservationCreated) {
     await recordBillingEvent({
       source: "STRIPE_WEBHOOK",
       eventId: event.id,
@@ -544,6 +743,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
     res.json({ received: true, duplicate: true });
     return;
   }
+  reservationAcquired = true;
 
   try {
     switch (event.type) {
@@ -565,19 +765,37 @@ router.post("/stripe", async (req: Request, res: Response) => {
         const plan = session.metadata?.plan as SubscriptionPlan | undefined;
 
         if (userId && plan) {
-          const subscription = await prisma.subscription.upsert({
-            where: { userId },
-            create: {
+          const trustedSubscription = await prisma.subscription.findFirst({
+            where: {
               userId,
               billingProvider: BillingProvider.STRIPE,
-              providerCustomerId: session.customer,
-              providerSubscriptionId: session.subscription,
-              stripeCustomerId: session.customer,
-              stripeSubId: session.subscription,
-              plan,
-              status: "ACTIVE",
+              OR: [
+                { stripeCustomerId: session.customer },
+                { providerCustomerId: session.customer },
+              ],
             },
-            update: {
+            select: { id: true },
+          });
+
+          if (!trustedSubscription) {
+            recordOpsEvent({
+              metricName: "billing_webhook_rejected",
+              category: "billing",
+              outcome: "failure",
+              severity: "warning",
+              durationMs: Date.now() - startedAt,
+              details: { reason: "checkout_customer_binding_missing" },
+            });
+            break;
+          }
+
+          const lifecycle = await applyStripeLifecycleTransition({
+            subscriptionId: trustedSubscription.id,
+            eventId: event.id,
+            eventType: event.type,
+            occurredAt: new Date(event.created * 1000),
+            status: SubscriptionStatus.ACTIVE,
+            data: {
               billingProvider: BillingProvider.STRIPE,
               providerCustomerId: session.customer,
               providerSubscriptionId: session.subscription,
@@ -587,6 +805,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
               status: "ACTIVE",
             },
           });
+          if (!lifecycle.applied) break;
 
           const taxId = session.customer_details?.tax_ids?.[0];
           if (taxId?.type || taxId?.value || session.customer_details?.address?.country) {
@@ -614,7 +833,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
           await syncBillingEntitlementState(userId, "webhook_checkout_completed");
           await recordBillingEvent({
             userId,
-            subscriptionId: subscription.id,
+            subscriptionId: lifecycle.subscriptionId,
             source: "STRIPE_WEBHOOK",
             eventId: event.id,
             eventType: event.type,
@@ -714,16 +933,22 @@ router.post("/stripe", async (req: Request, res: Response) => {
           select: { userId: true, id: true },
         });
 
-        await prisma.subscription.updateMany({
-          where: { stripeSubId: sub.id },
+        if (!existing) break;
+        const lifecycle = await applyStripeLifecycleTransition({
+          subscriptionId: existing.id,
+          eventId: event.id,
+          eventType: event.type,
+          occurredAt: new Date(event.created * 1000),
+          status,
           data: {
             ...(plan && { plan }),
             status,
             ...(currentPeriodEnd && { currentPeriodEnd }),
           },
         });
+        if (!lifecycle.applied) break;
 
-        if (existing?.userId) {
+        if (existing.userId) {
           await syncBillingEntitlementState(existing.userId, "webhook_subscription_updated");
           await recordBillingEvent({
             userId: existing.userId,
@@ -760,15 +985,21 @@ router.post("/stripe", async (req: Request, res: Response) => {
           where: { stripeSubId: sub.id },
           select: { userId: true, id: true },
         });
-        await prisma.subscription.updateMany({
-          where: { stripeSubId: sub.id },
+        if (!existing) break;
+        const lifecycle = await applyStripeLifecycleTransition({
+          subscriptionId: existing.id,
+          eventId: event.id,
+          eventType: event.type,
+          occurredAt: new Date(event.created * 1000),
+          status: SubscriptionStatus.CANCELLED,
           data: {
             status: "CANCELLED",
             plan: "FREE",
           },
         });
+        if (!lifecycle.applied) break;
 
-        if (existing?.userId) {
+        if (existing.userId) {
           await syncBillingEntitlementState(existing.userId, "webhook_subscription_deleted");
           await recordBillingEvent({
             userId: existing.userId,
@@ -811,12 +1042,18 @@ router.post("/stripe", async (req: Request, res: Response) => {
           where: { stripeSubId: invoice.subscription },
           select: { userId: true, id: true, plan: true },
         });
-        await prisma.subscription.updateMany({
-          where: { stripeSubId: invoice.subscription },
+        if (!existing) break;
+        const lifecycle = await applyStripeLifecycleTransition({
+          subscriptionId: existing.id,
+          eventId: event.id,
+          eventType: event.type,
+          occurredAt: new Date(event.created * 1000),
+          status: SubscriptionStatus.PAST_DUE,
           data: { status: "PAST_DUE" },
         });
+        if (!lifecycle.applied) break;
 
-        if (existing?.userId) {
+        if (existing.userId) {
           await syncBillingEntitlementState(existing.userId, "webhook_invoice_payment_failed");
           const auditEvent = await recordBillingEvent({
             userId: existing.userId,
@@ -900,12 +1137,18 @@ router.post("/stripe", async (req: Request, res: Response) => {
             select: { userId: true, id: true, plan: true },
           });
 
-          await prisma.subscription.updateMany({
-            where: { stripeSubId: invoice.subscription },
+          if (!existing) break;
+          const lifecycle = await applyStripeLifecycleTransition({
+            subscriptionId: existing.id,
+            eventId: event.id,
+            eventType: event.type,
+            occurredAt: new Date(event.created * 1000),
+            status: SubscriptionStatus.ACTIVE,
             data: { status: "ACTIVE" },
           });
+          if (!lifecycle.applied) break;
 
-          if (existing?.userId) {
+          if (existing.userId) {
             await syncBillingEntitlementState(existing.userId, "webhook_invoice_paid");
             const auditEvent = await recordBillingEvent({
               userId: existing.userId,
@@ -1046,21 +1289,15 @@ router.post("/stripe", async (req: Request, res: Response) => {
       }
 
       default:
-        await recordBillingEvent({
-          source: "STRIPE_WEBHOOK",
-          eventId: event.id,
-          eventType: event.type,
-          outcome: BillingEventOutcome.RECEIVED,
-          rawPayload: event as unknown as Prisma.InputJsonValue,
-          occurredAt: new Date(event.created * 1000),
-          processedAt: new Date(),
-        });
-        // Unhandled event types are fine — log and acknowledge
-        console.info(`[webhook] Unhandled event type: ${event.type}`);
-    }
+        // Event types are allowlisted before idempotency reservation.
+        }
 
+    processingCompleted = true;
     res.json({ received: true });
   } catch (error) {
+    if (reservationAcquired && !processingCompleted) {
+      await releaseEventId(BillingProvider.STRIPE, event.id).catch(() => undefined);
+    }
     console.error("[webhook] Handler error:", error);
     const failedAudit = await recordBillingEvent({
       source: "STRIPE_WEBHOOK",
@@ -1107,14 +1344,9 @@ router.post("/stripe", async (req: Request, res: Response) => {
         reason: "handler_error",
       },
     });
-    // Release the idempotency reservation so a manual Stripe redelivery can
-    // re-process this event (subscription upserts and audit writes are
-    // idempotent). We still return 200 to suppress automatic Stripe retries
-    // since state may be partially applied.
-    await releaseEventId(BillingProvider.STRIPE, event.id).catch(() => undefined);
-
-    // Return 200 to prevent Stripe from retrying (state may be partially applied)
-    res.json({ received: true, error: "Handler error — check server logs" });
+    // The reservation was released before fallible reporting so Stripe can
+    // safely retry the incomplete event.
+    res.status(500).json({ error: "Webhook processing failed" });
   }
 });
 

@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { Router, Request, Response } from "express";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import {
   AbuseReportReason,
@@ -34,8 +35,21 @@ import { runEmployerVerificationRollout } from "../lib/ai/langgraph/integration/
 import { runCandidateVerificationRollout } from "../lib/ai/langgraph/integration/candidateVerificationAdapter.js";
 import { createUserNotification } from "../lib/notifications.js";
 import { isSmsConfigured, sendSms } from "../lib/sms/africasTalking.js";
+import { getAuthenticatedRateLimitKey } from "../middleware/security.js";
 
 const router = Router();
+
+// A report creates durable moderation work and can affect trust signals. Keep
+// this separate from the general API limiter and key it by the authenticated
+// account so one shared NAT cannot suppress legitimate reporters.
+const trustReportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: process.env.NODE_ENV === "test" ? 1000 : 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => getAuthenticatedRateLimitKey(req, "trust-reports"),
+  message: { error: "Too many trust reports. Please try again later." },
+});
 
 function hostnameFromUrl(value: string | null | undefined) {
   if (!value) return null;
@@ -1112,6 +1126,7 @@ router.post(
   "/reports",
   authenticate,
   requireAccountStanding({ allowLimited: true }),
+  trustReportLimiter,
   async (req: Request, res: Response) => {
     try {
       const data = reportSchema.parse(req.body);
@@ -1196,6 +1211,9 @@ router.post(
         const application = await prisma.application.findUnique({
           where: { id: data.targetApplicationId },
           include: {
+            job: {
+              select: { employerId: true },
+            },
             candidate: {
               include: {
                 candidateTrustProfile: {
@@ -1207,6 +1225,24 @@ router.post(
         });
 
         if (!application) {
+          res.status(404).json({ error: "Application not found" });
+          return;
+        }
+
+        // Only the employer that owns the application's job may report it.
+        // A guessed application ID must not let another account create trust
+        // cases or risk records against an unrelated candidate.
+        const reporterEmployer = req.user!.role === Role.EMPLOYER
+          ? await prisma.employer.findUnique({
+              where: { userId: req.user!.userId },
+              select: { id: true },
+            })
+          : null;
+        const canReportApplication =
+          req.user!.role === Role.ADMIN ||
+          (reporterEmployer?.id !== undefined && application.job.employerId === reporterEmployer.id);
+
+        if (!canReportApplication) {
           res.status(404).json({ error: "Application not found" });
           return;
         }
@@ -1235,6 +1271,11 @@ router.post(
         });
 
         if (!thread) {
+          res.status(404).json({ error: "Conversation not found" });
+          return;
+        }
+
+        if (!thread.participants.some((participant) => participant.userId === req.user!.userId)) {
           res.status(404).json({ error: "Conversation not found" });
           return;
         }

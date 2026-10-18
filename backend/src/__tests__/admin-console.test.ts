@@ -123,6 +123,10 @@ function candidateRecord() {
   };
 }
 
+function isCurrentAccountLookup(args: { select?: Record<string, boolean> }): boolean {
+  return args.select?.sessionsRevokedAt === true && args.select?.accountRestrictionStatus === true;
+}
+
 function setAdminPermissions(permissions: AdminPermission[] | null) {
   db.adminRole.findUnique.mockResolvedValue(
     permissions === null
@@ -136,14 +140,15 @@ beforeEach(() => {
   candidateState = active();
   setAdminPermissions(ALL_PERMISSIONS);
 
-  // Account-access gate lookup used by `authenticate`.
-  db.user.findFirst.mockImplementation(async (args: { where: { id: string } }) => {
-    if (args.where.id === CANDIDATE_ID) return { ...candidateState };
-    if (args.where.id === ADMIN_ID) return active();
-    return null;
-  });
-
-  db.user.findUnique.mockImplementation(async (args: { where: { id?: string; email?: string } }) => {
+  db.user.findUnique.mockImplementation(async (args: { where: { id?: string; email?: string }; select?: Record<string, boolean> }) => {
+    // Current-account lookup used by `authenticate` (role + access gate).
+    if (isCurrentAccountLookup(args)) {
+      if (args.where.id === CANDIDATE_ID) {
+        return { id: CANDIDATE_ID, email: "cand@test.com", role: Role.CANDIDATE, ...candidateState };
+      }
+      if (args.where.id === ADMIN_ID) return { id: ADMIN_ID, email: "admin@test.com", role: Role.ADMIN, ...active() };
+      return null;
+    }
     if (args.where.id === CANDIDATE_ID || args.where.email === "cand@test.com") return candidateRecord();
     return null;
   });
@@ -208,12 +213,12 @@ describe("admin console — authorization", () => {
   });
 
   it("enforces the admin TOTP gate on console mutations", async () => {
-    db.user.findUnique.mockResolvedValueOnce({
-      role: Role.ADMIN,
-      totpEnrolledAt: null,
-      totpGraceUntil: null,
-      adminRole: { id: "admin-role-1" },
-    });
+    const defaultLookup = db.user.findUnique.getMockImplementation() as (args: unknown) => Promise<unknown>;
+    db.user.findUnique.mockImplementation(async (args: { where: { id?: string }; select?: Record<string, boolean> }) =>
+      isCurrentAccountLookup(args)
+        ? defaultLookup(args)
+        : { role: Role.ADMIN, totpEnrolledAt: null, totpGraceUntil: null, adminRole: { id: "admin-role-1" } },
+    );
     const res = await lifecycle({ action: "ban", reason: "spam" }).set("x-admin-totp-test-bypass", "enforce");
     expect(res.status).toBe(403);
     expect(res.body.code).toBe("TOTP_ENROLMENT_REQUIRED");

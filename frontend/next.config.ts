@@ -2,8 +2,10 @@ import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enable standalone output for Docker deployment
-  output: "standalone",
+  // Docker needs standalone output; Vercel assembles its own server bundle.
+  // Keeping standalone enabled there makes Vercel's post-build tracing look
+  // for an artifact Next no longer emits at that path.
+  output: process.env.VERCEL === "1" ? undefined : "standalone",
   poweredByHeader: false,
 
   // Free-tier deployment: when BACKEND_PROXY_ORIGIN is set (e.g. on Vercel),

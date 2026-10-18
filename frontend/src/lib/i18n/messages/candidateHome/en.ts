@@ -609,6 +609,8 @@ export default {
   "dash.bt.badge.employment": "Employment history checked",
   "dash.bt.badge.unverified": "Unverified profile",
   "dash.bt.warn.profile": "Complete more of your profile to improve authenticity.",
+  "dash.bt.warn.resume": "Add an active resume so employers can trust your profile details.",
+  "dash.bt.warn.history": "Make sure your work history dates and titles are internally consistent.",
   "dash.bt.warn.reports": "Your account has unresolved trust reports.",
   "dash.bt.warn.volume": "High-volume applications can trigger anti-spam review.",
   "dash.bt.warn.evidence": "Add evidence-backed skills or portfolio links to increase employer confidence.",

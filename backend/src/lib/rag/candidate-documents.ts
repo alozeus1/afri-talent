@@ -37,7 +37,7 @@ export const semanticCandidateSelect = Prisma.validator<Prisma.CandidateProfileS
     },
   },
   resumes: {
-    where: { isActive: true },
+    where: { isActive: true, securityStatus: "CLEAN" },
     select: {
       id: true,
       fileName: true,

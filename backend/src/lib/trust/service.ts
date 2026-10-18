@@ -428,6 +428,7 @@ export async function refreshCandidateTrustProfile(userId: string) {
         where: {
           profile: { userId },
           isActive: true,
+          securityStatus: "CLEAN",
         },
       }),
       prisma.verificationArtifact.count({

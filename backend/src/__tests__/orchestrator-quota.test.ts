@@ -10,6 +10,13 @@
 
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
+// authenticate rehydrates the account per request; model the account behind
+// every token this suite mints (see helpers/current-account.ts).
+vi.mock("../lib/jwt.js", async (importOriginal) =>
+  (await import("./helpers/current-account.js")).mockJwtModule(importOriginal));
+vi.mock("../lib/account-access.js", async (importOriginal) =>
+  (await import("./helpers/current-account.js")).mockAccountAccessModule(importOriginal));
+
 const { aiRunCount, runOrchestratorMock, persistence } = vi.hoisted(() => ({
   aiRunCount: vi.fn(),
   runOrchestratorMock: vi.fn(),

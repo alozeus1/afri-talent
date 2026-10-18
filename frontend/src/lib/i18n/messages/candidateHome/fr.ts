@@ -608,6 +608,8 @@ export default {
   "dash.bt.badge.employment": "Parcours professionnel vérifié",
   "dash.bt.badge.unverified": "Profil non vérifié",
   "dash.bt.warn.profile": "Complétez davantage votre profil pour renforcer son authenticité.",
+  "dash.bt.warn.resume": "Ajoutez un CV actif pour que les employeurs puissent se fier aux informations de votre profil.",
+  "dash.bt.warn.history": "Vérifiez que les dates et intitulés de votre parcours professionnel sont cohérents.",
   "dash.bt.warn.reports": "Votre compte fait l’objet de signalements non résolus.",
   "dash.bt.warn.volume": "Un grand nombre de candidatures peut déclencher un contrôle anti-spam.",
   "dash.bt.warn.evidence": "Ajoutez des compétences étayées ou des liens de portfolio pour renforcer la confiance des employeurs.",

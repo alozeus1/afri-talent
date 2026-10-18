@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { isBlockedIp, assertPublicHttpUrl, SsrfError } from "../../lib/security/ssrf.js";
 
 describe("isBlockedIp", () => {
@@ -41,6 +41,10 @@ describe("isBlockedIp", () => {
 });
 
 describe("assertPublicHttpUrl", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("rejects non-http(s) schemes", async () => {
     await expect(assertPublicHttpUrl("ftp://example.com/x")).rejects.toBeInstanceOf(SsrfError);
     await expect(assertPublicHttpUrl("file:///etc/passwd")).rejects.toBeInstanceOf(SsrfError);
@@ -60,6 +64,11 @@ describe("assertPublicHttpUrl", () => {
     await expect(assertPublicHttpUrl("http://[::1]/")).rejects.toBeInstanceOf(SsrfError);
   });
 
+  it("rejects alternate IPv4 loopback notation after URL normalization", async () => {
+    await expect(assertPublicHttpUrl("http://0177.0.0.1/")).rejects.toBeInstanceOf(SsrfError);
+    await expect(assertPublicHttpUrl("http://0x7f000001/")).rejects.toBeInstanceOf(SsrfError);
+  });
+
   it("accepts a public IP literal URL", async () => {
     await expect(assertPublicHttpUrl("http://8.8.8.8/robots.txt")).resolves.toBeInstanceOf(URL);
   });
@@ -67,5 +76,25 @@ describe("assertPublicHttpUrl", () => {
   it("rejects malformed URLs", async () => {
     await expect(assertPublicHttpUrl("http://")).rejects.toBeInstanceOf(SsrfError);
     await expect(assertPublicHttpUrl("not a url")).rejects.toBeInstanceOf(SsrfError);
+  });
+});
+
+describe("safePublicFetch", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("revalidates each redirect and blocks a public-to-private redirect without a second fetch", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: "http://127.0.0.1/private" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { safePublicFetch } = await import("../../lib/security/ssrf.js");
+    await expect(safePublicFetch("https://8.8.8.8/redirect")).rejects.toBeInstanceOf(SsrfError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

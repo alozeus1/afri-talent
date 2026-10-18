@@ -10,7 +10,7 @@
  * via `?verbose=1`.
  */
 
-import { vi, describe, it, expect } from "vitest";
+import { vi, describe, it, expect, afterEach } from "vitest";
 import { Role } from "@prisma/client";
 
 // Mock prisma so importing app.ts never attempts a DB connection.
@@ -18,6 +18,9 @@ vi.mock("../lib/prisma.js", () => ({
   default: {
     $queryRaw: vi.fn().mockResolvedValue([]),
     $disconnect: vi.fn().mockResolvedValue(undefined),
+    user: {
+      findUnique: vi.fn(),
+    },
   },
 }));
 
@@ -31,14 +34,36 @@ vi.mock("../lib/ai/persistence.js", () => ({
 import request from "supertest";
 import app from "../app.js";
 import { signToken } from "../lib/jwt.js";
+import prisma from "../lib/prisma.js";
 
 function adminToken(): string {
   return signToken({ userId: "admin-1", email: "admin@example.com", role: Role.ADMIN });
 }
 
-function candidateToken(): string {
-  return signToken({ userId: "user-1", email: "user@example.com", role: Role.CANDIDATE });
+function mockCurrentAccount(input: { id: string; email: string; role: Role }): void {
+  (prisma.user.findUnique as any).mockImplementation((args: any) => {
+    const isAuthLookup =
+      args?.where?.id === input.id &&
+      args?.select?.deletedAt === true &&
+      args?.select?.accountRestrictionStatus === true;
+
+    if (isAuthLookup) {
+      return Promise.resolve({
+        id: input.id,
+        email: input.email,
+        role: input.role,
+        deletedAt: null,
+        accountRestrictionStatus: "ACTIVE",
+      });
+    }
+
+    return undefined;
+  });
 }
+
+afterEach(() => {
+  (prisma.user.findUnique as any).mockReset();
+});
 
 describe("health endpoints", () => {
   it("GET /live → 200 with alive status (no DB required)", async () => {
@@ -68,14 +93,18 @@ describe("health endpoints", () => {
     expect(res.status).toBe(403);
   });
 
-  it("GET /api/health?verbose=1 (candidate token) → 403", async () => {
+  it("GET /api/health?verbose=1 (database candidate with stale admin claim) → 403", async () => {
+    mockCurrentAccount({ id: "user-1", email: "user@example.com", role: Role.CANDIDATE });
+
     const res = await request(app)
       .get("/api/health?verbose=1")
-      .set("Authorization", `Bearer ${candidateToken()}`);
+      .set("Authorization", `Bearer ${signToken({ userId: "user-1", email: "user@example.com", role: Role.ADMIN })}`);
     expect(res.status).toBe(403);
   });
 
   it("GET /api/health?verbose=1 (admin token) → 200 with rich payload", async () => {
+    mockCurrentAccount({ id: "admin-1", email: "admin@example.com", role: Role.ADMIN });
+
     const res = await request(app)
       .get("/api/health?verbose=1")
       .set("Authorization", `Bearer ${adminToken()}`);

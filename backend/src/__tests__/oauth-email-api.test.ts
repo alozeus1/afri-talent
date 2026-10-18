@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import request from "supertest";
 import { Role } from "@prisma/client";
 import { signToken } from "../lib/jwt.js";
@@ -54,9 +54,46 @@ function makeCandidateToken(id = "candidate-1"): string {
   });
 }
 
+function mockUnverifiedCandidateForCheckout(): void {
+  (prisma.user.findUnique as any).mockImplementation((args: any) => {
+    const isAuthLookup =
+      args?.where?.id === "candidate-1" &&
+      args?.select?.deletedAt === true &&
+      args?.select?.accountRestrictionStatus === true;
+
+    if (isAuthLookup) {
+      return Promise.resolve({
+        id: "candidate-1",
+        email: "candidate@example.com",
+        role: Role.CANDIDATE,
+        deletedAt: null,
+        accountRestrictionStatus: "ACTIVE",
+      });
+    }
+
+    const isVerificationLookup =
+      args?.where?.id === "candidate-1" &&
+      args?.select?.emailVerified === true &&
+      args?.select?.email === true;
+
+    if (isVerificationLookup) {
+      return Promise.resolve({
+        emailVerified: false,
+        email: "candidate@example.com",
+      });
+    }
+
+    return undefined;
+  });
+}
+
 describe("OAuth + Email Verification API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    (prisma.user.findUnique as any).mockReset();
   });
 
   it("lists enabled OAuth providers", async () => {
@@ -204,10 +241,7 @@ describe("OAuth + Email Verification API", () => {
   });
 
   it("blocks sensitive billing action for unverified users", async () => {
-    (prisma.user.findUnique as any).mockResolvedValueOnce({
-      emailVerified: false,
-      email: "candidate@example.com",
-    });
+    mockUnverifiedCandidateForCheckout();
 
     const token = makeCandidateToken("candidate-1");
     const res = await request(app)

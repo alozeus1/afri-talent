@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 
 const hoisted = vi.hoisted(() => {
     process.env.S3_UPLOADS_BUCKET = "test-bucket";
@@ -65,10 +65,44 @@ const findProfile = vi.mocked(prisma.candidateProfile.findUnique);
 const createDownload = vi.mocked(prisma.templateDownload.create);
 const findSubscription = vi.mocked(prisma.subscription.findUnique);
 
-function exportPdf() {
+function mockCurrentCandidate(input = {
+    id: "cand-1",
+    email: "ada@example.com",
+    name: "Ada Obi",
+}): void {
+    findUser.mockImplementation((args: any) => {
+        const isAuthLookup =
+            args?.where?.id === input.id &&
+            args?.select?.deletedAt === true &&
+            args?.select?.accountRestrictionStatus === true;
+
+        if (isAuthLookup) {
+            return Promise.resolve({
+                id: input.id,
+                email: input.email,
+                role: Role.CANDIDATE,
+                deletedAt: null,
+                accountRestrictionStatus: "ACTIVE",
+            }) as never;
+        }
+
+        const isProfileLookup =
+            args?.where?.id === input.id &&
+            args?.select?.name === true &&
+            args?.select?.phoneNumber === true;
+
+        if (isProfileLookup) {
+            return Promise.resolve({ name: input.name, phoneNumber: null }) as never;
+        }
+
+        return undefined as never;
+    });
+}
+
+function exportPdf(token = TOKEN) {
     return request(app)
         .post(`/api/skills/resume-templates/${TEMPLATE_ID}/export-pdf`)
-        .set("Authorization", `Bearer ${TOKEN}`)
+        .set("Authorization", `Bearer ${token}`)
         .send({});
 }
 
@@ -93,9 +127,13 @@ beforeEach(() => {
         content: { sections: { summary: "Builder of things", skills: ["TypeScript"] } },
         rawText: "raw",
     } as never);
-    findUser.mockResolvedValue({ name: "Ada Obi", phoneNumber: null } as never);
+    mockCurrentCandidate();
     findProfile.mockResolvedValue(null as never);
     createDownload.mockResolvedValue({} as never);
+});
+
+afterEach(() => {
+    findUser.mockReset();
 });
 
 afterAll(() => {
@@ -155,6 +193,24 @@ describe("POST /api/skills/resume-templates/:id/export-pdf", () => {
         const res = await exportPdf();
 
         expect(res.status).toBe(403);
+    });
+
+    it("does not export another candidate's resume", async () => {
+        const candidateBToken = signToken({
+            userId: "cand-2",
+            email: "candidate-b@example.test",
+            role: Role.CANDIDATE,
+        });
+        mockCurrentCandidate({ id: "cand-2", email: "candidate-b@example.test", name: "Candidate B" });
+        (findResume as any).mockImplementation(({ where }: any) =>
+            where?.userId === "cand-2" ? Promise.resolve(null) : Promise.resolve({ content: {}, rawText: "candidate A" }),
+        );
+
+        const res = await exportPdf(candidateBToken);
+
+        expect(res.status).toBe(404);
+        expect(hoisted.renderMock).not.toHaveBeenCalled();
+        expect(findResume).toHaveBeenCalledWith({ where: { userId: "cand-2" } });
     });
 
     it("propagates fill-pipeline errors (no saved resume)", async () => {

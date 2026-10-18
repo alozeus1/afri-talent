@@ -52,6 +52,8 @@ const EXACT: Record<string, CandidateMessageKey> = {
   "Employment history checked": "dash.bt.badge.employment",
   "Unverified profile": "dash.bt.badge.unverified",
   "Complete more of your profile to improve authenticity.": "dash.bt.warn.profile",
+  "Add an active resume so employers can trust your profile details.": "dash.bt.warn.resume",
+  "Make sure your work history dates and titles are internally consistent.": "dash.bt.warn.history",
   "Your account has unresolved trust reports.": "dash.bt.warn.reports",
   "High-volume applications can trigger anti-spam review.": "dash.bt.warn.volume",
   "Add evidence-backed skills or portfolio links to increase employer confidence.": "dash.bt.warn.evidence",

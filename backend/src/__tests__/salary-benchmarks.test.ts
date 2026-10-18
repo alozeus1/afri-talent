@@ -30,6 +30,27 @@ function makeCandidateToken(id = "can123"): string {
     });
 }
 
+function mockCurrentCandidate(): void {
+    (prisma.user.findUnique as any).mockImplementation((args: any) => {
+        const isAuthLookup =
+            args?.where?.id === "can123" &&
+            args?.select?.deletedAt === true &&
+            args?.select?.accountRestrictionStatus === true;
+
+        if (isAuthLookup) {
+            return Promise.resolve({
+                id: "can123",
+                email: "candidate@test.com",
+                role: Role.CANDIDATE,
+                deletedAt: null,
+                accountRestrictionStatus: "ACTIVE",
+            });
+        }
+
+        return undefined;
+    });
+}
+
 const BENCHMARK_ROW = {
     role: "Software Engineer",
     level: "senior",
@@ -55,6 +76,7 @@ describe("GET /api/salary-benchmarks/search", () => {
     });
 
     it("returns 400 when role is missing", async () => {
+        mockCurrentCandidate();
         const res = await request(app)
             .get("/api/salary-benchmarks/search")
             .set("Authorization", `Bearer ${makeCandidateToken()}`);
@@ -65,6 +87,7 @@ describe("GET /api/salary-benchmarks/search", () => {
     });
 
     it("returns 200 with matching benchmarks", async () => {
+        mockCurrentCandidate();
         findMany.mockResolvedValueOnce([BENCHMARK_ROW] as never);
 
         const res = await request(app)
@@ -96,6 +119,7 @@ describe("GET /api/salary-benchmarks/search", () => {
     });
 
     it("applies optional country and level filters", async () => {
+        mockCurrentCandidate();
         findMany.mockResolvedValueOnce([] as never);
 
         const res = await request(app)
