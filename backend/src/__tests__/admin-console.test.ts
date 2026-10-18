@@ -384,4 +384,43 @@ describe("evaluateAccountAccess", () => {
   it("keeps LIMITED accounts signed in", () => {
     expect(evaluateAccountAccess({ ...active(), accountRestrictionStatus: "LIMITED" }, { now }).allowed).toBe(true);
   });
+
+  it("rejects a soft-deleted account even when otherwise ACTIVE", () => {
+    const decision = evaluateAccountAccess({ ...active(), deletedAt: new Date("2026-10-01T00:00:00Z") }, { now });
+    expect(decision.allowed).toBe(false);
+    if (!decision.allowed) {
+      expect(decision.status).toBe(401);
+      expect(decision.code).toBe("ACCOUNT_DELETED");
+    }
+  });
+
+  it("reports ACCOUNT_DELETED ahead of the anonymization suspension", () => {
+    const decision = evaluateAccountAccess(
+      { ...active(), accountRestrictionStatus: "SUSPENDED", deletedAt: new Date("2026-10-01T00:00:00Z") },
+      { now },
+    );
+    expect(decision.allowed).toBe(false);
+    if (!decision.allowed) expect(decision.code).toBe("ACCOUNT_DELETED");
+  });
+});
+
+describe("soft-deleted accounts", () => {
+  it("authenticate rejects a still-valid token for a deleted account", async () => {
+    candidateState = { ...active(), deletedAt: new Date() };
+    const res = await protectedCall();
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("ACCOUNT_DELETED");
+  });
+
+  it("optionalAuth treats a deleted account's token as anonymous", async () => {
+    candidateState = { ...active(), deletedAt: new Date() };
+    const res = await request(app).get("/api/auth/me").set("Authorization", `Bearer ${candidateToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.authenticated).toBe(false);
+  });
+
+  it("the same token works while the account is not deleted", async () => {
+    const res = await protectedCall();
+    expect(res.status).not.toBe(401);
+  });
 });

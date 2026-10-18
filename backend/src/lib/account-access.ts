@@ -11,8 +11,14 @@ import logger from "./logger.js";
 //
 // LIMITED accounts keep access (sensitive actions are gated separately by
 // requireAccountStanding); only SUSPENDED (unexpired) and BANNED are blocked.
+// A soft-deleted (anonymized) account is always rejected: a JWT issued before
+// the anonymization must not keep working on authenticate/optionalAuth/OAuth.
 
-export type AccountAccessCode = "ACCOUNT_SUSPENDED" | "ACCOUNT_BANNED" | "SESSION_REVOKED";
+export type AccountAccessCode =
+  | "ACCOUNT_SUSPENDED"
+  | "ACCOUNT_BANNED"
+  | "SESSION_REVOKED"
+  | "ACCOUNT_DELETED";
 
 export interface AccountAccessRecord {
   accountRestrictionStatus: AccountRestrictionStatus;
@@ -37,6 +43,15 @@ export function evaluateAccountAccess(
   opts: { tokenIssuedAtSeconds?: number; now?: Date } = {},
 ): AccountAccessDecision {
   const now = opts.now ?? new Date();
+
+  if (record.deletedAt) {
+    return {
+      allowed: false,
+      status: 401,
+      code: "ACCOUNT_DELETED",
+      error: "This account has been closed.",
+    };
+  }
 
   if (record.accountRestrictionStatus === AccountRestrictionStatus.BANNED) {
     return {
