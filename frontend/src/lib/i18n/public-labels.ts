@@ -289,6 +289,8 @@ const LOCATION_WORDS: Record<string, PublicMessageKey> = {
   worldwide: "discover.loc.worldwide",
   global: "discover.loc.worldwide",
   "remote worldwide": "discover.loc.worldwide",
+  "anywhere in the world": "discover.loc.worldwide",
+  "remote anywhere": "discover.loc.worldwide",
   anywhere: "discover.loc.anywhere",
   africa: "discover.loc.africa",
   "sub-saharan africa": "discover.loc.subSaharanAfrica",

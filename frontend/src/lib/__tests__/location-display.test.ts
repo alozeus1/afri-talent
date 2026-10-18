@@ -57,6 +57,9 @@ describe("translateLocation", () => {
 
   it("localises the tidy forms", () => {
     expect(translateLocation(tpFor("fr"), "fr", "CET +/- 3 hours")).toBe("À distance (CET ±3h)");
+    expect(translateLocation(tpFor("fr"), "fr", "Anywhere in the World")).toBe(
+      translatePublic("fr", "discover.loc.worldwide"),
+    );
     expect(translateLocation(tpFor("fr"), "fr", LONG_LIST, { compact: true })).toBe("Afrique du Sud + 20 autres");
     expect(translateLocation(tpFor("ar"), "ar", LONG_LIST, { compact: true })).toContain("+");
   });
