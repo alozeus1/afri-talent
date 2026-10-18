@@ -19,6 +19,7 @@ import logger from "../../../logger.js";
 import { buildJobIntelligenceUpdate, buildSourceFingerprint } from "../../discovery.js";
 import { buildDedupKeys } from "../../dedup.js";
 import { normalizeCompany, normalizeLocation } from "../../normalize.js";
+import { resolveSalaryPeriod } from "../../salary-period.js";
 import { classifyApplyStrategy } from "../../apply-strategy.js";
 import { resolveEffectiveApplyStrategy } from "../../../apply/caps.js";
 import {
@@ -91,6 +92,7 @@ export function toJobDocument(job: AggregatedJob, now: Date) {
     salaryMin: job.salary?.min ?? null,
     salaryMax: job.salary?.max ?? null,
     currency: job.salary?.currency ?? null,
+    salaryPeriod: job.salary ? resolveSalaryPeriod(job.salary) : null,
     visaSponsorship: job.visaSponsorship,
     relocationAssistance: job.relocationAssistance,
     eligibleCountries: job.eligibleCountries,
@@ -367,6 +369,7 @@ async function buildWriteData(
     salaryMin: job.salary?.min ?? null,
     salaryMax: job.salary?.max ?? null,
     currency: job.salary?.currency ?? null,
+    salaryPeriod: job.salary ? resolveSalaryPeriod(job.salary) : null,
     tags: job.skills,
     status: qualityOverride?.status ?? ("PUBLISHED" as const),
     publishedAt: job.postedAt,

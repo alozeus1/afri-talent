@@ -27,6 +27,13 @@ enum SupportedLocale {
   AR
 }
 
+enum SalaryPeriod {
+  HOURLY
+  DAILY
+  MONTHLY
+  YEARLY
+}
+
 enum JobStatus {
   DRAFT
   PENDING_REVIEW
@@ -999,6 +1006,9 @@ model Job {
   salaryMin          Int?
   salaryMax          Int?
   currency           String?
+  // Pay period of salaryMin/salaryMax. Null = unknown (legacy rows); the UI
+  // then only labels the range "/year" when the amount is plausibly annual.
+  salaryPeriod       SalaryPeriod?
   tags               String[]
   status             JobStatus
   publishedAt        DateTime?

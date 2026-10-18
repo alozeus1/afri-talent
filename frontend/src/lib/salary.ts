@@ -44,12 +44,22 @@ export function salaryPeriodSchemaUnit(period?: string | null): "YEAR" | "MONTH"
   return PERIOD_SCHEMA_UNITS[normalizeSalaryPeriod(period)];
 }
 
-export function formatSalaryRange(opts: {
+/** No real annual salary is below this; such a range is an hourly/daily rate. */
+const MIN_PLAUSIBLE_ANNUAL = 1000;
+
+export type SalaryInput = {
   salaryMin?: number | null;
   salaryMax?: number | null;
   currency?: string | null;
   salaryPeriod?: string | null;
-}): string | null {
+};
+
+/**
+ * Splits a salary into the numeric range ("USD 60,000 - USD 90,000") and its
+ * pay period. `period` is null when it cannot be stated honestly: an unknown
+ * or yearly period on a sub-1,000 amount is never labelled "/year".
+ */
+export function formatSalaryParts(opts: SalaryInput): { amount: string; period: SalaryPeriod | null } | null {
   const { salaryMin, salaryMax, currency, salaryPeriod } = opts;
 
   if (!salaryMin && !salaryMax) return null;
@@ -57,7 +67,16 @@ export function formatSalaryRange(opts: {
   const safeCurrency = currency || "USD";
   const min = salaryMin ? `${safeCurrency} ${salaryMin.toLocaleString()}` : "";
   const max = salaryMax ? `${safeCurrency} ${salaryMax.toLocaleString()}` : "";
-  const range = min && max ? `${min} - ${max}` : min || max;
+  const amount = min && max ? `${min} - ${max}` : min || max;
 
-  return `${range}/${salaryPeriodLabel(salaryPeriod)}`;
+  const top = Math.max(salaryMin ?? 0, salaryMax ?? 0);
+  const period = normalizeSalaryPeriod(salaryPeriod);
+  if (period === "yearly" && top < MIN_PLAUSIBLE_ANNUAL) return { amount, period: null };
+  return { amount, period };
+}
+
+export function formatSalaryRange(opts: SalaryInput): string | null {
+  const parts = formatSalaryParts(opts);
+  if (!parts) return null;
+  return parts.period ? `${parts.amount}/${PERIOD_LABELS[parts.period]}` : parts.amount;
 }

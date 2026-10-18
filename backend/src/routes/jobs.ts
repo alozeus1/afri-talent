@@ -46,6 +46,7 @@ const createJobSchema = z.object({
   salaryMin: z.coerce.number().optional(),
   salaryMax: z.coerce.number().optional(),
   currency: z.string().optional(),
+  salaryPeriod: z.enum(["HOURLY", "DAILY", "MONTHLY", "YEARLY"]).optional(),
   tags: z.array(z.string()).optional(),
   applicationUrl: z.string().url().max(500).optional().or(z.literal("")),
   // Mobility fields map 1:1 onto existing Job columns (no migration). They

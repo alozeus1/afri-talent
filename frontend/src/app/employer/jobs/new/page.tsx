@@ -33,7 +33,14 @@ import {
   JobMobilityFields,
   type JobMobilityValues,
 } from "@/components/employer/job-mobility-fields";
-import { CURRENCIES, JOB_TYPES, SENIORITY_LEVELS } from "@/components/employer/job-form-options";
+import {
+  CURRENCIES,
+  JOB_TYPES,
+  SALARY_PERIOD_KEYS,
+  SALARY_PERIODS,
+  SENIORITY_LEVELS,
+  type SalaryPeriodOption,
+} from "@/components/employer/job-form-options";
 import { parseCountryList } from "@/lib/job-options";
 
 type Step = 1 | 2 | 3;
@@ -57,6 +64,7 @@ export default function NewJobPage() {
     salaryMin: "",
     salaryMax: "",
     currency: "USD",
+    salaryPeriod: "YEARLY",
     tags: "",
     applicationUrl: "",
   });
@@ -145,6 +153,7 @@ export default function NewJobPage() {
         salaryMin: formData.salaryMin ? parseInt(formData.salaryMin, 10) : undefined,
         salaryMax: formData.salaryMax ? parseInt(formData.salaryMax, 10) : undefined,
         currency: formData.currency || undefined,
+        salaryPeriod: formData.salaryPeriod as SalaryPeriodOption,
         tags: formData.tags ? formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : undefined,
         applicationUrl: formData.applicationUrl || undefined,
         workplaceType: mobility.workplaceType || undefined,
@@ -256,7 +265,7 @@ export default function NewJobPage() {
     [
       t("jobs.reviewSalary"),
       formData.salaryMin || formData.salaryMax
-        ? `${formData.salaryMin || "–"} – ${formData.salaryMax || "–"} ${formData.currency}`
+        ? `${formData.salaryMin || "–"} – ${formData.salaryMax || "–"} ${formData.currency} · ${t(SALARY_PERIOD_KEYS[formData.salaryPeriod as SalaryPeriodOption])}`
         : t("common.notSpecified"),
     ],
     [t("jobs.reviewWorkplace"), [workplaceLabel, mobility.jobField ? tv("opt.field", mobility.jobField) : ""].filter(Boolean).join(" · ")],
@@ -426,7 +435,7 @@ export default function NewJobPage() {
                     </div>
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Input
                       id="salaryMin"
                       type="number"
@@ -459,6 +468,21 @@ export default function NewJobPage() {
                       >
                         {CURRENCIES.map((code) => (
                           <option key={code} value={code}>{code}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="salaryPeriod" className={labelClass}>
+                        {t("jobs.fieldSalaryPeriod")}
+                      </label>
+                      <select
+                        id="salaryPeriod"
+                        className={controlClass}
+                        value={formData.salaryPeriod}
+                        onChange={(e) => updateField("salaryPeriod", e.target.value)}
+                      >
+                        {SALARY_PERIODS.map((value) => (
+                          <option key={value} value={value}>{t(SALARY_PERIOD_KEYS[value])}</option>
                         ))}
                       </select>
                     </div>

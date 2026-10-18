@@ -24,7 +24,14 @@ import {
   controlClass,
   labelClass,
 } from "@/components/employer/employer-ui";
-import { CURRENCIES, JOB_TYPES, SENIORITY_LEVELS } from "@/components/employer/job-form-options";
+import {
+  CURRENCIES,
+  JOB_TYPES,
+  SALARY_PERIOD_KEYS,
+  SALARY_PERIODS,
+  SENIORITY_LEVELS,
+  type SalaryPeriodOption,
+} from "@/components/employer/job-form-options";
 import { parseCountryList } from "@/lib/job-options";
 
 /** Keep a stored value selectable even if it predates the current option list. */
@@ -49,6 +56,7 @@ export default function EditJobPage() {
     salaryMin: "",
     salaryMax: "",
     currency: "USD",
+    salaryPeriod: "YEARLY",
     tags: "",
   });
   const [mobility, setMobility] = useState<JobMobilityValues>(EMPTY_JOB_MOBILITY);
@@ -86,6 +94,7 @@ export default function EditJobPage() {
         salaryMin: job.salaryMin?.toString() || "",
         salaryMax: job.salaryMax?.toString() || "",
         currency: job.currency || "USD",
+        salaryPeriod: job.salaryPeriod || "YEARLY",
         tags: job.tags?.join(", ") || "",
       });
       setMobility({
@@ -123,6 +132,7 @@ export default function EditJobPage() {
         salaryMin: formData.salaryMin ? parseInt(formData.salaryMin, 10) : undefined,
         salaryMax: formData.salaryMax ? parseInt(formData.salaryMax, 10) : undefined,
         currency: formData.currency || undefined,
+        salaryPeriod: formData.salaryPeriod as SalaryPeriodOption,
         tags: formData.tags ? formData.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : undefined,
         workplaceType: mobility.workplaceType || undefined,
         jobField: mobility.jobField || undefined,
@@ -288,7 +298,7 @@ export default function EditJobPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Input
                 id="salaryMin"
                 type="number"
@@ -321,6 +331,21 @@ export default function EditJobPage() {
                 >
                   {withCurrent(CURRENCIES, formData.currency).map((code) => (
                     <option key={code} value={code}>{code}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="salaryPeriod" className={labelClass}>
+                  {t("jobs.fieldSalaryPeriod")}
+                </label>
+                <select
+                  id="salaryPeriod"
+                  className={controlClass}
+                  value={formData.salaryPeriod}
+                  onChange={(e) => updateField("salaryPeriod", e.target.value)}
+                >
+                  {SALARY_PERIODS.map((value) => (
+                    <option key={value} value={value}>{t(SALARY_PERIOD_KEYS[value])}</option>
                   ))}
                 </select>
               </div>

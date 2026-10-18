@@ -267,6 +267,24 @@ describe("runIngestion (persisting)", () => {
     expect(llm).not.toHaveBeenCalled();
   });
 
+  it("persists the salary period, treating an undeclared sub-300 rate as hourly", async () => {
+    const { prisma, jobs } = fakePrisma();
+    const feeds = [
+      feed("greenhouse", [
+        posting("rate", { externalId: "greenhouse:acme:rate", scopeKey: "greenhouse:acme:", salary: { min: 60, max: 120, currency: "USD" } }),
+        posting("annual", { externalId: "greenhouse:acme:annual", scopeKey: "greenhouse:acme:", title: "Data Engineer", descriptionHtml: "<p>Own batch pipelines in Spark and Airflow for analytics.</p>", salary: { min: 60000, max: 90000, currency: "USD", period: "yearly" } }),
+        posting("monthly", { externalId: "greenhouse:acme:monthly", scopeKey: "greenhouse:acme:", title: "Product Designer", descriptionHtml: "<p>Design onboarding flows in Figma with research partners.</p>", salary: { min: 2000, max: 3000, currency: "USD", period: "monthly" } }),
+        posting("none", { externalId: "greenhouse:acme:none", scopeKey: "greenhouse:acme:", title: "Mobile Engineer", descriptionHtml: "<p>Ship React Native features for our payments app in TypeScript.</p>" }),
+      ]),
+    ];
+    await runIngestion({ ...baseOptions(), prisma, feeds, classifier: new TaxonomyClassifier(10, vi.fn(), true) });
+    const bySource = new Map(Array.from(jobs.values()).map((row) => [row.sourceId, row]));
+    expect(bySource.get("greenhouse:acme:rate")).toMatchObject({ salaryMin: 60, salaryMax: 120, salaryPeriod: "HOURLY" });
+    expect(bySource.get("greenhouse:acme:annual")).toMatchObject({ salaryPeriod: "YEARLY" });
+    expect(bySource.get("greenhouse:acme:monthly")).toMatchObject({ salaryPeriod: "MONTHLY" });
+    expect(bySource.get("greenhouse:acme:none")).toMatchObject({ salaryPeriod: null });
+  });
+
   it("updates changed jobs and never overwrites an employer-posted job", async () => {
     const { prisma, jobs } = fakePrisma([
       {

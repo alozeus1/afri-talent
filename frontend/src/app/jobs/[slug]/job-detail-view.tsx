@@ -15,6 +15,7 @@ import { SaveJobButton } from "@/components/jobs/save-job-button";
 import { BackToJobs, CompanyLink } from "@/components/jobs/job-detail-links";
 import { splitJobDescriptionSections } from "@/lib/job-description";
 import { formatSalaryRange } from "@/lib/salary";
+import { SalaryText } from "@/components/jobs/salary-text";
 import { africaEligibility, deriveJobTrustLabels, type AfricaEligibilityStatus } from "@/lib/job-trust-labels";
 import { formatPostedLong } from "@/lib/posted-age";
 import { localizePath, useLocale } from "@/lib/i18n/client";
@@ -209,7 +210,9 @@ export function JobDetailView({ job }: { job: Job }) {
                 <div className="inline-flex items-center gap-2 font-semibold text-fg">
                   <dt className="sr-only">{tp("discover.detail.salary")}</dt>
                   <Wallet className="h-5 w-5 text-fg-muted" aria-hidden="true" />
-                  <dd>{label(salary)}</dd>
+                  <dd>
+                    <SalaryText salary={job} />
+                  </dd>
                 </div>
               )}
               {postedLabel && (

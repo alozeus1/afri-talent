@@ -9,6 +9,7 @@ import { africaPill } from "@/lib/job-trust-labels";
 import { jobSourceDisplayName } from "@/lib/job-source";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { formatSalaryRange } from "@/lib/salary";
+import { SalaryText } from "@/components/jobs/salary-text";
 import { jobDiscoveryEvents } from "@/lib/analytics";
 import { formatPostedShort } from "@/lib/posted-age";
 import { MapPin, Briefcase, Heart, Clock } from "lucide-react";
@@ -199,7 +200,9 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
           </div>
 
           {salary && (
-            <p className="font-display text-base font-semibold tabular-nums text-fg">{label(salary)}</p>
+            <p className="font-display text-base font-semibold tabular-nums text-fg">
+              <SalaryText salary={job} />
+            </p>
           )}
 
           {signals.length > 0 && (
