@@ -1,4 +1,11 @@
-import { EARLY_LEARNING_CATEGORIES, EARLY_LEARNING_LESSONS, TOP_PAYING_ROLE_GUIDANCE } from "@/lib/early-tester-content";
+import {
+  CUSTOM_ROLE_QUESTION_TEMPLATE,
+  EARLY_LEARNING_CATEGORIES,
+  EARLY_LEARNING_LESSONS,
+  INTERVIEW_ROLE_TRACKS,
+  STAR_PRACTICE_QUESTION,
+  TOP_PAYING_ROLE_GUIDANCE,
+} from "@/lib/early-tester-content";
 import { HIRING_RESOURCE_GUIDES, MARKET_SALARY_BENCHMARKS, OFFICIAL_IMMIGRATION_GUIDES } from "@/lib/market-reference-data";
 import ar from "../content/ar";
 import es from "../content/es";
@@ -39,7 +46,42 @@ describe.each(Object.entries(overlays))("content overlay %s", (_locale, overlay)
   });
 });
 
+describe.each(Object.entries(overlays))("interview question overlay %s", (_locale, overlay) => {
+  const practice = INTERVIEW_ROLE_TRACKS.flatMap((track) => track.questions);
+
+  it("translates every practice question and both custom-role fallbacks", () => {
+    expect(Object.keys(overlay.questions ?? {}).sort()).toEqual(
+      [...practice.map((q) => q.question), CUSTOM_ROLE_QUESTION_TEMPLATE, STAR_PRACTICE_QUESTION].sort(),
+    );
+    for (const q of practice) {
+      const patch = overlay.questions?.[q.question];
+      expect(patch?.question).toBeTruthy();
+      expect(patch?.question).not.toBe(q.question);
+      expect(patch?.expectedPoints?.length).toBe(q.expectedPoints.length);
+    }
+    expect(overlay.questions?.[CUSTOM_ROLE_QUESTION_TEMPLATE]?.question).toContain("{role}");
+  });
+});
+
 describe("localizeContent", () => {
+  it("localizes interview questions by English text or template key and fills {role}", () => {
+    const fallback = {
+      key: CUSTOM_ROLE_QUESTION_TEMPLATE,
+      question: CUSTOM_ROLE_QUESTION_TEMPLATE.replace("{role}", "Cloud Engineer"),
+      category: "behavioral" as const,
+      difficulty: "medium" as const,
+      expectedPoints: ["Specific examples", "Measurable outcomes", "Relevance to role"],
+    };
+    const list = [INTERVIEW_ROLE_TRACKS[0].questions[0], fallback];
+    expect(localizeContent("en").interviewQuestions(list, { role: "Cloud Engineer" })).toEqual(list);
+    const [first, custom] = localizeContent("fr").interviewQuestions(list, { role: "Ingénieur cloud" });
+    expect(first.question).toBe(fr.questions?.[list[0].question]?.question);
+    expect(first.category).toBe(list[0].category);
+    expect(custom.question).toBe("Parlez-moi de votre expérience en lien avec le poste visé (Ingénieur cloud).");
+    expect(custom.expectedPoints).toEqual(fr.questions?.[CUSTOM_ROLE_QUESTION_TEMPLATE]?.expectedPoints);
+  });
+
+
   it("returns English data unchanged for en and translated fields otherwise", () => {
     expect(localizeContent("en").lessons(EARLY_LEARNING_LESSONS)[0].title).toBe(EARLY_LEARNING_LESSONS[0].title);
     const french = localizeContent("fr").lessons(EARLY_LEARNING_LESSONS)[0];

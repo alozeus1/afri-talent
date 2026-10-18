@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { localizePath, useLocale } from "@/lib/i18n/client";
 import { usePublicT, type PublicMessageKey } from "@/lib/i18n/public-messages";
 import { usePublicLabel } from "@/lib/i18n/public-labels";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MapPin, Users } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -357,8 +357,16 @@ export default function CompanyDetailPage() {
               </div>
               {company.industry && <p className="mb-1 text-fg-secondary">{company.industry}</p>}
               <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-fg-secondary">
-                {company.size && <span><span aria-hidden="true">👥</span> {company.size}</span>}
-                {company.headquarters && <span><span aria-hidden="true">📍</span> {company.headquarters}</span>}
+                {company.size && (
+                  <span className="inline-flex items-center gap-1">
+                    <Users aria-hidden="true" className="h-4 w-4 shrink-0" /> {company.size}
+                  </span>
+                )}
+                {company.headquarters && (
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin aria-hidden="true" className="h-4 w-4 shrink-0" /> {company.headquarters}
+                  </span>
+                )}
               </div>
               {company.website && (
                 <a

@@ -3,6 +3,7 @@ import { ALL_NAMESPACES } from "../messages/registry";
 import { SUPPORTED_LOCALES } from "../config";
 import { ADMIN_MESSAGES, formatAdminMessage, type AdminMessageKey } from "../admin-messages";
 import type { SupportedLocale } from "../config";
+import arDiscover from "../messages/discover/ar";
 
 const translateAdmin = (locale: SupportedLocale, key: AdminMessageKey, vars: Record<string, number>) =>
   formatAdminMessage(ADMIN_MESSAGES[locale][key], vars, locale);
@@ -83,5 +84,15 @@ describe("plural parity", () => {
         }
       }
     }
+  });
+});
+
+describe("Arabic posted-age labels", () => {
+  it("uses full plural forms instead of a truncated unit", () => {
+    const ar = arDiscover as Record<string, string>;
+    expect(formatMessage(ar["discover.posted.daysShort"], { count: "3" }, "ar")).toBe("نُشرت قبل 3 أيام");
+    expect(formatMessage(ar["discover.posted.daysShort"], { count: "2" }, "ar")).toBe("نُشرت قبل يومين");
+    expect(formatMessage(ar["discover.posted.weeksShort"], { count: "3" }, "ar")).toBe("نُشرت قبل 3 أسابيع");
+    expect(formatMessage(ar["discover.posted.monthsShort"], { count: "11" }, "ar")).toBe("نُشرت قبل 11 شهرًا");
   });
 });

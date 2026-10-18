@@ -34,6 +34,11 @@ export interface ContentOverlay {
     string,
     { role?: string; focus?: string; questions?: Array<{ question?: string; expectedPoints?: string[] }> }
   >;
+  /**
+   * Interview practice questions, keyed by the English question text (or the
+   * template, e.g. "...a {role} role.", for the custom-role fallbacks).
+   */
+  questions?: Record<string, { question?: string; expectedPoints?: string[] }>;
   /** lib/early-tester-content INTERVIEW_INSIGHTS, keyed by `id`. */
   interviewInsights?: Record<string, { title?: string; role?: string; summary?: string; bullets?: string[] }>;
   /** Flat tip lists, replaced wholesale. */

@@ -9,6 +9,8 @@
  * Authenticated pages use VISUAL_CANDIDATE_EMAIL / VISUAL_CANDIDATE_PASSWORD
  * when set; otherwise a throwaway candidate is registered through the UI.
  */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { test, expect, type Browser, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
@@ -88,7 +90,31 @@ async function seededState(browser: Browser, email: string, home: RegExp, file: 
   return file;
 }
 
+// Playwright restarts the worker after a failing test and re-runs beforeAll.
+// The seeded sessions and detail paths are cached at a fixed path inside the
+// run's output directory (wiped at the start of every run), so a restart reuses
+// them instead of signing in again and tripping the login rate limit, which
+// used to skip every remaining test after a single failure.
+interface SetupCache {
+  candidateState: string;
+  employerState: string;
+  adminState: string;
+  detailPaths: typeof detailPaths;
+}
+
 test.beforeAll(async ({ browser }, testInfo) => {
+  const authDir = join(testInfo.project.outputDir, ".auth", "visual-contrast");
+  const cacheFile = join(authDir, "setup.json");
+  if (existsSync(cacheFile)) {
+    const cached = JSON.parse(readFileSync(cacheFile, "utf8")) as SetupCache;
+    if ([cached.candidateState, cached.employerState, cached.adminState].every((file) => existsSync(file))) {
+      ({ candidateState, employerState, adminState } = cached);
+      Object.assign(detailPaths, cached.detailPaths);
+      return;
+    }
+  }
+  mkdirSync(authDir, { recursive: true });
+
   const context = await browser.newContext();
   const page = await context.newPage();
   const email = process.env.VISUAL_CANDIDATE_EMAIL;
@@ -107,12 +133,12 @@ test.beforeAll(async ({ browser }, testInfo) => {
     await page.getByRole("button", { name: "Create Account" }).click();
   }
   await page.waitForURL(/\/en\/candidate/, { timeout: 60_000 });
-  candidateState = testInfo.outputPath("candidate-state.json");
+  candidateState = join(authDir, "candidate-state.json");
   await context.storageState({ path: candidateState });
   await context.close();
 
-  employerState = await seededState(browser, "employer@example.com", /\/en\/employer/, testInfo.outputPath("employer-state.json"));
-  adminState = await seededState(browser, "admin@example.com", /\/admin(\/|$)/, testInfo.outputPath("admin-state.json"));
+  employerState = await seededState(browser, "employer@example.com", /\/en\/employer/, join(authDir, "employer-state.json"));
+  adminState = await seededState(browser, "admin@example.com", /\/admin(\/|$)/, join(authDir, "admin-state.json"));
 
   // Detail pages: follow the first job / company link like a visitor would.
   const browse = await browser.newContext();
@@ -129,6 +155,9 @@ test.beforeAll(async ({ browser }, testInfo) => {
     detailPaths[kind] = href;
   }
   await browse.close();
+
+  const cache: SetupCache = { candidateState, employerState, adminState, detailPaths };
+  writeFileSync(cacheFile, JSON.stringify(cache, null, 2));
 });
 
 for (const theme of THEMES) {

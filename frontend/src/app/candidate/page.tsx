@@ -30,6 +30,7 @@ import {
   InstantMatch,
   profile as profileApi,
   trust,
+  type TrustRiskLevel,
 } from "@/lib/api";
 import { candidateRetentionEvents } from "@/lib/analytics";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -191,6 +192,47 @@ function QuickLink({
   );
 }
 
+type StrengthLevel = "STARTING" | "BUILDING" | "GOOD" | "STRONG";
+
+function strengthLevel(score: number): StrengthLevel {
+  if (score >= 75) return "STRONG";
+  if (score >= 50) return "GOOD";
+  if (score >= 25) return "BUILDING";
+  return "STARTING";
+}
+
+/** Authenticity as a labelled progress bar, with the risk level in words. */
+function ProfileStrength({ score, riskLevel, t }: { score: number; riskLevel: TrustRiskLevel; t: ReturnType<typeof useCandidateT> }) {
+  const value = Math.max(0, Math.min(100, Math.round(score)));
+  const level = strengthLevel(value);
+  const levelLabel = t(`dash.trust.level.${level}` as CandidateMessageKey);
+  const bar = level === "STRONG" || level === "GOOD" ? "bg-success" : "bg-primary";
+  const riskTone = riskLevel === "LOW" ? "text-success" : riskLevel === "MEDIUM" ? "text-warning" : "text-danger";
+  return (
+    <div className="mt-3 max-w-md" data-testid="profile-strength">
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="font-medium text-fg">{t("dash.trust.strength")}</span>
+        <span className="tabular-nums text-fg-secondary">{t("dash.trust.strengthValue", { level: levelLabel, score: value })}</span>
+      </div>
+      <div
+        className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted"
+        role="progressbar"
+        aria-label={t("dash.trust.strength")}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={value}
+        aria-valuetext={t("dash.trust.strengthValue", { level: levelLabel, score: value })}
+      >
+        <div className={`h-full rounded-full ${bar}`} style={{ width: `${value}%` }} />
+      </div>
+      <p className="mt-2 text-xs text-fg-muted">
+        <span className={`font-medium ${riskTone}`}>{t(`dash.trust.risk.${riskLevel}` as CandidateMessageKey)}</span>
+        {value < 75 ? <> · {t("dash.trust.strengthHint")}</> : null}
+      </p>
+    </div>
+  );
+}
+
 export default function CandidateDashboard() {
   const locale = useLocale();
   const locationLabel = useLocationLabel();
@@ -218,6 +260,10 @@ export default function CandidateDashboard() {
   const [selectedTab, setSelectedTab] = useState<TabId>("overview");
 
   const href = (path: string) => localizePath(path, locale);
+  // When the weekly trusted digest is empty, show the top-ranked roles that
+  // match the profile's skills instead of an empty card.
+  const skillMatched = instantMatches.filter((match) => match.matchedSkills.length > 0);
+  const skillMatchFallback = (skillMatched.length > 0 ? skillMatched : instantMatches).slice(0, 3);
 
   useEffect(() => {
     if (!isLoading && (!user || user.role?.toUpperCase() !== "CANDIDATE")) {
@@ -433,12 +479,11 @@ export default function CandidateDashboard() {
                       )}
                     </div>
                     <h2 className="mt-4 text-lg font-semibold text-fg">{t("dash.trust.title")}</h2>
-                    <p className="mt-2 text-sm text-fg-secondary">
-                      {t("dash.trust.scores", {
-                        authenticity: trustDashboard.trust.authenticityScore,
-                        risk: trustDashboard.trust.riskScore,
-                      })}
-                    </p>
+                    <ProfileStrength
+                      score={trustDashboard.trust.authenticityScore}
+                      riskLevel={trustDashboard.trust.riskLevel}
+                      t={t}
+                    />
                     <div className="mt-3 flex flex-wrap gap-2">
                       {trustDashboard.trust.verifiedSkillCount > 0 && (
                         <TrustBadge
@@ -504,7 +549,7 @@ export default function CandidateDashboard() {
                           <p className="mt-1 text-xs leading-5 text-fg-secondary">{bt(journey.description)}</p>
                         </div>
                         <Badge
-                          variant={journey.status === "DONE" ? "success" : journey.status === "READY" ? "warning" : "info"}
+                          variant={journey.status === "DONE" ? "success" : journey.status === "READY" ? "info" : "default"}
                         >
                           {enumLabel(t, "dash.journey", journey.status)}
                         </Badge>
@@ -532,10 +577,48 @@ export default function CandidateDashboard() {
               <Card>
                 <CardHeader>
                   <h2 className="text-lg font-semibold text-fg">{t("dash.matches.title")}</h2>
-                  <p className="mt-1 text-sm text-fg-secondary">{bt(retentionSummary.weeklyDigest.headline)}</p>
+                  <p className="mt-1 text-sm text-fg-secondary">
+                    {retentionSummary.recommendations.length === 0 && skillMatchFallback.length > 0
+                      ? t("dash.matches.skillFallback")
+                      : bt(retentionSummary.weeklyDigest.headline)}
+                  </p>
                 </CardHeader>
                 <CardContent>
-                  {retentionSummary.recommendations.length === 0 ? (
+                  {retentionSummary.recommendations.length === 0 && skillMatchFallback.length > 0 ? (
+                    <ul className="space-y-3" data-testid="trusted-matches-fallback">
+                      {skillMatchFallback.map((job) => (
+                        <li key={job.id} className="rounded-2xl border border-line bg-surface-sunken p-4">
+                          <Link
+                            href={href(`/jobs/${job.slug}`)}
+                            className="text-sm font-semibold text-fg hover:text-primary-text"
+                            onClick={() =>
+                              candidateRetentionEvents.recommendationClicked({
+                                source: "candidate_dashboard",
+                                job_id: job.id,
+                              })
+                            }
+                          >
+                            {job.title}
+                          </Link>
+                          <p className="mt-1 text-xs text-fg-muted">
+                            {[job.companyName, locationLabel(job.location)].filter(Boolean).join(" · ")}
+                          </p>
+                          {job.matchedSkills.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {job.matchedSkills.slice(0, 4).map((skill) => (
+                                <span
+                                  key={skill}
+                                  className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary-text"
+                                >
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : retentionSummary.recommendations.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-line-strong bg-surface-sunken p-5">
                       <Search className="mb-3 h-6 w-6 text-primary-text" aria-hidden="true" />
                       <p className="text-sm font-semibold text-fg">{t("dash.matches.emptyTitle")}</p>

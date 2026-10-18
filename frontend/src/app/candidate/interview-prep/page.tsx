@@ -13,10 +13,12 @@ import { trackEvent } from "@/lib/analytics";
 import { EarlyTesterFeedback } from "@/components/feedback/early-tester-feedback";
 import { FREE_MODE } from "@/lib/free-mode";
 import {
+  CUSTOM_ROLE_QUESTION_TEMPLATE,
   INTERVIEW_INSIGHTS,
   INTERVIEW_ROLE_TRACKS,
   InterviewDifficulty,
   InterviewPracticeQuestion,
+  STAR_PRACTICE_QUESTION,
   evaluateInterviewAnswerLocally,
   getInterviewQuestionsForRole,
 } from "@/lib/early-tester-content";
@@ -34,7 +36,8 @@ import { useLocalizedContent } from "@/lib/i18n/content";
 
 type Difficulty = InterviewDifficulty;
 type Stage = "setup" | "question" | "feedback" | "complete";
-type Question = InterviewPracticeQuestion;
+// `key` is the English template a localized overlay is looked up by.
+type Question = InterviewPracticeQuestion & { key?: string };
 
 interface Feedback {
   score: number;
@@ -80,6 +83,8 @@ export default function InterviewPrepPage() {
   if (authLoading || !user) return <CandidateSpinner className="py-24" />;
 
   const targetRole = (customRole.trim() || role).trim();
+  // The role as the candidate sees it: their own wording, or the localized track name.
+  const displayRole = customRole.trim() || localizedTracks[INTERVIEW_ROLE_TRACKS.findIndex((track) => track.role === role)]?.role || role;
 
   async function handleStart() {
     if (!targetRole) {
@@ -105,7 +110,7 @@ export default function InterviewPrepPage() {
               difficulty,
               expectedPoints: [t("ip.pt.examples"), t("ip.pt.outcomes"), t("ip.pt.lessons")],
             }))
-          : getDefaultQuestions(targetRole, difficulty);
+          : content.interviewQuestions(getDefaultQuestions(targetRole, difficulty), { role: displayRole });
 
       setQuestions(sessionQuestions);
       setCurrentIndex(0);
@@ -268,7 +273,7 @@ export default function InterviewPrepPage() {
                 </div>
               </fieldset>
 
-              <Button onClick={handleStart} disabled={loading || !targetRole} className="w-full">
+              <Button onClick={handleStart} disabled={loading || !targetRole} className="w-full" data-testid="interview-start">
                 {loading ? t("ip.starting") : t("ip.start")}
               </Button>
             </CardContent>
@@ -309,7 +314,7 @@ export default function InterviewPrepPage() {
               <div className="h-full rounded-full bg-primary" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }} />
             </div>
 
-            <Card>
+            <Card data-testid="interview-question">
               <CardContent className="pt-6">
                 <p className="text-base font-medium leading-relaxed text-fg" dir="auto">
                   {currentQuestion.question}
@@ -413,7 +418,7 @@ export default function InterviewPrepPage() {
             <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
               <CheckCircle2 className="h-12 w-12 text-success" aria-hidden="true" />
               <h2 className="text-xl font-semibold text-fg">{t("ip.complete")}</h2>
-              <p className="max-w-sm text-sm text-fg-muted">{t("ip.completeBody", { role: targetRole })}</p>
+              <p className="max-w-sm text-sm text-fg-muted">{t("ip.completeBody", { role: displayRole })}</p>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Button onClick={handleRestart}>{t("ip.again")}</Button>
                 <Button variant="outline" onClick={() => router.push(localizePath("/candidate/applications", locale))}>
@@ -447,13 +452,14 @@ function getDefaultQuestions(role: string, difficulty: Difficulty): Question[] {
   return [
     ...getInterviewQuestionsForRole(role, difficulty),
     {
-      question: `Tell me about your experience relevant to a ${role} role.`,
+      key: CUSTOM_ROLE_QUESTION_TEMPLATE,
+      question: CUSTOM_ROLE_QUESTION_TEMPLATE.replace("{role}", role),
       category: "behavioral" as const,
       difficulty,
       expectedPoints: ["Specific examples", "Measurable outcomes", "Relevance to role"],
     },
     {
-      question: "Describe a challenging project and how you handled it using the STAR method.",
+      question: STAR_PRACTICE_QUESTION,
       category: "star practice" as const,
       difficulty,
       expectedPoints: ["Situation", "Task", "Action", "Result"],

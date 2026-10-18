@@ -545,6 +545,10 @@ export function getInterviewRoleNames(): string[] {
   return INTERVIEW_ROLE_TRACKS.map((track) => track.role);
 }
 
+/** Fallback practice prompts appended to every session; `{role}` is the target role. */
+export const CUSTOM_ROLE_QUESTION_TEMPLATE = "Tell me about your experience relevant to a {role} role.";
+export const STAR_PRACTICE_QUESTION = "Describe a challenging project and how you handled it using the STAR method.";
+
 export function getInterviewQuestionsForRole(role: string, difficulty: InterviewDifficulty): InterviewPracticeQuestion[] {
   const normalizedRole = role.toLowerCase().trim();
   const exact = INTERVIEW_ROLE_TRACKS.find((track) => track.role.toLowerCase() === normalizedRole);

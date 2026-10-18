@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -124,14 +125,13 @@ export default function CompaniesPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Hero Section */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-950 via-emerald-900 to-zinc-950 px-6 py-20 text-center shadow-2xl mb-12 animate-gradient-breath">
-        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay" aria-hidden="true"></div>
         <div className="relative z-10 max-w-3xl mx-auto">
-          <Badge className="mb-6 bg-white/10 text-emerald-100 hover:bg-white/20 border-white/20 backdrop-blur-md">
+          <span className="mb-6 inline-flex items-center rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-xs font-medium text-emerald-100 backdrop-blur-md">
             {t("companies.employerDirBeta")}
-          </Badge>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 tracking-tight font-display">
-            {t("companies.heroHeading")} <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-200">
+          </span>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 tracking-tight font-display text-balance">
+            <span className="block text-balance">{t("companies.heroHeading")}</span>
+            <span className="block text-balance text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-200">
               {t("companies.heroHighlight")}
             </span>
           </h1>
@@ -266,8 +266,8 @@ export default function CompaniesPage() {
                       </div>
 
                       {company.headquarters && (
-                        <p className="text-sm text-fg-muted mb-3">
-                          <span aria-hidden="true">📍</span> {company.headquarters}
+                        <p className="mb-3 flex items-center gap-1.5 text-sm text-fg-muted">
+                          <MapPin aria-hidden="true" className="h-4 w-4 shrink-0" /> {company.headquarters}
                         </p>
                       )}
 

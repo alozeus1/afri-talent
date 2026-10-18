@@ -13,6 +13,8 @@
  * and brand names are excluded: pages mark it with [data-user-content]. Table
  * bodies are scanned too, so status/role badges and other chrome cells count.
  * Count strings are also checked for plural agreement ("1 applications").
+ * Interview prep also starts a practice session, so the in-session questions
+ * and key points are covered, not just the setup screen.
  */
 import { test, expect, type Browser, type Page } from "@playwright/test";
 
@@ -157,6 +159,29 @@ test("header language switcher changes locale, and Arabic is RTL", async ({ page
   await page.getByRole("combobox", { name: /language|langue|idioma|اللغة/i }).first().selectOption("en");
   await page.waitForURL(/\/en\/jobs/);
 });
+
+/** Starts a practice session and returns the first question card's strings. */
+async function interviewQuestionStrings(browser: Browser, locale: string): Promise<string[]> {
+  const ctx = await browser.newContext({ storageState: states.candidate });
+  const page = await ctx.newPage();
+  await page.goto(`/${locale}/candidate/interview-prep`);
+  await page.getByTestId("interview-start").click();
+  const card = page.getByTestId("interview-question");
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  const strings = (await card.locator("p, li").allInnerTexts()).map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean);
+  await ctx.close();
+  return strings;
+}
+
+for (const locale of LOCALES) {
+  test(`candidate interview-prep session questions are translated in ${locale}`, async ({ browser }) => {
+    const en = new Set(await interviewQuestionStrings(browser, "en"));
+    const loc = await interviewQuestionStrings(browser, locale);
+    expect(loc.length, "question card rendered").toBeGreaterThan(1);
+    const leftovers = loc.filter((s) => en.has(s) && looksLikeEnglishProse(s) && !ALLOWED.some((re) => re.test(s)));
+    expect(leftovers, `untranslated interview questions on /${locale}/candidate/interview-prep`).toEqual([]);
+  });
+}
 
 for (const [role, pages] of [
   ["public", PUBLIC_PAGES],

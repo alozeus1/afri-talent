@@ -64,6 +64,23 @@ export function localizeContent(locale: SupportedLocale) {
           questions: track.questions.map((q, index) => ({ ...q, ...(questionPatches?.[index] ?? {}) })),
         } as T;
       }),
+    /**
+     * Localizes practice questions. `key` (the English template) wins over the
+     * question text, and `{role}` in the result is filled from `vars.role`.
+     */
+    interviewQuestions: <T extends { question: string; expectedPoints: string[]; key?: string }>(
+      list: readonly T[],
+      vars: { role: string },
+    ) =>
+      list.map((item) => {
+        const patch = o.questions?.[item.key ?? item.question];
+        if (!patch) return item;
+        return {
+          ...item,
+          question: (patch.question ?? item.question).replaceAll("{role}", vars.role),
+          expectedPoints: patch.expectedPoints ?? item.expectedPoints,
+        } as T;
+      }),
     interviewInsights: <T extends { id: string }>(list: readonly T[]) => mergeList(list, (i) => i.id, o.interviewInsights),
     tips: (key: keyof NonNullable<ContentOverlay["tips"]>, list: readonly string[]) => o.tips?.[key] ?? [...list],
   };

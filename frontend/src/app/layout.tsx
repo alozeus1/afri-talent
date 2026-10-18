@@ -53,7 +53,8 @@ export default function RootLayout({
             </div>
           </AuthProvider>
         </ThemeProvider>
-        <SpeedInsights />
+        {/* The Speed Insights script is only served on Vercel; elsewhere it 404s. */}
+        {process.env.VERCEL ? <SpeedInsights /> : null}
       </body>
     </html>
   );

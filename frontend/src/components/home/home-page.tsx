@@ -122,14 +122,24 @@ export function HomePageContent() {
                 </div>
 
                 <div className="surface-panel relative ml-auto w-full max-w-[36rem] rounded-3xl p-5 border border-line bg-surface-sunken">
-                  <div className="relative flex h-[540px] items-center justify-center overflow-hidden rounded-2xl border border-line bg-surface">
+                  {/* Current /jobs capture; the dark variant follows the site theme. */}
+                  <div className="relative h-[540px] overflow-hidden rounded-2xl border border-line bg-surface">
                     <Image
-                      src="/images/hero/homepage-design-preview.webp"
+                      src="/images/hero/jobs-preview-light.webp"
                       alt={tp("site.home.previewAlt")}
-                      width={190}
-                      height={600}
-                      className="h-full w-auto object-contain p-4"
+                      width={1080}
+                      height={1089}
+                      sizes="36rem"
+                      className="h-full w-full object-cover object-left-top dark:hidden"
                       priority
+                    />
+                    <Image
+                      src="/images/hero/jobs-preview-dark.webp"
+                      alt={tp("site.home.previewAlt")}
+                      width={1080}
+                      height={1089}
+                      sizes="36rem"
+                      className="hidden h-full w-full object-cover object-left-top dark:block"
                     />
                   </div>
 
