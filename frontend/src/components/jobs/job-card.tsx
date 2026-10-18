@@ -100,9 +100,13 @@ export function JobCard({ job, initialSaved = false }: JobCardProps) {
   const companyName = job.employer?.companyName || job.sourceName || null;
   const sourceName = jobSourceDisplayName(job);
   const signals = selectCardSignals(job, { hasSalary: Boolean(salary) });
-  const locationLine = job.workplaceType
-    ? `${locationLabel(job.location)} · ${label(job.workplaceType)}`
-    : locationLabel(job.location);
+  const place = locationLabel(job.location, { compact: true });
+  const workplace = job.workplaceType ? label(job.workplaceType) : "";
+  // Skip the workplace suffix when the place already says it ("Remote (CET ±3h)").
+  const locationLine =
+    workplace && !place.toLocaleLowerCase(locale).includes(workplace.toLocaleLowerCase(locale))
+      ? [place, workplace].filter(Boolean).join(" · ")
+      : place || workplace;
   const roleLine = [job.type ? label(job.type) : null, job.seniority ? label(job.seniority) : null]
     .filter(Boolean)
     .join(" · ");

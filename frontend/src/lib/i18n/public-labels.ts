@@ -8,6 +8,7 @@
 import { useCallback } from "react";
 import { useLocale } from "./client";
 import { usePublicT, type PublicMessageKey, type PublicT, type PublicVars } from "./public-messages";
+import { tidyLocation, type TidyLocationOptions } from "../location-display";
 
 const EXACT: Record<string, PublicMessageKey> = {
   // job types (filter values and API values)
@@ -361,8 +362,7 @@ function translateLocationPart(tp: PublicT, locale: string, part: string): strin
   return localized ? part.replace(trimmed, localized) : part;
 }
 
-/** "Remote (Africa)" -> "À distance (Afrique)" in French; cities pass through. */
-export function translateLocation(tp: PublicT, locale: string, text: string | null | undefined): string {
+function translateLocationText(tp: PublicT, locale: string, text: string): string {
   if (!text) return "";
   const whole = translateLocationPart(tp, locale, text);
   if (whole !== text) return whole;
@@ -372,9 +372,33 @@ export function translateLocation(tp: PublicT, locale: string, text: string | nu
     .join("");
 }
 
+/**
+ * "Remote (Africa)" -> "À distance (Afrique)" in French; cities pass through.
+ * Raw feed strings are tidied first (lib/location-display): "Paris, Paris" ->
+ * "Paris", "CET +/- 3 hours" -> "Remote (CET ±3h)", and with `compact` a long
+ * country list -> "South Africa + 20 more".
+ */
+export function translateLocation(
+  tp: PublicT,
+  locale: string,
+  text: string | null | undefined,
+  options: TidyLocationOptions = {},
+): string {
+  if (!text) return "";
+  const tidy = tidyLocation(text, options);
+  if (tidy.kind === "timezone") return tp("discover.loc.remoteTimezone", { zone: tidy.zone });
+  if (tidy.kind === "list") {
+    return tp("discover.loc.plusMore", { place: translateLocationText(tp, locale, tidy.first), count: tidy.more });
+  }
+  return translateLocationText(tp, locale, tidy.text);
+}
+
 /** `location("Remote, Nigeria")` -> "Remoto, Nigéria" in Portuguese. */
 export function useLocationLabel() {
   const tp = usePublicT();
   const locale = useLocale();
-  return useCallback((text: string | null | undefined) => translateLocation(tp, locale, text), [tp, locale]);
+  return useCallback(
+    (text: string | null | undefined, options?: TidyLocationOptions) => translateLocation(tp, locale, text, options),
+    [tp, locale],
+  );
 }

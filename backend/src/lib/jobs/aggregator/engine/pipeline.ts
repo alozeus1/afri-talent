@@ -2,7 +2,7 @@
 // Aggregator engine — one ingestion run.
 //
 //   feeds ──(concurrency, circuit breaker, min-interval, time budget)──▶ raw
-//   raw ──normalise──▶ eligibility rules ──uncertain──▶ batched LLM tie-break
+//   raw ──normalise──▶ evergreen denylist ──▶ eligibility rules ──uncertain──▶ batched LLM tie-break
 //   eligible ──cross-source dedupe──▶ persist (skip unchanged) ──▶ expire stale
 //   metrics per source ──▶ AggregatorRun row (+ ops events)
 //
@@ -20,6 +20,7 @@ import { getSharedHttpClient, HttpClient, RobotsDisallowedError } from "./http.j
 import { EligibilityTieBreaker } from "./llm-tiebreak.js";
 import { feedToJobSource, normalizePosting, type NormalizedPosting } from "./normalize-posting.js";
 import { expireMissing, persistGroups, TaxonomyClassifier } from "./persist.js";
+import { isEvergreenPosting } from "./quality.js";
 import { buildFeedSources } from "./registry.js";
 import type {
   FeedScopeResult,
@@ -162,8 +163,13 @@ export async function runIngestion(options: RunIngestionOptions = {}): Promise<I
       scopes = result.scopes;
       for (const raw of result.postings) {
         try {
-          allPostings.push(normalizePosting(feed.id, raw, now));
+          const posting = normalizePosting(feed.id, raw, now);
           metric.fetched += 1;
+          if (isEvergreenPosting(posting.job.title)) {
+            metric.rejected += 1; // evergreen catch-all ("General application", "Talent pool"), not a vacancy
+            continue;
+          }
+          allPostings.push(posting);
         } catch (error) {
           metric.errors += 1;
           if (metric.errorSamples.length < 3) metric.errorSamples.push(`normalize: ${(error as Error).message}`);

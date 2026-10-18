@@ -650,4 +650,6 @@ export default {
   "discover.loc.middleEast": "Middle East",
   "discover.loc.multiple": "Multiple locations",
   "discover.loc.notSpecified": "Location not specified",
+  "discover.loc.remoteTimezone": "Remote ({zone})",
+  "discover.loc.plusMore": "{place} + {count, plural, one {# more} other {# more}}",
 } satisfies Record<string, string>;

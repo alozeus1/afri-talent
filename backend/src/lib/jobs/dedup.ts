@@ -74,11 +74,30 @@ function expandTitleAbbreviations(title: string): string {
   return out;
 }
 
+// ATS location strings repeat the same place under board labels: Greenhouse's
+// "EMEA; Roles - EMEA" and "Roles - EMEA" are one location, as are "Berlin
+// Office" and "Berlin". Canonicalise before K1 so re-posts of one role match.
+const LOCATION_LABEL_PREFIX = /^(?:roles?|locations?|offices?)\s*[-–:]\s*/i;
+const LOCATION_OFFICE_SUFFIX = /\s+(?:office|hq|headquarters)$/i;
+
+export function canonicalDedupLocation(raw: string | null | undefined): string {
+  const seen = new Set<string>();
+  const segments: string[] = [];
+  for (const segment of (raw ?? "").split(";")) {
+    const cleaned = segment.replace(/\s+/g, " ").trim().replace(LOCATION_LABEL_PREFIX, "").replace(LOCATION_OFFICE_SUFFIX, "").trim();
+    const key = cleaned.toLowerCase();
+    if (!cleaned || seen.has(key)) continue;
+    seen.add(key);
+    segments.push(cleaned);
+  }
+  return segments.join("; ");
+}
+
 export function buildDedupKeys(input: DedupKeyInput): DedupKeys {
   const normCompany = normalizeCompany(input.company ?? input.sourceName ?? "");
   const expandedTitle = expandTitleAbbreviations(input.title);
   const normTitle = normalizeTitle(expandedTitle);
-  const normCity = normalizeLocation(input.location ?? "").city ?? "";
+  const normCity = normalizeLocation(canonicalDedupLocation(input.location)).city ?? "";
   const k1 = `${normCompany}:${normTitle}:${normCity}`.toLowerCase();
   const embeddingInput: JobEmbeddingInput = {
     title: input.title,

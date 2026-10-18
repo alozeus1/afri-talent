@@ -34,6 +34,7 @@ import type { AggregatedJob } from "../types.js";
 import { resolveJobField } from "../taxonomy.js";
 import { mapWithConcurrency } from "./circuit-breaker.js";
 import { contentHash } from "./dedupe.js";
+import { qualifiesForAfricaBadge } from "./eligibility.js";
 import type { PostingGroup } from "./dedupe.js";
 import type { FeedSourceId } from "./types.js";
 
@@ -77,6 +78,15 @@ function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let index = 0; index < items.length; index += size) out.push(items.slice(index, index + size));
   return out;
+}
+
+/** "Hires from Africa" badge for the canonical posting of a group. */
+export function africaBadge(group: PostingGroup): boolean {
+  const { job, eligibility } = group.canonical;
+  return qualifiesForAfricaBadge(eligibility, {
+    remote: job.locationType === "remote",
+    visaSponsorship: job.visaSponsorship,
+  });
 }
 
 export function toJobDocument(job: AggregatedJob, now: Date) {
@@ -222,7 +232,10 @@ export async function persistGroups(
       sourceFingerprint: fingerprint,
       sourceName: job.company,
     }).k1;
-    return { group, job, document, fingerprint, k1, hash: contentHash(job) };
+    // Derived flags are part of the hash so a rules change (eligibility badge,
+    // workplace type) rewrites rows that the source itself did not change.
+    const hash = contentHash(job, [africaBadge(group), job.workplaceType ?? null]);
+    return { group, job, document, fingerprint, k1, hash };
   });
 
   const existing = await lookupExisting(prisma, {
@@ -307,7 +320,6 @@ async function buildWriteData(
   now: Date,
 ) {
   const { job, document, fingerprint, k1, hash } = item;
-  const eligibility = item.group.canonical.eligibility;
 
   let qualityOverride: ReturnType<typeof jobPersistenceForDecision> | undefined;
   if (isGraphEnabled("job_ingestion_quality")) {
@@ -376,7 +388,7 @@ async function buildWriteData(
     visaSponsorship: job.visaSponsorship,
     relocationAssistance: job.relocationAssistance,
     eligibleCountries: job.eligibleCountries,
-    hiresFromAfrica: eligibility.verdict === "eligible",
+    hiresFromAfrica: africaBadge(item.group),
     jobSource: "AGGREGATED" as const,
     sourceUrl: job.sourceUrl,
     sourceId: job.externalId,

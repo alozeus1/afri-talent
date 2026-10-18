@@ -46,8 +46,9 @@ export function identityKey(job: Pick<AggregatedJob, "title" | "company" | "loca
   }).k1;
 }
 
-export function contentHash(job: AggregatedJob): string {
+export function contentHash(job: AggregatedJob, derived: unknown[] = []): string {
   const payload = JSON.stringify([
+    ...(derived.length > 0 ? [derived] : []),
     job.title,
     job.company,
     job.location,

@@ -346,3 +346,28 @@ export function evaluateAfricaEligibility(input: EligibilityInput): EligibilityR
   }
   return mobilityFallback(visa, relocation, `${input.hybrid ? "hybrid" : "on-site"} in ${location}`);
 }
+
+const REMOTE_SCOPES: ReadonlySet<EligibilityScope> = new Set([
+  "REMOTE_WORLDWIDE",
+  "REMOTE_EMEA",
+  "REMOTE_TIMEZONE_COMPATIBLE",
+]);
+
+/**
+ * Whether a kept posting may carry the "Hires from Africa" badge. Being kept
+ * (eligible) is a weaker claim than the badge: relocation-only on-site roles
+ * abroad stay listed but are not badged. The badge needs one of:
+ *   - the role is based in, or remote-open to, an African country/Africa,
+ *   - the role is REMOTE and open worldwide / EMEA / an Africa-overlapping timezone,
+ *   - the employer states visa sponsorship (visaSponsorship=YES).
+ */
+export function qualifiesForAfricaBadge(
+  eligibility: Pick<EligibilityResult, "verdict" | "scopes">,
+  job: { remote: boolean; visaSponsorship: string | null | undefined },
+): boolean {
+  if (eligibility.verdict !== "eligible") return false;
+  const scopes = eligibility.scopes;
+  if (scopes.includes("AFRICA_BASED") || scopes.includes("REMOTE_AFRICA")) return true;
+  if (job.visaSponsorship === "YES") return true;
+  return job.remote && scopes.some((scope) => REMOTE_SCOPES.has(scope));
+}

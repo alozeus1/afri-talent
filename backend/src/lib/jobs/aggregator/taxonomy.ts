@@ -351,8 +351,32 @@ export function resolveJobField(input: {
   );
 }
 
-export function normalizeWorkplaceType(locationType: "remote" | "hybrid" | "onsite"): "REMOTE" | "HYBRID" | "ONSITE" {
+// "Remote" as a delimited qualifier in a title or location: "Sr Security
+// Engineer | Remote | Europe", "People Partner (Remote Europe)", "Remote - EMEA",
+// "Berlin or Remote". A leading word such as "Remote Sensing Scientist" is not
+// a qualifier, so a bare "remote" must touch a delimiter or the string edge.
+const REMOTE_QUALIFIER_RX =
+  /(?:^|[(|[\-–—,/:;]|\bor)\s*(?:fully\s+|100%\s+)?remote\b(?!\s+(?:sensing|control|monitoring|patient|pilot|operated|operations)\b)|\bremote\s*(?:[)|\]\-–—,/:;]|$)/i;
+const HYBRID_QUALIFIER_RX = /\bhybrid\b/i;
+
+/** True when a title or location string marks the role as remote. */
+export function signalsRemote(text: string | null | undefined): boolean {
+  const value = (text ?? "").trim();
+  if (!value || HYBRID_QUALIFIER_RX.test(value)) return false;
+  return REMOTE_QUALIFIER_RX.test(value);
+}
+
+/**
+ * Maps the source's location type to Job.workplaceType. A source that reports
+ * an on-site role whose title or location says "Remote" (e.g. "Sr Security
+ * Engineer | Remote | Europe" listed under "Berlin Office") is stored REMOTE.
+ */
+export function normalizeWorkplaceType(
+  locationType: "remote" | "hybrid" | "onsite",
+  hints: { title?: string | null; location?: string | null } = {},
+): "REMOTE" | "HYBRID" | "ONSITE" {
   if (locationType === "remote") return "REMOTE";
   if (locationType === "hybrid") return "HYBRID";
+  if (signalsRemote(hints.title) || signalsRemote(hints.location)) return "REMOTE";
   return "ONSITE";
 }

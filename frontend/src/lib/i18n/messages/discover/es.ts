@@ -647,4 +647,6 @@ export default {
   "discover.loc.middleEast": "Oriente Medio",
   "discover.loc.multiple": "Varias ubicaciones",
   "discover.loc.notSpecified": "Ubicación no indicada",
+  "discover.loc.remoteTimezone": "Remoto ({zone})",
+  "discover.loc.plusMore": "{place} + {count, plural, one {# más} other {# más}}",
 } satisfies Record<keyof typeof en, string>;

@@ -71,6 +71,8 @@ Domestic relocation never makes a remote, country-restricted role eligible.
 
 **Uncertain** postings are the only ones sent to Haiku. They go in batches of 20 and are cached by content hash, in memory and in Redis for 30 days. Each run is capped by `AGGREGATOR_LLM_MAX_JOBS_PER_RUN` (default 120). The LLM is off when `MOCK_AI=1`, when `AI_DISABLED=1`, when `AGGREGATOR_LLM_TIEBREAK=0`, or when there is no API key. `AGGREGATOR_UNCERTAIN_POLICY` controls postings that are still unresolved: `drop` (the default) discards them, `keep` stores them with `hiresFromAfrica=false`.
 
+Being kept is weaker than the **Hires from Africa** badge (`qualifiesForAfricaBadge`). The badge needs an African location, a REMOTE role open worldwide, to EMEA or to an Africa-overlapping timezone, or `visaSponsorship=YES`. On-site roles abroad that only offer relocation stay listed without the badge. Evergreen catch-all titles ("Don't see your role…", "General application", "Talent pool") are dropped before eligibility (`quality.ts`). `scripts/jobs/backfill-inventory-hygiene.ts` applies the same rules to stored rows.
+
 ## Cost and efficiency (fix for the per-upsert LLM call)
 
 - `Job.contentHash` (sha256 of every persisted field) is compared with the stored value. An unchanged posting gets one batched `updateMany` that sets `sourceLastSeenAt`. It skips taxonomy classification, apply-strategy work, the LangGraph gate and the row rewrite.

@@ -5,7 +5,7 @@
 
 import type { AggregatedJob, JobRegion, JobSource } from "../types.js";
 import { extractSkillsFromText, normalizeDescriptionText } from "../sources/base.js";
-import { classifyJobField, normalizeWorkplaceType } from "../taxonomy.js";
+import { classifyJobField, normalizeWorkplaceType, signalsRemote } from "../taxonomy.js";
 import { detectRelocationText, detectVisaSponsorshipText, evaluateAfricaEligibility } from "./eligibility.js";
 import type { EligibilityResult, FeedSourceId, RawPosting } from "./types.js";
 
@@ -84,7 +84,12 @@ export function normalizePosting(feed: FeedSourceId, raw: RawPosting, now = new 
   const title = normalizeDescriptionText(raw.title ?? "").replace(/\s+/g, " ").trim();
   const company = (raw.company ?? "").replace(/\s+/g, " ").trim() || "Unknown company";
   const location = (raw.location ?? "").replace(/\s+/g, " ").trim();
-  const remote = Boolean(raw.remote) || /\b(remote|anywhere|worldwide)\b/i.test(location);
+  // Honour "Remote" in the title or location even when the source reports the
+  // role as on-site ("Sr Security Engineer | Remote | Europe" @ "Berlin Office").
+  const remote =
+    Boolean(raw.remote) ||
+    /\b(remote|anywhere|worldwide)\b/i.test(location) ||
+    (!raw.hybrid && signalsRemote(title));
 
   const eligibility = evaluateAfricaEligibility({
     title,
