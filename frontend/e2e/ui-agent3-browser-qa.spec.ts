@@ -59,15 +59,22 @@ test("public landing, jobs, and companies pages render core browse affordances",
 
   await page.goto(`${APP_URL}/jobs`, { waitUntil: "domcontentloaded" });
   await expect(
-    page.getByRole("heading", {
-      name: /Find the roles where your credibility and readiness compound/i,
-    }),
+    page.getByRole("heading", { level: 1, name: /Find jobs open to African talent/i }),
   ).toBeVisible();
+  // The ranking explanation now sits behind a compact "How ranking works"
+  // disclosure in the jobs hero; it must still be reachable and readable.
+  const rankingInfo = page.getByRole("button", { name: /How ranking works/i });
+  await expect(rankingInfo).toBeVisible();
+  // Retry the click until hydration has attached the handler.
+  await expect(async () => {
+    if ((await rankingInfo.getAttribute("aria-expanded")) !== "true") await rankingInfo.click();
+    await expect(rankingInfo).toHaveAttribute("aria-expanded", "true", { timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
   await expect(page.getByText(/Search ranking prioritizes relevance/i).first()).toBeVisible();
 
   await page.goto(`${APP_URL}/companies`, { waitUntil: "domcontentloaded" });
   await expect(
-    page.getByRole("heading", { name: /Discover employer profiles as verification comes online/i }),
+    page.getByRole("heading", { level: 1, name: /Discover employer profiles\s*as verification comes online/i }),
   ).toBeVisible();
   await expect(page.getByPlaceholder("Search companies by name or industry...")).toBeVisible();
   await expect(page.getByText(/compan(y|ies) found/i)).toBeVisible();
@@ -78,8 +85,8 @@ test("candidate dashboard accepts login and exposes basic candidate actions", as
 }) => {
   await loginViaUi(page, CANDIDATE_CREDS);
   await expect(page).toHaveURL(/\/(en\/)?candidate$/);
-  await expect(page.getByRole("heading", { name: /Dashboard:/i })).toBeVisible();
-  await expect(page.getByText(/Track your job applications and career progress/i)).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /Welcome back/i })).toBeVisible();
+  await expect(page.getByText(/Track your applications/i).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Browse Jobs|Find Jobs/i }).first()).toBeVisible();
 });
 
@@ -89,8 +96,12 @@ test("employer dashboard accepts login and exposes basic employer actions", asyn
   await loginViaUi(page, EMPLOYER_CREDS);
   await expect(page).toHaveURL(/\/(en\/)?employer$/);
   await expect(page.getByRole("heading", { name: /hiring command center/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Post first credible job/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Open guided onboarding/i })).toBeVisible();
+  const main = page.getByRole("main");
+  await expect(main.getByRole("link", { name: "Post a job" })).toHaveAttribute(
+    "href",
+    /\/employer\/jobs\/new$/,
+  );
+  await expect(main.getByRole("link", { name: "Search talent" }).first()).toBeVisible();
 });
 
 test("Spanish route and language switcher preserve localized navigation", async ({
@@ -104,7 +115,8 @@ test("Spanish route and language switcher preserve localized navigation", async 
     "/es/jobs",
   );
 
-  const languageSelector = page.getByLabel("Language selector").first();
+  // The language selector's accessible name is localized ("Idioma" on /es).
+  const languageSelector = page.getByRole("combobox", { name: "Idioma" }).first();
   await languageSelector.selectOption("en");
   await expect(page).toHaveURL(/\/en\/pricing$/);
   await expect(page.getByRole("heading", { name: /Plans & Pricing/i })).toBeVisible();
