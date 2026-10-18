@@ -63,14 +63,37 @@ export function resolveLocale(pathname: string | null, cookieLocale: SupportedLo
 }
 
 const noopSubscribe = () => () => {};
-const getCookieSnapshot = () => readLocaleCookie(document.cookie);
+// The locale cookie only changes through the language switcher, which reloads
+// the page, so one read per page load is enough (every useT()/usePublicT()
+// caller reads this snapshot on every render).
+let cookieLocaleSnapshot: { value: SupportedLocale | null } | null = null;
+function readCookieLocaleOnce(): SupportedLocale | null {
+  if (!cookieLocaleSnapshot) cookieLocaleSnapshot = { value: readLocaleCookie(document.cookie) };
+  return cookieLocaleSnapshot.value;
+}
+// Only a cookie that can change resolveLocale()'s answer is reported: a path
+// prefix always wins, and a cookie equal to the default resolves the same as
+// no cookie. Reporting it anyway (the middleware sets the cookie on every
+// /<locale>/ visit) made the client snapshot differ from the server snapshot
+// (null), which forces React to synchronously re-render every useLocale()
+// consumer right after hydration: one long main-thread task on every page.
+const getCookieSnapshotOnPrefixedPath = () => null;
+const getCookieSnapshot = () => {
+  const cookieLocale = readCookieLocaleOnce();
+  return cookieLocale === DEFAULT_LOCALE ? null : cookieLocale;
+};
 // Server render (and hydration) has no document.cookie; the client re-renders
 // with the cookie locale right after hydration, so markup never mismatches.
 const getServerCookieSnapshot = () => null;
 
 export function useLocale(): SupportedLocale {
   const pathname = usePathname();
-  const cookieLocale = useSyncExternalStore(noopSubscribe, getCookieSnapshot, getServerCookieSnapshot);
+  const hasLocalePrefix = isSupportedLocale(pathname?.split("/").filter(Boolean)[0]);
+  const cookieLocale = useSyncExternalStore(
+    noopSubscribe,
+    hasLocalePrefix ? getCookieSnapshotOnPrefixedPath : getCookieSnapshot,
+    getServerCookieSnapshot,
+  );
   return useMemo(() => resolveLocale(pathname, cookieLocale), [pathname, cookieLocale]);
 }
 

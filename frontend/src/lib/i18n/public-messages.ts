@@ -7,7 +7,8 @@
 // colliding with edits to the shared site dictionary.
 import { useCallback } from "react";
 import { useLocale } from "./client";
-import { SUPPORTED_LOCALES, type SupportedLocale } from "./config";
+import type { SupportedLocale } from "./config";
+import { lazyLocaleRecord } from "./lazy-dictionary";
 import discover from "./messages/discover";
 import guides from "./messages/guides";
 import legal from "./messages/legal";
@@ -26,12 +27,9 @@ type PublicDictionary = Record<PublicMessageKey, string>;
 
 const PUBLIC_NAMESPACES = [site, discover, guides, legal];
 
-export const PUBLIC_MESSAGES = Object.fromEntries(
-  SUPPORTED_LOCALES.map((locale) => [
-    locale,
-    Object.assign({}, ...PUBLIC_NAMESPACES.map((ns) => ns[locale])) as PublicDictionary,
-  ]),
-) as Record<SupportedLocale, PublicDictionary>;
+export const PUBLIC_MESSAGES: Record<SupportedLocale, PublicDictionary> = lazyLocaleRecord(
+  (locale) => Object.assign({}, ...PUBLIC_NAMESPACES.map((ns) => ns[locale])) as PublicDictionary,
+);
 
 export type PublicVars = Record<string, string | number>;
 
@@ -39,10 +37,20 @@ export function formatPublicMessage(template: string, vars?: PublicVars, locale:
   return formatMessage(template, vars, locale);
 }
 
+// Look a key up namespace by namespace instead of reading the merged
+// PUBLIC_MESSAGES dictionary: merging thousands of keys costs measurable
+// main-thread time during hydration, and a lookup needs at most four probes.
+function lookupPublic(locale: SupportedLocale, key: PublicMessageKey): string | undefined {
+  for (const ns of PUBLIC_NAMESPACES) {
+    const value = (ns[locale] as Record<string, string> | undefined)?.[key];
+    if (value) return value;
+  }
+  return undefined;
+}
+
 /** Translate a public-surface key in a given locale (usable outside React). */
 export function translatePublic(locale: SupportedLocale, key: PublicMessageKey, vars?: PublicVars): string {
-  const dict = PUBLIC_MESSAGES[locale] ?? PUBLIC_MESSAGES.en;
-  return formatPublicMessage(dict[key] || PUBLIC_MESSAGES.en[key] || key, vars, locale);
+  return formatPublicMessage(lookupPublic(locale, key) || lookupPublic("en", key) || key, vars, locale);
 }
 
 export type PublicT = (key: PublicMessageKey, vars?: PublicVars) => string;

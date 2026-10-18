@@ -74,12 +74,28 @@ function pluralCategory(locale: string, value: number): string {
   return rules.select(value);
 }
 
+// Constructing an Intl.NumberFormat is expensive (tens of ms per page on a
+// throttled phone when every plural message built a new one), so cache one per
+// locale like the plural rules above.
+const numberFormatCache = new Map<string, Intl.NumberFormat | null>();
+// Locales whose default numbering system is Latin digits: a small integer
+// formats exactly as String(value) there (no grouping below 1000), so skip
+// creating an Intl.NumberFormat at all for the common "{count} jobs" case.
+const LATIN_DIGIT_LOCALES = new Set(["en", "es", "fr", "pt"]);
 function formatNumber(locale: string, value: number): string {
-  try {
-    return new Intl.NumberFormat(locale).format(value);
-  } catch {
+  if (LATIN_DIGIT_LOCALES.has(locale) && Number.isInteger(value) && Math.abs(value) < 1000) {
     return String(value);
   }
+  let formatter = numberFormatCache.get(locale);
+  if (formatter === undefined) {
+    try {
+      formatter = new Intl.NumberFormat(locale);
+    } catch {
+      formatter = null;
+    }
+    numberFormatCache.set(locale, formatter);
+  }
+  return formatter ? formatter.format(value) : String(value);
 }
 
 /** Whole-number value of a formatted count, accepting Arabic-Indic digits. */

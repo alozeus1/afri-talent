@@ -20,8 +20,13 @@ export function HtmlLangSync({ locale: forced }: { locale?: string }) {
   const locale = forced ?? resolved;
   useEffect(() => {
     const root = document.documentElement;
-    root.lang = locale;
-    root.dir = getLocaleDirection(locale);
+    // Only write when the value actually changes. Any write to `lang` or `dir`
+    // on <html> (even the same value) makes the browser re-resolve style for
+    // the whole document; on a throttled phone that was an ~80 ms blocking
+    // task on every page load. An absent `dir` already means ltr.
+    if (root.lang !== locale) root.lang = locale;
+    const dir = getLocaleDirection(locale);
+    if ((root.getAttribute("dir") ?? "ltr") !== dir) root.dir = dir;
   }, [locale]);
 
   return null;
