@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { LoadErrorCard } from "@/components/ui/load-error-card";
 import { useAdminHref } from "@/components/admin/admin-shell";
+import { TotpRequiredNotice } from "@/components/admin/totp-notice";
 import {
   ConfirmDialog,
   ConfirmRequest,
@@ -19,7 +20,13 @@ import {
   restrictionTone,
   strong,
 } from "@/components/admin/console-ui";
-import { adminConsole, ConsoleJob, ConsoleJobStatus, ConsoleOverview } from "@/lib/admin-console-api";
+import {
+  adminConsole,
+  ConsoleJob,
+  ConsoleJobStatus,
+  ConsoleOverview,
+  isTotpEnrolmentRequired,
+} from "@/lib/admin-console-api";
 import type { AccountRestrictionStatus } from "@/lib/api";
 import { useAdminFormatters, useAdminT } from "@/lib/i18n/admin-messages";
 import { useLocationLabel } from "@/lib/i18n/public-labels";
@@ -135,6 +142,7 @@ export default function AdminOverviewPage() {
     });
 
   if (loading && !overview) return <Spinner />;
+  if (isTotpEnrolmentRequired(loadError)) return <TotpRequiredNotice />;
   if (loadError || !overview) {
     return <LoadErrorCard error={loadError} subject={t("overview.loadSubject")} onRetry={() => void load()} />;
   }

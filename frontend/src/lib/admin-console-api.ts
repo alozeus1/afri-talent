@@ -277,3 +277,56 @@ export const adminConsole = {
       body: JSON.stringify(body),
     }),
 };
+
+// Typed client for /api/admin/totp (backend/src/routes/admin-totp.ts). These
+// routes are exempt from the admin TOTP gate so an un-enrolled admin can
+// always reach them.
+
+export interface AdminTotpStatus {
+  enrolled: boolean;
+  /** "pending" when a secret was generated but never verified. */
+  enrolmentStartedAt: "pending" | null;
+  graceUntil: string | null;
+  isAdmin: true;
+}
+
+export interface AdminTotpEnrolment {
+  secret: string;
+  provisioningUri: string;
+  instructions: string;
+}
+
+const TOTP_BASE = "/api/admin/totp";
+
+export const adminTotp = {
+  status: () => fetchAPI<AdminTotpStatus>(`${TOTP_BASE}/status`),
+
+  enrol: () => fetchAPI<AdminTotpEnrolment>(`${TOTP_BASE}/enrol`, { method: "POST" }),
+
+  verifyEnrolment: (code: string) =>
+    fetchAPI<{ enrolled: true; enrolledAt: string }>(`${TOTP_BASE}/verify-enrolment`, {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+
+  disable: (code: string) =>
+    fetchAPI<{ disabled: true }>(`${TOTP_BASE}/disable`, {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+};
+
+/** Fired on window after enrolment state changes so the console banner refreshes. */
+export const ADMIN_TOTP_CHANGED_EVENT = "afritalent:admin-totp-changed";
+
+export function errorCodeOf(err: unknown): string | undefined {
+  if (err && typeof err === "object" && typeof (err as { code?: unknown }).code === "string") {
+    return (err as { code: string }).code;
+  }
+  return undefined;
+}
+
+/** True when the admin TOTP gate rejected a request (backend/src/middleware/admin-totp-gate.ts). */
+export function isTotpEnrolmentRequired(err: unknown): boolean {
+  return errorCodeOf(err) === "TOTP_ENROLMENT_REQUIRED";
+}

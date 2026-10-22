@@ -4,13 +4,16 @@ import { FormEvent, ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { isSupportedLocale } from "@/lib/i18n/config";
 import { AdminMessageKey, useAdminT } from "@/lib/i18n/admin-messages";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { initialsOf, useDropdown } from "@/components/layout/use-dropdown";
 import { muted, strong } from "./console-ui";
+import { TotpBanner } from "./totp-notice";
+import { useAdminPrefix } from "./admin-href";
 import "./admin-console.css";
+
+export { useAdminHref } from "./admin-href";
 
 // Brand name, intentionally not translated.
 const BRAND = "AfriTalent";
@@ -30,6 +33,7 @@ const MANAGE: NavItem[] = [
 ];
 
 const PLATFORM: NavItem[] = [
+  { href: "/admin/security", key: "nav.security", icon: "M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7zM9.5 12.5l2 2 3.5-4" },
   { href: "/admin/ops", key: "nav.operations", icon: "M4 19V9m6 10V5m6 14v-7m4 7H2" },
   { href: "/admin/billing", key: "nav.billing", icon: "M3 7h18v10H3zM3 11h18" },
   { href: "/admin/bulk", key: "nav.bulk", icon: "M4 6h16M4 12h16M4 18h10" },
@@ -38,16 +42,6 @@ const PLATFORM: NavItem[] = [
   { href: "/admin/blog", key: "nav.blog", icon: "M5 4h14v16H5zM8 8h8M8 12h8M8 16h5" },
   { href: "/admin/learning-feedback", key: "nav.learningFeedback", icon: "M4 6l8-3 8 3-8 3zM6 9v5c0 2 3 4 6 4s6-2 6-4V9" },
 ];
-
-function useAdminPrefix(): { prefix: string; strip: (path: string) => string } {
-  const pathname = usePathname() ?? "/";
-  const first = pathname.split("/").filter(Boolean)[0];
-  const prefix = isSupportedLocale(first) ? `/${first}` : "";
-  return {
-    prefix,
-    strip: (path: string) => (prefix && path.startsWith(prefix) ? path.slice(prefix.length) || "/" : path),
-  };
-}
 
 function NavIcon({ d }: { d: string }) {
   return (
@@ -230,13 +224,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </nav>
           </div>
         </aside>
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="min-w-0 flex-1">
+          <TotpBanner />
+          {children}
+        </div>
       </div>
     </div>
   );
-}
-
-export function useAdminHref() {
-  const { prefix } = useAdminPrefix();
-  return (path: string) => `${prefix}${path}`;
 }
