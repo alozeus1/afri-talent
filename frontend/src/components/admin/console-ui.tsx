@@ -4,7 +4,13 @@ import { ReactNode, useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAdminT } from "@/lib/i18n/admin-messages";
 import type { AccountRestrictionStatus } from "@/lib/api";
-import type { ConsoleJobStatus, EmployerVerificationLevel, Pagination as PaginationData } from "@/lib/admin-console-api";
+import {
+  isTotpEnrolmentRequired,
+  type ConsoleJobStatus,
+  type EmployerVerificationLevel,
+  type Pagination as PaginationData,
+} from "@/lib/admin-console-api";
+import { TotpRequiredNotice } from "./totp-notice";
 
 // Shared building blocks for the admin console. Every colour resolves through
 // the semantic design tokens (globals.css), which carry their own light/dark
@@ -432,6 +438,7 @@ function ConfirmDialogBody({ request, onClose }: { request: ConfirmRequest; onCl
   const [date, setDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [totpRequired, setTotpRequired] = useState(false);
   const titleId = useId();
   const reasonId = useId();
   const dateId = useId();
@@ -443,11 +450,13 @@ function ConfirmDialogBody({ request, onClose }: { request: ConfirmRequest; onCl
     }
     setSubmitting(true);
     setError(null);
+    setTotpRequired(false);
     try {
       await request.onConfirm({ reason: reason.trim(), date: date ? new Date(date).toISOString() : null });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("common.error"));
+      if (isTotpEnrolmentRequired(err)) setTotpRequired(true);
+      else setError(err instanceof Error ? err.message : t("common.error"));
       setSubmitting(false);
     }
   };
@@ -483,6 +492,7 @@ function ConfirmDialogBody({ request, onClose }: { request: ConfirmRequest; onCl
           )}
           <p className={`text-xs ${muted}`}>{t("confirm.audited")}</p>
           {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+          {totpRequired && <TotpRequiredNotice compact />}
         </div>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="outline" onClick={onClose} disabled={submitting}>
